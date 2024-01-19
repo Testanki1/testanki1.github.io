@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Balancer Stats</title>
+  <title>负载均衡器统计</title>
 </head>
 <body>
 
-  <h1>Balancer Stats</h1>
+  <h1>负载均衡器统计</h1>
 
   <div id="statsContainer">
-    <p>Inbattles: <span id="inbattlesCount"></span></p>
-    <p>Online: <span id="onlineCount"></span></p>
-    <p>My 4399 Com: <span id="my4399ComCount"></span></p>
+    <p>战斗中数量：<span id="inbattlesCount"></span></p>
+    <p>在线数量：<span id="onlineCount"></span></p>
+    <p>我的4399 Com数量：<span id="my4399ComCount"></span></p>
   </div>
 
   <script>
@@ -20,18 +20,20 @@
       fetch('https://balancer.3dtank.com/balancer')
         .then(response => response.json())
         .then(data => {
-          const { inbattles, online, my_4399_com } = data.nodes['cn-main.c2'];
+          const { inbattles, online, partners } = data.nodes['cn-main.c2'];
+          const my4399ComCount = partners && partners.my_4399_com ? partners.my_4399_com : 0;
+
           document.getElementById('inbattlesCount').innerText = inbattles;
           document.getElementById('onlineCount').innerText = online;
-          document.getElementById('my4399ComCount').innerText = my_4399_com;
+          document.getElementById('my4399ComCount').innerText = my4399ComCount;
         })
-        .catch(error => console.error('Error fetching data:', error));
+        .catch(error => console.error('获取数据时出错：', error));
     }
 
-    // Initial fetch
+    // 初始获取
     fetchBalancerStats();
 
-    // Periodic fetch every 10 seconds
+    // 每隔10秒刷新一次
     setInterval(fetchBalancerStats, 10000);
   </script>
 
