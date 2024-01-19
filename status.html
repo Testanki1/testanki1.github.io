@@ -27,6 +27,9 @@
 <p id="euUpdateStatus">
 	预更新：
 </p>
+<p id="updateTime">
+	预计更新时间：
+</p>
 <script>
     function fetchBalancerStats() {
       fetch('https://balancer.3dtank.com/balancer')
@@ -62,15 +65,29 @@
     }
     function checkEUUpdateStatus() {
       fetch('https://balancer.eu.tankionline.com/datacenter')
-        .then(response => response.text())
+        .then(response => response.status === 502 ? '否' : response.json())
         .then(data => {
-          const match = data.match(/deploy\d+/);
-          const euUpdateStatus = match ? match[0] : '否';
-          document.getElementById('euUpdateStatus').innerText = `预更新：${euUpdateStatus}`;
+          const hasDeploy = data && data.datacenters && Object.keys(data.datacenters).some(key => key !== 'default');
+          const updateStatus = hasDeploy ? '是' : '否';
+          document.getElementById('euUpdateStatus').innerText = `预更新：${updateStatus}`;
+          if (updateStatus !== '否') {
+            const nonDefaultDatacenter = Object.keys(data.datacenters).find(key => key !== 'default');
+            if (nonDefaultDatacenter) {
+              const expireDate = data.datacenters[nonDefaultDatacenter].expireDate;
+              const gmtTime = new Date(expireDate).toLocaleString('en-US', { timeZone: 'GMT' });
+              const gmtPlus8Time = new Date(gmtTime).toLocaleString('en-US', { timeZone: 'Asia/Shanghai' });
+              document.getElementById('updateTime').innerText = `预计更新时间：${gmtPlus8Time}`;
+            } else {
+              document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+            }
+          } else {
+            document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+          }
         })
         .catch(error => {
           console.error('获取外服预更新状态时出错：', error);
           document.getElementById('euUpdateStatus').innerText = '预更新：否';
+          document.getElementById('updateTime').innerText = '预计更新时间：暂无';
         });
     }
     // 初始获取
@@ -83,4 +100,4 @@
       checkUpdateStatus();
       checkEUUpdateStatus();
     }, 10000);
-  </script>
+</script>
