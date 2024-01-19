@@ -16,7 +16,7 @@
 	4399：<span id="my4399ComCount"></span> 
 </p>
 <p>
-	
+	<br />
 </p>
 <p id="updateStatus">
 	预更新：
@@ -31,73 +31,79 @@
 	预计更新时间：
 </p>
 <script>
-    function fetchBalancerStats() {
-      fetch('https://balancer.3dtank.com/balancer')
-        .then(response => response.json())
-        .then(data => {
-          let totalInbattles = 0;
-          let totalOnline = 0;
-          let totalMy4399Com = 0;
-          Object.values(data.nodes).forEach(node => {
-            totalInbattles += node.inbattles || 0;
-            totalOnline += node.online || 0;
-            totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
-          });
-          const my4399ComCount = totalMy4399Com || 0;
-          document.getElementById('inbattlesCount').innerText = totalInbattles;
-          document.getElementById('onlineCount').innerText = totalOnline;
-          document.getElementById('my4399ComCount').innerText = my4399ComCount;
-        })
-        .catch(error => console.error('获取数据时出错：', error));
-    }
-    function checkUpdateStatus() {
-      fetch('https://c3.3dtank.com/stage-balancer')
-        .then(response => response.status === 502 ? '否' : response.json())
-        .then(data => {
-          const hasC3Node = data && data.nodes && data.nodes['cn-stage-game.c3'];
-          const updateStatus = hasC3Node ? '是' : '否';
-          document.getElementById('updateStatus').innerText = `预更新：${updateStatus}`;
-        })
-        .catch(error => {
-          console.error('获取预更新状态时出错：', error);
-          document.getElementById('updateStatus').innerText = '预更新：否';
-        });
-    }
-    function checkEUUpdateStatus() {
-      fetch('https://balancer.eu.tankionline.com/datacenter')
-        .then(response => response.status === 502 ? '否' : response.json())
-        .then(data => {
-          const hasDeploy = data && data.datacenters && Object.keys(data.datacenters).some(key => key !== 'default');
-          const updateStatus = hasDeploy ? '是' : '否';
-          document.getElementById('euUpdateStatus').innerText = `预更新：${updateStatus}`;
-          if (updateStatus !== '否') {
+        function fetchBalancerStats() {
+            fetch('https://balancer.3dtank.com/balancer')
+                .then(response => response.json())
+                .then(data => {
+                    let totalInbattles = 0;
+                    let totalOnline = 0;
+                    let totalMy4399Com = 0;
+                    Object.values(data.nodes).forEach(node => {
+                        totalInbattles += node.inbattles || 0;
+                        totalOnline += node.online || 0;
+                        totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
+                    });
+                    const my4399ComCount = totalMy4399Com || 0;
+                    document.getElementById('inbattlesCount').innerText = totalInbattles;
+                    document.getElementById('onlineCount').innerText = totalOnline;
+                    document.getElementById('my4399ComCount').innerText = my4399ComCount;
+                })
+                .catch(error => console.error('获取数据时出错：', error));
+        }
+        function checkUpdateStatus() {
+            fetch('https://c3.3dtank.com/stage-balancer')
+                .then(response => response.status === 502 ? '否' : response.json())
+                .then(data => {
+                    const hasC3Node = data && data.nodes && data.nodes['cn-stage-game.c3'];
+                    const updateStatus = hasC3Node ? '是' : '否';
+                    document.getElementById('updateStatus').innerText = `预更新：${updateStatus}`;
+                })
+                .catch(error => {
+                    console.error('获取预更新状态时出错：', error);
+                    document.getElementById('updateStatus').innerText = '预更新：否';
+                });
+        }
+        function checkEUUpdateStatus() {
+            fetch('https://balancer.eu.tankionline.com/datacenter')
+                .then(response => response.status === 502 ? '否' : response.json())
+                .then(data => {
+                    const deployNumber = findDeployNumber(data);
+                    const updateStatus = deployNumber ? `预更新：deploy${deployNumber}` : '否';
+                    document.getElementById('euUpdateStatus').innerText = updateStatus;
+                    if (updateStatus !== '否') {
+                        const nonDefaultDatacenter = Object.keys(data.datacenters).find(key => key !== 'default');
+                        if (nonDefaultDatacenter) {
+                            const expireDate = data.datacenters[nonDefaultDatacenter].expireDate;
+                            const gmtTime = new Date(expireDate);
+                            const gmtPlus8Time = gmtTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+                            document.getElementById('updateTime').innerText = `预计更新时间：${gmtPlus8Time}`;
+                        } else {
+                            document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+                        }
+                    } else {
+                        document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+                    }
+                })
+                .catch(error => {
+                    console.error('获取外服预更新状态时出错：', error);
+                    document.getElementById('euUpdateStatus').innerText = '预更新：否';
+                    document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+                });
+        }
+        function findDeployNumber(data) {
             const nonDefaultDatacenter = Object.keys(data.datacenters).find(key => key !== 'default');
-            if (nonDefaultDatacenter) {
-              const expireDate = data.datacenters[nonDefaultDatacenter].expireDate;
-              const gmtTime = new Date(expireDate);
-              const gmtPlus8Time = gmtTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-              document.getElementById('updateTime').innerText = `预计更新时间：${gmtPlus8Time}`;
-            } else {
-              document.getElementById('updateTime').innerText = '预计更新时间：暂无';
-            }
-          } else {
-            document.getElementById('updateTime').innerText = '预计更新时间：暂无';
-          }
-        })
-        .catch(error => {
-          console.error('获取外服预更新状态时出错：', error);
-          document.getElementById('euUpdateStatus').innerText = '预更新：否';
-          document.getElementById('updateTime').innerText = '预计更新时间：暂无';
-        });
-    }
-    // 初始获取
-    fetchBalancerStats();
-    checkUpdateStatus();
-    checkEUUpdateStatus();
-    // 每隔10秒刷新一次
-    setInterval(() => {
-      fetchBalancerStats();
-      checkUpdateStatus();
-      checkEUUpdateStatus();
-    }, 10000);
-</script>
+            const deployUrl = nonDefaultDatacenter ? data.datacenters[nonDefaultDatacenter].balancer : null;
+            const deployMatch = deployUrl ? deployUrl.match(/deploy(\d+)/) : null;
+            return deployMatch ? deployMatch[1] : null;
+        }
+        // 初始获取
+        fetchBalancerStats();
+        checkUpdateStatus();
+        checkEUUpdateStatus();
+        // 每隔10秒刷新一次
+        setInterval(() => {
+            fetchBalancerStats();
+            checkUpdateStatus();
+            checkEUUpdateStatus();
+        }, 10000);
+    </script>
