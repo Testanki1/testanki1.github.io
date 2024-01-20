@@ -1,0 +1,250 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	3D坦克服务器状态页面
+</title>
+<!-- CSS for the first page -->
+<style>
+        /* Styles for the first page */
+#backButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #76ff33;
+            padding: 10px;
+            border: none;
+            color: #001926;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 10px; /* 添加圆角 */
+            transition: background-color 0.3s;
+        }
+        #backButton:hover {
+            background-color: #4CAF50;
+        }
+        .left-section, .right-section {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .left-section {
+            left: 10%; /* Adjust the left value based on your design */
+        }
+        .right-section {
+            right: 10%; /* Adjust the right value based on your design */
+        }
+        a {
+    color: #ffffff !important;
+text-decoration: none !important;
+}
+        a:hover {
+    color: #76ff33 !important;
+    text-decoration: none !important;
+}
+        body, h1, p, span, strong {
+            color: white !important;
+        }
+        /* Initial visibility settings for developer mode */
+        #updateStatus, #rightSection, #euUpdateStatus, #updateTime {
+            display: none;
+        }
+    </style>
+<!-- CSS for the second page -->
+<style>
+        @font-face {
+            font-family: RubikRegular;
+            src: url('https://3dtank.com/play/static/fonts/Rubik-Regular.7e001ec0.woff') format('woff2'),
+                url('https://3dtank.com/play/static/fonts/Rubik-Regular.7e001ec0.woff') format('woff');
+        }
+        @font-face {
+            font-family: RubikBold;
+            src: url('https://3dtank.com/play/static/fonts/Rubik-Bold.26ae1fce.woff') format('woff2'),
+                url('https://3dtank.com/play/static/fonts/Rubik-Bold.26ae1fce.woff') format('woff');
+        }
+        @font-face {
+            font-family: RubikMedium;
+            src: url('https://3dtank.com/play/static/fonts/Rubik-Medium.fc871fe9.woff') format('woff2'),
+                url('https://3dtank.com/play/static/fonts/Rubik-Medium.fc871fe9.woff') format('woff');
+        }
+        html, body {
+            font-family: RubikMedium;
+            background: radial-gradient(50% 100% at 50% 100%, #395673 0%, #001926 100%);
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            position: fixed;
+            color: white !important;
+        }
+        .logo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 128px;
+            height: 124px;
+        }
+        .progress {
+            position: absolute;
+            bottom: 40px;
+            height: 30px;
+            width: 320px;
+            mix-blend-mode: lighten;
+            background: url('https://3dtank.com/play/static/images/progress.d07ca56f.gif') no-repeat;
+            background-size: contain;
+            transform: translateX(-50%);
+            left: 50%;
+        }
+        .loading-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            line-height: 30px;
+            text-transform: uppercase;
+        }
+        #modal-root {
+            pointer-events: none;
+        }
+        img {
+            pointer-events: none;
+        }
+        #modal-root > div {
+            pointer-events: auto;
+        }
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .bgClipText {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+<!-- JavaScript for the second page -->
+<script>
+        function fetchBalancerStats() {
+            fetch('https://balancer.3dtank.com/balancer')
+                .then(response => response.json())
+                .then(data => {
+                    let totalInbattles = 0;
+                    let totalOnline = 0;
+                    let totalMy4399Com = 0;
+                    Object.values(data.nodes).forEach(node => {
+                        totalInbattles += node.inbattles || 0;
+                        totalOnline += node.online || 0;
+                        totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
+                    });
+                    const my4399ComCount = totalMy4399Com || 0;
+                    document.getElementById('inbattlesCount').innerText = totalInbattles;
+                    document.getElementById('onlineCount').innerText = totalOnline;
+                    document.getElementById('my4399ComCount').innerText = my4399ComCount;
+                })
+                .catch(error => console.error('获取数据时出错：', error));
+        }
+        function checkUpdateStatus() {
+            fetch('https://c3.3dtank.com/stage-balancer')
+                .then(response => response.status === 502 ? '否' : response.json())
+                .then(data => {
+                    const hasC3Node = data && data.nodes && data.nodes['cn-stage-game.c3'];
+                    const updateStatus = hasC3Node ? '是' : '否';
+                    document.getElementById('updateStatus').innerText = `预更新：${updateStatus}`;
+                })
+                .catch(error => {
+                    console.error('获取预更新状态时出错：', error);
+                    document.getElementById('updateStatus').innerText = '预更新：否';
+                });
+        }
+        function checkEUUpdateStatus() {
+    fetch('https://balancer.eu.tankionline.com/datacenter')
+        .then(response => response.status === 502 ? '否' : response.json())
+        .then(data => {
+            const deployNumber = findDeployNumber(data);
+            const updateStatus = deployNumber ? `预更新：deploy${deployNumber}` : '否';
+            const euUpdateLink = document.getElementById('euUpdateLink');
+euUpdateLink.innerHTML = `<span id="deployNumber">${deployNumber}</span> 点击进入`;
+euUpdateLink.setAttribute('href', `https://public-deploy${deployNumber}.test-eu.tankionline.com/browser-public/index.html`);
+            if (updateStatus !== '否') {
+                const nonDefaultDatacenter = Object.keys(data.datacenters).find(key => key !== 'default');
+                if (nonDefaultDatacenter) {
+                    const expireDate = data.datacenters[nonDefaultDatacenter].expireDate;
+                    const gmtTime = new Date(expireDate);
+                    const gmtPlus8Time = gmtTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+                    document.getElementById('updateTime').innerText = `预计更新时间：${gmtPlus8Time}`;
+                } else {
+                    document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+                }
+            } else {
+                document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+            }
+        })
+        .catch(error => {
+            console.error('获取外服预更新状态时出错：', error);
+            document.getElementById('euUpdateStatus').innerText = '预更新：否';
+            document.getElementById('updateTime').innerText = '预计更新时间：暂无';
+        });
+}
+        function findDeployNumber(data) {
+            const nonDefaultDatacenter = Object.keys(data.datacenters).find(key => key !== 'default');
+            const deployUrl = nonDefaultDatacenter ? data.datacenters[nonDefaultDatacenter].balancer : null;
+            const deployMatch = deployUrl ? deployUrl.match(/deploy(\d+)/) : null;
+            return deployMatch ? deployMatch[1] : null;
+        }
+        // Function to toggle visibility based on developer mode
+        function goBack() {
+        // Add your logic here to define what should happen when the back button is clicked
+        alert('Go back logic goes here');
+    }
+        function toggleDeveloperMode() {
+            const developerModeSwitch = document.getElementById('developerModeSwitch');
+            const isDeveloperMode = developerModeSwitch.checked;
+            // Toggle visibility of elements based on developer mode
+            const elementsToToggle = [
+                document.getElementById('updateStatus'),
+                document.getElementById('rightSection'),
+                document.getElementById('euUpdateStatus'),
+                document.getElementById('updateTime')
+            ];
+            elementsToToggle.forEach(element => {
+                element.style.display = isDeveloperMode ? 'block' : 'none';
+            });
+        }
+        // Initial setup
+        fetchBalancerStats();
+        checkUpdateStatus();
+        checkEUUpdateStatus();
+    </script>
+<!-- Developer Mode Switch --> <button id="backButton" onclick="goBack()">返回</button> 
+<div style="text-align:right;">
+	<label for="developerModeSwitch">开发者模式：</label> <input type="checkbox" id="developerModeSwitch" onchange="toggleDeveloperMode()" /> 
+</div>
+<!-- Content from the first page -->
+<div class="left-section">
+	<h1>
+		<strong><span style="font-size:18px;">国服</span></strong> 
+	</h1>
+	<p>
+		在线：<span id="onlineCount"></span> 
+	</p>
+	<p>
+		战斗中：<span id="inbattlesCount"></span> 
+	</p>
+	<p>
+		4399：<span id="my4399ComCount"></span> 
+	</p>
+	<p id="updateStatus">
+		预更新：
+	</p>
+</div>
+<!-- Content from the second page -->
+<div id="rightSection" class="right-section">
+	<h1>
+		<strong><span style="font-size:18px;">外服</span></strong> 
+	</h1>
+	<p id="euUpdateStatus">
+		预更新：deploy<a href="#" id="euUpdateLink"><span id="deployNumber"></span>，点击进入</a> 
+	</p>
+	<p id="updateTime">
+		预计更新时间：
+	</p>
+</div>
