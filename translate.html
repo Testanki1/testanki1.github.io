@@ -3,25 +3,88 @@
 <title>
 	游戏术语翻译
 </title>
+<style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        section {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 8px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #outputBox {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        footer {
+            text-align: center;
+            padding: 10px;
+            color: #666;
+        }
+    </style>
 <header>
 <h1>
 	游戏术语翻译
 </h1>
 </header>
     <section>
-        <label for="inputText">输入文本：</label> <textarea id="inputText" style="width:100%;height:400px;"></textarea> <button onclick="replaceAndCopy()">替换文本并复制</button> <label for="fileName">文件名：</label> <input type="text" id="fileName" /> <button onclick="saveToFile()">保存到文件</button> </section>
-    <section>
-<p id="resultText">
-	<br />
+<p>
+	在下面的输入框中输入游戏术语的文本，替换后的结果将实时显示在输出框中，然后点击“复制结果”按钮。
 </p>
-</section>
+<label for="inputText">输入文本：</label> <textarea id="inputText" oninput="replaceAndDisplay()"></textarea> <button onclick="copyResult()">复制结果</button> <label for="fileName">文件名（可选）：</label> <input type="text" id="fileName" placeholder="输入文件名" /> <button onclick="saveToFile()">保存到文件</button> </section>
+    <section>
+        <!-- 修改为实时显示的输出框 --> <label for="outputBox">替换后的文本：</label> <textarea id="outputBox" readonly="readonly"></textarea> </section>
     <footer>
 <p>
 	&copy; 2024 游戏翻译网站。保留所有权利。
 </p>
 </footer>
 <script>
-        // 定义带有不区分大小写键的替换字典
         const replacementDict = {
             'turret': '炮塔',
     'Firebird': '火焰炮',
@@ -323,33 +386,26 @@
     'war': '战争',
     'news': '新闻',
         };
-        // 替换并复制函数
-        function replaceAndCopy() {
-            // 获取用户输入
+        function replaceAndDisplay() {
             let userInput = document.getElementById('inputText').value;
-            // 在字典中替换每个术语
             for (const [key, value] of Object.entries(replacementDict)) {
-                // 使用不区分大小写的正则表达式进行替换
-                let regex = new RegExp(key, 'gi');
+                let regex = new RegExp(`\\b${key}\\b`, 'gi');
                 userInput = userInput.replace(regex, value);
             }
-            // 显示替换后的文本
-            document.getElementById('resultText').innerText = userInput;
-            // 复制替换后的文本到剪贴板
-            const resultText = document.getElementById('resultText');
+            document.getElementById('outputBox').value = userInput;
+        }
+        function copyResult() {
+            const outputBox = document.getElementById('outputBox');
             const range = document.createRange();
-            range.selectNode(resultText);
+            range.selectNode(outputBox);
             window.getSelection().removeAllRanges();
             window.getSelection().addRange(range);
             document.execCommand('copy');
             window.getSelection().removeAllRanges();
         }
-        // 保存到文件函数
         function saveToFile() {
-            // 获取用户输入
             let fileName = document.getElementById('fileName').value || 'output.txt';
-            let resultText = document.getElementById('resultText').innerText;
-            // 创建 Blob 并创建下载链接
+            let resultText = document.getElementById('outputBox').value;
             const blob = new Blob([resultText], { type: 'text/plain' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
