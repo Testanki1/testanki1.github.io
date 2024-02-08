@@ -1,86 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>下载文本内容</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL资源下载器</title>
 </head>
 <body>
-    <input type="text" id="text" style="width: 500px; height: 100px;">
-    <button onclick="download()">下载</button>
+  <h1>URL资源下载器</h1>
+  <textarea id="textInput" rows="10" cols="50" placeholder="粘贴文本包含URL的内容"></textarea><br>
+  <button onclick="downloadResources()">下载资源</button>
 
-    <script>
-        function download() {
-            const text = document.getElementById("text").value;
-            const file = new File([text], "text.txt", {type: "text/plain"});
+  <script>
+    function downloadResources() {
+      var text = document.getElementById('textInput').value;
+      var urls = text.match(/(https?:\/\/\S+)/g);
 
-            // 使用上述代码将文件内容下载
-            const files = [file];
-            const zip = new JSZip();
+      if (!urls) {
+        alert('没有找到URL资源！');
+        return;
+      }
 
-            // 显示进度条
-            progress.style.display = "block";
+      var zip = new JSZip();
+      var count = 0;
 
-            // 初始化进度
-            progressBar.value = 0;
-            speedElement.textContent = "";
-            remainingElement.textContent = "";
-
-            // 创建下载任务
-            const tasks = [];
-            for (const file of files) {
-                tasks.push(zip.file(file.name, file));
+      urls.forEach(function(url) {
+        var filename = url.split('/').pop();
+        fetch(url)
+          .then(response => response.blob())
+          .then(blob => {
+            zip.file(filename, blob);
+            count++;
+            if (count === urls.length) {
+              zip.generateAsync({type:"blob"}).then(function(content) {
+                saveAs(content, "downloaded_resources.zip");
+              });
             }
+          })
+          .catch(error => {
+            console.error('下载资源出错：', error);
+            count++;
+          });
+      });
+    }
+  </script>
 
-            // 开始下载
-            JSZip.external.Promise.all(tasks).then(function() {
-                // 压缩完成
-
-                // 计算下载速度
-                const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
-                const downloadTime = Date.now() - startTime;
-                const speed = Math.round(totalBytes / downloadTime * 1000) / 1000;
-
-                // 显示下载完成信息
-                speedElement.textContent = `${speed} KB/s`;
-                remainingElement.textContent = "下载完成";
-
-                // 生成 ZIP 压缩包
-                zip.generateAsync({type: "blob"})
-                    .then(function(content) {
-                        const url = window.URL.createObjectURL(content);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = "download.zip";
-                        a.click();
-                    });
-            }, function(error) {
-                // 下载失败
-
-                // 显示错误信息
-                console.error(error);
-                alert("下载失败！");
-            });
-
-            // 更新进度
-            const startTime = Date.now();
-            const updateProgress = () => {
-                const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
-                const loadedBytes = zip.progress.loaded;
-                const progress = Math.round(loadedBytes / totalBytes * 100);
-
-                // 更新进度条
-                progressBar.value = progress;
-
-                // 计算剩余时间
-                const remainingTime = Math.round((totalBytes - loadedBytes) / speed);
-                remainingElement.textContent = `剩余时间：${remainingTime} 秒`;
-
-                // 每秒更新一次进度
-                setTimeout(updateProgress, 1000);
-            };
-
-            updateProgress();
-        }
-    </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </body>
 </html>
