@@ -2,41 +2,128 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>下载文件</title>
 </head>
 <body>
-    <input type="file" id="file-input" accept=".txt">
-    <button id="download-button">下载</button>
+    <div id="dropzone">
+        拖拽文件到这里
+    </div>
+    <input type="file" id="file" multiple style="display: none;">
+    <button onclick="download()">下载</button>
+
+    <div id="progress">
+        <progress value="0" max="100"></progress>
+        <span id="speed"></span>
+        <span id="remaining"></span>
+    </div>
 
     <script>
-        const fileInput = document.getElementById("file-input");
-        const downloadButton = document.getElementById("download-button");
+        const dropzone = document.getElementById("dropzone");
+        const fileInput = document.getElementById("file");
+        const progress = document.getElementById("progress");
+        const progressBar = progress.querySelector("progress");
+        const speedElement = progress.querySelector("#speed");
+        const remainingElement = progress.querySelector("#remaining");
 
-        downloadButton.addEventListener("click", () => {
-            const file = fileInput.files[0];
-            const reader = new FileReader();
+        // 添加拖拽事件监听器
+        dropzone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzone.classList.add("dragover");
+        });
 
-            reader.onload = () => {
-                const urls = reader.result.split(/\r?\n/);
-                const zip = new JSZip();
+        dropzone.addEventListener("dragleave", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzone.classList.remove("dragover");
+        });
 
-                for (const url of urls) {
-                    const filename = url.split("/")[-1];
-                    zip.file(filename, url);
-                }
+        dropzone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzone.classList.remove("dragover");
 
+            const files = event.dataTransfer.files;
+            fileInput.files = files;
+
+            // 开始下载
+            download();
+        });
+
+        // 添加文件选择事件监听器
+        fileInput.addEventListener("change", () => {
+            // 开始下载
+            download();
+        });
+
+        function download() {
+            const files = fileInput.files;
+            const zip = new JSZip();
+
+            // 显示进度条
+            progress.style.display = "block";
+
+            // 初始化进度
+            progressBar.value = 0;
+            speedElement.textContent = "";
+            remainingElement.textContent = "";
+
+            // 创建下载任务
+            const tasks = [];
+            for (const file of files) {
+                tasks.push(zip.file(file.name, file));
+            }
+
+            // 开始下载
+            JSZip.external.Promise.all(tasks).then(function() {
+                // 压缩完成
+
+                // 计算下载速度
+                const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
+                const downloadTime = Date.now() - startTime;
+                const speed = Math.round(totalBytes / downloadTime * 1000) / 1000;
+
+                // 显示下载完成信息
+                speedElement.textContent = `${speed} KB/s`;
+                remainingElement.textContent = "下载完成";
+
+                // 生成 ZIP 压缩包
                 zip.generateAsync({type: "blob"})
-                    .then((blob) => {
-                        const link = document.createElement("a");
-                        link.href = window.URL.createObjectURL(blob);
-                        link.download = "download.zip";
-                        link.click();
+                    .then(function(content) {
+                        const url = window.URL.createObjectURL(content);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "download.zip";
+                        a.click();
                     });
+            }, function(error) {
+                // 下载失败
+
+                // 显示错误信息
+                console.error(error);
+                alert("下载失败！");
+            });
+
+            // 更新进度
+            const startTime = Date.now();
+            const updateProgress = () => {
+                const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
+                const loadedBytes = zip.progress.loaded;
+                const progress = Math.round(loadedBytes / totalBytes * 100);
+
+                // 更新进度条
+                progressBar.value = progress;
+
+                // 计算剩余时间
+                const remainingTime = Math.round((totalBytes - loadedBytes) / speed);
+                remainingElement.textContent = `剩余时间：${remainingTime} 秒`;
+
+                // 每秒更新一次进度
+                setTimeout(updateProgress, 1000);
             };
 
-            reader.readAsText(file);
-        });
+            updateProgress();
+        }
     </script>
 </body>
 </html>
