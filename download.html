@@ -8,7 +8,9 @@
 <body>
   <h1>URL资源下载器</h1>
   <textarea id="textInput" rows="10" cols="50" placeholder="粘贴文本包含URL的内容"></textarea><br>
-  <button onclick="downloadResources()">下载资源</button>
+  <button onclick="downloadResources()">下载资源</button><br>
+  <progress id="downloadProgress" value="0" max="100"></progress>
+  <span id="progressText">0%</span>
 
   <script>
     function downloadResources() {
@@ -30,6 +32,7 @@
           .then(blob => {
             zip.file(filename, blob);
             count++;
+            updateProgress(count, urls.length);
             if (count === urls.length) {
               zip.generateAsync({type:"blob"}).then(function(content) {
                 saveAs(content, "downloaded_resources.zip");
@@ -39,8 +42,15 @@
           .catch(error => {
             console.error('下载资源出错：', error);
             count++;
+            updateProgress(count, urls.length);
           });
       });
+    }
+
+    function updateProgress(current, total) {
+      var progress = Math.round((current / total) * 100);
+      document.getElementById('downloadProgress').value = progress;
+      document.getElementById('progressText').innerText = progress + '%';
     }
   </script>
 
