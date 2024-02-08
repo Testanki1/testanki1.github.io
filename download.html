@@ -28,7 +28,12 @@
       urls.forEach(function(url) {
         var filename = url.split('/').pop();
         fetch(url)
-          .then(response => response.blob())
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('下载失败：' + response.statusText);
+            }
+            return response.blob();
+          })
           .then(blob => {
             zip.file(filename, blob);
             count++;
