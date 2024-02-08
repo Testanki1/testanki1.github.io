@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下载文件</title>
+</head>
+<body>
+    <input type="file" id="file-input" accept=".txt">
+    <button id="download-button">下载</button>
+
+    <script>
+        const fileInput = document.getElementById("file-input");
+        const downloadButton = document.getElementById("download-button");
+
+        downloadButton.addEventListener("click", () => {
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                const urls = reader.result.split(/\r?\n/);
+                const zip = new JSZip();
+
+                for (const url of urls) {
+                    const filename = url.split("/")[-1];
+                    zip.file(filename, url);
+                }
+
+                zip.generateAsync({type: "blob"})
+                    .then((blob) => {
+                        const link = document.createElement("a");
+                        link.href = window.URL.createObjectURL(blob);
+                        link.download = "download.zip";
+                        link.click();
+                    });
+            };
+
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+</html>
