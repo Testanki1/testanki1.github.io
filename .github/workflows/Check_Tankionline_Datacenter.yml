@@ -1,0 +1,43 @@
+name: Check Tankionline Datacenter
+
+on:
+  schedule:
+    - cron: '*/1 * * * *'
+
+jobs:
+  check-datacenter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Datacenter
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const https = require('https');
+            const fs = require('fs');
+
+            const url = 'https://balancer.eu.tankionline.com/datacenter';
+            const filename = 'datacenter-log.txt';
+
+            https.get(url, (res) => {
+              const statusCode = res.statusCode;
+              const body = [];
+
+              res.on('data', (chunk) => {
+                body.push(chunk);
+              });
+
+              res.on('end', () => {
+                const data = Buffer.concat(body);
+                const log = `${new Date().toISOString()} - Status Code: ${statusCode}\n${data.toString()}`;
+
+                fs.writeFile(filename, log, (err) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  }
+
+                  console.log(`Log file saved: ${filename}`);
+                });
+              });
+            });
