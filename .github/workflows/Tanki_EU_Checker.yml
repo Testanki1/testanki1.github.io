@@ -1,17 +1,19 @@
 name: Tanki EU Checker
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 允许手动触发
   schedule:
-    - cron: '*/1 * * * *'
+    - cron: '*/5 * * * *' # 每5分钟执行一次，根据需要调整
 
 jobs:
   download_eu_content:
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
     - name: Download Tanki EU Content
-      run: |
-        curl -L https://balancer.eu.tankionline.com/datacenter > tanki_eu_content.txt
+      run: curl https://balancer.eu.tankionline.com/datacenter > tanki_eu_content.txt
 
     - name: Setup Git Config
       run: |
@@ -21,8 +23,7 @@ jobs:
     - name: Commit and Push EU Content
       run: |
         git fetch origin main
-        git reset --hard FETCH_HEAD
+        git reset --soft FETCH_HEAD
         git add tanki_eu_content.txt
         git commit -m "Updated Tanki EU content via schedule or manual trigger" -a || echo "No changes to commit"
-        git push origin main
-
+        git push --force-with-lease origin main
