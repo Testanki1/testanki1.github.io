@@ -3,23 +3,41 @@ name: Tanki Datacenters Checker
 on:
   workflow_dispatch: # 允许手动触发
   schedule:
-    - cron: '*/1 * * * *' # 根据需要每1分钟执行一次，注意调整为您需要的频率
+    - cron: '*/1 * * * *' # 根据需要每15分钟执行一次，注意调整为您需要的频率
 
 jobs:
-  download_and_save:
+  download_cn_content:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-
-    - name: Download Tanki CN and EU Content
+    - name: Download Tanki CN Content
       run: |
         curl https://3dtank.com/datacenters.config.json > tanki_cn_content.txt
-        curl https://balancer.eu.tankionline.com/datacenter > tanki_eu_content.txt
+    - name: Setup Git Config
+      run: |
         git config --global user.name 'Testanki1'
         git config --global user.email 'testanki@qq.com'
-        git add tanki_cn_content.txt tanki_eu_content.txt
-        git commit -m "Updated Tanki CN and EU content via schedule or manual trigger" -a || echo "No changes to commit"
+    - name: Commit and Push CN Content
+      run: |
+        git add tanki_cn_content.txt
+        git commit -m "Updated Tanki CN content via schedule or manual trigger" -a || echo "No changes to commit"
         git push
 
+  download_eu_content:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Download Tanki EU Content
+      run: |
+        curl https://balancer.eu.tankionline.com/datacenter > tanki_eu_content.txt
+    - name: Setup Git Config
+      run: |
+        git config --global user.name 'Testanki1'
+        git config --global user.email 'testanki@qq.com'
+    - name: Commit and Push EU Content
+      run: |
+        git add tanki_eu_content.txt
+        git commit -m "Updated Tanki EU content via schedule or manual trigger" -a || echo "No changes to commit"
+        git push
