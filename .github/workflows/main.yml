@@ -1,22 +1,27 @@
-name: Check Website and Log
+name: Manual Trigger Example
 
 on:
-  schedule:
-    - cron: '* * * * *' # 每分钟执行一次
+  workflow_dispatch: # 允许手动触发此workflow
 
 jobs:
-  check_and_log:
-    runs-on: ubuntu-latest
+  download_and_save:
+    runs-on: ubuntu-latest # 指定运行环境
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v2 # 检出你的仓库代码
 
-    - name: Check website and save to log
+    - name: Download Website Content
       run: |
-        curl https://balancer.eu.tankionline.com/balancer > website_content.txt
+        curl https://balancer.eu.tankionline.com/balancer > website_content.txt # 使用curl下载网站内容
+
+    - name: Setup Git Config
+      run: |
         git config --global user.name 'Your GitHub Username'
         git config --global user.email 'Your GitHub Email'
+
+    - name: Commit and Push
+      run: |
         git add website_content.txt
-        git commit -m "Updated website content log"
-        git push
+        git commit -m "Updated website content via manual trigger" -a || echo "No changes to commit" # 如果有变化则提交
+        git push # 推送到仓库
