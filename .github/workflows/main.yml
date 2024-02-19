@@ -1,19 +1,21 @@
-name: Manual Trigger Example
+name: Automated and Manual Trigger Example
 
 on:
-  workflow_dispatch: # 允许手动触发此workflow
+  workflow_dispatch: # 允许手动触发
+  schedule:
+    - cron: '*/1 * * * *' # 每分钟执行一次
 
 jobs:
   download_and_save:
-    runs-on: ubuntu-latest # 指定运行环境
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2 # 检出你的仓库代码
+      uses: actions/checkout@v2
 
     - name: Download Website Content
       run: |
-        curl https://balancer.eu.tankionline.com/balancer > website_content.txt # 使用curl下载网站内容
+        curl https://balancer.eu.tankionline.com/balancer > website_content.txt
 
     - name: Setup Git Config
       run: |
@@ -23,5 +25,5 @@ jobs:
     - name: Commit and Push
       run: |
         git add website_content.txt
-        git commit -m "Updated website content via manual trigger" -a || echo "No changes to commit" # 如果有变化则提交
-        git push # 推送到仓库
+        git commit -m "Updated website content via schedule or manual trigger" -a || echo "No changes to commit"
+        git push
