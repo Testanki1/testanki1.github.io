@@ -1,0 +1,33 @@
+name: Tanki Datacenters Checker
+
+on:
+  workflow_dispatch: # 允许手动触发
+  schedule:
+    - cron: '*/1 * * * *' # 每15分钟执行一次，根据需要调整
+
+jobs:
+  download_and_save:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Download Tanki CN Content
+      run: |
+        curl https://3dtank.com/datacenters.config.json > tanki_cn_content.txt
+
+    - name: Download Tanki EU Content
+      run: |
+        curl https://balancer.eu.tankionline.com/datacenter > tanki_eu_content.txt
+
+    - name: Setup Git Config
+      run: |
+        git config --global user.name 'Testanki1'
+        git config --global user.email 'testanki@qq.com'
+
+    - name: Commit and Push
+      run: |
+        git add tanki_cn_content.txt tanki_eu_content.txt
+        git commit -m "Updated Tanki CN and EU content via schedule or manual trigger" -a || echo "No changes to commit"
+        git push
