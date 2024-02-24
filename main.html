@@ -193,6 +193,9 @@ border: none; /* 悬停时的背景颜色 */
 <a href="/status" id="statusButton">查看服务器状态</a> <a href="/about" id="aboutButton">关于</a> <a id="settingsButton">设置</a> 
 <div id="settingsModal">
 	<span class="closeButton" id="closeButton">×</span> <label for="customUrl">自定义网址：</label> <input type="text" id="customUrl" placeholder="输入网址" /> <button id="redirectButton">跳转</button> 
+	<div>
+		<input type="checkbox" id="chineseCheckbox" /> <label for="chineseCheckbox">锁定中文</label> 
+	</div>
 </div>
 <div id="preloader">
 </div>
@@ -281,4 +284,31 @@ document.getElementById('redirectButton').addEventListener('click', function() {
         window.location.href = customUrl;
     }
 });
+window.addEventListener('DOMContentLoaded', function() {
+    var chineseCheckbox = document.getElementById('chineseCheckbox');
+    var chineseModeEnabled = localStorage.getItem('chineseModeEnabled') === 'true';
+    // 设置复选框的状态
+    chineseCheckbox.checked = chineseModeEnabled;
+    // 根据保存的状态，更新超链接的 href 属性
+    updateLinks(chineseModeEnabled);
+});
+// 复选框状态改变时执行
+document.getElementById('chineseCheckbox').addEventListener('change', function() {
+    var chineseModeEnabled = this.checked;
+    // 更新超链接的 href 属性
+    updateLinks(chineseModeEnabled);
+    // 保存设置到本地存储
+    localStorage.setItem('chineseModeEnabled', chineseModeEnabled);
+});
+// 更新超链接的 href 属性
+function updateLinks(chineseModeEnabled) {
+    var links = document.querySelectorAll('a[href="https://tankionline.com/play"]');
+    links.forEach(function(link) {
+        if (chineseModeEnabled) {
+            link.href = 'https://tankionline.com/play/?locale=zh';
+        } else {
+            link.href = 'https://tankionline.com/play';
+        }
+    });
+}
 </script>
