@@ -137,8 +137,40 @@
         #statusButton:hover {
             background: linear-gradient(45deg, #4CAF50, #76ff33);
         }
+#settingsButton {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px;
+        background: linear-gradient(45deg, #76ff33, #4CAF50);
+        color: #000;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.3s;
+    }
+    #settingsButton:hover {
+        background: linear-gradient(45deg, #4CAF50, #76ff33);
+    }
+    #settingsModal {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 9999;
+    }
     </style>
-<a href="/status" id="statusButton">查看服务器状态</a> <a href="/about" id="aboutButton">关于</a> 
+<a href="/status" id="statusButton">查看服务器状态</a> <a href="/about" id="aboutButton">关于</a> <a id="settingsButton">设置</a> 
+<div id="settingsModal">
+	<label for="customUrl">自定义网址：</label> <input type="text" id="customUrl" placeholder="输入网址" /> <button id="redirectButton">跳转</button> 
+</div>
 <div id="preloader">
 </div>
 <div id="modal-root">
@@ -180,7 +212,6 @@
     var referrer = document.referrer;
     var redirectUrl = 'https://testanki1.github.io/1.html';
     var message = '请更新客户端，将有更快的启动速度，网址：testanki1.github.io';
-
     if (referrer === redirectUrl) {
         var promptDiv = document.createElement('div');
         promptDiv.style.position = 'fixed';
@@ -195,5 +226,21 @@
         document.body.appendChild(promptDiv);
     }
 };
-	
+document.getElementById('settingsButton').addEventListener('click', function() {
+        document.getElementById('settingsModal').style.display = 'block';
+    });
+    // Close settings modal when clicking outside the modal
+    window.addEventListener('click', function(event) {
+        var modal = document.getElementById('settingsModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    });
+    // Redirect to custom URL when the redirect button is clicked
+    document.getElementById('redirectButton').addEventListener('click', function() {
+        var customUrl = document.getElementById('customUrl').value;
+        if (customUrl.trim() !== '') {
+            window.location.href = customUrl;
+        }
+    });
 </script>
