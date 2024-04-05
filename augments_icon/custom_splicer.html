@@ -1,15 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SVG Generator</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	SVG Generator
+</title>
 <script>
     function generateSVG() {
-        // 获取文本文件和SVG文件的URL
-        var txtUrl = document.getElementById("txtUrl").value;
-        var svgUrl = document.getElementById("svgUrl").value;
-
+        // 获取文本文件和SVG文件的名称
+        var txtName = document.getElementById("txtName").value.trim();
+        var svgName = document.getElementById("svgName").value.trim();
+        // 构建文本文件和SVG文件的URL
+        var txtUrl = 'https://testanki1.github.io/augments_icon/hulls/equipment/' + encodeURIComponent(txtName) + '.txt';
+        var svgUrl = 'https://testanki1.github.io/augments_icon/hulls/augment/' + encodeURIComponent(svgName) + '.svg';
         // 发送HTTP请求获取文本文件内容
         fetch(txtUrl)
             .then(response => response.text())
@@ -20,20 +21,15 @@
                     .then(svgContent => {
                         // 在SVG内容中查找<defs>标签的位置
                         var defsIndex = svgContent.indexOf('<defs>');
-
                         // 如果<defs>标签存在，将文本内容插入<defs>标签的上一行
                         if (defsIndex !== -1) {
                             var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
-                            
                             // 将生成的SVG显示在预览框中
                             document.getElementById("svgPreview").innerHTML = finalSVG;
-
                             // 创建Blob对象
                             var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
-
                             // 创建URL
                             var url = URL.createObjectURL(blob);
-
                             // 创建并设置下载链接
                             var a = document.createElement('a');
                             a.href = url;
@@ -49,16 +45,12 @@
             .catch(error => console.error('Error fetching TXT file:', error));
     }
 </script>
-</head>
-<body>
-<h1>SVG Generator</h1>
-<label for="txtUrl">Text File URL:</label>
-<input type="text" id="txtUrl" placeholder="Enter text file URL"><br>
-<label for="svgUrl">SVG File URL:</label>
-<input type="text" id="svgUrl" placeholder="Enter SVG file URL"><br>
-<button onclick="generateSVG()">Generate SVG</button>
+<h1>
+	SVG Generator
+</h1>
+<label for="txtName">Text File Name:</label> <input type="text" id="txtName" placeholder="Enter text file name" /><br />
+<label for="svgName">SVG File Name:</label> <input type="text" id="svgName" placeholder="Enter SVG file name" /><br />
+<button onclick="generateSVG()">Generate SVG</button> 
 <div id="svgPreview">
-    <!-- Generated SVG will be displayed here -->
+	<!-- Generated SVG will be displayed here -->
 </div>
-</body>
-</html>
