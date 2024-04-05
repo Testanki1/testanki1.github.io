@@ -81,7 +81,7 @@
                             var a = document.createElement('a');
                             a.href = url;
                             a.download = 'generated.svg';
-                            a.textContent = '下载图标'; // Change to "下载图标"
+                            a.textContent = '下载 SVG 矢量图'; // Change to "下载图标"
                             // 替换下载按钮
                             var downloadBtn = document.getElementById("downloadBtn");
                             downloadBtn.innerHTML = "";
@@ -106,6 +106,31 @@
                 document.getElementById("loading").style.display = "none";
             });
     }
+    function convertToPNG() {
+        var svg = document.getElementById("svgPreview").querySelector("svg");
+        var canvas = document.createElement("canvas");
+        var context = canvas.getContext("2d");
+        var aspectRatio = svg.width.baseVal.value / svg.height.baseVal.value;
+        var width = parseInt(document.getElementById("pngWidth").value) || 512;
+        var height = parseInt(document.getElementById("pngHeight").value) || 512;
+        if (width / height > aspectRatio) {
+            width = height * aspectRatio;
+        } else {
+            height = width / aspectRatio;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        var svgString = new XMLSerializer().serializeToString(svg);
+        var img = new Image();
+        img.onload = function () {
+            context.drawImage(img, 0, 0, width, height);
+            var link = document.createElement('a');
+            link.download = 'generated.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+        img.src = 'data:image/svg+xml;base64,' + btoa(svgString);
+    }
 </script>
 <h1>
 	3D坦克装备改造图标自定义拼接器
@@ -123,7 +148,7 @@
         <option value="维京">维京</option>
         <option value="黄蜂轻甲">黄蜂轻甲</option>
     </select><br />
-<label for="svgName">选择改造:</label> <select id="svgName"> <option value="极端轻型结构">极端轻型结构</option>
+<label for="svgName">选择改造：</label> <select id="svgName"> <option value="极端轻型结构">极端轻型结构</option>
         <option value="爆破手">爆破手</option>
         <option value="工兵">工兵</option>
         <option value="驱动器">驱动器</option>
@@ -149,6 +174,12 @@
 	</div>
 	<div id="downloadBtn">
 		<!-- Download button will be displayed here -->
+	</div>
+	<div>
+		将 SVG 转换为 PNG：<br />
+宽度：<input type="number" id="pngWidth" placeholder="1024" /><br />
+高度：<input type="number" id="pngHeight" placeholder="1024" /><br />
+<button onclick="convertToPNG()">转换为 PNG 下载</button> 
 	</div>
 </div>
 <p style="color:white;margin-top:50px;">
