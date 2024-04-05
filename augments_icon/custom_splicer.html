@@ -1,56 +1,147 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>
-	SVG Generator
+	3D坦克装备改造图标自定义拼接器
 </title>
+<style>
+    body {
+        background-color: #001926;
+        color: white;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+    }
+    #svgContainer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 50px;
+    }
+    #svgPreview {
+        width: 256px;
+        height: 256px;
+        margin-bottom: 20px;
+    }
+    button {
+        background-color: #76FF33;
+        color: #001926;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        margin-bottom: 20px;
+    }
+    button:hover {
+        background-color: #4CAF50;
+    }
+    #downloadBtn {
+        background-color: #76FF33;
+        color: #001926;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    #downloadBtn:hover {
+        background-color: #4CAF50;
+    }
+</style>
 <script>
     function generateSVG() {
-        // 获取文本文件和SVG文件的名称
         var txtName = document.getElementById("txtName").value.trim();
         var svgName = document.getElementById("svgName").value.trim();
-        // 构建文本文件和SVG文件的URL
         var txtUrl = 'https://testanki1.github.io/augments_icon/hulls/equipment/' + encodeURIComponent(txtName) + '.txt';
         var svgUrl = 'https://testanki1.github.io/augments_icon/hulls/augment/' + encodeURIComponent(svgName) + '.svg';
-        // 发送HTTP请求获取文本文件内容
+        // 显示加载提示
+        document.getElementById("loading").style.display = "block";
         fetch(txtUrl)
             .then(response => response.text())
             .then(txtContent => {
-                // 发送HTTP请求获取SVG文件内容
                 fetch(svgUrl)
                     .then(response => response.text())
                     .then(svgContent => {
-                        // 在SVG内容中查找<defs>标签的位置
                         var defsIndex = svgContent.indexOf('<defs>');
-                        // 如果<defs>标签存在，将文本内容插入<defs>标签的上一行
                         if (defsIndex !== -1) {
                             var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
-                            // 将生成的SVG显示在预览框中
-                            document.getElementById("svgPreview").innerHTML = finalSVG;
-                            // 创建Blob对象
+                            var svgPreview = document.getElementById("svgPreview");
+                            svgPreview.innerHTML = finalSVG;
+                            // 设置 SVG 尺寸为 256x256
+                            svgPreview.querySelector("svg").setAttribute("width", "256");
+                            svgPreview.querySelector("svg").setAttribute("height", "256");
                             var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
-                            // 创建URL
                             var url = URL.createObjectURL(blob);
-                            // 创建并设置下载链接
                             var a = document.createElement('a');
                             a.href = url;
                             a.download = 'generated.svg';
                             a.textContent = 'Download SVG';
-                            document.body.appendChild(a);
+                            // 替换下载按钮
+                            var downloadBtn = document.getElementById("downloadBtn");
+                            downloadBtn.innerHTML = "";
+                            downloadBtn.appendChild(a);
+                            // 隐藏加载提示
+                            document.getElementById("loading").style.display = "none";
                         } else {
                             console.error('Error: <defs> tag not found in SVG file.');
+                            // 隐藏加载提示
+                            document.getElementById("loading").style.display = "none";
                         }
                     })
-                    .catch(error => console.error('Error fetching SVG file:', error));
+                    .catch(error => {
+                        console.error('Error fetching SVG file:', error);
+                        // 隐藏加载提示
+                        document.getElementById("loading").style.display = "none";
+                    });
             })
-            .catch(error => console.error('Error fetching TXT file:', error));
+            .catch(error => {
+                console.error('Error fetching TXT file:', error);
+                // 隐藏加载提示
+                document.getElementById("loading").style.display = "none";
+            });
     }
 </script>
 <h1>
-	SVG Generator
+	3D坦克装备改造图标自定义拼接器
 </h1>
-<label for="txtName">Text File Name:</label> <input type="text" id="txtName" placeholder="Enter text file name" /><br />
-<label for="svgName">SVG File Name:</label> <input type="text" id="svgName" placeholder="Enter SVG file name" /><br />
-<button onclick="generateSVG()">Generate SVG</button> 
-<div id="svgPreview">
-	<!-- Generated SVG will be displayed here -->
+<div id="svgContainer">
+	<label for="txtName">选择装备：</label> <select id="txtName"> <option value="泰坦">泰坦</option>
+        <option value="圣骑士">圣骑士</option>
+        <option value="猛犸象">猛犸象</option>
+        <option value="猎人中甲">猎人中甲</option>
+        <option value="蜂王">蜂王</option>
+        <option value="霍珀">霍珀</option>
+        <option value="独裁者">独裁者</option>
+        <option value="阿瑞斯">阿瑞斯</option>
+        <option value="十字军">十字军</option>
+        <option value="维京">维京</option>
+        <option value="黄蜂轻甲">黄蜂轻甲</option>
+    </select><br />
+<label for="svgName">选择改造:</label> <select id="svgName"> <option value="极端轻型结构">极端轻型结构</option>
+        <option value="爆破手">爆破手</option>
+        <option value="工兵">工兵</option>
+        <option value="驱动器">驱动器</option>
+        <option value="轻型结构">轻型结构</option>
+        <option value="重型结构">重型结构</option>
+        <option value="耐寒性">耐寒性</option>
+        <option value="耐热性">耐热性</option>
+        <option value="抗干扰器">抗干扰器</option>
+        <option value="攻强免疫">攻强免疫</option>
+        <option value="抗电磁脉冲">抗电磁脉冲</option>
+        <option value="抗眩晕">抗眩晕</option>
+        <option value="抗热">抗热</option>
+        <option value="抗寒">抗寒</option>
+        <option value="救生员">救生员</option>
+        <option value="工程师">工程师</option>
+    </select><br />
+<button onclick="generateSVG()">生成 SVG</button> 
+	<div id="svgPreview">
+		<!-- Generated SVG will be displayed here -->
+	</div>
+	<div id="loading" style="display:none;">
+		加载中……
+	</div>
+	<div id="downloadBtn">
+	</div>
 </div>
