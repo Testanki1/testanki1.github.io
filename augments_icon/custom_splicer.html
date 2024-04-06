@@ -58,106 +58,99 @@ button:hover {
 </style>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-            var generateBtn = document.getElementById('generateBtn');
-            generateBtn.disabled = true; // 页面加载时禁用生成图标按钮
-            document.getElementById('svgName').addEventListener('change', toggleGenerateBtn);
-            document.getElementById('txtName').addEventListener('change', toggleGenerateBtn);
-            function toggleGenerateBtn() {
-                var txtName = document.getElementById('txtName').value.trim();
-                var svgName = document.getElementById('svgName').value.trim();
-                
-            }
-        });
-        function generateSVG() {
-            var txtName = document.getElementById("txtName").value.trim();
-            var svgName = document.getElementById("svgName").value.trim();
-            if (txtName === '') {
-                alert('请先选择一个装备');
-                return;
-	    }
-if (svgName === '') {
-                alert('请先选择一个改造');
-                return;
-            }
-
-            var quality = document.getElementById("quality").value;
-            var txtUrl = 'https://testanki1.github.io/augments_icon/equipments/' + encodeURIComponent(txtName) + '.txt';
-            var svgUrl = 'https://testanki1.github.io/augments_icon/augments/' + encodeURIComponent(svgName) + '.svg';
-            // 显示加载提示
-            document.getElementById("loading").style.display = "block";
-            fetch(txtUrl)
+    document.getElementById('svgName').addEventListener('change', toggleGenerateBtn);
+    document.getElementById('txtName').addEventListener('change', toggleGenerateBtn);
+document.getElementById('quality').addEventListener('change', generateSVG);
+});
+function toggleGenerateBtn() {
+    var txtName = document.getElementById('txtName').value.trim();
+    var svgName = document.getElementById('svgName').value.trim();
+    // 检查装备和改造是否都选择了
+    if (txtName !== '' && svgName !== '') {
+        generateSVG(); // 自动调用生成图标函数
+    }
+}
+function generateSVG() {
+    var txtName = document.getElementById("txtName").value.trim();
+    var svgName = document.getElementById("svgName").value.trim();
+    var quality = document.getElementById("quality").value;
+    var txtUrl = 'https://testanki1.github.io/augments_icon/equipments/' + encodeURIComponent(txtName) + '.txt';
+    var svgUrl = 'https://testanki1.github.io/augments_icon/augments/' + encodeURIComponent(svgName) + '.svg';
+    // 显示加载提示
+    document.getElementById("loading").style.display = "block";
+    fetch(txtUrl)
+        .then(response => response.text())
+        .then(txtContent => {
+            fetch(svgUrl)
                 .then(response => response.text())
-                .then(txtContent => {
-                    fetch(svgUrl)
-                        .then(response => response.text())
-                        .then(svgContent => {
-                            var defsIndex = svgContent.indexOf('<defs>');
-                            if (defsIndex !== -1) {
-                                var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
-                                // Replace fill color if quality is selected
-                                if (quality !== 'default') {
-                                    finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
-                                }
-                                var svgPreview = document.getElementById("svgPreview");
-                                svgPreview.innerHTML = finalSVG;
-                                // 设置 SVG 尺寸为 256x256
-                                svgPreview.querySelector("svg").setAttribute("width", "256");
-                                svgPreview.querySelector("svg").removeAttribute("height"); // 移除另一个尺寸属性
-                                var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
-                                var url = URL.createObjectURL(blob);
-                                var a = document.createElement('a');
-                                a.href = url;
-                                a.download = 'generated.svg';
-                                a.textContent = '下载 SVG 矢量图'; // Change to "下载图标"
-                                // 替换下载按钮
-                                var downloadBtn = document.getElementById("downloadBtn");
-                                downloadBtn.innerHTML = "";
-                                downloadBtn.appendChild(a);
-                                // 隐藏加载提示
-                                document.getElementById("loading").style.display = "none";
-                            } else {
-                                console.error('Error: <defs> tag not found in SVG file.');
-                                // 隐藏加载提示
-                                document.getElementById("loading").style.display = "none";
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error fetching SVG file:', error);
-                            // 隐藏加载提示
-                            document.getElementById("loading").style.display = "none";
-                        });
+                .then(svgContent => {
+                    var defsIndex = svgContent.indexOf('<defs>');
+                    if (defsIndex !== -1) {
+                        var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
+                        // Replace fill color if quality is selected
+                        if (quality !== 'default') {
+                            finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
+                        }
+                        var svgPreview = document.getElementById("svgPreview");
+                        svgPreview.innerHTML = finalSVG;
+                        // 设置 SVG 尺寸为 256x256
+                        svgPreview.querySelector("svg").setAttribute("width", "256");
+                        svgPreview.querySelector("svg").removeAttribute("height"); // 移除另一个尺寸属性
+                        var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
+                        var url = URL.createObjectURL(blob);
+                        var a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'generated.svg';
+                        a.textContent = '下载 SVG 矢量图'; // Change to "下载图标"
+                        // 替换下载按钮
+                        var downloadBtn = document.getElementById("downloadBtn");
+                        downloadBtn.innerHTML = "";
+                        downloadBtn.appendChild(a);
+                        // 隐藏加载提示
+                        document.getElementById("loading").style.display = "none";
+                    } else {
+                        console.error('Error: <defs> tag not found in SVG file.');
+                        // 隐藏加载提示
+                        document.getElementById("loading").style.display = "none";
+                    }
                 })
                 .catch(error => {
-                    console.error('Error fetching TXT file:', error);
+                    console.error('Error fetching SVG file:', error);
                     // 隐藏加载提示
                     document.getElementById("loading").style.display = "none";
                 });
-        }
-    function convertToPNG() {
-        var svg = document.getElementById("svgPreview").querySelector("svg");
-        var canvas = document.createElement("canvas");
-        var context = canvas.getContext("2d");
-        var aspectRatio = svg.width.baseVal.value / svg.height.baseVal.value;
-        var width = parseInt(document.getElementById("pngWidth").value) || 1024;
-        var height = parseInt(document.getElementById("pngHeight").value) || 1024;
-        if (width / height > aspectRatio) {
-            width = height * aspectRatio;
-        } else {
-            height = width / aspectRatio;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        var svgString = new XMLSerializer().serializeToString(svg);
-        var img = new Image();
-        img.onload = function () {
-            context.drawImage(img, 0, 0, width, height);
-            var link = document.createElement('a');
-            link.download = 'generated.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        };
-        img.src = 'data:image/svg+xml;base64,' + btoa(svgString);
+        })
+        .catch(error => {
+            console.error('Error fetching TXT file:', error);
+            // 隐藏加载提示
+            document.getElementById("loading").style.display = "none";
+        });
+}
+function convertToPNG() {
+    var svg = document.getElementById("svgPreview").querySelector("svg");
+    var canvas = document.createElement("canvas");
+    var context = canvas.getContext("2d");
+    var aspectRatio = svg.width.baseVal.value / svg.height.baseVal.value;
+    var width = parseInt(document.getElementById("pngWidth").value) || 1024;
+    var height = parseInt(document.getElementById("pngHeight").value) || 1024;
+    if (width / height > aspectRatio) {
+        width = height * aspectRatio;
+    } else {
+        height = width / aspectRatio;
     }
+    canvas.width = width;
+    canvas.height = height;
+    var svgString = new XMLSerializer().serializeToString(svg);
+    var img = new Image();
+    img.onload = function () {
+        context.drawImage(img, 0, 0, width, height);
+        var link = document.createElement('a');
+        link.download = 'generated.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgString);
+}
 </script>
 <h1>
 	3D坦克装备改造图标自定义拼接器
@@ -276,7 +269,6 @@ if (svgName === '') {
         <option value="#FFEE00">传奇</option>
         <option value="#FF6666">异国情调</option>
     </select><br />
-<button onclick="generateSVG()">生成图标</button> 
 	<div id="svgPreview">
 		<!-- Generated SVG will be displayed here -->
 	</div>
