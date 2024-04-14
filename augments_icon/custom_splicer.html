@@ -87,8 +87,7 @@
 	</div>
 	<div>
 		转换为 PNG 图片：<br />
-宽度：<input type="number" id="pngWidth" placeholder="1024" /><br />
-高度：<input type="number" id="pngHeight" placeholder="1024" /><br />
+尺寸大小：<input type="number" id="pngSize" placeholder="1024" /><br />
 <button onclick="convertToPNG()">保存为 PNG 图片</button> 
 	</div>
 </div>
@@ -213,14 +212,9 @@ function convertToPNG() {
     var svg = document.getElementById("svgPreview").querySelector("svg");
     var canvas = document.createElement("canvas");
     var context = canvas.getContext("2d");
-    var aspectRatio = svg.width.baseVal.value / svg.height.baseVal.value;
-    var width = parseInt(document.getElementById("pngWidth").value) || 1024;
-    var height = parseInt(document.getElementById("pngHeight").value) || 1024;
-    if (width / height > aspectRatio) {
-        width = height * aspectRatio;
-    } else {
-        height = width / aspectRatio;
-    }
+    var svgRect = svg.getBoundingClientRect(); // 获取 SVG 元素的实际尺寸
+    var width = parseInt(document.getElementById("pngSize").value) || 1024;
+    var height = width * (svgRect.height / svgRect.width); // 根据 SVG 元素的宽高比来计算高度
     canvas.width = width;
     canvas.height = height;
     var svgString = new XMLSerializer().serializeToString(svg);
