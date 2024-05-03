@@ -1,10 +1,9 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3D坦克服务器状态页面</title>
-    <style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	3D坦克服务器状态页面
+</title>
+<style>
         /* CSS for the page */
         body {
             background: radial-gradient(50% 100% at 50% 100%, #395673 0%, #001926 100%);
@@ -25,8 +24,25 @@
             cursor: pointer;
             border-radius: 10px;
             transition: background-color 0.3s;
+            display: none; /* Initially hide the button */
         }
         #backButton:hover {
+            background-color: #4CAF50;
+        }
+        #refreshButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #76ff33;
+            padding: 10px;
+            border: none;
+            color: #001926;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background-color 0.3s;
+        }
+        #refreshButton:hover {
             background-color: #4CAF50;
         }
         .container {
@@ -54,19 +70,25 @@
             color: #76ff33;
         }
     </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Left section -->
-        <div class="section">
-            <h1>国服</h1>
-            <p>在线：<span id="onlineCount"></span></p>
-            <p>战斗中：<span id="inbattlesCount"></span></p>
-            <p>4399：<span id="my4399ComCount"></span></p>
-        </div>
-    </div>
-    <!-- JavaScript -->
-    <script>
+<div class="container">
+	<!-- Left section -->
+	<div class="section">
+		<h1>
+			国服
+		</h1>
+		<p>
+			在线：<span id="onlineCount"></span>
+		</p>
+		<p>
+			战斗中：<span id="inbattlesCount"></span>
+		</p>
+		<p>
+			4399：<span id="my4399ComCount"></span>
+		</p>
+	</div>
+</div>
+<!-- JavaScript -->
+<script>
         function fetchBalancerStats() {
             fetch('https://balancer.3dtank.com/balancer')
                 .then(response => response.json())
@@ -86,17 +108,22 @@
                 })
                 .catch(error => console.error('获取数据时出错：', error));
         }
-
+        // Function to manually refresh data
+        function manualRefresh() {
+            fetchBalancerStats();
+        }
         // Initial setup
         fetchBalancerStats();
         setInterval(fetchBalancerStats, 11000);
-    </script>
-    <!-- Back Button -->
-    <button id="backButton" onclick="goBack()">返回</button>
-    <script>
+        // Function to go back if referrer is from testanki1.github.io
         function goBack() {
-            window.history.back();
+            if (document.referrer.includes("testanki1.github.io")) {
+                window.history.back();
+            }
+        }
+        // Check if referrer is from testanki1.github.io, then display back button
+        if (document.referrer.includes("testanki1.github.io")) {
+            document.getElementById("backButton").style.display = "block";
         }
     </script>
-</body>
-</html>
+<!-- Back and Refresh Buttons --> <button id="backButton" onclick="goBack()">返回</button> <button id="refreshButton" onclick="manualRefresh()">手动刷新</button>
