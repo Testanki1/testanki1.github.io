@@ -45,6 +45,12 @@
         #refreshButton:hover {
             background-color: #4CAF50;
         }
+        #refreshTimer {
+            position: absolute;
+            top: 10px;
+            right: 80px; /* Adjusted position */
+            font-size: 16px;
+        }
         .container {
             display: flex;
             justify-content: center;
@@ -77,18 +83,20 @@
 			国服
 		</h1>
 		<p>
-			在线：<span id="onlineCount"></span>
+			在线：<span id="onlineCount"></span> 
 		</p>
 		<p>
-			战斗中：<span id="inbattlesCount"></span>
+			战斗中：<span id="inbattlesCount"></span> 
 		</p>
 		<p>
-			4399：<span id="my4399ComCount"></span>
+			4399：<span id="my4399ComCount"></span> 
 		</p>
 	</div>
 </div>
 <!-- JavaScript -->
 <script>
+        let refreshInterval;
+        let refreshTime = 11;
         function fetchBalancerStats() {
             fetch('https://balancer.3dtank.com/balancer')
                 .then(response => response.json())
@@ -108,22 +116,29 @@
                 })
                 .catch(error => console.error('获取数据时出错：', error));
         }
-        // Function to manually refresh data
         function manualRefresh() {
             fetchBalancerStats();
         }
-        // Initial setup
-        fetchBalancerStats();
-        setInterval(fetchBalancerStats, 11000);
-        // Function to go back if referrer is from testanki1.github.io
+        function startRefreshTimer() {
+            refreshInterval = setInterval(() => {
+                refreshTime--;
+                document.getElementById('refreshTimer').innerText = refreshTime;
+                if (refreshTime === 0) {
+                    manualRefresh();
+                    refreshTime = 11; // Reset refresh time
+                }
+            }, 1000);
+        }
         function goBack() {
             if (document.referrer.includes("testanki1.github.io")) {
                 window.history.back();
             }
         }
-        // Check if referrer is from testanki1.github.io, then display back button
         if (document.referrer.includes("testanki1.github.io")) {
             document.getElementById("backButton").style.display = "block";
         }
+        fetchBalancerStats(); // Initial fetch
+        startRefreshTimer(); // Start refresh timer
+        setInterval(fetchBalancerStats, 11000); // Auto refresh
     </script>
-<!-- Back and Refresh Buttons --> <button id="backButton" onclick="goBack()">返回</button> <button id="refreshButton" onclick="manualRefresh()">手动刷新</button>
+<!-- Back and Refresh Buttons --> <button id="backButton" onclick="goBack()">返回</button> <button id="refreshButton" onclick="manualRefresh()">刷新</button> <span id="refreshTimer"><span>11</span></span>
