@@ -28,7 +28,7 @@
             color: white; /* 文字颜色修改为白色 */
         }
         .form-group button {
-            width: 40ch; /* 与 20 个字符的宽度相近 */
+            width: 40ch;
             padding: 10px;
             margin-top: 10px;
             background-color: #76FF33; /* 按钮颜色修改为 #76FF33 */
@@ -52,6 +52,39 @@
             background-color: transparent; /* 去掉背景颜色 */
             color: white; /* 文字颜色修改为白色 */
         }
+        /* 加载提示样式 */
+        .loader {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            height: 50px;
+            width: 100%; 
+            background-color: #001926;
+            position: relative;
+            margin-top: 10px;
+        }
+        .loader .loader-inner {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 4px solid #5C6C74;
+            position: relative;
+        }
+        .loader .loader-inner:before {
+            content: "";
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            border-radius: 50%;
+            border: 4px solid #fefefe;
+            border-color: #fefefe transparent transparent transparent;
+            animation: load infinite 1s linear;
+        }
+        @keyframes load {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 <h1>
 	3D坦克个人资料查询
@@ -60,8 +93,8 @@
 	<label for="region" style="text-align:center;">选择服务器区域:</label> 
 	<div style="text-align:center;">
 		<select id="region"> <option value="国服">国服</option>
-            <option value="外服">外服</option>
-        </select> 
+                <option value="外服">外服</option>
+            </select> 
 	</div>
 </div>
 <div class="form-group">
@@ -76,15 +109,23 @@
 <div id="result">
 	<!-- 个人资料将显示在这里 -->
 </div>
+<!-- 加载提示 -->
+<div class="loader" id="loader">
+	<div class="loader-inner">
+	</div>
+</div>
 <script>
         document.getElementById('fetchButton').addEventListener('click', fetchProfile);
         async function fetchProfile() {
             const region = document.getElementById('region').value;
             const username = document.getElementById('username').value;
             const resultDiv = document.getElementById('result');
+            const loader = document.getElementById('loader');
             resultDiv.innerHTML = '';  // 清空之前的结果
+            loader.style.display = 'flex'; // 显示加载提示
             if (username.trim() === '') {
                 alert('请输入昵称');
+                loader.style.display = 'none'; // 隐藏加载提示
                 return;
             }
             let url;
@@ -110,6 +151,8 @@
 	获取资料失败: ${error.message}
 </p>
 `;
+            } finally {
+                loader.style.display = 'none'; // 隐藏加载提示
             }
         }
         function displayProfile(data) {
