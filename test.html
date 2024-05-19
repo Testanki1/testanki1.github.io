@@ -1,17 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL Availability Checker</title>
-    <style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	3D坦克测试服务器列表
+</title>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         body {
-            font-family: Arial, sans-serif;
+            font-family: Rubik, sans-serif;
             padding: 20px;
+            background-color: #001926;
+            color: white;
         }
         .url-check {
             margin-bottom: 10px;
         }
+* {
+        -webkit-tap-highlight-color: transparent;
+    }
         .hidden {
             display: none;
         }
@@ -29,14 +34,46 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .button {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #76FF33;
+            color: #001926;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-button {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #76FF33;
+            color: #001926;
+            text-decoration: none;
+            border-radius: 20px; /* 圆角 */
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
     </style>
-</head>
-<body>
-    <h1>URL Availability Checker</h1>
-    <div id="loader" class="loader"></div>
-    <div id="results" class="hidden"></div>
-
-    <script>
+<h1 style="text-align:center;">
+	3D坦克测试服务器列表
+</h1>
+<div id="loader" class="loader">
+</div>
+<div id="deploy-results" class="hidden">
+</div>
+<div id="review-results" class="hidden">
+</div>
+<script>
+        // 检查是否从 testanki1.github.io 跳转
+        if (document.referrer.includes('testanki1.github.io')) {
+            const backButton = document.createElement('a');
+            backButton.href = '#';
+            backButton.className = 'back-button';
+            backButton.textContent = '返回';
+            document.body.appendChild(backButton);
+        }
         async function checkURL(url) {
             try {
                 const response = await fetch(url, { method: 'HEAD' });
@@ -45,49 +82,16 @@
                 return false;
             }
         }
-
         function createButton(label, link) {
             const button = document.createElement('a');
             button.href = link;
             button.textContent = label;
             button.target = '_blank';
-            button.style.display = 'inline-block';
-            button.style.margin = '5px';
-            button.style.padding = '10px 20px';
-            button.style.backgroundColor = '#4CAF50';
-            button.style.color = 'white';
-            button.style.textDecoration = 'none';
-            button.style.borderRadius = '5px';
+            button.className = 'button';
             return button;
         }
-
         async function checkURLs() {
-            const resultsDiv = document.getElementById('results');
+            const deployResultsDiv = document.getElementById('deploy-results');
+            const reviewResultsDiv = document.getElementById('review-results');
             const loader = document.getElementById('loader');
-
-            for (let i = 1; i <= 9; i++) {
-                const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
-                const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
-
-                const isDeployAccessible = await checkURL(deployURL);
-                const isReviewAccessible = await checkURL(reviewURL);
-
-                if (isDeployAccessible) {
-                    const deployButton = createButton(`Go to Deploy ${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
-                    resultsDiv.appendChild(deployButton);
-                }
-
-                if (isReviewAccessible) {
-                    const reviewButton = createButton(`Go to Review ${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
-                    resultsDiv.appendChild(reviewButton);
-                }
-            }
-
-            loader.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-        }
-
-        checkURLs();
-    </script>
-</body>
-</html>
+            for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; const isDeployAccessible = await checkURL(deployURL); const isReviewAccessible = await checkURL(reviewURL); if (isDeployAccessible) { const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`); deployResultsDiv.appendChild(deployButton); } if (isReviewAccessible) { const reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`); reviewResultsDiv.appendChild(reviewButton); } } loader.classList.add('hidden'); deployResultsDiv.classList.remove('hidden'); reviewResultsDiv.classList.remove('hidden'); } checkURLs(); </script>
