@@ -1,15 +1,22 @@
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>
-	3D坦克测试服务器列表
-</title>
-<style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D坦克测试服务器列表</title>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         body {
             font-family: Rubik, sans-serif;
             padding: 20px;
             background-color: #001926;
             color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
         }
         .url-check {
             margin-bottom: 10px;
@@ -71,19 +78,25 @@
             top: 20px;
             left: 20px;
         }
+        .results {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
     </style>
-<h1 style="text-align:center;">
-	3D坦克测试服务器列表
-</h1>
-<div id="loader" class="loader">
-	<div class="loader-inner">
-	</div>
-</div>
-<div id="deploy-results" class="hidden">
-</div>
-<div id="review-results" class="hidden">
-</div>
-<script>
+</head>
+<body>
+    <h1 style="text-align:center;">
+        3D坦克测试服务器列表
+    </h1>
+    <div id="loader" class="loader">
+        <div class="loader-inner"></div>
+    </div>
+    <div id="results" class="results hidden">
+        <div id="deploy-results"></div>
+        <div id="review-results"></div>
+    </div>
+    <script>
         // 检查是否从 testanki1.github.io 跳转
         if (document.referrer.includes('testanki1.github.io')) {
             const backButton = document.createElement('a');
@@ -92,6 +105,7 @@
             backButton.textContent = '返回';
             document.body.appendChild(backButton);
         }
+
         async function checkURL(url) {
             console.log(`Checking URL: ${url}`);
             try {
@@ -103,6 +117,7 @@
                 return false;
             }
         }
+
         function createButton(label, link) {
             const button = document.createElement('a');
             button.href = link;
@@ -111,12 +126,22 @@
             button.className = 'button';
             return button;
         }
+
         async function checkURLs() {
             const deployResultsDiv = document.getElementById('deploy-results');
             const reviewResultsDiv = document.getElementById('review-results');
             const loader = document.getElementById('loader');
+            const resultsDiv = document.getElementById('results');
+
             const promises = [];
-            for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; console.log(`Adding deploy URL: ${deployURL}`); promises.push( checkURL(deployURL).then(isAccessible => {
+
+            for (let i = 1; i <= 9; i++) {
+                const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
+                const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
+
+                console.log(`Adding deploy URL: ${deployURL}`);
+                promises.push(
+                    checkURL(deployURL).then(isAccessible => {
                         console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
                         if (isAccessible) {
                             const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
@@ -124,6 +149,7 @@
                         }
                     })
                 );
+
                 console.log(`Adding review URL: ${reviewURL}`);
                 promises.push(
                     checkURL(reviewURL).then(isAccessible => {
@@ -135,13 +161,18 @@
                     })
                 );
             }
+
             // 使用 Promise.allSettled 确保所有请求都完成，无论成功与否
             await Promise.allSettled(promises);
+
             console.log("所有 URL 检测完毕，隐藏加载图标并显示结果");
+
             // 隐藏加载图标并显示结果
             loader.style.display = 'none';
-            deployResultsDiv.classList.remove('hidden');
-            reviewResultsDiv.classList.remove('hidden');
+            resultsDiv.classList.remove('hidden');
         }
+
         checkURLs();
     </script>
+</body>
+</html>
