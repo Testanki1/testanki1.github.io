@@ -29,18 +29,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .button {
-            display: inline-block;
-            margin: 5px;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        .button-503 {
-            background-color: #FFA500;
-        }
     </style>
 </head>
 <body>
@@ -50,29 +38,26 @@
 
     <script>
         async function checkURL(url) {
-            const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url);
             try {
-                const response = await fetch(proxyUrl);
-                const data = await response.json();
-                if (data && data.contents) {
-                    return 'accessible';
-                } else {
-                    return 'inaccessible';
-                }
+                const response = await fetch(url, { method: 'HEAD' });
+                return response.ok;
             } catch (error) {
-                return 'inaccessible';
+                return false;
             }
         }
 
-        function createButton(label, link, status) {
+        function createButton(label, link) {
             const button = document.createElement('a');
             button.href = link;
             button.textContent = label;
             button.target = '_blank';
-            button.className = 'button';
-            if (status === '503') {
-                button.classList.add('button-503');
-            }
+            button.style.display = 'inline-block';
+            button.style.margin = '5px';
+            button.style.padding = '10px 20px';
+            button.style.backgroundColor = '#4CAF50';
+            button.style.color = 'white';
+            button.style.textDecoration = 'none';
+            button.style.borderRadius = '5px';
             return button;
         }
 
@@ -84,24 +69,16 @@
                 const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
                 const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
 
-                const deployStatus = await checkURL(deployURL);
-                const reviewStatus = await checkURL(reviewURL);
+                const isDeployAccessible = await checkURL(deployURL);
+                const isReviewAccessible = await checkURL(reviewURL);
 
-                if (deployStatus === 'accessible' || deployStatus === '503') {
-                    const deployButton = createButton(
-                        `Go to Deploy ${i}`,
-                        `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`,
-                        deployStatus
-                    );
+                if (isDeployAccessible) {
+                    const deployButton = createButton(`Go to Deploy ${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
                     resultsDiv.appendChild(deployButton);
                 }
 
-                if (reviewStatus === 'accessible' || reviewStatus === '503') {
-                    const reviewButton = createButton(
-                        `Go to Review ${i}`,
-                        `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`,
-                        reviewStatus
-                    );
+                if (isReviewAccessible) {
+                    const reviewButton = createButton(`Go to Review ${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
                     resultsDiv.appendChild(reviewButton);
                 }
             }
