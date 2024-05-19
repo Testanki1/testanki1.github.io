@@ -1,0 +1,111 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	3D坦克个人资料查询
+</title>
+<style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #001926; /* 背景颜色修改为 #001926 */
+            color: white; /* 文字颜色修改为白色 */
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: white; /* 文字颜色修改为白色 */
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: white; /* 文字颜色修改为白色 */
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .form-group button {
+            width: 100%;
+            padding: 10px;
+            background-color: #76FF33; /* 按钮颜色修改为 #76FF33 */
+            color: white; /* 文字颜色修改为白色 */
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #59cc1d; /* 按钮悬停颜色修改为 #59cc1d */
+        }
+        .result {
+            margin-top: 20px;
+        }
+        .result pre {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: auto;
+        }
+    </style>
+<div class="container">
+	<h1>
+		3D坦克个人资料查询
+	</h1>
+	<div class="form-group">
+		<label for="username">输入昵称:</label> <input type="text" id="username" placeholder="请输入坦克昵称" /> 
+	</div>
+	<div class="form-group">
+		<button id="fetchButton">确定</button> 
+	</div>
+	<div class="result" id="result">
+		<!-- 个人资料将显示在这里 -->
+	</div>
+</div>
+<script>
+        document.getElementById('fetchButton').addEventListener('click', fetchProfile);
+        async function fetchProfile() {
+            const username = document.getElementById('username').value;
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';  // 清空之前的结果
+            if (username.trim() === '') {
+                alert('请输入昵称');
+                return;
+            }
+            const proxyUrl = 'https://api.allorigins.win/get?url=';
+            const targetUrl = encodeURIComponent(`https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`);
+            const url = proxyUrl + targetUrl;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('网络响应错误');
+                }
+                const data = await response.json();
+                const profileData = JSON.parse(data.contents);
+                displayProfile(profileData);
+            } catch (error) {
+                resultDiv.innerHTML = `
+<p>
+	获取资料失败: ${error.message}
+</p>
+`;
+            }
+        }
+        function displayProfile(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+<pre>${JSON.stringify(data, null, 2)}</pre>
+`;
+        }
+    </script>
