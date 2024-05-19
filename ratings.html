@@ -45,12 +45,14 @@
             width: 100%;
             overflow: auto;
             color: white; /* 文字颜色修改为白色 */
+            text-align: center; /* 居中显示内容 */
         }
         #result pre {
             padding: 10px;
             overflow: auto;
             background-color: transparent; /* 去掉背景颜色 */
             color: white; /* 文字颜色修改为白色 */
+            display: inline-block; /* 内容居中显示 */
         }
         /* 加载提示样式 */
         .loader {
@@ -143,8 +145,24 @@
                     throw new Error('网络响应错误');
                 }
                 const data = await response.json();
-                const profileData = JSON.parse(data.contents);
-                displayProfile(profileData);
+                if (data && data.contents) {
+                    try {
+                        const responseData = JSON.parse(data.contents);
+                        if (responseData && responseData.responseType === 'NOT_FOUND') {
+                            resultDiv.innerHTML = `
+<p>
+	找不到个人资料。请检查输入的昵称是否正确。
+</p>
+`;
+                        } else {
+                            resultDiv.innerHTML = data.contents; // 显示获取的网页内容
+                        }
+                    } catch (error) {
+                        throw new Error('无效 JSON 数据');
+                    }
+                } else {
+                    throw new Error('未知错误');
+                }
             } catch (error) {
                 resultDiv.innerHTML = `
 <p>
@@ -154,11 +172,5 @@
             } finally {
                 loader.style.display = 'none'; // 隐藏加载提示
             }
-        }
-        function displayProfile(data) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `
-<pre>${JSON.stringify(data, null, 2)}</pre>
-`;
         }
     </script>
