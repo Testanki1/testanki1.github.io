@@ -5,73 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D坦克测试服务器列表</title>
     <style>
-        body, html {
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+        body {
+            font-family: Rubik, sans-serif;
             margin: 0;
-            padding: 0;
-            height: 100%;
-            font-family: Arial, sans-serif;
+            padding-top: 80px; /* Offset for the fixed header */
+            background-color: #001926;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
         }
-
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hidden {
+            display: none;
+        }
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%; /* Ensure it covers the whole viewport */
+            background-color: #001926; /* Ensure it matches the body background color */
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .loader .loader-inner {
+            width: 3.375rem;
+            height: 3.375rem;
+            border-radius: 50%;
+            border: .325rem solid #5C6C74;
+            position: relative;
+        }
+        .loader .loader-inner:before {
+            content: "";
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            left: -.325rem;
+            top: -.325rem;
+            border-radius: 50%;
+            border: .325rem solid #fefefe;
+            border-color: #fefefe transparent transparent transparent;
+            animation: load infinite 1s linear;
+        }
+        @keyframes load {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .button {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #76FF33;
+            color: #001926;
+            text-decoration: none;
+            border-radius: 5px;
+        }
         .header {
             position: fixed;
             top: 0;
             width: 100%;
-            background-color: #f8f9fa;
+            background-color: #001926;
             padding: 10px 0;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            padding-top: 60px; /* Offset for the fixed header */
-        }
-
-        .button-container {
-            text-align: center;
-        }
-
-        button {
-            display: block;
-            width: 200px;
-            margin: 10px auto;
-            padding: 10px;
-            font-size: 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        #loader {
-            display: none;
-            position: fixed;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
             z-index: 1000;
-        }
-
-        .loader-inner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #007bff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -79,34 +84,88 @@
     <div class="header">
         <h1>3D坦克测试服务器列表</h1>
     </div>
-
-    <div class="container">
-        <div class="button-container">
-            <button id="deployButton">Deploy</button>
-            <button id="reviewButton">Review</button>
-        </div>
-    </div>
-
     <div id="loader" class="loader">
         <div class="loader-inner"></div>
     </div>
-
+    <div id="deploy-results" class="hidden"></div>
+    <div id="review-results" class="hidden"></div>
     <script>
-        document.getElementById('deployButton').addEventListener('click', function() {
-            // 部署按钮的逻辑
-            alert('Deploy button clicked');
-        });
-
-        document.getElementById('reviewButton').addEventListener('click', function() {
-            // 审查按钮的逻辑
-            alert('Review button clicked');
-        });
-
-        // 隐藏加载动画的逻辑
-        function hideLoader() {
-            document.getElementById('loader').style.display = 'none';
+        // 检查是否从 testanki1.github.io 跳转
+        if (document.referrer.includes('testanki1.github.io')) {
+            const backButton = document.createElement('a');
+            backButton.href = '#';
+            backButton.className = 'button';
+            backButton.textContent = '返回';
+            document.body.appendChild(backButton);
         }
-        hideLoader(); // 默认隐藏加载动画
+
+        async function checkURL(url) {
+            console.log(`Checking URL: ${url}`);
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                console.log(`Status for ${url}: ${response.status}`);
+                return response.ok || response.status === 503;
+            } catch (error) {
+                console.error(`Error checking URL ${url}:`, error);
+                return false;
+            }
+        }
+
+        function createButton(label, link) {
+            const button = document.createElement('a');
+            button.href = link;
+            button.textContent = label;
+            button.target = '_blank';
+            button.className = 'button';
+            return button;
+        }
+
+        async function checkURLs() {
+            const deployResultsDiv = document.getElementById('deploy-results');
+            const reviewResultsDiv = document.getElementById('review-results');
+            const loader = document.getElementById('loader');
+
+            const promises = [];
+
+            for (let i = 1; i <= 9; i++) {
+                const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
+                const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
+
+                console.log(`Adding deploy URL: ${deployURL}`);
+                promises.push(
+                    checkURL(deployURL).then(isAccessible => {
+                        console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                        if (isAccessible) {
+                            const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
+                            deployResultsDiv.appendChild(deployButton);
+                        }
+                    })
+                );
+
+                console.log(`Adding review URL: ${reviewURL}`);
+                promises.push(
+                    checkURL(reviewURL).then(isAccessible => {
+                        console.log(`Review ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                        if (isAccessible) {
+                            const reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
+                            reviewResultsDiv.appendChild(reviewButton);
+                        }
+                    })
+                );
+            }
+
+            // 使用 Promise.allSettled 确保所有请求都完成，无论成功与否
+            await Promise.allSettled(promises);
+
+            console.log("所有 URL 检测完毕，隐藏加载图标并显示结果");
+
+            // 隐藏加载图标并显示结果
+            loader.style.display = 'none';
+            deployResultsDiv.classList.remove('hidden');
+            reviewResultsDiv.classList.remove('hidden');
+        }
+
+        checkURLs();
     </script>
 </body>
 </html>
