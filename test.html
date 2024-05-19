@@ -1,9 +1,10 @@
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>
-	URL Availability Checker
-</title>
-<style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Availability Checker</title>
+    <style>
         body {
             font-family: Arial, sans-serif;
             padding: 20px;
@@ -41,21 +42,20 @@
             background-color: #FFA500;
         }
     </style>
-<h1>
-	URL Availability Checker
-</h1>
-<div id="loader" class="loader">
-</div>
-<div id="results" class="hidden">
-</div>
-<script>
+</head>
+<body>
+    <h1>URL Availability Checker</h1>
+    <div id="loader" class="loader"></div>
+    <div id="results" class="hidden"></div>
+
+    <script>
         async function checkURL(url) {
+            const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url);
             try {
-                const response = await fetch(url, { method: 'HEAD' });
-                if (response.status === 200) {
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                if (data && data.contents) {
                     return 'accessible';
-                } else if (response.status === 503) {
-                    return '503';
                 } else {
                     return 'inaccessible';
                 }
@@ -63,6 +63,7 @@
                 return 'inaccessible';
             }
         }
+
         function createButton(label, link, status) {
             const button = document.createElement('a');
             button.href = link;
@@ -74,7 +75,42 @@
             }
             return button;
         }
+
         async function checkURLs() {
             const resultsDiv = document.getElementById('results');
             const loader = document.getElementById('loader');
-            for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; const deployStatus = await checkURL(deployURL); const reviewStatus = await checkURL(reviewURL); if (deployStatus === 'accessible' || deployStatus === '503') { const deployButton = createButton( `Go to Deploy ${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`, deployStatus ); resultsDiv.appendChild(deployButton); } if (reviewStatus === 'accessible' || reviewStatus === '503') { const reviewButton = createButton( `Go to Review ${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`, reviewStatus ); resultsDiv.appendChild(reviewButton); } } loader.classList.add('hidden'); resultsDiv.classList.remove('hidden'); } checkURLs(); </script>
+
+            for (let i = 1; i <= 9; i++) {
+                const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
+                const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
+
+                const deployStatus = await checkURL(deployURL);
+                const reviewStatus = await checkURL(reviewURL);
+
+                if (deployStatus === 'accessible' || deployStatus === '503') {
+                    const deployButton = createButton(
+                        `Go to Deploy ${i}`,
+                        `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`,
+                        deployStatus
+                    );
+                    resultsDiv.appendChild(deployButton);
+                }
+
+                if (reviewStatus === 'accessible' || reviewStatus === '503') {
+                    const reviewButton = createButton(
+                        `Go to Review ${i}`,
+                        `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`,
+                        reviewStatus
+                    );
+                    resultsDiv.appendChild(reviewButton);
+                }
+            }
+
+            loader.classList.add('hidden');
+            resultsDiv.classList.remove('hidden');
+        }
+
+        checkURLs();
+    </script>
+</body>
+</html>
