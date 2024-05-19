@@ -1,10 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL Availability Checker</title>
-    <style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	URL Availability Checker
+</title>
+<style>
         body {
             font-family: Arial, sans-serif;
             padding: 20px;
@@ -29,65 +28,53 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .button {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .button-503 {
+            background-color: #FFA500;
+        }
     </style>
-</head>
-<body>
-    <h1>URL Availability Checker</h1>
-    <div id="loader" class="loader"></div>
-    <div id="results" class="hidden"></div>
-
-    <script>
+<h1>
+	URL Availability Checker
+</h1>
+<div id="loader" class="loader">
+</div>
+<div id="results" class="hidden">
+</div>
+<script>
         async function checkURL(url) {
             try {
                 const response = await fetch(url, { method: 'HEAD' });
-                return response.ok;
+                if (response.status === 200) {
+                    return 'accessible';
+                } else if (response.status === 503) {
+                    return '503';
+                } else {
+                    return 'inaccessible';
+                }
             } catch (error) {
-                return false;
+                return 'inaccessible';
             }
         }
-
-        function createButton(label, link) {
+        function createButton(label, link, status) {
             const button = document.createElement('a');
             button.href = link;
             button.textContent = label;
             button.target = '_blank';
-            button.style.display = 'inline-block';
-            button.style.margin = '5px';
-            button.style.padding = '10px 20px';
-            button.style.backgroundColor = '#4CAF50';
-            button.style.color = 'white';
-            button.style.textDecoration = 'none';
-            button.style.borderRadius = '5px';
+            button.className = 'button';
+            if (status === '503') {
+                button.classList.add('button-503');
+            }
             return button;
         }
-
         async function checkURLs() {
             const resultsDiv = document.getElementById('results');
             const loader = document.getElementById('loader');
-
-            for (let i = 1; i <= 9; i++) {
-                const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
-                const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
-
-                const isDeployAccessible = await checkURL(deployURL);
-                const isReviewAccessible = await checkURL(reviewURL);
-
-                if (isDeployAccessible) {
-                    const deployButton = createButton(`Go to Deploy ${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
-                    resultsDiv.appendChild(deployButton);
-                }
-
-                if (isReviewAccessible) {
-                    const reviewButton = createButton(`Go to Review ${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
-                    resultsDiv.appendChild(reviewButton);
-                }
-            }
-
-            loader.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-        }
-
-        checkURLs();
-    </script>
-</body>
-</html>
+            for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; const deployStatus = await checkURL(deployURL); const reviewStatus = await checkURL(reviewURL); if (deployStatus === 'accessible' || deployStatus === '503') { const deployButton = createButton( `Go to Deploy ${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`, deployStatus ); resultsDiv.appendChild(deployButton); } if (reviewStatus === 'accessible' || reviewStatus === '503') { const reviewButton = createButton( `Go to Review ${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`, reviewStatus ); resultsDiv.appendChild(reviewButton); } } loader.classList.add('hidden'); resultsDiv.classList.remove('hidden'); } checkURLs(); </script>
