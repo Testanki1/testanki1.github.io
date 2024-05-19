@@ -15,41 +15,34 @@
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #fff;
+            background-color: #001926; /* 背景颜色修改为 #001926 */
+            color: white; /* 文字颜色修改为白色 */
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         h1 {
             text-align: center;
-            color: white; /* 文字颜色修改为白色 */
-        }
-        .form-group {
-            margin-bottom: 20px;
         }
         .form-group label {
             display: block;
             margin-bottom: 5px;
-            color: white; /* 文字颜色修改为白色 */
         }
-        .form-group input {
+        .form-group input,
+        .form-group select,
+        .form-group button {
             width: 100%;
             padding: 8px;
+            margin-bottom: 10px;
             box-sizing: border-box;
         }
         .form-group button {
-            width: 100%;
-            padding: 10px;
             background-color: #76FF33; /* 按钮颜色修改为 #76FF33 */
-            color: white; /* 文字颜色修改为白色 */
             border: none;
             border-radius: 4px;
             cursor: pointer;
         }
         .form-group button:hover {
             background-color: #59cc1d; /* 按钮悬停颜色修改为 #59cc1d */
-        }
-        .result {
-            margin-top: 20px;
         }
         .result pre {
             padding: 10px;
@@ -64,6 +57,11 @@
 		3D坦克个人资料查询
 	</h1>
 	<div class="form-group">
+		<label for="region">选择服务器区域:</label> <select id="region"> <option value="国服">国服</option>
+                <option value="外服">外服</option>
+            </select> 
+	</div>
+	<div class="form-group">
 		<label for="username">输入昵称:</label> <input type="text" id="username" placeholder="请输入坦克昵称" /> 
 	</div>
 	<div class="form-group">
@@ -76,6 +74,7 @@
 <script>
         document.getElementById('fetchButton').addEventListener('click', fetchProfile);
         async function fetchProfile() {
+            const region = document.getElementById('region').value;
             const username = document.getElementById('username').value;
             const resultDiv = document.getElementById('result');
             resultDiv.innerHTML = '';  // 清空之前的结果
@@ -83,11 +82,17 @@
                 alert('请输入昵称');
                 return;
             }
+            let url;
+            if (region === '国服') {
+                url = `https://ratings.3dtank.com/get_stat/profile/?user=${username}&lang=cn`;
+            } else if (region === '外服') {
+                url = `https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`;
+            }
             const proxyUrl = 'https://api.allorigins.win/get?url=';
-            const targetUrl = encodeURIComponent(`https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`);
-            const url = proxyUrl + targetUrl;
+            const targetUrl = encodeURIComponent(url);
+            const apiUrl = proxyUrl + targetUrl;
             try {
-                const response = await fetch(url);
+                const response = await fetch(apiUrl);
                 if (!response.ok) {
                     throw new Error('网络响应错误');
                 }
