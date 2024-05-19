@@ -14,23 +14,39 @@
         .url-check {
             margin-bottom: 10px;
         }
-* {
-        -webkit-tap-highlight-color: transparent;
-    }
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
         .hidden {
             display: none;
         }
         .loader {
-            border: 16px solid #f3f3f3; /* Light grey */
-            border-top: 16px solid #3498db; /* Blue */
-            border-radius: 50%;
-            width: 120px;
-            height: 120px;
-            animation: spin 2s linear infinite;
-            margin: auto;
-            display: block;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-        @keyframes spin {
+        .loader .loader-inner {
+            width: 3.375rem;
+            height: 3.375rem;
+            border-radius: 50%;
+            border: .325rem solid #5C6C74;
+            position: relative;
+        }
+        .loader .loader-inner:before {
+            content: "";
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            left: -.325rem;
+            top: -.325rem;
+            border-radius: 50%;
+            border: .325rem solid #fefefe;
+            border-color: #fefefe transparent transparent transparent;
+            animation: load infinite 1s linear;
+        }
+        @keyframes load {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
@@ -60,6 +76,8 @@
 	3D坦克测试服务器列表
 </h1>
 <div id="loader" class="loader">
+	<div class="loader-inner">
+	</div>
 </div>
 <div id="deploy-results" class="hidden">
 </div>
@@ -75,10 +93,13 @@
             document.body.appendChild(backButton);
         }
         async function checkURL(url) {
+            console.log(`Checking URL: ${url}`);
             try {
                 const response = await fetch(url, { method: 'HEAD' });
-                return response.ok;
+                console.log(`Status for ${url}: ${response.status}`);
+                return response.ok || response.status === 503;
             } catch (error) {
+                console.error(`Error checking URL ${url}:`, error);
                 return false;
             }
         }
@@ -94,4 +115,33 @@
             const deployResultsDiv = document.getElementById('deploy-results');
             const reviewResultsDiv = document.getElementById('review-results');
             const loader = document.getElementById('loader');
-            for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; const isDeployAccessible = await checkURL(deployURL); const isReviewAccessible = await checkURL(reviewURL); if (isDeployAccessible) { const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`); deployResultsDiv.appendChild(deployButton); } if (isReviewAccessible) { const reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`); reviewResultsDiv.appendChild(reviewButton); } } loader.classList.add('hidden'); deployResultsDiv.classList.remove('hidden'); reviewResultsDiv.classList.remove('hidden'); } checkURLs(); </script>
+            const promises = [];
+            for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; console.log(`Adding deploy URL: ${deployURL}`); promises.push( checkURL(deployURL).then(isAccessible => {
+                        console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                        if (isAccessible) {
+                            const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
+                            deployResultsDiv.appendChild(deployButton);
+                        }
+                    })
+                );
+                console.log(`Adding review URL: ${reviewURL}`);
+                promises.push(
+                    checkURL(reviewURL).then(isAccessible => {
+                        console.log(`Review ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                        if (isAccessible) {
+                            const reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
+                            reviewResultsDiv.appendChild(reviewButton);
+                        }
+                    })
+                );
+            }
+            // 使用 Promise.allSettled 确保所有请求都完成，无论成功与否
+            await Promise.allSettled(promises);
+            console.log("所有 URL 检测完毕，隐藏加载图标并显示结果");
+            // 隐藏加载图标并显示结果
+            loader.style.display = 'none';
+            deployResultsDiv.classList.remove('hidden');
+            reviewResultsDiv.classList.remove('hidden');
+        }
+        checkURLs();
+    </script>
