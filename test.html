@@ -4,93 +4,99 @@
 	3D坦克测试服务器列表
 </title>
 <style>
-        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
-        body {
-            font-family: Rubik, sans-serif;
-            margin: 0;
-            padding-top: 80px; /* Offset for the fixed header */
-            background-color: #001926;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            flex-direction: column;
-        }
-        * {
-            -webkit-tap-highlight-color: transparent;
-        }
-        .hidden {
-            display: none;
-        }
-        .loader {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100%; /* Ensure it covers the whole viewport */
-            background-color: #001926; /* Ensure it matches the body background color */
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        .loader .loader-inner {
-            width: 3.375rem;
-            height: 3.375rem;
-            border-radius: 50%;
-            border: .325rem solid #5C6C74;
-            position: relative;
-        }
-        .loader .loader-inner:before {
-            content: "";
-            display: block;
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            left: -.325rem;
-            top: -.325rem;
-            border-radius: 50%;
-            border: .325rem solid #fefefe;
-            border-color: #fefefe transparent transparent transparent;
-            animation: load infinite 1s linear;
-        }
-        @keyframes load {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-	#deploy-results,
-#review-results {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-        .button {
-            display: inline-block;
-            margin: 10px;
-            padding: 10px 20px;
-            background-color: transparent;
-            color: #BFD5FF;
-            border: 1px solid #667D9DBA;
-            text-decoration: none;
-            border-radius: 6px;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        .button:hover {
-            background-color: #76FF33;
-            color: #001926;
-        }
-        .header {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background-color: #001926;
-            padding: 10px 0;
-            text-align: center;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-    </style>
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+    body {
+        font-family: Rubik, sans-serif;
+        margin: 0;
+        padding-top: 80px; /* Offset for the fixed header */
+        background-color: #001926;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        flex-direction: column;
+    }
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
+    .hidden {
+        display: none;
+    }
+    .loader {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100%; /* Ensure it covers the whole viewport */
+        background-color: #001926; /* Ensure it matches the body background color */
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+    .loader .loader-inner {
+        width: 3.375rem;
+        height: 3.375rem;
+        border-radius: 50%;
+        border: .325rem solid #5C6C74;
+        position: relative;
+    }
+    .loader .loader-inner:before {
+        content: "";
+        display: block;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        left: -.325rem;
+        top: -.325rem;
+        border-radius: 50%;
+        border: .325rem solid #fefefe;
+        border-color: #fefefe transparent transparent transparent;
+        animation: load infinite 1s linear;
+    }
+    @keyframes load {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    #deploy-results,
+    #review-results {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .button-container {
+        display: flex;
+        align-items: center;
+    }
+    .button {
+        display: inline-block;
+        margin: 10px;
+        padding: 10px 20px;
+        background-color: transparent;
+        color: #BFD5FF;
+        border: 1px solid #667D9DBA;
+        text-decoration: none;
+        border-radius: 6px;
+        transition: background-color 0.3s, color 0.3s;
+    }
+    .button:hover {
+        background-color: #76FF33;
+        color: #001926;
+    }
+    .header {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        background-color: #001926;
+        padding: 10px 0;
+        text-align: center;
+        z-index: 1000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .online-count {
+        margin-left: 10px;
+    }
+</style>
 <div class="header">
 	<h1>
 		3D坦克测试服务器列表
@@ -105,71 +111,92 @@
 <div id="review-results" class="hidden">
 </div>
 <script>
-        // 检查是否从 testanki1.github.io 跳转
-        if (document.referrer.includes('testanki1.github.io')) {
-            const backButton = document.createElement('a');
-            backButton.href = '#';
-            backButton.className = 'button';
-            backButton.textContent = '返回';
-            document.body.appendChild(backButton);
-        }
-        async function checkURL(url) {
-            console.log(`Checking URL: ${url}`);
-            try {
-                const response = await fetch(url, { method: 'HEAD' });
-                console.log(`Status for ${url}: ${response.status}`);
-                return response.ok || response.status === 503;
-            } catch (error) {
-                console.error(`Error checking URL ${url}:`, error);
-                return false;
-            }
-        }
-        function createButton(label, link) {
-            const button = document.createElement('a');
-            button.href = link;
-            button.textContent = label;
-            button.target = '_blank';
-            button.className = 'button';
-            return button;
-        }
-        async function checkURLs() {
-    const deployResultsDiv = document.getElementById('deploy-results');
-    const reviewResultsDiv = document.getElementById('review-results');
-    const loader = document.getElementById('loader');
-    const promises = [];
-    const deployButtons = []; // 存储部署按钮
-    const reviewButtons = []; // 存储审查按钮
-    for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; console.log(`Adding deploy URL: ${deployURL}`); promises.push( checkURL(deployURL).then(isAccessible => {
-                console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
-                if (isAccessible) {
-                    const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
-                    deployButtons.push({ number: i, button: deployButton });
-                }
-            })
-        );
-        console.log(`Adding review URL: ${reviewURL}`);
-        promises.push(
-            checkURL(reviewURL).then(isAccessible => {
-                console.log(`Review ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
-                if (isAccessible) {
-                    const reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
-                    reviewButtons.push({ number: i, button: reviewButton });
-                }
-            })
-        );
+    // 检查是否从 testanki1.github.io 跳转
+    if (document.referrer.includes('testanki1.github.io')) {
+        const backButton = document.createElement('a');
+        backButton.href = '#';
+        backButton.className = 'button';
+        backButton.textContent = '返回';
+        document.body.appendChild(backButton);
     }
-    // 等待所有 Promise 完成
-    await Promise.allSettled(promises);
-    // 按数字对按钮进行排序
-    deployButtons.sort((a, b) => a.number - b.number);
-    reviewButtons.sort((a, b) => a.number - b.number);
-    // 将按钮添加到页面上
-    deployButtons.forEach(deploy => deployResultsDiv.appendChild(deploy.button));
-    reviewButtons.forEach(review => reviewResultsDiv.appendChild(review.button));
-    // 隐藏加载图标并显示结果
-    loader.style.display = 'none';
-    deployResultsDiv.classList.remove('hidden');
-    reviewResultsDiv.classList.remove('hidden');
-}
-checkURLs();
-    </script>
+    async function checkURL(url) {
+        console.log(`Checking URL: ${url}`);
+        try {
+            const response = await fetch(url, { method: 'HEAD' });
+            console.log(`Status for ${url}: ${response.status}`);
+            return response.ok || response.status === 503;
+        } catch (error) {
+            console.error(`Error checking URL ${url}:`, error);
+            return false;
+        }
+    }
+    function createButton(label, link) {
+        const container = document.createElement('div');
+        container.className = 'button-container';
+        const button = document.createElement('a');
+        button.href = link;
+        button.textContent = label;
+        button.target = '_blank';
+        button.className = 'button';
+        const onlineCount = document.createElement('span');
+        onlineCount.className = 'online-count';
+        container.appendChild(button);
+        container.appendChild(onlineCount);
+        return container;
+    }
+    async function fetchOnlineCount(url) {
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            const onlineCount = Object.values(data.nodes).reduce((sum, node) => sum + node.online, 0);
+            return onlineCount;
+        } catch (error) {
+            console.error(`Error fetching online count from ${url}:`, error);
+            return 0;
+        }
+    }
+    async function checkURLs() {
+        const deployResultsDiv = document.getElementById('deploy-results');
+        const reviewResultsDiv = document.getElementById('review-results');
+        const loader = document.getElementById('loader');
+        const promises = [];
+        const deployButtons = []; // 存储部署按钮
+        const reviewButtons = []; // 存储审查按钮
+        for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; console.log(`Adding deploy URL: ${deployURL}`); promises.push( checkURL(deployURL).then(async isAccessible => {
+                    console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                    if (isAccessible) {
+                        const deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
+                        const onlineCount = await fetchOnlineCount(deployURL);
+                        deployButton.querySelector('.online-count').textContent = `在线人数: ${onlineCount}`;
+                        deployButtons.push({ number: i, button: deployButton });
+                    }
+                })
+            );
+            console.log(`Adding review URL: ${reviewURL}`);
+            promises.push(
+                checkURL(reviewURL).then(async isAccessible => {
+                    console.log(`Review ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                    if (isAccessible) {
+                        const reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
+                        const onlineCount = await fetchOnlineCount(reviewURL);
+                        reviewButton.querySelector('.online-count').textContent = `在线人数: ${onlineCount}`;
+                        reviewButtons.push({ number: i, button: reviewButton });
+                    }
+                })
+            );
+        }
+        // 等待所有 Promise 完成
+        await Promise.allSettled(promises);
+        // 按数字对按钮进行排序
+        deployButtons.sort((a, b) => a.number - b.number);
+        reviewButtons.sort((a, b) => a.number - b.number);
+        // 将按钮添加到页面上
+        deployButtons.forEach(deploy => deployResultsDiv.appendChild(deploy.button));
+        reviewButtons.forEach(review => reviewResultsDiv.appendChild(review.button));
+        // 隐藏加载图标并显示结果
+        loader.style.display = 'none';
+        deployResultsDiv.classList.remove('hidden');
+        reviewResultsDiv.classList.remove('hidden');
+    }
+    checkURLs();
+</script>
