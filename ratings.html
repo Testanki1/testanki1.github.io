@@ -118,6 +118,9 @@
 </div>
 <div id="nameDisplay" style="color:white;text-align:center;margin-top:10px;">
 </div>
+<div id="rankDisplay" style="color:white;text-align:center;margin-top:10px;">
+</div>
+<!-- 等级显示区域 -->
 <div id="result">
 	<!-- 个人资料将显示在这里 -->
 </div>
@@ -132,10 +135,12 @@ async function fetchProfile() {
     const region = document.getElementById('region').value;
     const username = document.getElementById('username').value;
     const resultDiv = document.getElementById('result');
-    const nameDisplay = document.getElementById('nameDisplay'); // 获取显示name的div
+    const nameDisplay = document.getElementById('nameDisplay');
+    const rankDisplay = document.getElementById('rankDisplay');  // 获取显示军衔的div
     const loader = document.getElementById('loader');
     resultDiv.innerHTML = '';  // 清空之前的结果
-    nameDisplay.innerHTML = ''; // 清空昵称显示区域
+    nameDisplay.innerHTML = ''; // 清空名称显示区域
+    rankDisplay.innerHTML = ''; // 清空军衔显示区域
     loader.style.display = 'flex'; // 显示加载提示
     if (username.trim() === '') {
         alert('请输入昵称');
@@ -151,6 +156,15 @@ async function fetchProfile() {
     const proxyUrl = 'https://api.allorigins.win/get?url=';
     const targetUrl = encodeURIComponent(url);
     const apiUrl = proxyUrl + targetUrl;
+    // 军衔名称映射表
+    const ranks = [
+        "新兵", "二等兵", "一等兵", "下士", "中士", "上士",
+        "三级军士长", "二级军士长", "一级军士长", "军士长",
+        "五级准尉", "四级准尉", "三级准尉", "二级准尉", "一级准尉", "特级准尉",
+        "少尉", "中尉", "上尉", "少校", "中校", "上校",
+        "准将", "少将", "中将", "上将", "元帅", "陆军元帅",
+        "统帅", "大元帅", "传奇"
+    ];
     try {
         const response = await fetch(apiUrl);
         if (!response.ok) {
@@ -167,21 +181,19 @@ async function fetchProfile() {
 </p>
 `;
                 } else {
-                    // 替换链接中的 .tnk 为 .webp 并显示结果
-                    const formattedContent = JSON.stringify(responseData, null, 2)
-                        .replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
-                        .replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
+                    const formattedContent = JSON.stringify(responseData, null, 2);
                     resultDiv.innerHTML = `
 <pre>${formattedContent}</pre>
 `;
-                    // 显示name属性
-                    if (responseData.response && responseData.response.name) {
-                        nameDisplay.innerHTML = `昵称: ${responseData.response.name}`;
-                    } else {
-                        nameDisplay.innerHTML = '昵称未提供';
-                    }
+                    // 显示昵称
+                    const name = responseData.response && responseData.response.name ? responseData.response.name : '未知昵称';
+                    nameDisplay.innerHTML = `名称: ${name}`;
+                    // 显示等级
+                    const rank = responseData.response && responseData.response.rank ? responseData.response.rank : 1; // 默认为新兵
+                    const rankName = ranks[rank - 1] || '未知等级'; // 防止数组越界
+                    rankDisplay.innerHTML = `军衔: ${rankName}`;
                 }
-            } catch (error) {
+                        } catch (error) {
                 resultDiv.innerHTML = `
 <p>
 	无效 JSON 数据: ${error.message}
