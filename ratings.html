@@ -116,6 +116,8 @@
 <div class="form-group" style="text-align:center;">
 	<button id="fetchButton">确定</button> 
 </div>
+<div id="nameDisplay" style="color:white;text-align:center;margin-top:10px;">
+</div>
 <div id="result">
 	<!-- 个人资料将显示在这里 -->
 </div>
@@ -130,8 +132,10 @@ async function fetchProfile() {
     const region = document.getElementById('region').value;
     const username = document.getElementById('username').value;
     const resultDiv = document.getElementById('result');
+    const nameDisplay = document.getElementById('nameDisplay'); // 获取显示name的div
     const loader = document.getElementById('loader');
     resultDiv.innerHTML = '';  // 清空之前的结果
+    nameDisplay.innerHTML = ''; // 清空昵称显示区域
     loader.style.display = 'flex'; // 显示加载提示
     if (username.trim() === '') {
         alert('请输入昵称');
@@ -163,16 +167,26 @@ async function fetchProfile() {
 </p>
 `;
                 } else {
-                    // 格式化显示内容并替换链接
+                    // 替换链接中的 .tnk 为 .webp 并显示结果
                     const formattedContent = JSON.stringify(responseData, null, 2)
                         .replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
                         .replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
                     resultDiv.innerHTML = `
 <pre>${formattedContent}</pre>
 `;
+                    // 显示name属性
+                    if (responseData.response && responseData.response.name) {
+                        nameDisplay.innerHTML = `昵称: ${responseData.response.name}`;
+                    } else {
+                        nameDisplay.innerHTML = '昵称未提供';
+                    }
                 }
             } catch (error) {
-                throw new Error('无效 JSON 数据');
+                resultDiv.innerHTML = `
+<p>
+	无效 JSON 数据: ${error.message}
+</p>
+`;
             }
         } else {
             throw new Error('未知错误');
@@ -187,4 +201,4 @@ async function fetchProfile() {
         loader.style.display = 'none'; // 隐藏加载提示
     }
 }
-    </script>
+</script>
