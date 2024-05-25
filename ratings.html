@@ -99,7 +99,7 @@
 	3D坦克排行榜
 </h1>
 <div class="form-group">
-	<label for="region" style="text-align:center;">选择服务器区域:</label> 
+	<label for="region" style="text-align:center;">选择服务器：</label> 
 	<div style="text-align:center;">
 		<select id="region"> <option value="国服">国服</option>
                 <option value="外服">外服</option>
@@ -107,7 +107,7 @@
 	</div>
 </div>
 <div class="form-group">
-	<label for="username" style="text-align:center;">输入昵称:</label> 
+	<label for="username" style="text-align:center;">输入昵称：</label> 
 	<div style="text-align:center;">
 		<input type="text" id="username" placeholder="请输入坦克昵称" /> 
 	</div>
@@ -125,59 +125,62 @@
 </div>
 <script>
         document.getElementById('fetchButton').addEventListener('click', fetchProfile);
-        async function fetchProfile() {
-            const region = document.getElementById('region').value;
-            const username = document.getElementById('username').value;
-            const resultDiv = document.getElementById('result');
-            const loader = document.getElementById('loader');
-            resultDiv.innerHTML = '';  // 清空之前的结果
-            loader.style.display = 'flex'; // 显示加载提示
-            if (username.trim() === '') {
-                alert('请输入昵称');
-                loader.style.display = 'none'; // 隐藏加载提示
-                return;
-            }
-            let url;
-            if (region === '国服') {
-                url = `https://ratings.3dtank.com/get_stat/profile/?user=${username}&lang=cn`;
-            } else if (region === '外服') {
-                url = `https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`;
-            }
-            const proxyUrl = 'https://api.allorigins.win/get?url=';
-            const targetUrl = encodeURIComponent(url);
-            const apiUrl = proxyUrl + targetUrl;
+async function fetchProfile() {
+    const region = document.getElementById('region').value;
+    const username = document.getElementById('username').value;
+    const resultDiv = document.getElementById('result');
+    const loader = document.getElementById('loader');
+    resultDiv.innerHTML = '';  // 清空之前的结果
+    loader.style.display = 'flex'; // 显示加载提示
+    if (username.trim() === '') {
+        alert('请输入昵称');
+        loader.style.display = 'none'; // 隐藏加载提示
+        return;
+    }
+    let url;
+    if (region === '国服') {
+        url = `https://ratings.3dtank.com/get_stat/profile/?user=${username}&lang=cn`;
+    } else if (region === '外服') {
+        url = `https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`;
+    }
+    const proxyUrl = 'https://api.allorigins.win/get?url=';
+    const targetUrl = encodeURIComponent(url);
+    const apiUrl = proxyUrl + targetUrl;
+    try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            throw new Error('网络响应错误');
+        }
+        const data = await response.json();
+        if (data && data.contents) {
             try {
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    throw new Error('网络响应错误');
-                }
-                const data = await response.json();
-                if (data && data.contents) {
-                    try {
-                        const responseData = JSON.parse(data.contents);
-                        if (responseData && responseData.responseType === 'NOT_FOUND') {
-                            resultDiv.innerHTML = `
+                const responseData = JSON.parse(data.contents);
+                if (responseData && responseData.responseType === 'NOT_FOUND') {
+                    resultDiv.innerHTML = `
 <p>
 	找不到个人资料。请检查输入的昵称是否正确。
 </p>
 `;
-                        } else {
-                            resultDiv.innerHTML = data.contents; // 显示获取的网页内容
-                        }
-                    } catch (error) {
-                        throw new Error('无效 JSON 数据');
-                    }
                 } else {
-                    throw new Error('未知错误');
+                    // 格式化显示内容
+                    resultDiv.innerHTML = `
+<pre>${JSON.stringify(responseData, null, 2)}</pre>
+`;
                 }
             } catch (error) {
-                resultDiv.innerHTML = `
+                throw new Error('无效 JSON 数据');
+            }
+        } else {
+            throw new Error('未知错误');
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `
 <p>
 	获取资料失败: ${error.message}
 </p>
 `;
-            } finally {
-                loader.style.display = 'none'; // 隐藏加载提示
-            }
-        }
+    } finally {
+        loader.style.display = 'none'; // 隐藏加载提示
+    }
+}
     </script>
