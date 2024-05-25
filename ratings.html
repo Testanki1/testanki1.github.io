@@ -12,6 +12,7 @@
     -webkit-tap-highlight-color: transparent;
         }
         body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #001926; /* 背景颜色修改为 #001926 */
@@ -119,7 +120,13 @@
 </div>
 <div id="rankDisplay" style="color:white;text-align:center;margin-top:10px;">
 </div>
-<!-- 等级显示区域 -->
+<div id="killsDisplay" style="color:white;text-align:center;margin-top:10px;">
+</div>
+<div id="deathsDisplay" style="color:white;text-align:center;margin-top:10px;">
+</div>
+<div id="kdrDisplay" style="color:white;text-align:center;margin-top:10px;">
+	杀/死:
+</div>
 <div id="result">
 	<!-- 个人资料将显示在这里 -->
 </div>
@@ -135,7 +142,9 @@ async function fetchProfile() {
     const username = document.getElementById('username').value;
     const resultDiv = document.getElementById('result');
     const nameDisplay = document.getElementById('nameDisplay');
-    const rankDisplay = document.getElementById('rankDisplay');  // 获取显示军衔的div
+    const rankDisplay = document.getElementById('rankDisplay');  // 获取显示等级的div
+const killsDisplay = document.getElementById('killsDisplay'); // 确保 id 正确
+const deathsDisplay = document.getElementById('deathsDisplay'); // 确保 id 正确
     const loader = document.getElementById('loader');
     resultDiv.innerHTML = '';  // 清空之前的结果
     nameDisplay.innerHTML = ''; // 清空名称显示区域
@@ -155,7 +164,7 @@ async function fetchProfile() {
     const proxyUrl = 'https://api.allorigins.win/get?url=';
     const targetUrl = encodeURIComponent(url);
     const apiUrl = proxyUrl + targetUrl;
-    // 军衔名称映射表
+    // 等级名称映射表
     const ranks = [
         "新兵", "二等兵", "一等兵", "下士", "中士", "上士",
         "三级军士长", "二级军士长", "一级军士长", "军士长",
@@ -188,11 +197,18 @@ async function fetchProfile() {
 `;
                     // 显示昵称
                     const name = responseData.response && responseData.response.name ? responseData.response.name : '未知昵称';
-                    nameDisplay.innerHTML = `名称: ${name}`;
+                    nameDisplay.innerHTML = `昵称: ${name}`;
                     // 显示等级
                     const rank = responseData.response && responseData.response.rank ? responseData.response.rank : 1; // 默认为新兵
                     const rankName = ranks[rank - 1] || '未知等级'; // 防止数组越界
-                    rankDisplay.innerHTML = `军衔: ${rankName}`;
+                    rankDisplay.innerHTML = `等级: ${rankName}`;
+const kills = responseData.response && responseData.response.kills ? responseData.response.kills : '无';
+                    killsDisplay.innerHTML = `击杀: ${kills}`;
+const deaths = responseData.response && responseData.response.deaths ? responseData.response.deaths : '无';
+                    deathsDisplay.innerHTML = `死亡: ${deaths}`;
+const kdr = deaths === 0 ? '-' : (kills / deaths).toFixed(2);
+                    const kdrDisplay = document.getElementById('kdrDisplay');  // 获取显示杀/死率的div
+                    kdrDisplay.innerHTML = `杀/死: ${kdr}`;
                 }
                         } catch (error) {
                 resultDiv.innerHTML = `
