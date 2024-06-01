@@ -265,12 +265,14 @@ async function fetchProfile() {
         if (data && data.contents) {
             const responseData = JSON.parse(data.contents);
             if (responseData && responseData.responseType === 'NOT_FOUND') {
-                modalContent.innerHTML = `
-<p>
-	找不到个人资料。请检查输入的昵称是否正确。
-</p>
-`;
-            } else {
+                const errorMessage = document.createElement('p');
+    errorMessage.textContent = '找不到个人资料。请检查输入的昵称是否正确。';
+    document.getElementById('fetchButton').insertAdjacentElement('afterend', errorMessage);
+} else {
+const errorMessage = document.querySelector('#fetchButton + p');
+    if (errorMessage) {
+        errorMessage.remove();
+    }
                 // 格式化数据
                 const formattedContent = JSON.stringify(responseData, null, 2)
                     .replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
