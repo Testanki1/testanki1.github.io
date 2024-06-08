@@ -188,6 +188,8 @@
 </div>
 <div id="gearScoreDisplay" style="color:white;text-align:center;margin-top:10px;">
 </div>
+<div id="rankingsTable" style="margin-top:20px;text-align:center;">
+</div>
 <div id="resultContent" style="display:none;">
 </div>
 <button id="viewRawDataButton" class="view-button" style="display:none;">查看原始数据</button> <!-- The Modal -->
@@ -220,6 +222,7 @@ async function fetchProfile() {
     const caughtGoldsDisplay = document.getElementById('caughtGoldsDisplay');
     const earnedCrystalsDisplay = document.getElementById('earnedCrystalsDisplay');
     const gearScoreDisplay = document.getElementById('gearScoreDisplay');
+const rankingsTable = document.getElementById('rankingsTable');
     const loader = document.getElementById('loader');
     // 清空显示内容
     modalContent.innerHTML = '';
@@ -232,6 +235,7 @@ async function fetchProfile() {
     caughtGoldsDisplay.innerHTML = '';
     earnedCrystalsDisplay.innerHTML = '';
     gearScoreDisplay.innerHTML = '';
+rankingsTable.innerHTML = '';
     // 显示加载动画
     loader.style.display = 'flex';
     if (username.trim() === '') {
@@ -285,7 +289,49 @@ const errorMessage = document.querySelector('#fetchButton + p');
                 nameDisplay.innerHTML = `昵称: ${name}`;
                 const rank = responseData.response && responseData.response.rank ? responseData.response.rank : 1;
                 let rankName;
-                if (rank <= ranks.length) { rankName = ranks[rank - 1]; } else { let legendRank = rank - ranks.length; rankName = `传奇 ${legendRank + 1}`; } rankDisplay.innerHTML = `等级: ${rankName}`; const score = responseData.response && responseData.response.score ? responseData.response.score : '0'; const scoreNext = responseData.response && responseData.response.scoreNext ? responseData.response.scoreNext : '0'; experienceDisplay.innerHTML = `经验: ${score} / ${scoreNext}`; const kills = responseData.response && responseData.response.kills ? responseData.response.kills : '0'; killsDisplay.innerHTML = `击杀: ${kills}`; const deaths = responseData.response && responseData.response.deaths ? responseData.response.deaths : '0'; deathsDisplay.innerHTML = `死亡: ${deaths}`; const kdr = deaths === 0 ? '-' : (kills / deaths).toFixed(2); kdrDisplay.innerHTML = `杀/死: ${kdr}`; const caughtGolds = responseData.response && responseData.response.caughtGolds ? responseData.response.caughtGolds : '0'; caughtGoldsDisplay.innerHTML = `已获得的金箱子: ${caughtGolds}`; const earnedCrystals = responseData.response && responseData.response.earnedCrystals ? responseData.response.earnedCrystals : '0'; earnedCrystalsDisplay.innerHTML = `已获得的水晶: ${earnedCrystals}`; const gearScore = responseData.response && responseData.response.gearScore ? responseData.response.gearScore : '0'; gearScoreDisplay.innerHTML = `战斗力: ${gearScore}`; } } else { throw new Error('未知错误'); } } catch (error) { modalContent.innerHTML = `
+                if (rank <= ranks.length) { rankName = ranks[rank - 1]; } else { let legendRank = rank - ranks.length; rankName = `传奇 ${legendRank + 1}`; } rankDisplay.innerHTML = `等级: ${rankName}`; const score = responseData.response && responseData.response.score ? responseData.response.score : '0'; const scoreNext = responseData.response && responseData.response.scoreNext ? responseData.response.scoreNext : '0'; experienceDisplay.innerHTML = `经验: ${score} / ${scoreNext}`; const kills = responseData.response && responseData.response.kills ? responseData.response.kills : '0'; killsDisplay.innerHTML = `击杀: ${kills}`; const deaths = responseData.response && responseData.response.deaths ? responseData.response.deaths : '0'; deathsDisplay.innerHTML = `死亡: ${deaths}`; const kdr = deaths === 0 ? '-' : (kills / deaths).toFixed(2); kdrDisplay.innerHTML = `杀/死: ${kdr}`; const caughtGolds = responseData.response && responseData.response.caughtGolds ? responseData.response.caughtGolds : '0'; caughtGoldsDisplay.innerHTML = `已获得的金箱子: ${caughtGolds}`; const earnedCrystals = responseData.response && responseData.response.earnedCrystals ? responseData.response.earnedCrystals : '0'; earnedCrystalsDisplay.innerHTML = `已获得的水晶: ${earnedCrystals}`; const gearScore = responseData.response && responseData.response.gearScore ? responseData.response.gearScore : '0'; gearScoreDisplay.innerHTML = `战斗力: ${gearScore}`; const { previousRating, rating } = responseData.response; const categories = ['score', 'golds', 'crystals', 'efficiency']; const tableHtml = `
+<table style="width:50%;" cellpadding="1" cellspacing="0" align="center" border="0" bordercolor="#000000">
+	<tbody>
+		<tr>
+			<td style="text-align:center;">
+				排名
+			</td>
+			<td style="text-align:center;">
+				位置
+			</td>
+			<td style="text-align:center;">
+				价值
+			</td>
+			<td style="text-align:center;">
+				以前的位置
+			</td>
+			<td style="text-align:center;">
+				以前的价值
+			</td>
+		</tr>
+${categories.map(category => `
+		<tr>
+			<td style="text-align:center;">
+				${category === 'score' ? '经验值' : category === 'golds' ? '金箱子' : category === 'crystals' ? '水晶' : '效率'}
+			</td>
+			<td style="text-align:center;">
+				${rating[category] ? rating[category].position : '-'}
+			</td>
+			<td style="text-align:center;">
+				${rating[category] ? rating[category].value : '-'}
+			</td>
+			<td style="text-align:center;">
+				${previousRating[category] ? previousRating[category].position : '-'}
+			</td>
+			<td style="text-align:center;">
+				${previousRating[category] ? previousRating[category].value : '-'}
+			</td>
+		</tr>
+`).join('')}
+	</tbody>
+</table>
+`;
+                rankingsTable.innerHTML = tableHtml; } } else { throw new Error('未知错误'); } } catch (error) { modalContent.innerHTML = `
 <p>
 	获取资料失败: ${error.message}
 </p>
