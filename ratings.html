@@ -47,70 +47,6 @@
     .form-group button:hover {
         background-color: #59cc1d;
     }
-/* Modal styles */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1;
-    padding-top: 60px;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgb(0, 0, 0);
-    background-color: rgba(0, 0, 0, 0.4);
-}
-.modal-content {
-    background-color: #fefefe;
-    margin: 5% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    max-width: 600px;
-    color: black;
-}
-.close {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-}
-.close:hover,
-.close:focus {
-    color: black;
-    text-decoration: none;
-    cursor: pointer;
-}
-.view-button {
-    display: none;
-    margin: 10px auto;
-    background-color: #76FF33;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    padding: 10px;
-    text-align: center;
-}
-.view-button:hover {
-    background-color: #59cc1d;
-}
-    #result {
-        margin-top: 20px;
-        width: 100%;
-        overflow: auto;
-        color: white;
-        text-align: center;
-    }
-    #result pre {
-        padding: 10px;
-        overflow: auto;
-        background-color: transparent;
-        color: white;
-        display: inline-block;
-        white-space: pre-wrap;
-    }
     .loader {
     display: none;
     justify-content: center;
@@ -190,16 +126,6 @@
 </div>
 <div id="rankingsTable" style="margin-top:20px;text-align:center;">
 </div>
-<div id="resultContent" style="display:none;">
-</div>
-<button id="viewRawDataButton" class="view-button" style="display:none;">查看原始数据</button> <!-- The Modal -->
-<div id="myModal" class="modal">
-	<div class="modal-content">
-		<span class="close">×</span> 
-		<div id="result">
-		</div>
-	</div>
-</div>
 <div class="loader" id="loader">
 	<div class="loader-inner">
 	</div>
@@ -209,10 +135,6 @@ document.getElementById('fetchButton').addEventListener('click', fetchProfile);
 async function fetchProfile() {
     const region = document.getElementById('region').value;
     const username = document.getElementById('username').value;
-    // 获取模态框及模态框内容
-    const modal = document.getElementById('myModal');
-    const modalContent = document.getElementById('result');
-    // 获取其他显示元素
     const nameDisplay = document.getElementById('nameDisplay');
     const rankDisplay = document.getElementById('rankDisplay');
     const experienceDisplay = document.getElementById('experienceDisplay');
@@ -225,7 +147,6 @@ async function fetchProfile() {
 const rankingsTable = document.getElementById('rankingsTable');
     const loader = document.getElementById('loader');
     // 清空显示内容
-    modalContent.innerHTML = '';
     nameDisplay.innerHTML = '';
     rankDisplay.innerHTML = '';
     experienceDisplay.innerHTML = '';
@@ -281,9 +202,6 @@ const errorMessage = document.querySelector('#fetchButton + p');
                 const formattedContent = JSON.stringify(responseData, null, 2)
                     .replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
                     .replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
-                modalContent.innerHTML = `
-<pre>${formattedContent}</pre>
-`;
                 // 更新其他显示元素
                 const name = responseData.response && responseData.response.name ? responseData.response.name : '未知昵称';
                 nameDisplay.innerHTML = `昵称: ${name}`;
@@ -331,20 +249,8 @@ ${categories.map(category => `
 	</tbody>
 </table>
 `;
-                rankingsTable.innerHTML = tableHtml; } } else { throw new Error('未知错误'); } } catch (error) { modalContent.innerHTML = `
-<p>
-	获取资料失败: ${error.message}
-</p>
-`;
-    } finally {
+                rankingsTable.innerHTML = tableHtml; } } else { throw new Error('未知错误'); } } catch (error) {     } finally {
         loader.style.display = 'none';
-    }
-}
-// 当用户点击模态框之外的区域时，关闭模态框
-window.onclick = function(event) {
-    const modal = document.getElementById('myModal');
-    if (event.target == modal) {
-        modal.style.display = 'none';
     }
 }
 </script>
