@@ -5,87 +5,111 @@
 	3D坦克排行榜
 </title>
 <style>
-    * {
-        font-family: 'Rubik', sans-serif;
-    }
-    * {
-        -webkit-tap-highlight-color: transparent;
-    }
-    body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background-color: #001926;
-        color: white;
-    }
-    h1 {
-        text-align: center;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-    }
-    .form-group input,
-    .form-group select {
-        width: 40ch;
-        padding: 8px;
-        margin-bottom: 10px;
-        box-sizing: border-box;
-        background-color: #001926;
-        color: white;
-    }
-    .form-group button {
-        width: 40ch;
-        padding: 10px;
-        margin-top: 10px;
-        background-color: #76FF33;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    .form-group button:hover {
-        background-color: #59cc1d;
-    }
-    .loader {
-    display: none;
-    justify-content: center;
-    align-items: center;
-    height: 50px;
-    width: 100%;
-    background-color: #001926;
-    position: relative;
-    margin-top: 10px;
-}
-.loader .loader-inner {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 4px solid #5C6C74;
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-.loader .loader-inner:before {
-    content: "";
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 4px solid #fefefe;
-    border-color: #fefefe transparent transparent transparent;
-    animation: load 1s linear infinite;
-    position: absolute;
-}
-@keyframes load {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
-}
-</style>
+        * {
+            font-family: 'Rubik', sans-serif;
+        }
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #001926;
+            color: white;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input,
+        .form-group select {
+            width: 40ch;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            background-color: #001926;
+            color: white;
+        }
+        .form-group button {
+            width: 40ch;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #76FF33;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #59cc1d;
+        }
+        .loader {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            height: 50px;
+            width: 100%;
+            background-color: #001926;
+            position: relative;
+            margin-top: 10px;
+        }
+        .loader .loader-inner {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 4px solid #5C6C74;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .loader .loader-inner:before {
+            content: "";
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid #fefefe;
+            border-color: #fefefe transparent transparent transparent;
+            animation: load 1s linear infinite;
+            position: absolute;
+        }
+        @keyframes load {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        .container {
+            margin-top: 20px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .data-card {
+            display: inline-block;
+            background-color: #0a192f;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 10px;
+        }
+        .data-card img {
+            max-width: 100px;
+            max-height: 100px;
+        }
+        .data-card h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .data-card p {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+    </style>
 <h1>
 	3D坦克排行榜（完善中）
 </h1>
@@ -93,8 +117,8 @@
 	<label for="region" style="text-align:center;">选择服务器：</label> 
 	<div style="text-align:center;">
 		<select id="region"> <option value="国服">国服</option>
-            <option value="外服">外服</option>
-        </select> 
+                <option value="外服">外服</option>
+            </select> 
 	</div>
 </div>
 <div class="form-group">
@@ -134,95 +158,122 @@
 	<div class="loader-inner">
 	</div>
 </div>
+<div id="turretsPlayedContainer" class="container">
+</div>
+<div id="hullsPlayedContainer" class="container">
+</div>
+<div id="resistanceModulesContainer" class="container">
+</div>
+<div id="paintsPlayedContainer" class="container">
+</div>
+<div id="suppliesUsageContainer" class="container">
+</div>
+<div id="modesPlayedContainer" class="container">
+</div>
+<div id="presentsContainer" class="container">
+</div>
 <script>
-document.getElementById('fetchButton').addEventListener('click', fetchProfile);
-async function fetchProfile() {
-    const region = document.getElementById('region').value;
-    const username = document.getElementById('username').value;
-    const nameDisplay = document.getElementById('nameDisplay');
-    const rankDisplay = document.getElementById('rankDisplay');
-    const experienceDisplay = document.getElementById('experienceDisplay');
-    const gearScoreDisplay = document.getElementById('gearScoreDisplay');
-    const killsDisplay = document.getElementById('killsDisplay');
-    const deathsDisplay = document.getElementById('deathsDisplay');
-    const kdrDisplay = document.getElementById('kdrDisplay');
-    const caughtGoldsDisplay = document.getElementById('caughtGoldsDisplay');
-    const earnedCrystalsDisplay = document.getElementById('earnedCrystalsDisplay');
-    const suppliesUsageDisplay = document.getElementById('suppliesUsageDisplay');
-    const timePlayedDisplay = document.getElementById('timePlayedDisplay');
-    const rankingsTable = document.getElementById('rankingsTable');
-    const loader = document.getElementById('loader');
-    // 清空显示内容
-    nameDisplay.innerHTML = '';
-    rankDisplay.innerHTML = '';
-    experienceDisplay.innerHTML = '';
-    killsDisplay.innerHTML = '';
-    deathsDisplay.innerHTML = '';
-    kdrDisplay.innerHTML = '';
-    caughtGoldsDisplay.innerHTML = '';
-    earnedCrystalsDisplay.innerHTML = '';
-    suppliesUsageDisplay.innerHTML = '';
-    timePlayedDisplay.innerHTML = '';
-    gearScoreDisplay.innerHTML = '';
-    rankingsTable.innerHTML = '';
-    // 显示加载动画
-    loader.style.display = 'flex';
-    if (username.trim() === '') {
-        alert('请输入昵称');
-        loader.style.display = 'none';
-        return;
-    }
-    let url;
-    if (region === '国服') {
-        url = `https://ratings.3dtank.com/get_stat/profile/?user=${username}&lang=cn`;
-    } else if (region === '外服') {
-        url = `https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`;
-    }
-    const proxyUrl = 'https://api.allorigins.win/get?url=';
-    const targetUrl = encodeURIComponent(url);
-    const apiUrl = proxyUrl + targetUrl;
-    const ranks = [
-        "新兵", "二等兵", "一等兵", "下士", "中士", "上士",
-        "三级军士长", "二级军士长", "一级军士长", "军士长",
-        "五级准尉", "四级准尉", "三级准尉", "二级准尉", "一级准尉", "特级准尉",
-        "少尉", "中尉", "上尉", "少校", "中校", "上校",
-        "准将", "少将", "中将", "上将", "元帅", "陆军元帅",
-        "统帅", "大元帅", "传奇"
-    ];
-    try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error('网络响应错误');
-        }
-        const data = await response.json();
-        if (data && data.contents) {
-            const responseData = JSON.parse(data.contents);
-            if (responseData && responseData.responseType === 'NOT_FOUND') {
-    // 检查是否已存在错误信息
-    const existingErrorMessage = document.querySelector('#fetchButton + p');
-    if (existingErrorMessage) {
-        existingErrorMessage.remove(); // 移除已存在的错误信息
-    }
-    // 插入新的错误信息
-    const errorMessage = document.createElement('p');
-    errorMessage.textContent = '找不到个人资料。请检查输入的昵称是否正确。';
-    document.getElementById('fetchButton').insertAdjacentElement('afterend', errorMessage);
-} else {
-    // 如果找到资料，确保错误信息被移除
-    const errorMessage = document.querySelector('#fetchButton + p');
-    if (errorMessage) {
-        errorMessage.remove();
-    }
-                // 格式化数据
-                const formattedContent = JSON.stringify(responseData, null, 2)
-                    .replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
-                    .replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
-                // 更新其他显示元素
-                const name = responseData.response && responseData.response.name ? responseData.response.name : '未知昵称';
-                nameDisplay.innerHTML = `昵称: ${name}`;
-                const rank = responseData.response && responseData.response.rank ? responseData.response.rank : 1;
-                let rankName;
-                if (rank <= ranks.length) { rankName = ranks[rank - 1]; } else { let legendRank = rank - ranks.length; rankName = `传奇 ${legendRank + 1}`; } rankDisplay.innerHTML = `等级: ${rankName}`; const score = responseData.response && responseData.response.score ? responseData.response.score : '0'; const scoreNext = responseData.response && responseData.response.scoreNext ? responseData.response.scoreNext : '0'; experienceDisplay.innerHTML = `经验: ${score} / ${scoreNext}`; const kills = responseData.response && responseData.response.kills ? responseData.response.kills : '0'; killsDisplay.innerHTML = `击杀: ${kills}`; const deaths = responseData.response && responseData.response.deaths ? responseData.response.deaths : '0'; deathsDisplay.innerHTML = `死亡: ${deaths}`; const kdr = deaths === 0 ? '-' : (kills / deaths).toFixed(2); kdrDisplay.innerHTML = `杀/死: ${kdr}`; const caughtGolds = responseData.response && responseData.response.caughtGolds ? responseData.response.caughtGolds : '0'; caughtGoldsDisplay.innerHTML = `已获得的金箱子: ${caughtGolds}`; const earnedCrystals = responseData.response && responseData.response.earnedCrystals ? responseData.response.earnedCrystals : '0'; earnedCrystalsDisplay.innerHTML = `已获得的水晶: ${earnedCrystals}`; const gearScore = responseData.response && responseData.response.gearScore ? responseData.response.gearScore : '0'; gearScoreDisplay.innerHTML = `战斗力: ${gearScore}`; const { previousRating, rating } = responseData.response; const categories = ['score', 'golds', 'crystals', 'efficiency']; const tableHtml = `
+        document.getElementById('fetchButton').addEventListener('click', fetchProfile);
+        async function fetchProfile() {
+            const region = document.getElementById('region').value;
+            const username = document.getElementById('username').value;
+            const nameDisplay = document.getElementById('nameDisplay');
+            const rankDisplay = document.getElementById('rankDisplay');
+            const experienceDisplay = document.getElementById('experienceDisplay');
+            const gearScoreDisplay = document.getElementById('gearScoreDisplay');
+            const killsDisplay = document.getElementById('killsDisplay');
+            const deathsDisplay = document.getElementById('deathsDisplay');
+            const kdrDisplay = document.getElementById('kdrDisplay');
+            const caughtGoldsDisplay = document.getElementById('caughtGoldsDisplay');
+            const earnedCrystalsDisplay = document.getElementById('earnedCrystalsDisplay');
+            const suppliesUsageDisplay = document.getElementById('suppliesUsageDisplay');
+            const timePlayedDisplay = document.getElementById('timePlayedDisplay');
+            const loader = document.getElementById('loader');
+            const turretsPlayedContainer = document.getElementById('turretsPlayedContainer');
+            const hullsPlayedContainer = document.getElementById('hullsPlayedContainer');
+            const resistanceModulesContainer = document.getElementById('resistanceModulesContainer');
+            const paintsPlayedContainer = document.getElementById('paintsPlayedContainer');
+            const suppliesUsageContainer = document.getElementById('suppliesUsageContainer');
+            const modesPlayedContainer = document.getElementById('modesPlayedContainer');
+            const presentsContainer = document.getElementById('presentsContainer');
+            // 清空显示内容
+            nameDisplay.innerHTML = '';
+            rankDisplay.innerHTML = '';
+            experienceDisplay.innerHTML = '';
+            killsDisplay.innerHTML = '';
+            deathsDisplay.innerHTML = '';
+            kdrDisplay.innerHTML = '';
+            caughtGoldsDisplay.innerHTML = '';
+            earnedCrystalsDisplay.innerHTML = '';
+            suppliesUsageDisplay.innerHTML = '';
+            timePlayedDisplay.innerHTML = '';
+            gearScoreDisplay.innerHTML = '';
+            // 清空各列表项内容
+            turretsPlayedContainer.innerHTML = '';
+            hullsPlayedContainer.innerHTML = '';
+            resistanceModulesContainer.innerHTML = '';
+            paintsPlayedContainer.innerHTML = '';
+            suppliesUsageContainer.innerHTML = '';
+            modesPlayedContainer.innerHTML = '';
+            presentsContainer.innerHTML = '';
+            // 显示加载动画
+            loader.style.display = 'flex';
+            if (username.trim() === '') {
+                alert('请输入昵称');
+                loader.style.display = 'none';
+                return;
+            }
+            let url;
+            if (region === '国服') {
+                url = `https://ratings.3dtank.com/get_stat/profile/?user=${username}&lang=cn`;
+            } else if (region === '外服') {
+                url = `https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn`;
+            }
+            const proxyUrl = 'https://api.allorigins.win/get?url=';
+            const targetUrl = encodeURIComponent(url);
+            const apiUrl = proxyUrl + targetUrl;
+            const ranks = [
+                "新兵", "二等兵", "一等兵", "下士", "中士", "上士",
+                "三级军士长", "二级军士长", "一级军士长", "军士长",
+                "五级准尉", "四级准尉", "三级准尉", "二级准尉", "一级准尉", "特级准尉",
+                "少尉", "中尉", "上尉", "少校", "中校", "上校",
+                "准将", "少将", "中将", "上将", "元帅", "陆军元帅",
+                "统帅", "大元帅", "传奇"
+            ];
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error('网络响应错误');
+                }
+                const data = await response.json();
+                if (data && data.contents) {
+                    const responseData = JSON.parse(data.contents);
+                    if (responseData && responseData.responseType === 'NOT_FOUND') {
+                        // 检查是否已存在错误信息
+                        const existingErrorMessage = document.querySelector('#fetchButton + p');
+                        if (existingErrorMessage) {
+                            existingErrorMessage.remove(); // 移除已存在的错误信息
+                        }
+                        // 插入新的错误信息
+                        const errorMessage = document.createElement('p');
+                        errorMessage.textContent = '找不到个人资料。请检查输入的昵称是否正确。';
+                        document.getElementById('fetchButton').insertAdjacentElement('afterend', errorMessage);
+                    } else {
+                        // 如果找到资料，确保错误信息被移除
+                        const errorMessage = document.querySelector('#fetchButton + p');
+                        if (errorMessage) {
+                            errorMessage.remove();
+                        }
+                        // 格式化数据
+                        const formattedContent = JSON.stringify(responseData, null, 2)
+                            .replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
+                            .replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
+                        // 更新其他显示元素
+                        const name = responseData.response && responseData.response.name ? responseData.response.name : '未知昵称';
+                        nameDisplay.innerHTML = `昵称: ${name}`;
+                        const rank = responseData.response && responseData.response.rank ? responseData.response.rank : 1;
+                        let rankName;
+                        if (rank <= ranks.length) { rankName = ranks[rank - 1]; } else { let legendRank = rank - ranks.length; rankName = `传奇 ${legendRank + 1}`; } rankDisplay.innerHTML = `等级: ${rankName}`; const score = responseData.response && responseData.response.score ? responseData.response.score : '0'; const scoreNext = responseData.response && responseData.response.scoreNext ? responseData.response.scoreNext : '0'; experienceDisplay.innerHTML = `经验: ${score} / ${scoreNext}`; const kills = responseData.response && responseData.response.kills ? responseData.response.kills : '0'; killsDisplay.innerHTML = `击杀: ${kills}`; const deaths = responseData.response && responseData.response.deaths ? responseData.response.deaths : '0'; deathsDisplay.innerHTML = `死亡: ${deaths}`; const kdr = deaths === 0 ? '-' : (kills / deaths).toFixed(2); kdrDisplay.innerHTML = `杀/死: ${kdr}`; const caughtGolds = responseData.response && responseData.response.caughtGolds ? responseData.response.caughtGolds : '0'; caughtGoldsDisplay.innerHTML = `已获得的金箱子: ${caughtGolds}`; const earnedCrystals = responseData.response && responseData.response.earnedCrystals ? responseData.response.earnedCrystals : '0'; earnedCrystalsDisplay.innerHTML = `已获得的水晶: ${earnedCrystals}`; const gearScore = responseData.response && responseData.response.gearScore ? responseData.response.gearScore : '0'; gearScoreDisplay.innerHTML = `战斗力: ${gearScore}`; const { previousRating, rating } = responseData.response; const categories = ['score', 'golds', 'crystals', 'efficiency']; const tableHtml = `
 <table style="width:100%;" cellpadding="1" cellspacing="0" align="center" border="1" bordercolor="#BFD5FF">
 	<tbody>
 		<tr>
@@ -264,30 +315,121 @@ ${categories.map(category => `
 	</tbody>
 </table>
 `;
-                rankingsTable.innerHTML = tableHtml;
-const hullsPlayed = responseData.response && responseData.response.hullsPlayed ? responseData.response.hullsPlayed : [];
-                let totalTimePlayedMs = hullsPlayed.reduce((total, hull) => total + (hull.timePlayed || 0), 0);
-                // 将毫秒转换为 "X 小时 X 分钟 X.XXX 秒"
-                const hours = Math.floor(totalTimePlayedMs / (3600 * 1000));
-                totalTimePlayedMs %= (3600 * 1000);
-                const minutes = Math.floor(totalTimePlayedMs / (60 * 1000));
-                totalTimePlayedMs %= (60 * 1000);
-                const seconds = (totalTimePlayedMs / 1000).toFixed(3);
-                let timePlayedText = '';
-                if (hours > 0) {
-                    timePlayedText += `${hours} 小时 `;
+                        rankingsTable.innerHTML = tableHtml;
+                        const hullsPlayed = responseData.response && responseData.response.hullsPlayed ? responseData.response.hullsPlayed : [];
+                        let totalTimePlayedMs = hullsPlayed.reduce((total, hull) => total + (hull.timePlayed || 0), 0);
+                        // 将毫秒转换为 "X 小时 X 分钟 X.XXX 秒"
+                        const hours = Math.floor(totalTimePlayedMs / (3600 * 1000));
+                        totalTimePlayedMs %= (3600 * 1000);
+                        const minutes = Math.floor(totalTimePlayedMs / (60 * 1000));
+                        totalTimePlayedMs %= (60 * 1000);
+                        const seconds = (totalTimePlayedMs / 1000).toFixed(3);
+                        let timePlayedText = '';
+                        if (hours > 0) {
+                            timePlayedText += `${hours} 小时 `;
+                        }
+                        if (minutes > 0 || hours > 0) {
+                            timePlayedText += `${minutes} 分钟 `;
+                        }
+                        timePlayedText += `${seconds} 秒`;
+                        timePlayedDisplay.innerHTML = `游戏时长: ${timePlayedText}`;
+                        // 获取 suppliesUsage 数据并计算总使用量
+                        const suppliesUsage = responseData.response && responseData.response.suppliesUsage ? responseData.response.suppliesUsage : [];
+                        const totalSuppliesUsage = suppliesUsage.reduce((total, supply) => total + (supply.usages || 0), 0);
+                        suppliesUsageDisplay.innerHTML = `已使用的道具: ${totalSuppliesUsage}`;
+                        // 显示其他数据
+                        displayListData(hullsPlayed, hullsPlayedContainer, "hullsPlayed");
+                        displayListData(responseData.response.turretsPlayed, turretsPlayedContainer, "turretsPlayed");
+                        displayListData(responseData.response.resistanceModules, resistanceModulesContainer, "resistanceModules");
+                        displayListData(responseData.response.paintsPlayed, paintsPlayedContainer, "paintsPlayed");
+                        displayListData(responseData.response.modesPlayed, modesPlayedContainer, "modesPlayed");
+                        displayListData(responseData.response.presents, presentsContainer, "presents");
+                    }
+                } else {
+                    throw new Error('未知错误');
                 }
-                if (minutes > 0 || hours > 0) {
-                    timePlayedText += `${minutes} 分钟 `;
+            } catch (error) {
+                console.error(error);
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+        // 显示列表数据
+        function displayListData(data, container, title) {
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                return;
+            }
+            const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
+            data.forEach(item => {
+                if (!item || typeof item !== 'object') {
+                    return;
                 }
-                timePlayedText += `${seconds} 秒`;
-                timePlayedDisplay.innerHTML = `游戏时长: ${timePlayedText}`;
-// 获取 suppliesUsage 数据并计算总使用量
-const suppliesUsage = responseData.response && responseData.response.suppliesUsage ? responseData.response.suppliesUsage : [];
-const totalSuppliesUsage = suppliesUsage.reduce((total, supply) => total + (supply.usages || 0), 0);
-suppliesUsageDisplay.innerHTML = `已使用的道具: ${totalSuppliesUsage}`;
-    } } else { throw new Error('未知错误'); } } catch (error) {     } finally {
-        loader.style.display = 'none';
-    }
-}
-</script>
+                const grade = item.grade === -1 || item.grade === null ? '-' : gradeMap[item.grade];
+                const name = item.name === -1 || item.name === null ? '-' : item.name;
+                const imageUrl = item.imageUrl === -1 || item.imageUrl === null ? null : item.imageUrl;
+                const properties = item.properties === -1 || item.properties === null ? '-' : item.properties;
+                const scoreEarned = item.scoreEarned === -1 || item.scoreEarned === null ? '-' : item.scoreEarned;
+                const timePlayed = item.timePlayed === -1 || item.timePlayed === null ? '-' : formatTime(item.timePlayed);
+                const usages = item.usages === -1 || item.usages === null ? '-' : item.usages;
+                const type = item.type === -1 || item.type === null ? '-' : item.type;
+                const count = item.count === -1 || item.count === null ? '-' : item.count;
+                const div = document.createElement('div');
+                div.classList.add('item-container');
+                div.innerHTML = `
+<div class="item-title">
+	${title}
+</div>
+<div class="item-info">
+	<div>
+		等级: ${grade}
+	</div>
+	<div>
+		名称: ${name}
+	</div>
+	<div>
+		属性: ${properties}
+	</div>
+	<div>
+		分数: ${scoreEarned}
+	</div>
+	<div>
+		游戏时长: ${timePlayed}
+	</div>
+	<div>
+		使用次数: ${usages}
+	</div>
+	<div>
+		类型: ${type}
+	</div>
+	<div>
+		数量: ${count}
+	</div>
+</div>
+`;
+                if (imageUrl) {
+                    const image = new Image();
+                    image.src = imageUrl;
+                    image.classList.add('item-image');
+                    div.appendChild(image);
+                }
+                container.appendChild(div);
+            });
+        }
+        // 格式化时间
+        function formatTime(milliseconds) {
+            const hours = Math.floor(milliseconds / (3600 * 1000));
+            milliseconds %= (3600 * 1000);
+            const minutes = Math.floor(milliseconds / (60 * 1000));
+            milliseconds %= (60 * 1000);
+            const seconds = (milliseconds / 1000).toFixed(3);
+            let timePlayedText = '';
+            if (hours > 0) {
+                timePlayedText += `${hours} 小时 `;
+            }
+            if (minutes > 0 || hours > 0) {
+                timePlayedText += `${minutes} 分钟 `;
+            }
+            timePlayedText += `${seconds} 秒`;
+            return timePlayedText;
+        }
+    </script>
