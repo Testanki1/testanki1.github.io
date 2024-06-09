@@ -92,7 +92,6 @@
     white-space: nowrap;
     padding: 10px 0;
 }
-
 .data-card {
     display: inline-block;
     background-color: #0a192f;
@@ -102,22 +101,18 @@
     min-width: 100%;
     box-sizing: border-box;
 }
-
 .data-card img {
     max-width: 100px;
     max-height: 100px;
 }
-
 .data-card h3 {
     font-size: 18px;
     margin-bottom: 10px;
 }
-
 .data-card p {
     font-size: 14px;
     margin: 5px 0;
 }
-
     </style>
 <h1>
 	3D坦克排行榜（完善中）
@@ -163,13 +158,20 @@
 </div>
 <div id="rankingsTable" style="margin-top:20px;text-align:center;">
 </div>
-<div id="turretsPlayedContainer" class="container"></div>
-<div id="hullsPlayedContainer" class="container"></div>
-<div id="resistanceModulesContainer" class="container"></div>
-<div id="paintsPlayedContainer" class="container"></div>
-<div id="suppliesUsageContainer" class="container"></div>
-<div id="modesPlayedContainer" class="container"></div>
-<div id="presentsContainer" class="container"></div>
+<div id="turretsPlayedContainer" class="container">
+</div>
+<div id="hullsPlayedContainer" class="container">
+</div>
+<div id="resistanceModulesContainer" class="container">
+</div>
+<div id="paintsPlayedContainer" class="container">
+</div>
+<div id="suppliesUsageContainer" class="container">
+</div>
+<div id="modesPlayedContainer" class="container">
+</div>
+<div id="presentsContainer" class="container">
+</div>
 <div class="loader" id="loader">
 	<div class="loader-inner">
 	</div>
@@ -438,48 +440,75 @@ function displayListData(data, container, title) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return;
     }
-
     const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
-
     data.forEach(item => {
         if (!item || typeof item !== 'object') {
             return;
         }
-
-        const grade = item.grade === -1 || item.grade === null ? '-' : gradeMap[item.grade];
-        const name = item.name === -1 || item.name === null ? '-' : item.name;
-        const imageUrl = item.imageUrl === -1 || item.imageUrl === null ? null : item.imageUrl;
-        const properties = item.properties === -1 || item.properties === null ? '-' : item.properties;
-        const scoreEarned = item.scoreEarned === -1 || item.scoreEarned === null ? '-' : item.scoreEarned;
-        const timePlayed = item.timePlayed === -1 || item.timePlayed === null ? '-' : formatTime(item.timePlayed);
-        const usages = item.usages === -1 || item.usages === null ? '-' : item.usages;
-        const type = item.type === -1 || item.type === null ? '-' : item.type;
-        const count = item.count === -1 || item.count === null ? '-' : item.count;
-
+        const grade = item.grade == null || item.grade === -1 ? '-' : gradeMap[item.grade];
+        const name = item.name == null || item.name === -1 ? '-' : item.name;
+        const imageUrl = item.imageUrl == null || item.imageUrl === -1 ? null : item.imageUrl;
+        const properties = item.properties == null || item.properties === -1 ? '-' : item.properties;
+        const scoreEarned = item.scoreEarned == null || item.scoreEarned === -1 ? '-' : item.scoreEarned;
+        const timePlayed = item.timePlayed == null || item.timePlayed === -1 ? '-' : formatTime(item.timePlayed);
+        const usages = item.usages == null || item.usages === -1 ? '-' : item.usages;
+        const type = item.type == null || item.type === -1 ? '-' : item.type;
+        const count = item.count == null || item.count === -1 ? '-' : item.count;
         const div = document.createElement('div');
         div.classList.add('data-card');
-
         div.innerHTML = `
-            <div class="item-title">${title}</div>
-            <div class="item-info">
-                <div>等级: ${grade}</div>
-                <div>名称: ${name}</div>
-                <div>属性: ${properties}</div>
-                <div>分数: ${scoreEarned}</div>
-                <div>游戏时长: ${timePlayed}</div>
-                <div>使用次数: ${usages}</div>
-                <div>类型: ${type}</div>
-                <div>数量: ${count}</div>
-            </div>
-        `;
-
+<div class="item-title">
+	${title}
+</div>
+<div class="item-info">
+	${grade !== '-' ? `
+	<div>
+		等级: ${grade}
+	</div>
+` : ''}
+                ${name !== '-' ? `
+	<div>
+		名称: ${name}
+	</div>
+` : ''}
+                ${properties !== '-' ? `
+	<div>
+		属性: ${properties}
+	</div>
+` : ''}
+                ${scoreEarned !== '-' ? `
+	<div>
+		分数: ${scoreEarned}
+	</div>
+` : ''}
+                ${timePlayed !== '-' ? `
+	<div>
+		游戏时长: ${timePlayed}
+	</div>
+` : ''}
+                ${usages !== '-' ? `
+	<div>
+		使用次数: ${usages}
+	</div>
+` : ''}
+                ${type !== '-' ? `
+	<div>
+		类型: ${type}
+	</div>
+` : ''}
+                ${count !== '-' ? `
+	<div>
+		数量: ${count}
+	</div>
+` : ''}
+</div>
+`;
         if (imageUrl) {
             const image = new Image();
             image.src = imageUrl;
             image.classList.add('item-image');
             div.appendChild(image);
         }
-
         container.appendChild(div);
     });
 }
