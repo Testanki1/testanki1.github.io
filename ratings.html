@@ -371,67 +371,6 @@ ${categories.map(category => `
                 loader.style.display = 'none';
             }
         }
-        // 显示列表数据
-        function displayListData(data, container, title) {
-            if (!data || !Array.isArray(data) || data.length === 0) {
-                return;
-            }
-            const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
-            data.forEach(item => {
-                if (!item || typeof item !== 'object') {
-                    return;
-                }
-                const grade = item.grade === -1 || item.grade === null ? '-' : gradeMap[item.grade];
-                const name = item.name === -1 || item.name === null ? '-' : item.name;
-                const imageUrl = item.imageUrl === -1 || item.imageUrl === null ? null : item.imageUrl;
-                const properties = item.properties === -1 || item.properties === null ? '-' : item.properties;
-                const scoreEarned = item.scoreEarned === -1 || item.scoreEarned === null ? '-' : item.scoreEarned;
-                const timePlayed = item.timePlayed === -1 || item.timePlayed === null ? '-' : formatTime(item.timePlayed);
-                const usages = item.usages === -1 || item.usages === null ? '-' : item.usages;
-                const type = item.type === -1 || item.type === null ? '-' : item.type;
-                const count = item.count === -1 || item.count === null ? '-' : item.count;
-                const div = document.createElement('div');
-                div.classList.add('item-container');
-                div.innerHTML = `
-<div class="item-title">
-	${title}
-</div>
-<div class="item-info">
-	<div>
-		名称: ${name}
-	</div>
-	<div>
-		等级: ${grade}
-	</div>
-	<div>
-		特性: ${properties}
-	</div>
-	<div>
-		获得的经验值: ${scoreEarned}
-	</div>
-	<div>
-		使用时长: ${timePlayed}
-	</div>
-	<div>
-		使用量: ${usages}
-	</div>
-	<div>
-		类型: ${type}
-	</div>
-	<div>
-		数量: ${count}
-	</div>
-</div>
-`;
-                if (imageUrl) {
-                    const image = new Image();
-                    image.src = imageUrl;
-                    image.classList.add('item-image');
-                    div.appendChild(image);
-                }
-                container.appendChild(div);
-            });
-        }
         // 格式化时间
         function formatTime(milliseconds) {
             const hours = Math.floor(milliseconds / (3600 * 1000));
@@ -475,24 +414,24 @@ function displayListData(data, container, title) {
 	${title}
 </div>
 <div class="item-info">
-	${grade !== '-' ? `
+	${name !== '-' ? `
+	<div>
+		${name}
+	</div>
+` : ''}
+${grade !== '-' ? `
 	<div>
 		等级: ${grade}
 	</div>
 ` : ''}
-    ${name !== '-' ? `
-	<div>
-		名称: ${name}
-	</div>
-` : ''}
     ${properties !== '-' ? `
 	<div>
-		属性: ${properties}
+		特性: ${properties}
 	</div>
 ` : ''}
     ${scoreEarned !== '-' ? `
 	<div>
-		分数: ${scoreEarned}
+		获得的经验值: ${scoreEarned}
 	</div>
 ` : ''}
     ${timePlayed !== '-' ? `
@@ -502,7 +441,7 @@ function displayListData(data, container, title) {
 ` : ''}
     ${usages !== '-' ? `
 	<div>
-		使用次数: ${usages}
+		使用量: ${usages}
 	</div>
 ` : ''}
     ${type !== '-' ? `
