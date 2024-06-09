@@ -86,13 +86,13 @@
             }
         }
         .container {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    white-space: nowrap;
-    padding: 10px 0;
-}
-.data-card {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 0;
+        }
+        .data-card {
     display: inline-block;
     background-color: #0a192f;
     padding: 20px;
@@ -100,18 +100,31 @@
     border-radius: 10px;
     min-width: 100%;
     box-sizing: border-box;
+    position: relative;
+    overflow: hidden; /* 确保内容不会覆盖标题 */
+    max-height: 300px; /* 设置最大高度，便于查看效果 */
+    overflow-y: auto; /* 使内容可滚动 */
 }
-.data-card img {
-    max-width: 100px;
-    max-height: 100px;
-}
-.data-card h3 {
-    font-size: 18px;
-    margin-bottom: 10px;
-}
-.data-card p {
-    font-size: 14px;
-    margin: 5px 0;
+        .data-card img {
+            max-width: 100px;
+            max-height: 100px;
+        }
+        .data-card h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .data-card p {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        .item-title {
+    position: sticky;
+    top: 0;
+    background-color: #0a192f;
+    z-index: 1;
+    padding: 10px;
+    font-size: 20px;
+    text-align: center;
 }
     </style>
 <h1>
@@ -342,12 +355,12 @@ ${categories.map(category => `
                         const totalSuppliesUsage = suppliesUsage.reduce((total, supply) => total + (supply.usages || 0), 0);
                         suppliesUsageDisplay.innerHTML = `已使用的道具: ${totalSuppliesUsage}`;
                         // 显示其他数据
-                        displayListData(hullsPlayed, hullsPlayedContainer, "hullsPlayed");
-                        displayListData(responseData.response.turretsPlayed, turretsPlayedContainer, "turretsPlayed");
-                        displayListData(responseData.response.resistanceModules, resistanceModulesContainer, "resistanceModules");
-                        displayListData(responseData.response.paintsPlayed, paintsPlayedContainer, "paintsPlayed");
-                        displayListData(responseData.response.modesPlayed, modesPlayedContainer, "modesPlayed");
-                        displayListData(responseData.response.presents, presentsContainer, "presents");
+                        displayListData(hullsPlayed, hullsPlayedContainer, "使用的底盘");
+                        displayListData(responseData.response.turretsPlayed, turretsPlayedContainer, "使用的炮塔");
+                        displayListData(responseData.response.resistanceModules, resistanceModulesContainer, "使用的防御模块");
+                        displayListData(responseData.response.paintsPlayed, paintsPlayedContainer, "使用的迷彩");
+                        displayListData(responseData.response.modesPlayed, modesPlayedContainer, "玩过的模式");
+                        displayListData(responseData.response.presents, presentsContainer, "收到的礼物");
                     }
                 } else {
                     throw new Error('未知错误');
@@ -385,22 +398,22 @@ ${categories.map(category => `
 </div>
 <div class="item-info">
 	<div>
-		等级: ${grade}
-	</div>
-	<div>
 		名称: ${name}
 	</div>
 	<div>
-		属性: ${properties}
+		等级: ${grade}
 	</div>
 	<div>
-		分数: ${scoreEarned}
+		特性: ${properties}
 	</div>
 	<div>
-		游戏时长: ${timePlayed}
+		获得的经验值: ${scoreEarned}
 	</div>
 	<div>
-		使用次数: ${usages}
+		使用时长: ${timePlayed}
+	</div>
+	<div>
+		使用量: ${usages}
 	</div>
 	<div>
 		类型: ${type}
@@ -440,10 +453,7 @@ function displayListData(data, container, title) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return;
     }
-
-    // 按照 timePlayed 降序排序
     data.sort((a, b) => (b.timePlayed || 0) - (a.timePlayed || 0));
-
     const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
     data.forEach(item => {
         if (!item || typeof item !== 'object') {
@@ -470,37 +480,37 @@ function displayListData(data, container, title) {
 		等级: ${grade}
 	</div>
 ` : ''}
-	${name !== '-' ? `
+    ${name !== '-' ? `
 	<div>
 		名称: ${name}
 	</div>
 ` : ''}
-	${properties !== '-' ? `
+    ${properties !== '-' ? `
 	<div>
 		属性: ${properties}
 	</div>
 ` : ''}
-	${scoreEarned !== '-' ? `
+    ${scoreEarned !== '-' ? `
 	<div>
 		分数: ${scoreEarned}
 	</div>
 ` : ''}
-	${timePlayed !== '-' ? `
+    ${timePlayed !== '-' ? `
 	<div>
 		游戏时长: ${timePlayed}
 	</div>
 ` : ''}
-	${usages !== '-' ? `
+    ${usages !== '-' ? `
 	<div>
 		使用次数: ${usages}
 	</div>
 ` : ''}
-	${type !== '-' ? `
+    ${type !== '-' ? `
 	<div>
 		类型: ${type}
 	</div>
 ` : ''}
-	${count !== '-' ? `
+    ${count !== '-' ? `
 	<div>
 		数量: ${count}
 	</div>
@@ -516,5 +526,4 @@ function displayListData(data, container, title) {
         container.appendChild(div);
     });
 }
-
     </script>
