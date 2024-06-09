@@ -396,9 +396,7 @@ function displayListData(data, container, title) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return;
     }
-
     const aggregatedData = aggregateItemsByGrade(data);
-
     aggregatedData.forEach(item => {
         const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
         const grade = item.grade == null || item.grade === -1 ? '-' : gradeMap[item.grade];
@@ -406,38 +404,36 @@ function displayListData(data, container, title) {
         const imageUrl = item.imageUrl == null || item.imageUrl === -1 ? null : item.imageUrl;
         const scoreEarned = item.scoreEarned == null || item.scoreEarned === -1 ? '-' : item.scoreEarned;
         const timePlayed = item.timePlayed == null || item.timePlayed === -1 ? '-' : formatTime(item.timePlayed);
-
         const div = document.createElement('div');
         div.classList.add('data-card');
         div.innerHTML = `
 <div class="item-title">
-    ${title}
+	${title}
 </div>
 <div class="item-info">
-    ${name !== '-' ? `
-    <div>
-        ${name}
-    </div>
-    ` : ''}
+	${name !== '-' ? `
+	<div>
+		${name}
+	</div>
+` : ''}
     ${grade !== '-' ? `
-    <div>
-        等级: ${grade}
-    </div>
-    ` : ''}
+	<div>
+		等级: ${grade}
+	</div>
+` : ''}
     ${scoreEarned !== '-' ? `
-    <div>
-        获得的经验值: ${scoreEarned}
-    </div>
-    ` : ''}
+	<div>
+		获得的经验值: ${scoreEarned}
+	</div>
+` : ''}
     ${timePlayed !== '-' ? `
-    <div>
-        使用时间: ${timePlayed}
-    </div>
-    ` : ''}
+	<div>
+		使用时间: ${timePlayed}
+	</div>
+` : ''}
 </div>
 ${item.detailedGrades.length > 1 ? `<button onclick="showDetailedGrades('${name}', ${JSON.stringify(item.detailedGrades).replace(/"/g, '&quot;')})">查看各等级数据</button>` : ''}
 `;
-
         if (imageUrl) {
             const image = new Image();
             image.src = imageUrl;
@@ -447,7 +443,6 @@ ${item.detailedGrades.length > 1 ? `<button onclick="showDetailedGrades('${name}
         container.appendChild(div);
     });
 }
-
 function aggregateItemsByGrade(items) {
     const aggregatedItems = {};
     items.forEach(item => {
@@ -466,7 +461,9 @@ function aggregateItemsByGrade(items) {
             timePlayed: item.timePlayed
         });
     });
-    return Object.values(aggregatedItems);
+    // 按使用时长倒序排序
+    const sortedItems = Object.values(aggregatedItems).sort((a, b) => b.timePlayed - a.timePlayed);
+    return sortedItems;
 }
 function showDetailedGrades(name, detailedGrades) {
     const modal = document.createElement('div');
@@ -478,31 +475,44 @@ function showDetailedGrades(name, detailedGrades) {
     modal.style.padding = '20px';
     modal.style.borderRadius = '10px';
     modal.style.zIndex = '1000';
-
+    const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
+    // 按等级升序排序
+    const sortedGrades = detailedGrades.sort((a, b) => a.grade - b.grade);
     modal.innerHTML = `
-<h3>${name} 各等级数据</h3>
-<table style="width: 100%;">
-    <thead>
-        <tr>
-            <th>等级</th>
-            <th>使用时间</th>
-            <th>获得的经验值</th>
-        </tr>
-    </thead>
-    <tbody>
-        ${detailedGrades.map(gradeData => `
-        <tr>
-            <td>${gradeData.grade}</td>
-            <td>${formatTime(gradeData.timePlayed)}</td>
-            <td>${gradeData.scoreEarned}</td>
-        </tr>
-        `).join('')}
-    </tbody>
+<h3>
+	${name} 各等级数据
+</h3>
+<table style="width:100%;">
+	<thead>
+		<tr>
+			<th>
+				等级
+			</th>
+			<th>
+				使用时间
+			</th>
+			<th>
+				获得的经验值
+			</th>
+		</tr>
+	</thead>
+	<tbody>
+		${sortedGrades.map(gradeData => `
+		<tr>
+			<td>
+				${gradeMap[gradeData.grade]}
+			</td>
+			<td>
+				${formatTime(gradeData.timePlayed)}
+			</td>
+			<td>
+				${gradeData.scoreEarned}
+			</td>
+		</tr>
+`).join('')}
+	</tbody>
 </table>
-<button onclick="this.parentElement.remove()">关闭</button>
-`;
-
+<button onclick="this.parentElement.remove()">关闭</button> `;
     document.body.appendChild(modal);
 }
-
     </script>
