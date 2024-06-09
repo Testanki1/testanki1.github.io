@@ -396,70 +396,48 @@ function displayListData(data, container, title) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return;
     }
-    data.sort((a, b) => (b.timePlayed || 0) - (a.timePlayed || 0));
-    const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
-    data.forEach(item => {
-        if (!item || typeof item !== 'object') {
-            return;
-        }
+
+    const aggregatedData = aggregateItemsByGrade(data);
+
+    aggregatedData.forEach(item => {
+        const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
         const grade = item.grade == null || item.grade === -1 ? '-' : gradeMap[item.grade];
         const name = item.name == null || item.name === -1 ? '-' : item.name;
         const imageUrl = item.imageUrl == null || item.imageUrl === -1 ? null : item.imageUrl;
-        const properties = item.properties == null || item.properties === -1 ? '-' : item.properties;
         const scoreEarned = item.scoreEarned == null || item.scoreEarned === -1 ? '-' : item.scoreEarned;
         const timePlayed = item.timePlayed == null || item.timePlayed === -1 ? '-' : formatTime(item.timePlayed);
-        const usages = item.usages == null || item.usages === -1 ? '-' : item.usages;
-        const type = item.type == null || item.type === -1 ? '-' : item.type;
-        const count = item.count == null || item.count === -1 ? '-' : item.count;
+
         const div = document.createElement('div');
         div.classList.add('data-card');
         div.innerHTML = `
 <div class="item-title">
-	${title}
+    ${title}
 </div>
 <div class="item-info">
-	${name !== '-' ? `
-	<div>
-		${name}
-	</div>
-` : ''}
-${grade !== '-' ? `
-	<div>
-		等级: ${grade}
-	</div>
-` : ''}
-    ${properties !== '-' ? `
-	<div>
-		特性: ${properties}
-	</div>
-` : ''}
+    ${name !== '-' ? `
+    <div>
+        ${name}
+    </div>
+    ` : ''}
+    ${grade !== '-' ? `
+    <div>
+        等级: ${grade}
+    </div>
+    ` : ''}
     ${scoreEarned !== '-' ? `
-	<div>
-		获得的经验值: ${scoreEarned}
-	</div>
-` : ''}
+    <div>
+        获得的经验值: ${scoreEarned}
+    </div>
+    ` : ''}
     ${timePlayed !== '-' ? `
-	<div>
-		使用时间: ${timePlayed}
-	</div>
-` : ''}
-    ${usages !== '-' ? `
-	<div>
-		使用量: ${usages}
-	</div>
-` : ''}
-    ${type !== '-' ? `
-	<div>
-		类型: ${type}
-	</div>
-` : ''}
-    ${count !== '-' ? `
-	<div>
-		数量: ${count}
-	</div>
-` : ''}
+    <div>
+        使用时间: ${timePlayed}
+    </div>
+    ` : ''}
 </div>
+${item.detailedGrades.length > 1 ? `<button onclick="showDetailedGrades('${name}', ${JSON.stringify(item.detailedGrades).replace(/"/g, '&quot;')})">查看各等级数据</button>` : ''}
 `;
+
         if (imageUrl) {
             const image = new Image();
             image.src = imageUrl;
@@ -469,4 +447,62 @@ ${grade !== '-' ? `
         container.appendChild(div);
     });
 }
+
+function aggregateItemsByGrade(items) {
+    const aggregatedItems = {};
+    items.forEach(item => {
+        if (!aggregatedItems[item.name]) {
+            aggregatedItems[item.name] = {
+                ...item,
+                detailedGrades: []
+            };
+        } else {
+            aggregatedItems[item.name].scoreEarned += item.scoreEarned || 0;
+            aggregatedItems[item.name].timePlayed += item.timePlayed || 0;
+        }
+        aggregatedItems[item.name].detailedGrades.push({
+            grade: item.grade,
+            scoreEarned: item.scoreEarned,
+            timePlayed: item.timePlayed
+        });
+    });
+    return Object.values(aggregatedItems);
+}
+function showDetailedGrades(name, detailedGrades) {
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '50%';
+    modal.style.left = '50%';
+    modal.style.transform = 'translate(-50%, -50%)';
+    modal.style.backgroundColor = '#001926';
+    modal.style.padding = '20px';
+    modal.style.borderRadius = '10px';
+    modal.style.zIndex = '1000';
+
+    modal.innerHTML = `
+<h3>${name} 各等级数据</h3>
+<table style="width: 100%;">
+    <thead>
+        <tr>
+            <th>等级</th>
+            <th>使用时间</th>
+            <th>获得的经验值</th>
+        </tr>
+    </thead>
+    <tbody>
+        ${detailedGrades.map(gradeData => `
+        <tr>
+            <td>${gradeData.grade}</td>
+            <td>${formatTime(gradeData.timePlayed)}</td>
+            <td>${gradeData.scoreEarned}</td>
+        </tr>
+        `).join('')}
+    </tbody>
+</table>
+<button onclick="this.parentElement.remove()">关闭</button>
+`;
+
+    document.body.appendChild(modal);
+}
+
     </script>
