@@ -402,15 +402,15 @@ function displayListData(data, container, title) {
     const aggregatedData = aggregateItemsByGrade(data);
     aggregatedData.forEach(item => {
         const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
-        const grade = item.grade == null || item.grade === -1 ? '-' : gradeMap[item.grade];
+        const grade = item.grade == null || item.grade === -1 ? '-' : (title === "玩过的模式" ? item.type : gradeMap[item.grade]); // 修改这里
         const name = item.name == null || item.name === -1 ? '-' : item.name;
         const count = item.count == null || item.count === -1 ? '-' : item.count;
         const properties = item.properties == null || item.properties === -1 ? '-' : item.properties;
-        const type = item.type == null || item.type === -1 ? '-' : item.type;
+        const type = item.type == null || item.type === -1 ? '-' : item.type; // 这里保持不变
         const imageUrl = item.imageUrl == null || item.imageUrl === -1 ? null : item.imageUrl.replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp')).replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
         const scoreEarned = item.scoreEarned == null || item.scoreEarned === -1 ? '-' : item.scoreEarned;
         const timePlayed = item.timePlayed == null || item.timePlayed === -1 ? '-' : formatTime(item.timePlayed);
-const hideType = title === "玩过的模式" && item.detailedGrades.length > 1;
+        const hideType = title === "玩过的模式" && item.detailedGrades.length > 1;
         const div = document.createElement('div');
         div.classList.add('data-card');
         div.innerHTML = `
@@ -493,7 +493,7 @@ function aggregateItemsByGrade(items) {
     const sortedItems = Object.values(aggregatedItems).sort((a, b) => b.timePlayed - a.timePlayed);
     return sortedItems;
 }
-function showDetailedGrades(name, detailedGrades) {
+function showDetailedGrades(name, detailedGrades, title) {
     const modal = document.createElement('div');
     modal.style.position = 'fixed';
     modal.style.top = '50%';
@@ -504,17 +504,18 @@ function showDetailedGrades(name, detailedGrades) {
     modal.style.borderRadius = '10px';
     modal.style.zIndex = '1000';
     const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
-    // 按等级升序排序
+    const headerText = title === '玩过的模式' ? `${name} 各类型数据` : `${name} 各等级数据`; // Adjust header text based on title
+    // Sort by grade in ascending order
     const sortedGrades = detailedGrades.sort((a, b) => a.grade - b.grade);
     modal.innerHTML = `
 <h3>
-	${name} 各等级数据
+	${headerText}
 </h3>
 <table style="width:100%;">
 	<thead>
 		<tr>
 			<th>
-				等级
+				${title === '玩过的模式' ? '类型' : '等级'} <!-- Adjust column header text based on title -->
 			</th>
 			<th>
 				使用时间
@@ -528,7 +529,7 @@ function showDetailedGrades(name, detailedGrades) {
 		${sortedGrades.map(gradeData => `
 		<tr>
 			<td>
-				${gradeMap[gradeData.grade]}
+				${title === '玩过的模式' ? gradeData.grade : gradeMap[gradeData.grade]} <!-- Adjust displayed data based on title -->
 			</td>
 			<td>
 				${formatTime(gradeData.timePlayed)}
