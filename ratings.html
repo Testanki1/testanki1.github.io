@@ -396,7 +396,7 @@ function displayListData(data, container, title) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return;
     }
-if (title === "收到的礼物") {
+    if (title === "收到的礼物") {
         data.sort((a, b) => b.count - a.count);
     }
     const aggregatedData = aggregateItemsByGrade(data);
@@ -410,6 +410,7 @@ if (title === "收到的礼物") {
         const imageUrl = item.imageUrl == null || item.imageUrl === -1 ? null : item.imageUrl.replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp')).replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
         const scoreEarned = item.scoreEarned == null || item.scoreEarned === -1 ? '-' : item.scoreEarned;
         const timePlayed = item.timePlayed == null || item.timePlayed === -1 ? '-' : formatTime(item.timePlayed);
+const hideType = title === "玩过的模式" && item.detailedGrades.length > 1;
         const div = document.createElement('div');
         div.classList.add('data-card');
         div.innerHTML = `
@@ -422,6 +423,13 @@ if (title === "收到的礼物") {
 		${name}
 	</div>
 ` : ''}
+    ${hideType ? '' : `
+    ${type !== '-' ? `
+	<div>
+		类型: ${type}
+	</div>
+` : ''}
+    `}
     ${grade !== '-' ? `
 	<div>
 		当前等级: ${grade}
@@ -445,11 +453,6 @@ if (title === "收到的礼物") {
     ${properties !== '-' ? `
 	<div>
 		特性: ${properties}
-	</div>
-` : ''}
-    ${type !== '-' ? `
-	<div>
-		类型: ${type}
 	</div>
 ` : ''}
 </div>
