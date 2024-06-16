@@ -126,7 +126,7 @@ display: inline-block;
             font-size: 14px;
             margin: 5px 0;
         }
-        .item-title {
+        .item-name {
     position: sticky;
     top: 0;
     background-color: #0a192f;
@@ -427,53 +427,47 @@ const usages = item.usages == null || item.usages === -1 ? '-' : item.usages;
         const div = document.createElement('div');
         div.classList.add('data-card');
         div.innerHTML = `
-<div class="item-title">
-	${title}
+<div class="item-name">
+	${name}
 </div>
-<div class="item-info">
-	${name !== '-' ? `
-	<div style="text-align:center;">
-		${name}
-	</div>
-` : ''}
-    ${hideType ? '' : `
+${hideType ? '' : `
     ${type !== '-' ? `
-	<div>
-		类型: ${type}
-	</div>
+<div>
+	类型: ${type}
+</div>
 ` : ''}
     `}
     ${grade !== '-' ? `
-	<div>
-		当前等级: ${grade}
-	</div>
+<div>
+	当前等级: ${grade}
+</div>
 ` : ''}
     ${scoreEarned !== '-' ? `
-	<div>
-		获得的经验值: ${scoreEarned}
-	</div>
+<div>
+	获得的经验值: ${scoreEarned}
+</div>
 ` : ''}
     ${timePlayed !== '-' ? `
-	<div>
-		游戏时间: ${timePlayed}
-	</div>
+<div>
+	游戏时间: ${timePlayed}
+</div>
 ` : ''}
     ${count !== '-' ? `
-	<div>
-		数量: ${count}
-	</div>
+<div>
+	数量: ${count}
+</div>
 ` : ''}
 ${usages !== '-' ? `
-	<div>
-		使用量: ${usages}
-	</div>
+<div>
+	使用量: ${usages}
+</div>
 ` : ''}
     ${properties !== '-' ? `
-	<div>
-		特性: ${properties}
-	</div>
-` : ''}
+<div>
+	特性: ${properties}
 </div>
+` : ''}
+	</div>
 ${item.detailedGrades.length > 1 ? `<button onclick="showDetailedGrades('${name}', ${JSON.stringify(item.detailedGrades).replace(/"/g, '&quot;')}, '${title}')">${title === '玩过的模式' ? '查看各类型数据' : '查看各等级数据'}</button>` : ''}
 `;
         if (imageUrl) {
@@ -528,39 +522,39 @@ function showDetailedGrades(name, detailedGrades, title) {
     // Sort by grade in ascending order
     const sortedGrades = detailedGrades.sort((a, b) => a.grade - b.grade);
     modal.innerHTML = `
-<h3>
-	${headerText}
-</h3>
-<table style="width:100%;text-align:center;">
-	<thead>
-		<tr>
-			<th>
-				${title === '玩过的模式' ? '类型' : '等级'} <!-- Adjust column header text based on title -->
-			</th>
-			<th>
-				游戏时间
-			</th>
-			<th>
-				获得的经验值
-			</th>
-		</tr>
-	</thead>
-	<tbody>
-		${sortedGrades.map(gradeData => `
-		<tr>
-			<td>
-				${title === '玩过的模式' ? gradeData.type : gradeMap[gradeData.grade]} <!-- Adjust displayed data based on title -->
-			</td>
-			<td>
-				${formatTime(gradeData.timePlayed)}
-			</td>
-			<td>
-				${gradeData.scoreEarned}
-			</td>
-		</tr>
+	<h3>
+		${headerText}
+	</h3>
+	<table style="width:100%;text-align:center;">
+		<thead>
+			<tr>
+				<th>
+					${title === '玩过的模式' ? '类型' : '等级'} <!-- Adjust column header text based on title -->
+				</th>
+				<th>
+					游戏时间
+				</th>
+				<th>
+					获得的经验值
+				</th>
+			</tr>
+		</thead>
+		<tbody>
+			${sortedGrades.map(gradeData => `
+			<tr>
+				<td>
+					${title === '玩过的模式' ? gradeData.type : gradeMap[gradeData.grade]} <!-- Adjust displayed data based on title -->
+				</td>
+				<td>
+					${formatTime(gradeData.timePlayed)}
+				</td>
+				<td>
+					${gradeData.scoreEarned}
+				</td>
+			</tr>
 `).join('')}
-	</tbody>
-</table>
+		</tbody>
+	</table>
 <button onclick="this.parentElement.remove()">关闭</button> `;
     document.body.appendChild(modal);
 }
