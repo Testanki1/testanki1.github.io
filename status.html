@@ -88,14 +88,19 @@
 			国服
 		</h1>
 		<p>
-			在线：<span id="onlineCount"></span>
+			在线：<span id="onlineCount"></span> 
 		</p>
 		<p>
-			战斗中：<span id="inbattlesCount"></span>
+			战斗中：<span id="inbattlesCount"></span> 
 		</p>
 		<p>
-			4399：<span id="my4399ComCount"></span>
+			4399：<span id="my4399ComCount"></span> 
 		</p>
+<br />
+		<p id="updateStatus">
+			<br />
+		</p>
+<!-- Display update status message here -->
 	</div>
 </div>
 <!-- Back and Refresh Buttons --> <button id="backButton" onclick="goBack()">返回</button> <button id="refreshButton" onclick="manualRefresh()">刷新</button> <span id="refreshTimer"><span>0</span></span> <!-- JavaScript -->
@@ -103,24 +108,36 @@
         let refreshInterval;
         let refreshTime = 11;
         function fetchBalancerStats() {
-            fetch('https://balancer.3dtank.com/balancer')
+    // Fetch balancer data
+    fetch('https://balancer.3dtank.com/balancer')
+        .then(response => response.json())
+        .then(data => {
+            let totalInbattles = 0;
+            let totalOnline = 0;
+            let totalMy4399Com = 0;
+            Object.values(data.nodes).forEach(node => {
+                totalInbattles += node.inbattles || 0;
+                totalOnline += node.online || 0;
+                totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
+            });
+            const my4399ComCount = totalMy4399Com || 0;
+            document.getElementById('inbattlesCount').innerText = totalInbattles;
+            document.getElementById('onlineCount').innerText = totalOnline;
+            document.getElementById('my4399ComCount').innerText = my4399ComCount;
+            // Fetch datacenters.config.json using AllOrigins CORS proxy
+            fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://3dtank.com/datacenters.config.json'))
                 .then(response => response.json())
-                .then(data => {
-                    let totalInbattles = 0;
-                    let totalOnline = 0;
-                    let totalMy4399Com = 0;
-                    Object.values(data.nodes).forEach(node => {
-                        totalInbattles += node.inbattles || 0;
-                        totalOnline += node.online || 0;
-                        totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
-                    });
-                    const my4399ComCount = totalMy4399Com || 0;
-                    document.getElementById('inbattlesCount').innerText = totalInbattles;
-                    document.getElementById('onlineCount').innerText = totalOnline;
-                    document.getElementById('my4399ComCount').innerText = my4399ComCount;
+                .then(result => {
+                    const jsonData = JSON.parse(result.contents);
+                    // Check if the JSON stringified version contains "stage"
+                    if (JSON.stringify(jsonData).includes("stage")) {
+                        document.getElementById('updateStatus').innerText = "目前为预更新状态";
+                    }
                 })
-                .catch(error => console.error('获取数据时出错：', error));
-        }
+                .catch(error => console.error('Error fetching datacenters.config.json:', error));
+        })
+        .catch(error => console.error('Error fetching balancer data:', error));
+}
         function manualRefresh() {
             clearInterval(refreshInterval); // Clear existing interval
             refreshTime = 11; // Reset refresh time
