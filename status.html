@@ -128,15 +128,24 @@
             document.getElementById('my4399ComCount').innerText = my4399ComCount;
             // Fetch datacenters.config.json using AllOrigins CORS proxy
             fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://3dtank.com/datacenters.config.json'))
-                .then(response => response.json())
-                .then(result => {
-                    const jsonData = JSON.parse(result.contents);
-                    // Check if the JSON stringified version contains "stage"
-                    if (JSON.stringify(jsonData).includes("stage")) {
-                        document.getElementById('updateStatus').innerText = "目前为预更新状态";
-                    }
-                })
-                .catch(error => console.error('Error fetching datacenters.config.json:', error));
+    .then(response => response.json())
+    .then(result => {
+        const jsonData = JSON.parse(result.contents);
+        // Check if the JSON stringified version contains "stage"
+        if (JSON.stringify(jsonData).includes("stage")) {
+            document.getElementById('updateStatus').innerText = "目前为预更新状态";
+            // Check if 'versions' node exists and display its keys
+            if (jsonData.versions) {
+                const preUpdateVersion = jsonData.versions;
+                const keys = Object.keys(preUpdateVersion);
+                const keysMessage = keys.join(', '); // Join keys with a comma (adjust as needed)
+                const preUpdateMessage = document.createElement('p');
+                preUpdateMessage.innerText = `预更新版本号：${keysMessage}`;
+                document.getElementById('updateStatus').appendChild(preUpdateMessage);
+            }
+        }
+    })
+    .catch(error => console.error('Error fetching datacenters.config.json:', error));
         })
         .catch(error => console.error('Error fetching balancer data:', error));
 }
