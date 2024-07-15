@@ -20,17 +20,17 @@ jobs:
           for i in {1..9}; do
             url1="https://public-deploy$i.test-eu.tankionline.com/browser-public/index.html"
             url2="https://client-review-$i-public.test-ru.tankionline.com"
-
+            
             # Fetch page source and extract JS URLs with 'main'
             js_urls1=$(curl -s "$url1" | grep -oP '<script[^>]+src="\K/browser-public/static/js/main\.[^"]+')
             js_urls2=$(curl -s "$url2" | grep -oP '<script[^>]+src="\K/client-review-[0-9]+-public/static/js/main\.[^"]+')
-
+            
             # Loop through found JS URLs
             for js_url in $js_urls1 $js_urls2; do
               # Check if JS file already exists in the testanki1.github.io/test-sources directory
               if ! curl -s --head "https://testanki1.github.io/test-sources/$js_url" | head -n 1 | grep "200 OK" > /dev/null; then
                 # If not exists, save the JS file
-                curl -s "https://public-deploy$i.test-eu.tankionline.com$js_url" -o "testanki1.github.io/test-sources/$js_url"
+                curl -s "https://public-deploy$i.test-eu.tankionline.com$js_url" -o "./testanki1.github.io/test-sources/$(basename $js_url)"
                 echo "Saved $js_url to testanki1.github.io/test-sources/"
               else
                 echo "$js_url already exists, skipping."
