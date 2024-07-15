@@ -27,6 +27,8 @@ jobs:
             
             # Loop through found JS URLs
             for js_url in $js_urls1 $js_urls2; do
+              echo "Found JavaScript URL: $js_url"
+              
               # Check if JS file already exists in the testanki1.github.io/test-sources directory
               if ! curl -s --head --fail "$url1$js_url" | grep "200 OK" > /dev/null; then
                 echo "$js_url from $url1 does not exist, skipping."
@@ -34,10 +36,14 @@ jobs:
                 echo "$js_url from $url2 does not exist, skipping."
               else
                 # If not exists, save the JS file
-                curl -s "$url1$js_url" -o "./testanki1.github.io/test-sources/$(basename $js_url)"
-                echo "Saved $js_url from $url1 to testanki1.github.io/test-sources/"
-                curl -s "$url2$js_url" -o "./testanki1.github.io/test-sources/$(basename $js_url)"
-                echo "Saved $js_url from $url2 to testanki1.github.io/test-sources/"
+                file_name=$(basename $js_url)
+                output_path="./testanki1.github.io/test-sources/$file_name"
+                
+                curl -s "$url1$js_url" -o "$output_path"
+                echo "Saved $js_url from $url1 to $output_path"
+                
+                curl -s "$url2$js_url" -o "$output_path"
+                echo "Saved $js_url from $url2 to $output_path"
               fi
             done
           done
