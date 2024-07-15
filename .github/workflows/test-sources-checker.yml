@@ -1,4 +1,4 @@
-name: Test Server Sources Checker
+name: Check and Save JavaScript Files
 
 on:
   workflow_dispatch:
@@ -28,12 +28,16 @@ jobs:
             # Loop through found JS URLs
             for js_url in $js_urls1 $js_urls2; do
               # Check if JS file already exists in the testanki1.github.io/test-sources directory
-              if ! curl -s --head "https://testanki1.github.io/test-sources/$js_url" | head -n 1 | grep "200 OK" > /dev/null; then
-                # If not exists, save the JS file
-                curl -s "https://public-deploy$i.test-eu.tankionline.com$js_url" -o "./testanki1.github.io/test-sources/$(basename $js_url)"
-                echo "Saved $js_url to testanki1.github.io/test-sources/"
+              if ! curl -s --head --fail "$url1$js_url" | grep "200 OK" > /dev/null; then
+                echo "$js_url from $url1 does not exist, skipping."
+              elif ! curl -s --head --fail "$url2$js_url" | grep "200 OK" > /dev/null; then
+                echo "$js_url from $url2 does not exist, skipping."
               else
-                echo "$js_url already exists, skipping."
+                # If not exists, save the JS file
+                curl -s "$url1$js_url" -o "./testanki1.github.io/test-sources/$(basename $js_url)"
+                echo "Saved $js_url from $url1 to testanki1.github.io/test-sources/"
+                curl -s "$url2$js_url" -o "./testanki1.github.io/test-sources/$(basename $js_url)"
+                echo "Saved $js_url from $url2 to testanki1.github.io/test-sources/"
               fi
             done
           done
