@@ -67,46 +67,111 @@
         .highlight {
             font-weight: bold;
         }
+        .toggle-container {
+            margin-top: 20px;
+        }
+        .toggle-container label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .toggle-container input[type="checkbox"] {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <h1>幸运礼盒模拟器</h1>
     <p>请输入要打开的幸运礼盒数量（默认为 15）：</p>
     <input type="number" id="boxCount" value="15" min="1" />
-    <p>选择物品品质：</p>
-    <select id="itemQuality">
-        <option value="稀有物品">稀有</option>
-        <option value="珍奇物品">珍奇</option>
-        <option value="史诗物品">史诗</option>
-        <option value="传奇物品">传奇</option>
-        <option value="异国情调物品">异国情调</option>
-    </select>
-    <p>至少需要多少个该品质的物品：</p>
-    <input type="number" id="requiredCount" value="2" min="1" />
-    <button onclick="startInfiniteDraw()">开始抽奖</button>
+    
+    <div class="toggle-container">
+        <label>
+            <input type="checkbox" id="specificMode" />
+            特定品质数量模式
+        </label>
+    </div>
+    
+    <div id="specificOptions" style="display: none;">
+        <p>选择物品品质：</p>
+        <select id="itemQuality">
+            <option value="稀有物品">稀有</option>
+            <option value="珍奇物品">珍奇</option>
+            <option value="史诗物品">史诗</option>
+            <option value="传奇物品">传奇</option>
+            <option value="异国情调物品">异国情调</option>
+        </select>
+        <p>选择数量模式：</p>
+        <select id="quantityMode">
+            <option value="至少">至少</option>
+            <option value="至多">至多</option>
+        </select>
+        <p>数量：</p>
+        <input type="number" id="requiredCount" value="2" min="1" />
+    </div>
+    
+    <button onclick="startDraw()">开始抽奖</button>
     <div class="result" id="result"></div>
     <script>
-        function startInfiniteDraw() {
-            const boxCount = parseInt(document.getElementById('boxCount').value, 10);
-            const requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
-            const selectedQuality = document.getElementById('itemQuality').value;
-
-            if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 1) {
-                alert('请输入有效的数字！');
-                return;
+        // 切换特定模式的显示状态
+        document.getElementById('specificMode').addEventListener('change', function() {
+            document.getElementById('specificOptions').style.display = this.checked ? 'block' : 'none';
+            if (!this.checked) {
+                // 当特定模式关闭时，清空输入框和结果
+                document.getElementById('itemQuality').value = '';
+                document.getElementById('quantityMode').value = '至少';
+                document.getElementById('requiredCount').value = 2;
+                document.getElementById('result').innerHTML = '';
             }
+        });
 
-            // 更新条件: 需要的数量不能超过每次抽奖的数量
-            if (requiredCount > boxCount) {
-                alert('所需的物品数量不能超过每次抽奖的数量！');
-                return;
+        function startDraw() {
+            const boxCount = parseInt(document.getElementById('boxCount').value, 10);
+            const specificMode = document.getElementById('specificMode').checked;
+            let requiredCount = 0;
+            let selectedQuality = '';
+            let quantityMode = '';
+
+            if (specificMode) {
+                requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
+                selectedQuality = document.getElementById('itemQuality').value;
+                quantityMode = document.getElementById('quantityMode').value;
+
+                if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 1) {
+                    alert('请输入有效的数字！');
+                    return;
+                }
+
+                if (quantityMode === '至少' && requiredCount > boxCount) {
+                    alert('所需的物品数量不能超过每次抽奖的数量！');
+                    return;
+                }
             }
 
             let drawCount = 0;
             let itemCount = 0;
             let results = [];
 
-            while (itemCount < requiredCount) {
+            if (specificMode) {
+                while ((quantityMode === '至少' ? itemCount < requiredCount : itemCount > requiredCount)) {
+                    drawCount++;
+                    results = [];
+                    for (let i = 0; i < boxCount; i++) {
+                        const randomNum = Math.random();
+                        if (randomNum < 0.6) {
+                            results.push('稀有物品');
+                        } else if (randomNum < 0.875) {
+                            results.push('珍奇物品');
+                        } else if (randomNum < 0.975) {
+                            results.push('史诗物品');
+                        } else if (randomNum < 0.995) {
+                            results.push('传奇物品');
+                        } else {
+                            results.push('异国情调物品');
+                        }
+                    }
+                    itemCount = results.filter(item => item === selectedQuality).length;
+                }
+            } else {
                 drawCount++;
                 results = [];
                 for (let i = 0; i < boxCount; i++) {
@@ -123,13 +188,12 @@
                         results.push('异国情调物品');
                     }
                 }
-                itemCount = results.filter(item => item === selectedQuality).length;
             }
 
-            displayResults(results, drawCount, requiredCount, selectedQuality);
+            displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode);
         }
 
-        function displayResults(results, drawCount, requiredCount, selectedQuality) {
+        function displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode) {
             const resultDiv = document.getElementById('result');
             const itemCounts = results.reduce((acc, item) => {
                 acc[item] = (acc[item] || 0) + 1;
@@ -150,25 +214,31 @@
             // 强调物品品质的名称，不包括“物品”两个字
             const emphasizedQuality = selectedQuality.replace(/(稀有|珍奇|史诗|传奇|异国情调)(物品)?/, `<span style="color: ${selectedColor};">$1</span>`);
 
-            let resultHTML = `<p>你在第 <span class="highlight" style="color: ${selectedColor};">${drawCount}</span> 次抽奖时抽到了至少 <span class="highlight" style="color: ${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}物品</p>`;
-            if (itemCounts['稀有物品']) {
-                resultHTML += `<p class="rare">稀有物品: ${itemCounts['稀有物品']}</p>`;
-            }
-            if (itemCounts['珍奇物品']) {
-                resultHTML += `<p class="uncommon-item">珍奇物品: ${itemCounts['珍奇物品']}</p>`;
-            }
-            if (itemCounts['史诗物品']) {
-                resultHTML += `<p class="epic">史诗物品: ${itemCounts['史诗物品']}</p>`;
-            }
-            if (itemCounts['传奇物品']) {
-                resultHTML += `<p class="legendary">传奇物品: ${itemCounts['传奇物品']}</p>`;
-            }
-            if (itemCounts['异国情调物品']) {
-                resultHTML += `<p class="exotic">异国情调物品: ${itemCounts['异国情调物品']}</p>`;
-            }
-
-            resultDiv.innerHTML = resultHTML;
+            let resultHTML = '';
+            if (specificMode) {
+                const conditionText = quantityMode === '至少'
+                    ? `你在第 <span class="highlight" style="color: ${selectedColor};">${drawCount}</span> 次抽奖时抽到了至少 <span class="highlight" style="color: ${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}`
+                    : `你在第 <span class="highlight" style="color: ${selectedColor};">${drawCount}</span> 次抽奖时抽到了至多 <span class="highlight" style="color: ${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}`;
+                                resultHTML = `<p>${conditionText}物品</p>`;
         }
-    </script>
-</body>
-</html>
+
+        // 无论是否启用特定模式，都显示所有物品的统计信息
+        if (itemCounts['稀有物品']) {
+            resultHTML += `<p class="rare">稀有物品: ${itemCounts['稀有物品']}</p>`;
+        }
+        if (itemCounts['珍奇物品']) {
+            resultHTML += `<p class="uncommon-item">珍奇物品: ${itemCounts['珍奇物品']}</p>`;
+        }
+        if (itemCounts['史诗物品']) {
+            resultHTML += `<p class="epic">史诗物品: ${itemCounts['史诗物品']}</p>`;
+        }
+        if (itemCounts['传奇物品']) {
+            resultHTML += `<p class="legendary">传奇物品: ${itemCounts['传奇物品']}</p>`;
+        }
+        if (itemCounts['异国情调物品']) {
+            resultHTML += `<p class="exotic">异国情调物品: ${itemCounts['异国情调物品']}</p>`;
+        }
+
+        resultDiv.innerHTML = resultHTML;
+    }
+</script>
