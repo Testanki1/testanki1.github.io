@@ -109,7 +109,7 @@
         <input type="number" id="requiredCount" value="2" min="1" />
     </div>
     
-    <button onclick="startDraw()">开始抽奖</button>
+    <button onclick="startDraw()">打开幸运礼盒</button>
     <div class="result" id="result"></div>
     <script>
         // 切换特定模式的显示状态
@@ -125,73 +125,74 @@
         });
 
         function startDraw() {
-            const boxCount = parseInt(document.getElementById('boxCount').value, 10);
-            const specificMode = document.getElementById('specificMode').checked;
-            let requiredCount = 0;
-            let selectedQuality = '';
-            let quantityMode = '';
+    const boxCount = parseInt(document.getElementById('boxCount').value, 10);
+    const specificMode = document.getElementById('specificMode').checked;
+    let requiredCount = 0;
+    let selectedQuality = '';
+    let quantityMode = '';
 
-            if (specificMode) {
-                requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
-                selectedQuality = document.getElementById('itemQuality').value;
-                quantityMode = document.getElementById('quantityMode').value;
+    if (specificMode) {
+        requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
+        selectedQuality = document.getElementById('itemQuality').value;
+        quantityMode = document.getElementById('quantityMode').value;
 
-                if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 1) {
-                    alert('请输入有效的数字！');
-                    return;
-                }
-
-                if (quantityMode === '至少' && requiredCount > boxCount) {
-                    alert('所需的物品数量不能超过每次抽奖的数量！');
-                    return;
-                }
-            }
-
-            let drawCount = 0;
-            let itemCount = 0;
-            let results = [];
-
-            if (specificMode) {
-                while ((quantityMode === '至少' ? itemCount < requiredCount : itemCount > requiredCount)) {
-                    drawCount++;
-                    results = [];
-                    for (let i = 0; i < boxCount; i++) {
-                        const randomNum = Math.random();
-                        if (randomNum < 0.6) {
-                            results.push('稀有物品');
-                        } else if (randomNum < 0.875) {
-                            results.push('珍奇物品');
-                        } else if (randomNum < 0.975) {
-                            results.push('史诗物品');
-                        } else if (randomNum < 0.995) {
-                            results.push('传奇物品');
-                        } else {
-                            results.push('异国情调物品');
-                        }
-                    }
-                    itemCount = results.filter(item => item === selectedQuality).length;
-                }
-            } else {
-                drawCount++;
-                results = [];
-                for (let i = 0; i < boxCount; i++) {
-                    const randomNum = Math.random();
-                    if (randomNum < 0.6) {
-                        results.push('稀有物品');
-                    } else if (randomNum < 0.875) {
-                        results.push('珍奇物品');
-                    } else if (randomNum < 0.975) {
-                        results.push('史诗物品');
-                    } else if (randomNum < 0.995) {
-                        results.push('传奇物品');
-                    } else {
-                        results.push('异国情调物品');
-                    }
-                }
-            }
-
-            displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode);
+        if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 1) {
+            alert('请输入有效的数字！');
+            return;
         }
+
+        if (quantityMode === '至少' && requiredCount > boxCount) {
+            alert('所需的物品数量不能超过每次抽奖的数量！');
+            return;
+        }
+    }
+
+    let drawCount = 0;
+    let itemCount = 0;
+    let results = [];
+
+    if (specificMode) {
+        do {
+            drawCount++;
+            results = [];
+            for (let i = 0; i < boxCount; i++) {
+                const randomNum = Math.random();
+                if (randomNum < 0.6) {
+                    results.push('稀有物品');
+                } else if (randomNum < 0.875) {
+                    results.push('珍奇物品');
+                } else if (randomNum < 0.975) {
+                    results.push('史诗物品');
+                } else if (randomNum < 0.995) {
+                    results.push('传奇物品');
+                } else {
+                    results.push('异国情调物品');
+                }
+            }
+            itemCount = results.filter(item => item === selectedQuality).length;
+        } while ((quantityMode === '至少' ? itemCount < requiredCount : itemCount > requiredCount));
+    } else {
+        drawCount++;
+        results = [];
+        for (let i = 0; i < boxCount; i++) {
+            const randomNum = Math.random();
+            if (randomNum < 0.6) {
+                results.push('稀有物品');
+            } else if (randomNum < 0.875) {
+                results.push('珍奇物品');
+            } else if (randomNum < 0.975) {
+                results.push('史诗物品');
+            } else if (randomNum < 0.995) {
+                results.push('传奇物品');
+            } else {
+                results.push('异国情调物品');
+            }
+        }
+    }
+
+    displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode);
+}
+
 
         function displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode) {
             const resultDiv = document.getElementById('result');
@@ -242,3 +243,5 @@
         resultDiv.innerHTML = resultHTML;
     }
 </script>
+</body>
+</html>
