@@ -27,19 +27,20 @@
             transition: background-color 0.3s, transform 0.2s;
         }
         button:hover {
-            background-color: #5cdd29; /* 更深的绿色 */
+            background-color: #5cdd29;
         }
         button:active {
-            transform: scale(0.98); /* 按下按钮时的缩放效果 */
+            transform: scale(0.98);
         }
-        input[type="number"] {
+        input[type="number"], select {
             padding: 10px;
             font-size: 18px;
-            width: 80px;
+            width: 120px;
             border-radius: 8px;
-            border: 1px solid #76FF33; /* 输入框边框颜色 */
-            background-color: #002b36; /* 输入框背景颜色 */
-            color: white; /* 输入框文本颜色 */
+            border: 1px solid #76FF33;
+            background-color: #002b36;
+            color: white;
+            margin: 5px;
         }
         .result {
             margin-top: 30px;
@@ -63,47 +64,93 @@
         .exotic {
             color: #FF6666;
         }
+        .highlight {
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <h1>幸运礼盒模拟器</h1>
     <p>请输入要打开的幸运礼盒数量（默认为 15）：</p>
-    <input type="number" id="boxCount" value="15" min="1" /> 
-    <button onclick="openBoxes()">打开</button>
+    <input type="number" id="boxCount" value="15" min="1" />
+    <p>选择物品品质：</p>
+    <select id="itemQuality">
+        <option value="稀有物品">稀有</option>
+        <option value="珍奇物品">珍奇</option>
+        <option value="史诗物品">史诗</option>
+        <option value="传奇物品">传奇</option>
+        <option value="异国情调物品">异国情调</option>
+    </select>
+    <p>至少需要多少个该品质的物品：</p>
+    <input type="number" id="requiredCount" value="2" min="1" />
+    <button onclick="startInfiniteDraw()">开始抽奖</button>
     <div class="result" id="result"></div>
     <script>
-        function openBoxes() {
+        function startInfiniteDraw() {
             const boxCount = parseInt(document.getElementById('boxCount').value, 10);
-            if (isNaN(boxCount) || boxCount < 1) {
-                alert('请输入一个有效的数字！');
+            const requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
+            const selectedQuality = document.getElementById('itemQuality').value;
+
+            if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 1) {
+                alert('请输入有效的数字！');
                 return;
             }
-            const results = [];
-            for (let i = 0; i < boxCount; i++) {
-                const randomNum = Math.random();
-                if (randomNum < 0.6) {
-                    results.push('稀有物品');
-                } else if (randomNum < 0.875) {
-                    results.push('珍奇物品');
-                } else if (randomNum < 0.975) {
-                    results.push('史诗物品');
-                } else if (randomNum < 0.995) {
-                    results.push('传奇物品');
-                } else {
-                    results.push('异国情调物品');
-                }
+
+            // 更新条件: 需要的数量不能超过每次抽奖的数量
+            if (requiredCount > boxCount) {
+                alert('所需的物品数量不能超过每次抽奖的数量！');
+                return;
             }
-            displayResults(results);
+
+            let drawCount = 0;
+            let itemCount = 0;
+            let results = [];
+
+            while (itemCount < requiredCount) {
+                drawCount++;
+                results = [];
+                for (let i = 0; i < boxCount; i++) {
+                    const randomNum = Math.random();
+                    if (randomNum < 0.6) {
+                        results.push('稀有物品');
+                    } else if (randomNum < 0.875) {
+                        results.push('珍奇物品');
+                    } else if (randomNum < 0.975) {
+                        results.push('史诗物品');
+                    } else if (randomNum < 0.995) {
+                        results.push('传奇物品');
+                    } else {
+                        results.push('异国情调物品');
+                    }
+                }
+                itemCount = results.filter(item => item === selectedQuality).length;
+            }
+
+            displayResults(results, drawCount, requiredCount, selectedQuality);
         }
 
-        function displayResults(results) {
+        function displayResults(results, drawCount, requiredCount, selectedQuality) {
             const resultDiv = document.getElementById('result');
             const itemCounts = results.reduce((acc, item) => {
                 acc[item] = (acc[item] || 0) + 1;
                 return acc;
             }, {});
-            
-            let resultHTML = '';
+
+            // 设置选择的品质对应的颜色
+            const qualityColors = {
+                '稀有物品': '#76FF33',
+                '珍奇物品': '#00D4FF',
+                '史诗物品': '#D580FF',
+                '传奇物品': '#FFEE00',
+                '异国情调物品': '#FF6666'
+            };
+
+            const selectedColor = qualityColors[selectedQuality] || 'white';
+
+            // 强调物品品质的名称，不包括“物品”两个字
+            const emphasizedQuality = selectedQuality.replace(/(稀有|珍奇|史诗|传奇|异国情调)(物品)?/, `<span style="color: ${selectedColor};">$1</span>`);
+
+            let resultHTML = `<p>你在第 <span class="highlight" style="color: ${selectedColor};">${drawCount}</span> 次抽奖时抽到了至少 <span class="highlight" style="color: ${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}物品</p>`;
             if (itemCounts['稀有物品']) {
                 resultHTML += `<p class="rare">稀有物品: ${itemCounts['稀有物品']}</p>`;
             }
@@ -119,7 +166,7 @@
             if (itemCounts['异国情调物品']) {
                 resultHTML += `<p class="exotic">异国情调物品: ${itemCounts['异国情调物品']}</p>`;
             }
-            
+
             resultDiv.innerHTML = resultHTML;
         }
     </script>
