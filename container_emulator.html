@@ -1,11 +1,9 @@
-
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>幸运礼盒开箱模拟器</title>
-    <style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>
+	幸运礼盒开箱模拟器
+</title>
+<style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         body {
             background-color: #001926;
@@ -79,40 +77,41 @@
             margin-right: 10px;
         }
     </style>
-</head>
-<body>
-    <h1>幸运礼盒模拟器</h1>
-    <p>打开的幸运礼盒数量：</p>
-    <input type="number" id="boxCount" value="15" min="1" />
-    
-    <div class="toggle-container">
-        <label>
-            <input type="checkbox" id="specificMode" />
-            批量打开模式（15 个/次）
-        </label>
-    </div>
-    
-    <div id="specificOptions" style="display: none;">
-        <p>选择物品品质：</p>
-        <select id="itemQuality">
-            <option value="稀有物品">稀有</option>
+<h1>
+	幸运礼盒模拟器
+</h1>
+<p>
+	打开的幸运礼盒数量：
+</p>
+<input type="number" id="boxCount" value="15" min="1" /> 
+<div class="toggle-container">
+	<label> <input type="checkbox" id="specificMode" /> 批量打开模式（15 个/次） </label> 
+</div>
+<div id="specificOptions" style="display:none;">
+	<p>
+		选择物品品质：
+	</p>
+<select id="itemQuality"> <option value="稀有物品">稀有</option>
             <option value="珍奇物品">珍奇</option>
             <option value="史诗物品">史诗</option>
             <option value="传奇物品">传奇</option>
-            <option value="异国情调物品" selected>异国情调</option>
-        </select>
-        <p>选择数量模式：</p>
-        <select id="quantityMode">
-            <option value="至少">至少</option>
+            <option value="异国情调物品" selected="selected">异国情调</option>
+        </select> 
+	<p>
+		选择数量模式：
+	</p>
+<select id="quantityMode"> <option value="至少">至少</option>
             <option value="至多">至多</option>
-        </select>
-        <p>数量：</p>
-        <input type="number" id="requiredCount" value="2" min="0" />
-    </div>
-    
-    <button onclick="startDraw()">打开幸运礼盒</button>
-    <div class="result" id="result"></div>
-    <script>
+        </select> 
+	<p>
+		数量：
+	</p>
+<input type="number" id="requiredCount" value="2" min="0" /> 
+</div>
+<button onclick="startDraw()">打开幸运礼盒</button> 
+<div class="result" id="result">
+</div>
+<script>
         // 切换特定模式的显示状态
         document.getElementById('specificMode').addEventListener('change', function() {
     document.getElementById('specificOptions').style.display = this.checked ? 'block' : 'none';
@@ -125,88 +124,40 @@
         document.getElementById('result').innerHTML = '';
     }
 });
-
 document.getElementById('requiredCount').addEventListener('input', calculateAndDisplayProbability);
 document.getElementById('itemQuality').addEventListener('change', calculateAndDisplayProbability);
 document.getElementById('quantityMode').addEventListener('change', calculateAndDisplayProbability);
-
-
         function startDraw() {
             const boxCount = parseInt(document.getElementById('boxCount').value, 10);
             const specificMode = document.getElementById('specificMode').checked;
             let requiredCount = 0;
             let selectedQuality = '';
             let quantityMode = '';
-
             if (specificMode) {
                 requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
                 selectedQuality = document.getElementById('itemQuality').value;
                 quantityMode = document.getElementById('quantityMode').value;
-
-                if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 0) {
-                    alert('请输入有效的数字！');
-                    return;
-                }
-
-                if (requiredCount > boxCount) {
+                if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 0) { alert('请输入有效的数字！'); return; } if (requiredCount > boxCount) {
                     alert('所需的物品数量不能超过每次打开幸运礼盒的数量！');
                     return;
                 }
             }
-
             let drawCount = 0;
             let itemCount = 0;
             let results = [];
-
             if (specificMode) {
                 do {
                     drawCount++;
                     results = [];
-                    for (let i = 0; i < boxCount; i++) {
-                        const randomNum = Math.random();
-                        if (randomNum < 0.6) {
-                            results.push('稀有物品');
-                        } else if (randomNum < 0.875) {
-                            results.push('珍奇物品');
-                        } else if (randomNum < 0.975) {
-                            results.push('史诗物品');
-                        } else if (randomNum < 0.995) {
-                            results.push('传奇物品');
-                        } else {
-                            results.push('异国情调物品');
-                        }
-                    }
-                    itemCount = results.filter(item => item === selectedQuality).length;
+                    for (let i = 0; i < boxCount; i++) { const randomNum = Math.random(); if (randomNum < 0.6) { results.push('稀有物品'); } else if (randomNum < 0.875) { results.push('珍奇物品'); } else if (randomNum < 0.975) { results.push('史诗物品'); } else if (randomNum < 0.995) { results.push('传奇物品'); } else { results.push('异国情调物品'); } } itemCount = results.filter(item => item === selectedQuality).length;
                 } while ((quantityMode === '至少' ? itemCount < requiredCount : itemCount > requiredCount));
             } else {
                 drawCount++;
                 results = [];
-                for (let i = 0; i < boxCount; i++) {
-                    const randomNum = Math.random();
-                    if (randomNum < 0.6) {
-                        results.push('稀有物品');
-                    } else if (randomNum < 0.875) {
-                        results.push('珍奇物品');
-                    } else if (randomNum < 0.975) {
-                        results.push('史诗物品');
-                    } else if (randomNum < 0.995) {
-                        results.push('传奇物品');
-                    } else {
-                        results.push('异国情调物品');
-                    }
-                }
-            }
-
-            displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode);
-        }
-
-        function displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode) {
-            const resultDiv = document.getElementById('result');
-            const itemCounts = results.reduce((acc, item) => {
+                for (let i = 0; i < boxCount; i++) { const randomNum = Math.random(); if (randomNum < 0.6) { results.push('稀有物品'); } else if (randomNum < 0.875) { results.push('珍奇物品'); } else if (randomNum < 0.975) { results.push('史诗物品'); } else if (randomNum < 0.995) { results.push('传奇物品'); } else { results.push('异国情调物品'); } } } displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode); } function displayResults(results, drawCount, requiredCount, selectedQuality, specificMode, quantityMode) { const resultDiv = document.getElementById('result'); const itemCounts = results.reduce((acc, item) => {
                 acc[item] = (acc[item] || 0) + 1;
                 return acc;
             }, {});
-
             // 设置选择的品质对应的颜色
             const qualityColors = {
                 '稀有物品': '#76FF33',
@@ -215,37 +166,56 @@ document.getElementById('quantityMode').addEventListener('change', calculateAndD
                 '传奇物品': '#FFEE00',
                 '异国情调物品': '#FF6666'
             };
-
             const selectedColor = qualityColors[selectedQuality] || 'white';
-
             // 强调物品品质的名称，不包括“物品”两个字
-            const emphasizedQuality = selectedQuality.replace(/(稀有|珍奇|史诗|传奇|异国情调)(物品)?/, `<span style="color: ${selectedColor};">$1</span>`);
-
+            const emphasizedQuality = selectedQuality.replace(/(稀有|珍奇|史诗|传奇|异国情调)(物品)?/, `<span style="color:${selectedColor};">$1</span>`);
             let resultHTML = '';
             if (specificMode) {
                 const conditionText = quantityMode === '至少'
-                    ? `你在第 <span class="highlight" style="color: ${selectedColor};">${drawCount}</span> 次批量打开幸运礼盒时获得了至少 <span class="highlight" style="color: ${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}`
-                    : `你在第 <span class="highlight" style="color: ${selectedColor};">${drawCount}</span> 次批量打开幸运礼盒时获得了至多 <span class="highlight" style="color: ${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}`;
-                resultHTML = `<p>${conditionText}物品</p>`;
+                    ? `你在第 <span class="highlight" style="color:${selectedColor};">${drawCount}</span> 次批量打开幸运礼盒时获得了至少 <span class="highlight" style="color:${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}`
+                    : `你在第 <span class="highlight" style="color:${selectedColor};">${drawCount}</span> 次批量打开幸运礼盒时获得了至多 <span class="highlight" style="color:${selectedColor};">${requiredCount}</span> 个${emphasizedQuality}`;
+                resultHTML = `
+<p>
+	${conditionText}物品
+</p>
+`;
             }
-
             // 无论是否启用特定模式，都显示所有物品的统计信息
             if (itemCounts['稀有物品']) {
-                resultHTML += `<p class="uncommon">稀有物品: ${itemCounts['稀有物品']}</p>`;
+                resultHTML += `
+<p class="uncommon">
+	稀有物品: ${itemCounts['稀有物品']}
+</p>
+`;
             }
             if (itemCounts['珍奇物品']) {
-                resultHTML += `<p class="rare">珍奇物品: ${itemCounts['珍奇物品']}</p>`;
+                resultHTML += `
+<p class="rare">
+	珍奇物品: ${itemCounts['珍奇物品']}
+</p>
+`;
             }
             if (itemCounts['史诗物品']) {
-                resultHTML += `<p class="epic">史诗物品: ${itemCounts['史诗物品']}</p>`;
+                resultHTML += `
+<p class="epic">
+	史诗物品: ${itemCounts['史诗物品']}
+</p>
+`;
             }
             if (itemCounts['传奇物品']) {
-                resultHTML += `<p class="legendary">传奇物品: ${itemCounts['传奇物品']}</p>`;
+                resultHTML += `
+<p class="legendary">
+	传奇物品: ${itemCounts['传奇物品']}
+</p>
+`;
             }
             if (itemCounts['异国情调物品']) {
-                resultHTML += `<p class="exotic">异国情调物品: ${itemCounts['异国情调物品']}</p>`;
+                resultHTML += `
+<p class="exotic">
+	异国情调物品: ${itemCounts['异国情调物品']}
+</p>
+`;
             }
-
             resultDiv.innerHTML = resultHTML;
         }
 // 几率计算函数
@@ -283,7 +253,9 @@ function calculateAndDisplayProbability() {
     }
 
     const resultDiv = document.getElementById('result');
-    resultDiv.innerHTML = `<p>几率: ${successProbability}%</p>`;
+    const averageTries = 1 / (successProbability / 100);
+    resultDiv.innerHTML = `<p>几率: ${successProbability}%</p>
+                           <p>平均打开次数: ${averageTries.toFixed(2)}</p>`;
 }
 
 function calculateAtLeastProbability(boxCount, requiredCount, probability) {
@@ -311,7 +283,4 @@ function factorial(num) {
     if (num <= 1) return 1;
     return num * factorial(num - 1);
 }
-
-    </script>
-</body>
-</html>
+ </script>
