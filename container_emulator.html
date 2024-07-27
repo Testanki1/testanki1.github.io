@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -49,10 +50,10 @@
         .result p {
             margin: 5px 0;
         }
-        .rare {
+        .uncommon {
             color: #76FF33;
         }
-        .uncommon-item {
+        .rare {
             color: #00D4FF;
         }
         .epic {
@@ -114,19 +115,21 @@
     <script>
         // 切换特定模式的显示状态
         document.getElementById('specificMode').addEventListener('change', function() {
-            document.getElementById('specificOptions').style.display = this.checked ? 'block' : 'none';
-            if (this.checked) {
-                document.getElementById('boxCount').value = 15;
-                document.getElementById('boxCount').disabled = true;
-            } else {
-                document.getElementById('boxCount').disabled = false;
-                // 当特定模式关闭时，清空输入框和结果
-                document.getElementById('itemQuality').value = '异国情调物品';
-                document.getElementById('quantityMode').value = '至少';
-                document.getElementById('requiredCount').value = 2;
-                document.getElementById('result').innerHTML = '';
-            }
-        });
+    document.getElementById('specificOptions').style.display = this.checked ? 'block' : 'none';
+    if (this.checked) {
+        document.getElementById('boxCount').value = 15;
+        document.getElementById('boxCount').disabled = true;
+        calculateAndDisplayProbability(); // 计算并显示几率
+    } else {
+        document.getElementById('boxCount').disabled = false;
+        document.getElementById('result').innerHTML = '';
+    }
+});
+
+document.getElementById('requiredCount').addEventListener('input', calculateAndDisplayProbability);
+document.getElementById('itemQuality').addEventListener('change', calculateAndDisplayProbability);
+document.getElementById('quantityMode').addEventListener('change', calculateAndDisplayProbability);
+
 
         function startDraw() {
             const boxCount = parseInt(document.getElementById('boxCount').value, 10);
@@ -145,7 +148,7 @@
                     return;
                 }
 
-                if (quantityMode && requiredCount > boxCount) {
+                if (requiredCount > boxCount) {
                     alert('所需的物品数量不能超过每次打开幸运礼盒的数量！');
                     return;
                 }
@@ -228,10 +231,10 @@
 
             // 无论是否启用特定模式，都显示所有物品的统计信息
             if (itemCounts['稀有物品']) {
-                resultHTML += `<p class="rare">稀有物品: ${itemCounts['稀有物品']}</p>`;
+                resultHTML += `<p class="uncommon">稀有物品: ${itemCounts['稀有物品']}</p>`;
             }
             if (itemCounts['珍奇物品']) {
-                resultHTML += `<p class="uncommon-item">珍奇物品: ${itemCounts['珍奇物品']}</p>`;
+                resultHTML += `<p class="rare">珍奇物品: ${itemCounts['珍奇物品']}</p>`;
             }
             if (itemCounts['史诗物品']) {
                 resultHTML += `<p class="epic">史诗物品: ${itemCounts['史诗物品']}</p>`;
@@ -245,6 +248,70 @@
 
             resultDiv.innerHTML = resultHTML;
         }
+// 几率计算函数
+function calculateAndDisplayProbability() {
+    const boxCount = parseInt(document.getElementById('boxCount').value, 10);
+    const requiredCount = parseInt(document.getElementById('requiredCount').value, 10);
+    const selectedQuality = document.getElementById('itemQuality').value;
+    const quantityMode = document.getElementById('quantityMode').value;
+
+    if (isNaN(boxCount) || boxCount < 1 || isNaN(requiredCount) || requiredCount < 0) {
+        alert('请输入有效的数字！');
+        return;
+    }
+
+    if (quantityMode && requiredCount > boxCount) {
+        alert('所需的物品数量不能超过每次打开幸运礼盒的数量！');
+        return;
+    }
+
+    const qualityProbabilities = {
+        '稀有物品': 0.6,
+        '珍奇物品': 0.275,
+        '史诗物品': 0.1,
+        '传奇物品': 0.02,
+        '异国情调物品': 0.005
+    };
+
+    const probability = qualityProbabilities[selectedQuality];
+    let successProbability;
+
+    if (quantityMode === '至少') {
+        successProbability = calculateAtLeastProbability(boxCount, requiredCount, probability);
+    } else {
+        successProbability = calculateAtMostProbability(boxCount, requiredCount, probability);
+    }
+
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = `<p>几率: ${successProbability}%</p>`;
+}
+
+function calculateAtLeastProbability(boxCount, requiredCount, probability) {
+    let cumulativeProbability = 0;
+    for (let i = requiredCount; i <= boxCount; i++) {
+        cumulativeProbability += binomialProbability(i, boxCount, probability);
+    }
+    return cumulativeProbability * 100;
+}
+
+function calculateAtMostProbability(boxCount, requiredCount, probability) {
+    let cumulativeProbability = 0;
+    for (let i = 0; i <= requiredCount; i++) {
+        cumulativeProbability += binomialProbability(i, boxCount, probability);
+    }
+    return cumulativeProbability * 100;
+}
+
+function binomialProbability(k, n, p) {
+    const combinations = factorial(n) / (factorial(k) * factorial(n - k));
+    return combinations * Math.pow(p, k) * Math.pow(1 - p, n - k);
+}
+
+function factorial(num) {
+    if (num <= 1) return 1;
+    return num * factorial(num - 1);
+}
+
     </script>
 </body>
 </html>
