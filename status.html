@@ -1,13 +1,13 @@
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>
-	3D坦克服务器状态页面
-</title>
-<style>
-        /* CSS for the page */
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D坦克服务器状态页面</title>
+    <style>
         body {
             background: radial-gradient(50% 100% at 50% 100%, #395673 0%, #001926 100%);
-            font-family: 'Rubik', sans-serif; /* Apply Rubik font */
+            font-family: 'Rubik', sans-serif;
             color: white;
             margin: 0;
             padding: 0;
@@ -24,14 +24,14 @@
             cursor: pointer;
             border-radius: 10px;
             transition: background-color 0.3s;
-            display: none; /* Initially hide the button */
+            display: none;
         }
         #backButton:hover {
             background-color: #4CAF50;
         }
-	* {
-    -webkit-tap-highlight-color: transparent;
-	}
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
         #refreshButton {
             position: absolute;
             top: 10px;
@@ -51,12 +51,12 @@
         #refreshTimer {
             position: absolute;
             top: 10px;
-            right: 80px; /* Adjusted position */
+            right: 80px;
             font-size: 16px;
         }
-#updateStatus {
-    margin-top: 30px; /* Adjust this value as needed */
-}
+        #updateStatus {
+            margin-top: 30px;
+        }
         .container {
             display: flex;
             justify-content: center;
@@ -82,77 +82,46 @@
             color: #76ff33;
         }
     </style>
-<!-- Link to Rubik font -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" />
-<div class="container">
-	<!-- Left section -->
-	<div class="section">
-		<h1>
-			国服
-		</h1>
-		<p>
-			在线：<span id="onlineCount"></span> 
-		</p>
-		<p>
-			战斗中：<span id="inbattlesCount"></span> 
-		</p>
-		<p>
-			4399：<span id="my4399ComCount"></span> 
-		</p>
-		<p id="updateStatus">
-			<br />
-		</p>
-<!-- Display update status message here -->
-	</div>
-</div>
-<!-- Back and Refresh Buttons --> <button id="backButton" onclick="goBack()">返回</button> <button id="refreshButton" onclick="manualRefresh()">刷新</button> <span id="refreshTimer"><span>0</span></span> <!-- JavaScript -->
-<script>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <h1>国服</h1>
+            <p>在线：<span id="onlineCount"></span></p>
+            <p>战斗中：<span id="inbattlesCount"></span></p>
+            <p>4399：<span id="my4399ComCount"></span></p>
+        </div>
+    </div>
+    <button id="backButton" onclick="goBack()">返回</button>
+    <button id="refreshButton" onclick="manualRefresh()">刷新</button>
+    <span id="refreshTimer"><span>0</span></span>
+    <script>
         let refreshInterval;
         let refreshTime = 11;
         function fetchBalancerStats() {
-    // Fetch balancer data
-    fetch('https://balancer.3dtank.com/balancer')
-        .then(response => response.json())
-        .then(data => {
-            let totalInbattles = 0;
-            let totalOnline = 0;
-            let totalMy4399Com = 0;
-            Object.values(data.nodes).forEach(node => {
-                totalInbattles += node.inbattles || 0;
-                totalOnline += node.online || 0;
-                totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
-            });
-            const my4399ComCount = totalMy4399Com || 0;
-            document.getElementById('inbattlesCount').innerText = totalInbattles;
-            document.getElementById('onlineCount').innerText = totalOnline;
-            document.getElementById('my4399ComCount').innerText = my4399ComCount;
-            // Fetch datacenters.config.json using AllOrigins CORS proxy
-            fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://3dtank.com/datacenters.config.json'))
-    .then(response => response.json())
-    .then(result => {
-        const jsonData = JSON.parse(result.contents);
-        // Check if the JSON stringified version contains "stage"
-        if (JSON.stringify(jsonData).includes("stage")) {
-            document.getElementById('updateStatus').innerText = "当前为预更新状态";
-            // Check if 'versions' node exists and display its keys
-            if (jsonData.versions) {
-                const preUpdateVersion = jsonData.versions;
-                const keys = Object.keys(preUpdateVersion);
-                const keysMessage = keys.join(', '); // Join keys with a comma (adjust as needed)
-                const preUpdateMessage = document.createElement('p');
-                preUpdateMessage.innerText = `预更新版本号：${keysMessage}`;
-                document.getElementById('updateStatus').appendChild(preUpdateMessage);
-            }
+            fetch('https://balancer.3dtank.com/balancer')
+                .then(response => response.json())
+                .then(data => {
+                    let totalInbattles = 0;
+                    let totalOnline = 0;
+                    let totalMy4399Com = 0;
+                    Object.values(data.nodes).forEach(node => {
+                        totalInbattles += node.inbattles || 0;
+                        totalOnline += node.online || 0;
+                        totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
+                    });
+                    const my4399ComCount = totalMy4399Com || 0;
+                    document.getElementById('inbattlesCount').innerText = totalInbattles;
+                    document.getElementById('onlineCount').innerText = totalOnline;
+                    document.getElementById('my4399ComCount').innerText = my4399ComCount;
+                })
+                .catch(error => console.error('Error fetching balancer data:', error));
         }
-    })
-    .catch(error => console.error('Error fetching datacenters.config.json:', error));
-        })
-        .catch(error => console.error('Error fetching balancer data:', error));
-}
         function manualRefresh() {
-            clearInterval(refreshInterval); // Clear existing interval
-            refreshTime = 11; // Reset refresh time
-            startRefreshTimer(); // Start a new interval
+            clearInterval(refreshInterval);
+            refreshTime = 11;
+            startRefreshTimer();
             fetchBalancerStats();
         }
         function startRefreshTimer() {
@@ -172,7 +141,9 @@
         if (document.referrer.includes("testanki1.github.io")) {
             document.getElementById("backButton").style.display = "block";
         }
-        fetchBalancerStats(); // Initial fetch
-        startRefreshTimer(); // Start refresh timer
-        setInterval(fetchBalancerStats, 11000); // Auto refresh
+        fetchBalancerStats();
+        startRefreshTimer();
+        setInterval(fetchBalancerStats, 11000);
     </script>
+</body>
+</html>
