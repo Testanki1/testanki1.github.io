@@ -124,7 +124,6 @@ tr:nth-child(even) {
 tr:nth-child(odd) {
     background: rgba(125, 157, 186, 0.05);
 }
-
     .container {
         display: flex;
         flex-wrap: nowrap;
@@ -427,22 +426,27 @@ ${categories.map(category => `
 `;
                         rankingsTable.innerHTML = tableHtml;
                         const hullsPlayed = responseData.response && responseData.response.hullsPlayed ? responseData.response.hullsPlayed : [];
-                        let totalTimePlayedMs = hullsPlayed.reduce((total, hull) => total + (hull.timePlayed || 0), 0);
-                        // 将毫秒转换为 "X 小时 X 分钟 X.XXX 秒"
-                        const hours = Math.floor(totalTimePlayedMs / (3600 * 1000));
-                        totalTimePlayedMs %= (3600 * 1000);
-                        const minutes = Math.floor(totalTimePlayedMs / (60 * 1000));
-                        totalTimePlayedMs %= (60 * 1000);
-                        const seconds = (totalTimePlayedMs / 1000).toFixed(3);
-                        let timePlayedText = '';
-                        if (hours > 0) {
-                            timePlayedText += `${hours} 小时 `;
-                        }
-                        if (minutes > 0 || hours > 0) {
-                            timePlayedText += `${minutes} 分钟 `;
-                        }
-                        timePlayedText += `${seconds} 秒`;
-                        timePlayedDisplay.innerHTML = `游戏时长: ${timePlayedText}`;
+let totalTimePlayedMs = hullsPlayed.reduce((total, hull) => total + (hull.timePlayed || 0), 0);
+// 检查总时长是否为0
+let timePlayedText = '';
+if (totalTimePlayedMs === 0) {
+    timePlayedText = '未进行游戏';
+} else {
+    // 将毫秒转换为 "X 小时 X 分钟 X.XXX 秒"
+    const hours = Math.floor(totalTimePlayedMs / (3600 * 1000));
+    totalTimePlayedMs %= (3600 * 1000);
+    const minutes = Math.floor(totalTimePlayedMs / (60 * 1000));
+    totalTimePlayedMs %= (60 * 1000);
+    const seconds = (totalTimePlayedMs / 1000).toFixed(3);
+    if (hours > 0) {
+        timePlayedText += `${hours} 小时 `;
+    }
+    if (minutes > 0 || hours > 0) {
+        timePlayedText += `${minutes} 分钟 `;
+    }
+    timePlayedText += `${seconds} 秒`;
+}
+timePlayedDisplay.innerHTML = `游戏时长: ${timePlayedText}`;
                         // 获取 suppliesUsage 数据并计算总使用量
                         const suppliesUsage = responseData.response && responseData.response.suppliesUsage ? responseData.response.suppliesUsage : [];
                         const totalSuppliesUsage = suppliesUsage.reduce((total, supply) => total + (supply.usages || 0), 0);
@@ -468,21 +472,28 @@ displayListData(responseData.response.modesPlayed, modesPlayedContainer, "玩过
         }
         // 格式化时间
         function formatTime(milliseconds) {
-            const hours = Math.floor(milliseconds / (3600 * 1000));
-            milliseconds %= (3600 * 1000);
-            const minutes = Math.floor(milliseconds / (60 * 1000));
-            milliseconds %= (60 * 1000);
-            const seconds = (milliseconds / 1000).toFixed(3);
-            let timePlayedText = '';
-            if (hours > 0) {
-                timePlayedText += `${hours} 小时 `;
-            }
-            if (minutes > 0 || hours > 0) {
-                timePlayedText += `${minutes} 分钟 `;
-            }
-            timePlayedText += `${seconds} 秒`;
-            return timePlayedText;
-        }
+    if (milliseconds === 0) {
+        return '未进行游戏';
+    }
+
+    const hours = Math.floor(milliseconds / (3600 * 1000));
+    milliseconds %= (3600 * 1000);
+    const minutes = Math.floor(milliseconds / (60 * 1000));
+    milliseconds %= (60 * 1000);
+    const seconds = (milliseconds / 1000).toFixed(3);
+
+    let timePlayedText = '';
+    if (hours > 0) {
+        timePlayedText += `${hours} 小时 `;
+    }
+    if (minutes > 0 || hours > 0) {
+        timePlayedText += `${minutes} 分钟 `;
+    }
+    timePlayedText += `${seconds} 秒`;
+
+    return timePlayedText;
+}
+
 function displayListData(data, container, title) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return;
