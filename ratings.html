@@ -141,6 +141,13 @@
         font-size: 20px;
         text-align: center;
     }
+.item-image {
+    display: block;
+    max-width: 100px;
+    max-height: 100px;
+    margin: 10px auto;
+}
+
 .view-data-button {
         display: inline-block;
         padding: 12px 24px;
@@ -464,7 +471,7 @@ function displayListData(data, container, title) {
         const grade = item.grade == null || item.grade === -1 ? '-' : gradeMap[item.grade]; // 修改这里
         const name = item.name == null || item.name === -1 ? '-' : item.name;
         const count = item.count == null || item.count === -1 ? '-' : item.count;
-const usages = item.usages == null || item.usages === -1 ? '-' : item.usages;
+        const usages = item.usages == null || item.usages === -1 ? '-' : item.usages;
         const properties = item.properties == null || item.properties === -1 ? '-' : item.properties;
         const type = item.type == null || item.type === -1 ? '-' : item.type; // 这里保持不变
         const imageUrl = item.imageUrl == null || item.imageUrl === -1 ? null : item.imageUrl.replace(/s\.3dtank\.com\/[^"]*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp')).replace(/s\.eu.tankionline\.com\/[^"]*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
@@ -477,6 +484,7 @@ const usages = item.usages == null || item.usages === -1 ? '-' : item.usages;
 <div class="item-name">
 	${name}
 </div>
+${imageUrl ? `<img src="${imageUrl}" class="item-image" alt="${name}" />` : ''}
 ${hideType ? '' : `
     ${type !== '-' ? `
 <div>
@@ -504,7 +512,7 @@ ${hideType ? '' : `
 	数量: ${count}
 </div>
 ` : ''}
-${usages !== '-' ? `
+    ${usages !== '-' ? `
 <div>
 	使用量: ${usages}
 </div>
@@ -514,15 +522,9 @@ ${usages !== '-' ? `
 	特性: ${properties}
 </div>
 ` : ''}
+    ${item.detailedGrades.length > 1 ? `<button class="view-data-button" onclick="showDetailedGrades('${name}', ${JSON.stringify(item.detailedGrades).replace(/"/g, '&quot;')}, '${title}')">${title === '玩过的模式' ? '查看各类型数据' : '查看各等级数据'}</button>` : ''}
 	</div>
-${item.detailedGrades.length > 1 ? `<button class="view-data-button" onclick="showDetailedGrades('${name}', ${JSON.stringify(item.detailedGrades).replace(/"/g, '&quot;')}, '${title}')">${title === '玩过的模式' ? '查看各类型数据' : '查看各等级数据'}</button>` : ''}
 `;
-        if (imageUrl) {
-            const image = new Image();
-            image.src = imageUrl;
-            image.classList.add('item-image');
-            div.appendChild(image);
-        }
         container.appendChild(div);
     });
 }
