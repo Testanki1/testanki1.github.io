@@ -241,24 +241,45 @@ function updateSVGContent(txtContent, svgContent, quality) {
     var defsIndex = svgContent.indexOf('<defs>');
     if (defsIndex !== -1) {
         var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
+
         // Replace fill color if quality is selected
         if (quality !== 'default') {
             finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
         }
+
         var svgPreview = document.getElementById("svgPreview");
         svgPreview.innerHTML = finalSVG;
-        // 设置 SVG 尺寸为 256x256
-        svgPreview.querySelector("svg").setAttribute("width", "256");
-        svgPreview.querySelector("svg").removeAttribute("height"); // 移除另一个尺寸属性
-        var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = txtName + '-' + svgName + '.svg'; // 设置下载的文件名
-        a.textContent = '保存 SVG 矢量图'; // Change to "下载图标"
-        var downloadBtn = document.getElementById("downloadBtn");
-        downloadBtn.innerHTML = "";
-        downloadBtn.appendChild(a);
+
+        // Set SVG dimensions to 256x256
+        var svgElement = svgPreview.querySelector("svg");
+        if (svgElement) {
+            svgElement.setAttribute("width", "256");
+            svgElement.removeAttribute("height"); // Remove the other dimension attribute
+
+            // Create download link
+            var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+
+            // Correctly get the value of txtName and svgName
+            var txtName = document.getElementById("txtName").value.trim();
+            var svgName = document.getElementById("svgName").value.trim();
+
+            // Set filename if `txtName` and `svgName` are not empty
+            if (txtName && svgName) {
+                a.download = txtName + '-' + svgName + '.svg';
+            } else {
+                a.download = 'default.svg'; // Provide default filename if either value is empty
+            }
+
+            a.textContent = '保存 SVG 矢量图'; // Set download link text
+            var downloadBtn = document.getElementById("downloadBtn");
+            downloadBtn.innerHTML = "";
+            downloadBtn.appendChild(a);
+        }
+
+        // Hide loading message
         document.getElementById("loading").style.display = "none";
     } else {
         console.error('Error: <defs> tag not found in SVG file.');
