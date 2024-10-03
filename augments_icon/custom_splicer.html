@@ -98,14 +98,7 @@ select:focus, input:focus {
             <option value="#FFEE00">传奇</option>
             <option value="#FF6666">异国情调</option>
         </select><br />
-<label for="background">背景颜色：</label>
-<select id="background">
-    <option value="default">默认</option>
-    <option value="蓝紫色">蓝紫色</option>
-    <option value="深蓝色">深蓝色</option>
-    <option value="浅蓝色">浅蓝色</option>
-</select><br />
-
+<label for="background">背景颜色：</label> <select id="background"> <option value="default" selected="selected">默认</option> <!-- 设置默认选项为选中 --> </select><br />
 	<div id="svgPreview">
 		<!-- Generated SVG will be displayed here -->
 	</div>
@@ -173,6 +166,40 @@ var groupedEquipments = {
             });
             svgNameSelect.appendChild(optgroup);
         });
+const backgroundColors = [
+            "蓝紫色",
+            "深蓝色",
+            "浅蓝色",
+            "白色",
+            "黑色",
+            "红色",
+            "绿色",
+            "黄色",
+            "橙色",
+            "紫色",
+            "粉色"
+        ];
+        // 按拼音或字母排序
+        backgroundColors.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+        const backgroundSelect = document.getElementById("background");
+        // 动态生成颜色选项
+        backgroundColors.forEach(function(color) {
+            var option = document.createElement("option");
+            option.value = color;
+            option.textContent = color;
+            backgroundSelect.appendChild(option);
+        });
+        // 添加事件监听器
+        backgroundSelect.addEventListener('change', function() {
+            const selectedColor = this.value;
+            if (selectedColor !== "default") {
+                // 当选项不是“默认”时，执行更改
+                document.body.style.backgroundColor = selectedColor; // 更改背景颜色
+            } else {
+                // 当选项为“默认”时，恢复默认背景颜色
+                document.body.style.backgroundColor = "#001926"; // 恢复到原始背景颜色
+            }
+        });
 function toggleGenerateBtn() {
     var txtName = document.getElementById('txtName').value.trim();
     var svgName = document.getElementById('svgName').value.trim();
@@ -187,14 +214,11 @@ function generateSVG() {
     var svgName = document.getElementById("svgName").value.trim();
     var quality = document.getElementById("quality").value;
     var background = document.getElementById("background").value; // 获取背景颜色的值
-
     var txtUrl = 'https://testanki1.github.io/augments_icon/equipments/' + encodeURIComponent(txtName) + '.txt';
     var svgUrl = 'https://testanki1.github.io/augments_icon/augments/' + encodeURIComponent(svgName) + '.svg';
     var backgroundUrl = background !== 'default' ? 'https://testanki1.github.io/augments_icon/colors/' + encodeURIComponent(background) + '.txt' : null;
-
     // 显示加载提示
     document.getElementById("loading").style.display = "block";
-
     fetch(txtUrl)
         .then(response => response.text())
         .then(txtContent => {
@@ -207,7 +231,7 @@ function generateSVG() {
                             .then(response => response.text())
                             .then(backgroundContent => {
                                 // Replace the first radialGradient's stop tags
-                                svgContent = svgContent.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${backgroundContent}</radialGradient>`);
+                                svgContent = svgContent.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${backgroundContent}</radialgradient>`);
                                 updateSVGContent(txtContent, svgContent, quality);
                             });
                     } else {
@@ -224,7 +248,6 @@ function generateSVG() {
             document.getElementById("loading").style.display = "none";
         });
 }
-
 function updateSVGContent(txtContent, svgContent, quality) {
     var defsIndex = svgContent.indexOf('<defs>');
     if (defsIndex !== -1) {
