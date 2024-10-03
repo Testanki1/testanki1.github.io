@@ -98,6 +98,14 @@ select:focus, input:focus {
             <option value="#FFEE00">传奇</option>
             <option value="#FF6666">异国情调</option>
         </select><br />
+<label for="background">背景颜色：</label>
+<select id="background">
+    <option value="default">默认</option>
+    <option value="蓝紫色">蓝紫色</option>
+    <option value="深蓝色">深蓝色</option>
+    <option value="浅蓝色">浅蓝色</option>
+</select><br />
+
 	<div id="svgPreview">
 		<!-- Generated SVG will be displayed here -->
 	</div>
@@ -120,6 +128,7 @@ select:focus, input:focus {
         document.getElementById('txtName').addEventListener('change', toggleGenerateBtn);
 document.getElementById('svgName').addEventListener('change', toggleGenerateBtn);
 document.getElementById('quality').addEventListener('change', toggleGenerateBtn);
+document.getElementById('background').addEventListener('change', toggleGenerateBtn);
 var txtNameSelect = document.getElementById("txtName");
 var svgNameSelect = document.getElementById("svgName");
 var groupedEquipments = {
@@ -177,57 +186,72 @@ function generateSVG() {
     var txtName = document.getElementById("txtName").value.trim();
     var svgName = document.getElementById("svgName").value.trim();
     var quality = document.getElementById("quality").value;
+    var background = document.getElementById("background").value; // 获取背景颜色的值
+
     var txtUrl = 'https://testanki1.github.io/augments_icon/equipments/' + encodeURIComponent(txtName) + '.txt';
     var svgUrl = 'https://testanki1.github.io/augments_icon/augments/' + encodeURIComponent(svgName) + '.svg';
+    var backgroundUrl = background !== 'default' ? 'https://testanki1.github.io/augments_icon/colors/' + encodeURIComponent(background) + '.txt' : null;
+
     // 显示加载提示
     document.getElementById("loading").style.display = "block";
+
     fetch(txtUrl)
         .then(response => response.text())
         .then(txtContent => {
             fetch(svgUrl)
                 .then(response => response.text())
                 .then(svgContent => {
-                    var defsIndex = svgContent.indexOf('<defs>');
-                    if (defsIndex !== -1) {
-                        var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
-                        // Replace fill color if quality is selected
-                        if (quality !== 'default') {
-                            finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
-                        }
-                        var svgPreview = document.getElementById("svgPreview");
-                        svgPreview.innerHTML = finalSVG;
-                        // 设置 SVG 尺寸为 256x256
-                        svgPreview.querySelector("svg").setAttribute("width", "256");
-                        svgPreview.querySelector("svg").removeAttribute("height"); // 移除另一个尺寸属性
-                        var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
-                        var url = URL.createObjectURL(blob);
-                        var a = document.createElement('a');
-                        a.href = url;
-                        a.download = txtName + '-' + svgName + '.svg'; // 设置下载的文件名
-                        a.textContent = '保存 SVG 矢量图'; // Change to "下载图标"
-                        // 替换下载按钮
-                        var downloadBtn = document.getElementById("downloadBtn");
-                        downloadBtn.innerHTML = "";
-                        downloadBtn.appendChild(a);
-                        // 隐藏加载提示
-                        document.getElementById("loading").style.display = "none";
+                    if (backgroundUrl) {
+                        // Fetch background color information
+                        fetch(backgroundUrl)
+                            .then(response => response.text())
+                            .then(backgroundContent => {
+                                // Replace the first radialGradient's stop tags
+                                svgContent = svgContent.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${backgroundContent}</radialGradient>`);
+                                updateSVGContent(txtContent, svgContent, quality);
+                            });
                     } else {
-                        console.error('Error: <defs> tag not found in SVG file.');
-                        // 隐藏加载提示
-                        document.getElementById("loading").style.display = "none";
+                        updateSVGContent(txtContent, svgContent, quality);
                     }
                 })
                 .catch(error => {
                     console.error('Error fetching SVG file:', error);
-                    // 隐藏加载提示
                     document.getElementById("loading").style.display = "none";
                 });
         })
         .catch(error => {
             console.error('Error fetching TXT file:', error);
-            // 隐藏加载提示
             document.getElementById("loading").style.display = "none";
         });
+}
+
+function updateSVGContent(txtContent, svgContent, quality) {
+    var defsIndex = svgContent.indexOf('<defs>');
+    if (defsIndex !== -1) {
+        var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
+        // Replace fill color if quality is selected
+        if (quality !== 'default') {
+            finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
+        }
+        var svgPreview = document.getElementById("svgPreview");
+        svgPreview.innerHTML = finalSVG;
+        // 设置 SVG 尺寸为 256x256
+        svgPreview.querySelector("svg").setAttribute("width", "256");
+        svgPreview.querySelector("svg").removeAttribute("height"); // 移除另一个尺寸属性
+        var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = txtName + '-' + svgName + '.svg'; // 设置下载的文件名
+        a.textContent = '保存 SVG 矢量图'; // Change to "下载图标"
+        var downloadBtn = document.getElementById("downloadBtn");
+        downloadBtn.innerHTML = "";
+        downloadBtn.appendChild(a);
+        document.getElementById("loading").style.display = "none";
+    } else {
+        console.error('Error: <defs> tag not found in SVG file.');
+        document.getElementById("loading").style.display = "none";
+    }
 }
 function convertToPNG() {
     var txtName = document.getElementById("txtName").value.trim();
