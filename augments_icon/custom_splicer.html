@@ -134,6 +134,34 @@ var groupedEquipments = {
             "底盘": ["空（底盘）", "极端轻型结构", "爆破手", "工兵", "驱动器", "轻型结构", "重型结构", "耐寒性", "耐热性", "抗干扰器", "攻强免疫", "抗电磁脉冲", "抗眩晕", "抗热", "抗寒", "救生员", "工程师", "凤凰（底盘）"],
             "射击颜色": ["深红色", "岩浆", "幻影黑", "粉红色", "雪", "寒冷", "暗月", "毒（1）", "毒（2）", "太阳", "火", "血液", "日食", "水", "天空蓝", "虚空", "金", "紫罗兰色", "珊瑚礁", "电", "天空", "爆破手（绿）", "爆破手（红）", "神秘的红色", "黑暗", "暴力", "正午", "魔法"]
         };
+const groupedBackgroundColors = {
+    "来自装备改造图标": ["蓝紫色", "蓝粉渐变色", "红色", "浅蓝色", "深蓝色", "粉色", "紫色", "黄色", "橙色", "火红色", "蓝色", "绿色", "黑色"],
+    "来自射击颜色图标": ["爆破手（红）", "爆破手（绿）", "电", "毒（1）", "毒（2）", "粉红色", "寒冷", "黑暗", "幻影黑", "火", "金", "魔法", "日食", "珊瑚礁", "深红色", "神秘的红色", "水", "太阳", "天空", "天空蓝", "虚空", "雪", "血液", "岩浆", "正午", "紫罗兰色", "暴力", "暗月"]
+};
+
+// 获取下拉选择框
+const backgroundSelect = document.getElementById("background");
+
+// 动态生成颜色选项
+Object.keys(groupedBackgroundColors).forEach(function(group) {
+    var optgroup = document.createElement("optgroup");
+    optgroup.label = group;
+
+    // 对选项进行排序
+    groupedBackgroundColors[group].sort(function(a, b) {
+        return a.localeCompare(b);
+    });
+
+    groupedBackgroundColors[group].forEach(function(color) {
+        var option = document.createElement("option");
+        option.value = color;
+        option.textContent = color;
+        optgroup.appendChild(option);
+    });
+
+    backgroundSelect.appendChild(optgroup);
+});
+
         // 填充装备选项
         Object.keys(groupedEquipments).forEach(function(group) {
             var optgroup = document.createElement("optgroup");
@@ -165,29 +193,6 @@ var groupedEquipments = {
                 optgroup.appendChild(option);
             });
             svgNameSelect.appendChild(optgroup);
-        });
-const backgroundColors = ["蓝紫色", "蓝粉渐变色", "红色", "浅蓝色", "深蓝色", "粉色", "紫色", "黄色", "橙色", "火红色", "蓝色", "绿色", "黑色", "爆破手（红）", "爆破手（绿）", "电", "毒（1）", "毒（2）", "粉红色", "寒冷", "黑暗", "幻影黑", "火", "金", "魔法", "日食", "珊瑚礁", "深红色", "神秘的红色", "水", "太阳", "天空", "天空蓝", "虚空", "雪", "血液", "岩浆", "正午", "紫罗兰色", "暴力", "暗月"]
-;
-        // 按拼音或字母排序
-        backgroundColors.sort((a, b) => a.localeCompare(b, 'zh-CN'));
-        const backgroundSelect = document.getElementById("background");
-        // 动态生成颜色选项
-        backgroundColors.forEach(function(color) {
-            var option = document.createElement("option");
-            option.value = color;
-            option.textContent = color;
-            backgroundSelect.appendChild(option);
-        });
-        // 添加事件监听器
-        backgroundSelect.addEventListener('change', function() {
-            const selectedColor = this.value;
-            if (selectedColor !== "default") {
-                // 当选项不是“默认”时，执行更改
-                document.body.style.backgroundColor = selectedColor; // 更改背景颜色
-            } else {
-                // 当选项为“默认”时，恢复默认背景颜色
-                document.body.style.backgroundColor = "#001926"; // 恢复到原始背景颜色
-            }
         });
 function toggleGenerateBtn() {
     var txtName = document.getElementById('txtName').value.trim();
@@ -241,44 +246,36 @@ function updateSVGContent(txtContent, svgContent, quality) {
     var defsIndex = svgContent.indexOf('<defs>');
     if (defsIndex !== -1) {
         var finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
-
         // Replace fill color if quality is selected
         if (quality !== 'default') {
             finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
         }
-
         var svgPreview = document.getElementById("svgPreview");
         svgPreview.innerHTML = finalSVG;
-
         // Set SVG dimensions to 256x256
         var svgElement = svgPreview.querySelector("svg");
         if (svgElement) {
             svgElement.setAttribute("width", "256");
             svgElement.removeAttribute("height"); // Remove the other dimension attribute
-
             // Create download link
             var blob = new Blob([finalSVG], { type: 'image/svg+xml' });
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
-
             // Correctly get the value of txtName and svgName
             var txtName = document.getElementById("txtName").value.trim();
             var svgName = document.getElementById("svgName").value.trim();
-
             // Set filename if `txtName` and `svgName` are not empty
             if (txtName && svgName) {
                 a.download = txtName + '-' + svgName + '.svg';
             } else {
                 a.download = 'default.svg'; // Provide default filename if either value is empty
             }
-
             a.textContent = '保存 SVG 矢量图'; // Set download link text
             var downloadBtn = document.getElementById("downloadBtn");
             downloadBtn.innerHTML = "";
             downloadBtn.appendChild(a);
         }
-
         // Hide loading message
         document.getElementById("loading").style.display = "none";
     } else {
