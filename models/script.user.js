@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克皮肤模型替换
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.0
 // @description  替换3D坦克炮塔、底盘、无人机皮肤模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-        const currentVersionCode = 2; // 当前脚本版本
+        const currentVersionCode = 1; // 当前脚本版本
     const versionUrl = 'https://testanki1.github.io/models/version.json'; // 版本检查的 JSON 文件地址
 
     // 检查更新
