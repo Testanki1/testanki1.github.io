@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         3D坦克皮肤模型替换
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  替换3D坦克炮塔、底盘、无人机皮肤模型
+// @version      1.1
+// @description  替换3D坦克炮塔、底盘、无人机皮肤、节日模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -13,8 +13,8 @@
 
 (function() {
 	'use strict';
-        const currentVersionCode = 1; // 当前脚本版本
-    const versionUrl = 'https://testanki1.github.io/models/version.json'; // 版本检查的 JSON 文件地址
+        const currentVersionCode = 2;
+    const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     // 检查更新
     fetch(versionUrl)
@@ -23,12 +23,11 @@
             return response.json();
         })
         .then(data => {
-            const latestVersion = data.version; // 获取最新版本号
-            const latestVersionCode = data.version_code; // 获取最新版本代码
-            const updateInfo = data.update_info; // 获取更新内容
-            const downloadUrl = data.download_url; // 获取下载链接
+            const latestVersion = data.version;
+            const latestVersionCode = data.version_code;
+            const updateInfo = data.update_info;
+            const downloadUrl = data.download_url;
 
-            // 比较版本代码
             if (latestVersionCode > currentVersionCode) {
                 const message = `
                     有新版本可用！\n
@@ -36,7 +35,7 @@
                     更新内容：${updateInfo}\n
                 `;
                 if (confirm(message + "点击确定下载新版本？")) {
-                    window.location.href = downloadUrl; // 确定则下载
+                    window.location.href = downloadUrl;
                 }
             }
         })
