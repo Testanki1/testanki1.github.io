@@ -45,17 +45,29 @@
         .video-list {
             margin-top: 20px;
         }
-        video {
-            display: block;
-            margin-top: 10px;
-            max-width: 100%;
-            border-radius: 4px;
+        .video-item {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #003847;
+            border-radius: 8px;
+            text-align: center;
         }
         .video-title {
             font-size: 18px;
-            margin-top: 10px;
-            text-align: center;
+            margin-bottom: 10px;
             color: #76FF33;
+        }
+        .copy-button {
+            background-color: #76FF33;
+            color: #001926;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .copy-button:hover {
+            background-color: #5fd129;
         }
         @media (max-width: 600px) {
             h2 {
@@ -63,6 +75,9 @@
             }
             label, select, .video-title {
                 font-size: 16px;
+            }
+            .copy-button {
+                font-size: 14px;
             }
         }
     </style>
@@ -115,7 +130,7 @@
             '冰风暴 SE 皮肤': 'https://v.3304399.net/forums/media/2094531/c464f46f8e3111ef9b77c81f66c895c6/1499994733.mp4'
         },
         'RF（复古未来）': {
-            '火龙珠和圣骑士 RF 皮肤': 'https://v.3304399.net/forums/sd/2094548/418cca4f8e3511ef9b77c81f66c895c6/1396825149.mp4',
+            '火龙珠和圣骑士 RF 皮肤': 'https://v.3304399.net/forums/media/2094548/418cca4f8e3511ef9b77c81f66c895c6/1396825149.mp4',
             '离子炮和十字军 RF 皮肤': 'https://v.3304399.net/forums/media/2094558/35b6b0208e3711ef98a81866da4d1cd2/4122935232.mp4',
             '霍珀和特斯拉 RF 皮肤': 'https://v.3304399.net/forums/media/2094478/89b3d3f78e2711ef98a81866da4d1cd2/1981944175.mp4'
         },
@@ -123,42 +138,79 @@
             '激光炮和独裁者 GT 皮肤': 'https://v.3304399.net/forums/media/2094386/170b476e8e1911ef9b77c81f66c895c6/3259753061.mp4',
             '轰天炮和猎人中甲 GT 皮肤': 'https://v.3304399.net/forums/media/2094543/f66f13938e3311ef9b77c81f66c895c6/4086111923.mp4',
             '冰风暴和猎人中甲 GT 皮肤': 'https://v.3304399.net/forums/media/2094536/44350e9a8e3211ef98a81866da4d1cd2/214812952.mp4',
-            '离子炮和猛犸象 GT 皮肤': 'http://v.3304399.net/forums/media/2094555/743760ba8e3611ef98a81866da4d1cd2/4228130814.mp4',
+            '离子炮和猛犸象 GT 皮肤': 'https://v.3304399.net/forums/media/2094555/743760ba8e3611ef98a81866da4d1cd2/4228130814.mp4',
             '火焰炮和黄蜂轻甲 GT 皮肤': 'https://v.3304399.net/forums/media/2094553/1db03d168e3611ef9b77c81f66c895c6/4231893850.mp4'
         },
         'IC（冰）': {
-            '冰风暴 IC 皮肤': 'https://v.3304399.net/forums/media/2094383/c056f79d8e1811ef98a81866da4d1cd2/1476213934.mp4',
-            '电磁炮和冰风暴 IC 皮肤': 'https://v.3304399.net/forums/media/2094541/3a89ebe08e3311ef9b77c81f66c895c6/1982207811.mp4'
+            '冰风暴 IC 皮肤': 'https://v.3304399.net/forums/media/2094532/633e13a58e3111ef9b77c81f66c895c6/2234989421.mp4'
         }
     };
 
-    // 根据选择的类别更新视频选项
-    document.getElementById('category').addEventListener('change', function () {
-        const category = this.value;
+    // 处理类别选择事件
+    document.getElementById('category').addEventListener('change', function() {
+        const selectedCategory = this.value;
         const videoList = document.getElementById('videoList');
-        videoList.innerHTML = ''; // 清空视频列表
+        videoList.innerHTML = ''; // 清空之前的内容
 
-        if (category && videos[category]) {
-            for (const videoName in videos[category]) {
-                const videoUrl = videos[category][videoName];
-                
-                // 创建视频元素
-                const videoElement = document.createElement('video');
-                videoElement.src = videoUrl;
-                videoElement.controls = true; // 显示控制器
-                videoElement.style.marginTop = '10px'; // 添加一些间距
-
-                // 创建标题元素
-                const titleElement = document.createElement('p');
-                titleElement.textContent = videoName;
-                titleElement.className = 'video-title';
-
-                // 添加视频和标题到视频列表
-                videoList.appendChild(titleElement);
-                videoList.appendChild(videoElement);
+        if (selectedCategory && videos[selectedCategory]) {
+            for (const title in videos[selectedCategory]) {
+                const videoLink = videos[selectedCategory][title];
+                const videoItem = document.createElement('div');
+                videoItem.className = 'video-item';
+                videoItem.innerHTML = `
+                    <div class="video-title">${title}</div>
+                    <button class="copy-button" onclick="copyToClipboard('${videoLink}')">复制链接</button>
+                `;
+                videoList.appendChild(videoItem);
             }
         }
     });
+
+    // 复制链接到剪贴板并打开新标签页
+    function copyToClipboard(link) {
+        navigator.clipboard.writeText(link).then(() => {
+            if (confirm("链接已复制到剪贴板，点击确定后打开新标签页观看视频。")) {
+                const newTab = window.open("about:blank");
+                newTab.document.write(`
+                    <!DOCTYPE html>
+                    <html lang="zh-CN">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>视频播放</title>
+                        <style>
+                            body {
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                                background-color: #001926;
+                                color: #fff;
+                                font-family: 'Rubik', sans-serif;
+                                margin: 0;
+                            }
+                            video {
+                                max-width: 90%;
+                                max-height: 90%;
+                                border-radius: 8px;
+                                background-color: #002c36;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <video controls autoplay>
+                            <source src="${link}" type="video/mp4">
+                            您的浏览器不支持视频播放。
+                        </video>
+                    </body>
+                    </html>
+                `);
+                newTab.document.close();
+            }
+        }).catch(err => {
+            console.error('复制失败:', err);
+        });
+    }
 </script>
 
 </body>
