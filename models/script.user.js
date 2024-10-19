@@ -2,7 +2,7 @@
 // @name         3D坦克皮肤模型替换
 // @namespace    http://tampermonkey.net/
 // @version      1.1
-// @description  替换3D坦克炮塔、底盘、无人机皮肤、节日模型
+// @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
