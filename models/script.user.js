@@ -261,28 +261,36 @@ const currentUrl = window.location.href;
 			"XT": "602/142250/300/167/30545000710756"
 		}
 	};
+    const festivalsRedirectMap = {
+    "garage": {
+        "default": "601/166176/165/206/30545000710421",
+        "万圣节": "613/2501/252/46/30545000710615"
+    }
+};
 
 
 // 允许的选项正则表达式
 	const hullsPattern = /^(XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
 	const turretsPattern = /^(HD|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP)$/i;
 	const dronesPattern = /^(XT)$/i;
+    const festivalsPattern = /^(万圣节)$/i;
 
 	// 从 localStorage 中获取上次的选择
-	let lastHullsChoice = localStorage.getItem('userChoiceHulls') || 'XT';
+	let lastHullChoice = localStorage.getItem('userChoiceHull') || 'XT';
 	let lastTurretChoice = localStorage.getItem('userChoiceTurret') || 'XT';
 	let lastDroneChoice = localStorage.getItem('userChoiceDrone') || 'XT';
+    let lastFestivalChoice = localStorage.getItem('userChoiceFestival') || '万圣节';
 
 	// 选择底盘，确保用户输入合法
-	let userChoiceHulls = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullsChoice);
-	if (userChoiceHulls === null) {
-		userChoiceHulls = ''; // 用户点击取消，设置为空
+	let userChoiceHull = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullChoice);
+	if (userChoiceHull === null) {
+		userChoiceHull = ''; // 用户点击取消，设置为空
 	} else {
-		while (!hullsPattern.test(userChoiceHulls)) {
+		while (!hullsPattern.test(userChoiceHull)) {
 			alert("输入无效，请输入有效的底盘皮肤系列：XT, XT_HD, LC, PR, UT, DC, GT, RF, SP");
-			userChoiceHulls = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullsChoice);
-			if (userChoiceHulls === null) {
-				userChoiceHulls = ''; // 用户点击取消，设置为空
+			userChoiceHull = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullChoice);
+			if (userChoiceHull === null) {
+				userChoiceHull = ''; // 用户点击取消，设置为空
 				break;
 			}
 		}
@@ -317,35 +325,49 @@ const currentUrl = window.location.href;
 			}
 		}
 	}
+    let userChoiceFestival = prompt("请选择要使用的节日替换 (万圣节)（点击取消可不进行替换）:", lastFestivalChoice);
+	if (userChoiceFestival === null) {
+		userChoiceFestival = ''; // 用户点击取消，设置为空
+	} else {
+		while (!festivalsPattern.test(userChoiceFestival)) {
+			alert("输入无效，请输入有效的节日：万圣节");
+			userChoiceFestival = prompt("请选择要使用的节日替换 (万圣节):", lastFestivalChoice);
+			if (userChoiceFestival === null) {
+				userChoiceFestival = ''; // 用户点击取消，设置为空
+				break;
+			}
+		}
+	}
 
 	// 确认继续
-	const confirmationMessage = `您选择了底盘 ${userChoiceHulls ? userChoiceHulls.toUpperCase() : '未选择'}、炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '未选择'} 和无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '未选择'}。点击确定继续。`;
+	const confirmationMessage = `您选择了底盘 ${userChoiceHull ? userChoiceHull.toUpperCase() : '未选择'}、炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '未选择'} 、无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '未选择'}、${userChoiceFestival ? userChoiceFestival.toUpperCase() : '未选择'}。点击确定继续。`;
 	if (confirm(confirmationMessage)) {
 		// 将用户选择存储到 localStorage
-		localStorage.setItem('userChoiceHulls', userChoiceHulls);
+		localStorage.setItem('userChoiceHull', userChoiceHull);
 		localStorage.setItem('userChoiceTurret', userChoiceTurret);
 		localStorage.setItem('userChoiceDrone', userChoiceDrone);
+        localStorage.setItem('userChoiceFestival', userChoiceFestival);
         
-		if (userChoiceHulls && hullsRedirectMap[userChoiceHulls]) {
+		if (userChoiceHull && hullsRedirectMap[userChoiceHull]) {
 			const hullsMap = hullsRedirectMap;
 			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
 				for (const key in hullsMap) {
 					if (tag.src && tag.src.includes(hullsMap[key].default)) {
-						const newSrc = hullsMap[key][userChoiceHulls];
+						const newSrc = hullsMap[key][userChoiceHull];
 						if (newSrc) {
 							tag.src = tag.src.replace(hullsMap[key].default, newSrc);
 							// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-							if (key === "dictator" && userChoiceHulls.toUpperCase() === "SP") {
+							if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
 								tag.src = tag.src.replace("res.3dtank.com", "s.eu.tankionline.com");
 							}
 						}
 					}
 					if (tag.href && tag.href.includes(hullsMap[key].default)) {
-						const newHref = hullsMap[key][userChoiceHulls];
+						const newHref = hullsMap[key][userChoiceHull];
 						if (newHref) {
 							tag.href = tag.href.replace(hullsMap[key].default, newHref);
 							// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-							if (key === "dictator" && userChoiceHulls.toUpperCase() === "SP") {
+							if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
 								tag.href = tag.href.replace("res.3dtank.com", "s.eu.tankionline.com");
 							}
 						}
@@ -402,16 +424,34 @@ const currentUrl = window.location.href;
 				}
 			});
 		}
-
+if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
+			const festivalMap = festivalsRedirectMap;
+			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
+				for (const key in festivalMap) {
+					if (tag.src && tag.src.includes(festivalMap[key].default)) {
+						const newSrc = festivalMap[key][userChoiceFestival];
+						if (newSrc) {
+							tag.src = tag.src.replace(festivalMap[key].default, newSrc);
+						}
+					}
+					if (tag.href && tag.href.includes(festivalMap[key].default)) {
+						const newHref = festivalMap[key][userChoiceFestival];
+						if (newHref) {
+							tag.href = tag.href.replace(festivalMap[key].default, newHref);
+						}
+					}
+				}
+			});
+		}
 		// 拦截 fetch 请求
 		const originalFetch = window.fetch;
 		window.fetch = function(input, init) {
 			if (typeof input === 'string') {
 				for (const key in hullsRedirectMap) {
-					if (input.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHulls.toUpperCase()]) {
-						input = input.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHulls.toUpperCase()]);
+					if (input.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHull.toUpperCase()]) {
+						input = input.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHull.toUpperCase()]);
 						// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-						if (key === "dictator" && userChoiceHulls.toUpperCase() === "SP") {
+						if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
 							input = input.replace("res.3dtank.com", "s.eu.tankionline.com");
 						}
 						break;
@@ -432,6 +472,12 @@ const currentUrl = window.location.href;
 						break;
 					}
 				}
+                for (const key in festivalsRedirectMap) {
+					if (input.includes(festivalsRedirectMap[key].default) && festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]) {
+						input = input.replace(festivalsRedirectMap[key].default, festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]);
+						break;
+					}
+				}
 			}
 			return originalFetch(input, init);
 		};
@@ -440,10 +486,10 @@ const currentUrl = window.location.href;
 		const originalOpen = XMLHttpRequest.prototype.open;
 		XMLHttpRequest.prototype.open = function(method, url) {
 			for (const key in hullsRedirectMap) {
-				if (url.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHulls.toUpperCase()]) {
-					url = url.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHulls.toUpperCase()]);
+				if (url.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHull.toUpperCase()]) {
+					url = url.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHull.toUpperCase()]);
 					// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-					if (key === "dictator" && userChoiceHulls.toUpperCase() === "SP") {
+					if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
 						url = url.replace("res.3dtank.com", "s.eu.tankionline.com");
 					}
 					break;
@@ -461,6 +507,12 @@ const currentUrl = window.location.href;
 			for (const key in dronesRedirectMap) {
 				if (url.includes(dronesRedirectMap[key].default) && dronesRedirectMap[key][userChoiceDrone.toUpperCase()]) {
 					url = url.replace(dronesRedirectMap[key].default, dronesRedirectMap[key][userChoiceDrone.toUpperCase()]);
+					break;
+				}
+			}
+            for (const key in festivalsRedirectMap) {
+				if (url.includes(festivalsRedirectMap[key].default) && festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]) {
+					url = url.replace(festivalsRedirectMap[key].default, festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]);
 					break;
 				}
 			}
