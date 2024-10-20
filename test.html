@@ -1,11 +1,12 @@
-
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>
-	3D坦克测试服务器
-</title>
-<style>
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D坦克测试服务器</title>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+        
         body {
             font-family: Rubik, sans-serif;
             margin: 0;
@@ -18,22 +19,86 @@
             height: 100vh;
             flex-direction: column;
         }
+        
         * {
             -webkit-tap-highlight-color: transparent;
         }
-.header {
-    position: fixed; /* Fix the header at the top */
-    top: 0;
-    width: 100%;
-    background-color: #001926;
-    padding: 10px 0;
-    text-align: center;
-    z-index: 1000; /* Ensure the header is above other content */
-}
+        
+        #options {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(50, 50, 50, 0.9); /* Changed background color */
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            z-index: 1001; /* 确保在其他元素之上 */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* 添加阴影效果 */
+        }
+        
+        #options label {
+            display: flex;
+            align-items: center; /* 垂直居中对齐 */
+            margin: 5px 0;
+            cursor: pointer; /* 提示可点击 */
+        }
 
+        #options input[type="checkbox"] {
+            display: none; /* 隐藏原始复选框 */
+        }
+
+        /* 自定义复选框样式 */
+        #options input[type="checkbox"] + span {
+            position: relative;
+            padding-left: 30px; /* 为复选框留出空间 */
+            cursor: pointer; /* 提示可点击 */
+        }
+
+        #options input[type="checkbox"] + span:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px; /* 自定义复选框宽度 */
+            height: 20px; /* 自定义复选框高度 */
+            border: 2px solid #76FF33; /* 边框颜色 */
+            border-radius: 4px; /* 边框圆角 */
+            background: transparent; /* 背景透明 */
+            transition: background 0.3s, border-color 0.3s; /* 过渡效果 */
+        }
+
+        #options input[type="checkbox"]:checked + span:before {
+            background: #76FF33; /* 选中时的背景颜色 */
+            border-color: #76FF33; /* 选中时的边框颜色 */
+        }
+
+        #options input[type="checkbox"]:checked + span:after {
+            content: '';
+            position: absolute;
+            left: 5px; /* 复选标记位置 */
+            top: 10px; /* 复选标记位置 */
+            width: 10px; /* 复选标记宽度 */
+            height: 5px; /* 复选标记高度 */
+            border: solid #001926; /* 复选标记颜色 */
+            border-width: 0 2px 2px 0; /* 复选标记边框宽度 */
+            transform: rotate(45deg); /* 旋转形成对勾形状 */
+        }
+
+        .header {
+            position: fixed; /* Fix the header at the top */
+            top: 0;
+            width: 100%;
+            background-color: #001926;
+            padding: 10px 0;
+            text-align: center;
+            z-index: 1000; /* Ensure the header is above other content */
+        }
+        
         .hidden {
             display: none;
         }
+        
         .loader {
             display: flex;
             justify-content: center;
@@ -45,39 +110,41 @@
             top: 0;
             left: 0;
         }
-        #deploy-results,
-        #review-results {
+        
+        #deploy-results, #review-results {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+        
         .button-container {
-    display: flex;
-    align-items: center; /* Align items horizontally */
-}
-.button {
-    display: inline-block;
-    margin: 10px;
-    padding: 10px 20px;
-    background-color: transparent;
-    color: #BFD5FF;
-    border: 1px solid #667D9DBA;
-    text-decoration: none;
-    border-radius: 6px;
-    transition: background-color 0.3s, color 0.3s;
-    margin-right: 10px; /* Add margin to separate from counts */
-}
-
-/* Add this */
-.button:hover {
-    background-color: #76FF33;
-    color: #001926;
-}
-.online-count,
-.inbattles-count {
-    margin-left: 10px; /* Space between the button and counts */
-    color: #BFD5FF;
-}
+            display: flex;
+            align-items: center; /* Align items horizontally */
+        }
+        
+        .button {
+            display: inline-block;
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: transparent;
+            color: #BFD5FF;
+            border: 1px solid #667D9DBA;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background-color 0.3s, color 0.3s;
+            margin-right: 10px; /* Add margin to separate from counts */
+        }
+        
+        .button:hover {
+            background-color: #76FF33;
+            color: #001926;
+        }
+        
+        .online-count, .inbattles-count {
+            margin-left: 10px; /* Space between the button and counts */
+            color: #BFD5FF;
+        }
+        
         .button.back-button {
             position: fixed; /* Change to fixed positioning */
             top: 110px; /* Adjust the top position to be below the header */
@@ -85,34 +152,44 @@
             z-index: 1001; /* Increase the z-index */
         }
     </style>
-<div class="header">
-	<h1>
-		3D坦克测试服务器
-	</h1>
-</div>
-<div id="loader" class="loader">
-    <div data-testid="oval-loading" style="display: flex;padding: 3px;">
-        <svg width="100" height="100" viewBox="-21.5 -21.5 45 45" xmlns="http://www.w3.org/2000/svg" stroke="white" data-testid="oval-svg" aria-label="loading-indicator">
-            <g fill="none" fill-rule="evenodd">
-                <g transform="translate(1 1)" stroke-width="3">
-                    <circle stroke-opacity=".5" cx="0" cy="0" r="20" stroke="rgba(255, 255, 255, 0.3)" stroke-width="5"></circle>
-                    <path d="M20 0c0-9.94-8.06-20-20-20">
-                        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="1s" repeatCount="indefinite"></animateTransform>
-                    </path>
-                </g>
-            </g>
-        </svg>
+</head>
+<body>
+    <div class="header">
+        <h1>3D坦克测试服务器</h1>
     </div>
-</div>
+    <div id="loader" class="loader">
+        <div data-testid="oval-loading" style="display: flex;padding: 3px;">
+            <svg width="100" height="100" viewBox="-21.5 -21.5 45 45" xmlns="http://www.w3.org/2000/svg" stroke="white" data-testid="oval-svg" aria-label="loading-indicator">
+                <g fill="none" fill-rule="evenodd">
+                    <g transform="translate(1 1)" stroke-width="3">
+                        <circle stroke-opacity=".5" cx="0" cy="0" r="20" stroke="rgba(255, 255, 255, 0.3)" stroke-width="5"></circle>
+                        <path d="M20 0c0-9.94-8.06-20-20-20">
+                            <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="1s" repeatCount="indefinite"></animateTransform>
+                        </path>
+                    </g>
+                </g>
+            </svg>
+        </div>
+    </div>
+    <div id="options" class="hidden">
+        <label>
+            <input type="checkbox" id="lockLocale" />
+            <span>锁定中文</span>
+        </label>
+        <label>
+            <input type="checkbox" id="skipAnyKey" />
+            <span>跳过按任意键开始</span>
+        </label>
+        <label>
+            <input type="checkbox" id="isChinaBuild" />
+            <span>国服界面</span>
+        </label>
+    </div>
+    <div id="deploy-results" class="hidden"></div>
+    <div id="review-results" class="hidden"></div>
+    <div id="no-servers" class="hidden">当前暂无服务器</div>
 
-<div id="deploy-results" class="hidden">
-</div>
-<div id="review-results" class="hidden">
-</div>
-<div id="no-servers" class="hidden">
-	当前暂无服务器
-</div>
-<script>
+    <script>
         if (document.referrer.includes('testanki1.github.io')) {
             const backButton = document.createElement('a');
             backButton.href = '#';
@@ -124,6 +201,7 @@
                 window.history.back(); 
             });
         }
+
         async function checkURL(url) {
             console.log(`Checking URL: ${url}`);
             try {
@@ -135,22 +213,24 @@
                 return false;
             }
         }
+
         function createButton(label, link) {
-    const container = document.createElement('div');
-    container.className = 'button-container';
-    const button = document.createElement('a');
-    button.href = link;
-    button.textContent = label;
-    button.className = 'button';
-    const onlineCount = document.createElement('span');
-    onlineCount.className = 'online-count';
-    const inbattlesCount = document.createElement('span');
-    inbattlesCount.className = 'inbattles-count';
-    container.appendChild(button);
-    container.appendChild(onlineCount);
-    container.appendChild(inbattlesCount);
-    return container;
-}
+            const container = document.createElement('div');
+            container.className = 'button-container';
+            const button = document.createElement('a');
+            button.href = link;
+            button.textContent = label;
+            button.className = 'button';
+            const onlineCount = document.createElement('span');
+            onlineCount.className = 'online-count';
+            const inbattlesCount = document.createElement('span');
+            inbattlesCount.className = 'inbattles-count';
+            container.appendChild(button);
+            container.appendChild(onlineCount);
+            container.appendChild(inbattlesCount);
+            return container;
+        }
+
         async function fetchCounts(url) {
             try {
                 const response = await fetch(url);
@@ -163,73 +243,117 @@
                 return { onlineCount: 0, inbattlesCount: 0 };
             }
         }
-async function checkURLs(isInitialLoad = false) {
-    const deployResultsDiv = document.getElementById('deploy-results');
-    const reviewResultsDiv = document.getElementById('review-results');
-    const loader = document.getElementById('loader');
-    const noServersDiv = document.getElementById('no-servers'); 
-    if (isInitialLoad) {
-        loader.style.display = 'flex';
-    }
-    const promises = [];
-    const deployButtons = []; 
-    const reviewButtons = []; 
-    let serversFound = false; 
-    for (let i = 1; i <= 9; i++) { const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`; const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`; console.log(`Adding deploy URL: ${deployURL}`); promises.push( checkURL(deployURL).then(async isAccessible => {
-                console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
-                if (isAccessible) {
-                    serversFound = true; 
-                    const { onlineCount, inbattlesCount } = await fetchCounts(deployURL);
-                    let deployButton = document.querySelector(`#deploy${i}`);
-                    if (!deployButton) {
-                        deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
-                        deployButton.id = `deploy${i}`;
-                        deployButtons.push({ number: i, button: deployButton });
+
+        async function checkURLs(isInitialLoad = false) {
+            const deployResultsDiv = document.getElementById('deploy-results');
+            const reviewResultsDiv = document.getElementById('review-results');
+            const loader = document.getElementById('loader');
+            const noServersDiv = document.getElementById('no-servers'); 
+            if (isInitialLoad) {
+                loader.style.display = 'flex';
+            }
+            const promises = [];
+            const deployButtons = []; 
+            const reviewButtons = []; 
+            let serversFound = false; 
+
+            for (let i = 1; i <= 9; i++) {
+                const deployURL = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
+                const reviewURL = `https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`;
+                console.log(`Adding deploy URL: ${deployURL}`);
+                promises.push(checkURL(deployURL).then(async isAccessible => {
+                    console.log(`Deploy ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                    if (isAccessible) {
+                        serversFound = true; 
+                        const { onlineCount, inbattlesCount } = await fetchCounts(deployURL);
+                        let deployButton = document.querySelector(`#deploy${i}`);
+                        if (!deployButton) {
+                            deployButton = createButton(`deploy${i}`, `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
+                            deployButton.id = `deploy${i}`;
+                            deployButtons.push({ number: i, button: deployButton });
+                        }
+                        deployButton.querySelector('.online-count').textContent = `在线: ${onlineCount}`;
+                        deployButton.querySelector('.inbattles-count').textContent = `战斗中: ${inbattlesCount}`;
                     }
-                    deployButton.querySelector('.online-count').textContent = `在线: ${onlineCount}`;
-                    deployButton.querySelector('.inbattles-count').textContent = `战斗中: ${inbattlesCount}`;
-                }
-            })
-        );
-        console.log(`Adding review URL: ${reviewURL}`);
-        promises.push(
-            checkURL(reviewURL).then(async isAccessible => {
-                console.log(`Review ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
-                if (isAccessible) {
-                    serversFound = true; 
-                    const { onlineCount, inbattlesCount } = await fetchCounts(reviewURL);
-                    let reviewButton = document.querySelector(`#review${i}`);
-                    if (!reviewButton) {
-                        reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
-                        reviewButton.id = `review${i}`;
-                        reviewButtons.push({ number: i, button: reviewButton });
+                }));
+                console.log(`Adding review URL: ${reviewURL}`);
+                promises.push(checkURL(reviewURL).then(async isAccessible => {
+                    console.log(`Review ${i}: ${isAccessible ? 'Accessible' : 'Not Accessible'}`);
+                    if (isAccessible) {
+                        serversFound = true; 
+                        const { onlineCount, inbattlesCount } = await fetchCounts(reviewURL);
+                        let reviewButton = document.querySelector(`#review${i}`);
+                        if (!reviewButton) {
+                            reviewButton = createButton(`review-${i}`, `https://client-review-${i}-public.test-ru.tankionline.com/?config-template=https://c{server}.review-${i}-public.test-ru.tankionline.com/config.xml&resources=https://resources-review-${i}-public.test-ru.tankionline.com&balancer=https://balancer.review-${i}-public.test-ru.tankionline.com/balancer`);
+                            reviewButton.id = `review${i}`;
+                            reviewButtons.push({ number: i, button: reviewButton });
+                        }
+                        reviewButton.querySelector('.online-count').textContent = `在线: ${onlineCount}`;
+                        reviewButton.querySelector('.inbattles-count').textContent = `战斗中: ${inbattlesCount}`;
                     }
-                    reviewButton.querySelector('.online-count').textContent = `在线: ${onlineCount}`;
-                    reviewButton.querySelector('.inbattles-count').textContent = `战斗中: ${inbattlesCount}`;
-                }
-            })
-        );
-    }
-    await Promise.allSettled(promises);
-    if (!serversFound) {
-        noServersDiv.classList.remove('hidden');
-    } else {
-        noServersDiv.classList.add('hidden');
-    }
-    deployButtons.sort((a, b) => a.number - b.number);
-    reviewButtons.sort((a, b) => a.number - b.number);
-    if (isInitialLoad) {
-        deployButtons.forEach(deploy => deployResultsDiv.appendChild(deploy.button));
-        reviewButtons.forEach(review => reviewResultsDiv.appendChild(review.button));
-    }
-    if (isInitialLoad) {
-        loader.style.display = 'none';
-        deployResultsDiv.classList.remove('hidden');
-        reviewResultsDiv.classList.remove('hidden');
-    }
-}
+                }));
+            }
+            await Promise.allSettled(promises);
+            if (!serversFound) {
+                noServersDiv.classList.remove('hidden');
+            } else {
+                noServersDiv.classList.add('hidden');
+            }
+            deployButtons.sort((a, b) => a.number - b.number);
+            reviewButtons.sort((a, b) => a.number - b.number);
+            if (isInitialLoad) {
+                deployButtons.forEach(deploy => deployResultsDiv.appendChild(deploy.button));
+                reviewButtons.forEach(review => reviewResultsDiv.appendChild(review.button));
+            }
+            if (isInitialLoad) {
+                loader.style.display = 'none';
+                deployResultsDiv.classList.remove('hidden');
+                reviewResultsDiv.classList.remove('hidden');
+            }
+        }
+
         checkURLs(true);
         setInterval(function() {
             checkURLs();
         }, 11000);
+
+        // 选项面板逻辑
+        document.addEventListener('DOMContentLoaded', () => {
+            const skipAnyKeyCheckbox = document.getElementById('skipAnyKey');
+            const isChinaBuildCheckbox = document.getElementById('isChinaBuild');
+            const lockLocaleCheckbox = document.getElementById('lockLocale');
+
+            // 监听复选框状态变化
+            skipAnyKeyCheckbox.addEventListener('change', updateLinks);
+            isChinaBuildCheckbox.addEventListener('change', updateLinks);
+            lockLocaleCheckbox.addEventListener('change', updateLinks);
+
+            function updateLinks() {
+                const skipParam = skipAnyKeyCheckbox.checked ? 'skipEntranceAnyKey=true' : '';
+                const chinaParam = isChinaBuildCheckbox.checked ? 'isChinaBuild=true' : '';
+                const localeParam = lockLocaleCheckbox.checked ? 'locale=zh' : ''; // 添加锁定中文参数
+                const mobileParam = isChinaBuildCheckbox.checked && /Mobi|Android/i.test(navigator.userAgent) ? 'distribution=generic_mobile_china' : '';
+
+                // 更新链接参数
+                const links = document.querySelectorAll('#deploy-results a, #review-results a');
+                links.forEach(link => {
+                    const url = new URL(link.href);
+                    // 根据条件添加或删除参数
+                    if (skipParam) url.searchParams.set('skipEntranceAnyKey', 'true');
+                    if (chinaParam) {
+                        url.searchParams.set('isChinaBuild', 'true');
+                        url.searchParams.delete('skipEntranceAnyKey'); // 删除原有的 skipEntranceAnyKey 参数
+                    }
+                    if (localeParam) url.searchParams.set('locale', 'zh'); // 添加锁定中文参数
+                    if (mobileParam) url.searchParams.set('distribution', 'generic_mobile_china');
+
+                    link.href = url.toString(); // 更新链接
+                });
+            }
+
+            // 显示选项面板
+            document.getElementById('options').classList.remove('hidden');
+        });
     </script>
+</body>
+</html>
