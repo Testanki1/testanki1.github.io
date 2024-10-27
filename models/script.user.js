@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         3D坦克皮肤模型替换
+// @name         地图替换
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.1.1
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-        const currentVersionCode = 2;
+        const currentVersionCode = 3;
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     // 检查更新
@@ -113,7 +113,7 @@ const currentUrl = window.location.href;
 		},
 		"vulcan": {
 			"default": vulcanDefault,
-            "HD": "622/107753/242/303/31122501347624",
+                        "HD": "622/107753/242/303/31122501347624",
 			"XT": "0/16722/260/334/31033604733427",
 			"PR": "556/15741/256/125/31033605241104",
 			"UT": "560/31363/210/347/31033604717360",
@@ -166,9 +166,10 @@ const currentUrl = window.location.href;
 		},
 		"shaft": {
 			"default": shaftDefault,
-            "HD": "622/21305/321/374/31105044674676",
+                        "HD": "622/21305/321/374/31105044674676",
 			"XT": "546/73531/62/216/31033605014624",
-			"LC": "600/170471/174/26/31033605260624"
+			"LC": "600/170471/174/26/31033605260624",
+                        "DC": "622/107573/220/101/31123207764670"
 		}
 	};
 
@@ -262,8 +263,8 @@ const currentUrl = window.location.href;
 	};
     const festivalsRedirectMap = {
     "garage": {
-        "default": "601/166176/165/206/30545000710421",
-        "万圣节": "613/2501/252/46/30545000710615"
+        "default": "544/77313/263/311/30545211407625",
+        "万圣节": "570/174542/371/60/30544532052123"
     }
 };
 
@@ -385,7 +386,7 @@ const currentUrl = window.location.href;
 						const newSrc = turretMap[key][userChoiceTurret];
 						if (newSrc) {
 							tag.src = tag.src.replace(turretMap[key].default, newSrc);
-                            if ((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") {
+                            if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
 								tag.src = tag.src.replace("res.3dtank.com", "s.eu.tankionline.com");
 							}
 						}
@@ -394,7 +395,7 @@ const currentUrl = window.location.href;
 						const newHref = turretMap[key][userChoiceTurret];
 						if (newHref) {
 							tag.href = tag.href.replace(turretMap[key].default, newHref);
-                            if ((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") {
+                            if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
 								tag.href = tag.href.replace("res.3dtank.com", "s.eu.tankionline.com");
 							}
 						}
@@ -459,7 +460,7 @@ if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
 				for (const key in turretsRedirectMap) {
 					if (input.includes(turretsRedirectMap[key].default) && turretsRedirectMap[key][userChoiceTurret.toUpperCase()]) {
 						input = input.replace(turretsRedirectMap[key].default, turretsRedirectMap[key][userChoiceTurret.toUpperCase()]);
-                        if ((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") {
+                        if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
 							input = input.replace("res.3dtank.com", "s.eu.tankionline.com");
 						}
 						break;
@@ -497,7 +498,7 @@ if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
 			for (const key in turretsRedirectMap) {
 				if (url.includes(turretsRedirectMap[key].default) && turretsRedirectMap[key][userChoiceTurret.toUpperCase()]) {
 					url = url.replace(turretsRedirectMap[key].default, turretsRedirectMap[key][userChoiceTurret.toUpperCase()]);
-                    if ((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") {
+                    if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
 						url = url.replace("res.3dtank.com", "s.eu.tankionline.com");
 					}
 					break;
