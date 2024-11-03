@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D坦克网页资源浏览</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
+        
+        body {
+            background-color: #001926;
+            color: white;
+            font-family: 'Rubik', 'M PLUS 1p';
+            padding: 20px;
+            text-align: center; /* 内容居中 */
+        }
+
+        .container {
+            max-width: 800px; /* 最大宽度 */
+            margin: 0 auto; /* 居中容器 */
+        }
+
+        pre {
+            background-color: #002a34;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap; /* 处理长链接换行 */
+        }
+
+        select {
+            padding: 8px;
+            margin: 10px 0;
+            background-color: #76FF33; /* 下拉菜单背景色 */
+            color: black; /* 选项文本颜色 */
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            border: 2px solid #0088cc; /* 聚焦时的边框 */
+        }
+
+        img {
+            max-width: 100%; /* 限制图片最大宽度 */
+            height: auto; /* 保持图片比例 */
+            margin: 10px 0; /* 图片间距 */
+        }
+
+        video, audio {
+            max-width: 100%; /* 限制视频和音频最大宽度 */
+            margin: 10px 0; /* 视频和音频间距 */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3D坦克网页资源浏览</h1>
+        <label for="fileType">选择文件类型:</label>
+        <select id="fileType"></select>
+        <div id="resources"></div>
+    </div>
+
+    <script>
+        let resources = {};
+
+        async function fetchLinks() {
+            const response = await fetch('https://testanki1.github.io/page-sources/links.txt');
+            const text = await response.text();
+            const regex = /"([^"]+\.(\w+))"/g;
+            let match;
+
+            while ((match = regex.exec(text)) !== null) {
+                const link = "https://1.tankionline.com/play/" + match[1];
+                const extension = match[2];
+
+                if (!resources[extension]) {
+                    resources[extension] = [];
+                }
+                resources[extension].push(link);
+            }
+
+            populateFileTypes();
+        }
+
+        function populateFileTypes() {
+            const fileTypeSelect = document.getElementById('fileType');
+            const excludedExtensions = ['txt', 'json', '3ds'];
+
+            for (const extension in resources) {
+                if (!excludedExtensions.includes(extension)) {
+                    const option = document.createElement('option');
+                    option.value = extension;
+                    option.textContent = extension;
+                    fileTypeSelect.appendChild(option);
+                }
+            }
+
+            // 自动显示第一个选项的链接
+            if (fileTypeSelect.options.length > 0) {
+                displayResources(fileTypeSelect.value);
+            }
+        }
+
+        function displayResources(selectedExtension) {
+            const resourcesDiv = document.getElementById('resources');
+            resourcesDiv.innerHTML = ''; // 清空之前的内容
+
+            if (resources[selectedExtension]) {
+                resources[selectedExtension].forEach(link => {
+                    const extension = link.split('.').pop().toLowerCase();
+                    const fileNameWithExtension = link.split('/').pop(); // 获取完整的文件名
+                    const fileName = fileNameWithExtension
+                        .replace(/\.[^.]+$/, '') // 去掉后缀名
+                        .slice(0, -9) // 去掉最后8个字符
+                        .replace(/_/g, ' '); // 将下划线替换为空格
+
+                    // 创建一个显示文件名的元素
+                    const fileNameElement = document.createElement('div');
+                    fileNameElement.textContent = fileName; // 显示处理后的文件名
+
+                    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) {
+                        // 如果是图片，直接创建img标签
+                        const img = document.createElement('img');
+                        img.src = link;
+                        resourcesDiv.appendChild(fileNameElement);
+                        resourcesDiv.appendChild(img);
+                    } else if (['mp3'].includes(extension)) {
+                        // 显示为音频播放器
+                        const audio = document.createElement('audio');
+                        audio.controls = true;
+                        audio.src = link;
+                        resourcesDiv.appendChild(fileNameElement);
+                        resourcesDiv.appendChild(audio);
+                    } else if (['mp4', 'webm'].includes(extension)) {
+                        // 显示为视频播放器
+                        const video = document.createElement('video');
+                        video.controls = true;
+                        video.src = link;
+                        resourcesDiv.appendChild(fileNameElement);
+                        resourcesDiv.appendChild(video);
+                    } else if (['pdf', 'doc', 'docx'].includes(extension)) {
+                        // 显示为可下载链接
+                        const a = document.createElement('a');
+                        a.href = link;
+                        a.textContent = `下载 ${fileNameWithExtension}`; // 显示原文件名
+                        a.target = '_blank';
+                        resourcesDiv.appendChild(fileNameElement);
+                        resourcesDiv.appendChild(a);
+                        resourcesDiv.appendChild(document.createElement('br'));
+                    } else {
+                        // 其他文件类型显示为文本链接
+                        const pre = document.createElement('pre');
+                        pre.textContent = link;
+                        resourcesDiv.appendChild(fileNameElement);
+                        resourcesDiv.appendChild(pre);
+                    }
+                });
+            } else {
+                resourcesDiv.innerHTML = '<pre>没有找到相关链接。</pre>';
+            }
+        }
+
+        document.getElementById('fileType').addEventListener('change', (event) => {
+            displayResources(event.target.value);
+        });
+
+        fetchLinks();
+    </script>
+</body>
+</html>
