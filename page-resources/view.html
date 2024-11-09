@@ -14,10 +14,11 @@
             font-family: 'Rubik', 'M PLUS 1p';
             padding: 20px;
             text-align: center; /* 内容居中 */
+            margin: 0;
         }
 
         .container {
-            max-width: 800px; /* 最大宽度 */
+            max-width: 1000px; /* 最大宽度 */
             margin: 0 auto; /* 居中容器 */
         }
 
@@ -44,15 +45,34 @@
             border: 2px solid #BFD5FF; /* 聚焦时的边框 */
         }
 
+        /* 使用 Flexbox 布局来自动换行并控制文件项的排列 */
+        #resources {
+            display: flex;
+            flex-wrap: wrap;           /* 自动换行 */
+            justify-content: center;   /* 居中显示资源项 */
+            gap: 20px;                 /* 文件之间的间距 */
+            padding: 10px;             /* 为容器添加内边距 */
+        }
+
+        .resource-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;       /* 居中文本和图片 */
+            text-align: center;        /* 文件名居中 */
+            max-width: 180px;          /* 限制每个资源项的最大宽度 */
+            flex: 1 1 180px;           /* 每个资源项占据最小 180px 的宽度，并且在空间足够时扩展 */
+            box-sizing: border-box;    /* 包含内边距和边框 */
+        }
+
         img {
-            max-width: 100%; /* 限制图片最大宽度 */
-            height: auto; /* 保持图片比例 */
-            margin: 10px 0; /* 图片间距 */
+            max-width: 100%;           /* 限制每个图片的最大宽度 */
+            height: auto;              /* 保持图片比例 */
+            margin-top: 10px;          /* 图片与文件名之间的间距 */
         }
 
         video, audio {
-            max-width: 100%; /* 限制视频和音频最大宽度 */
-            margin: 10px 0; /* 视频和音频间距 */
+            max-width: 100%;           /* 限制视频和音频最大宽度 */
+            margin-top: 10px;          /* 视频和音频与文件名之间的间距 */
         }
 
         footer {
@@ -77,6 +97,11 @@
 
     <script>
         let resources = {};
+
+        // 添加空格到每个大写字母前面，但避免在连续大写字母之间添加空格
+        function addSpaceBeforeUppercase(text) {
+            return text.replace(/([a-z])([A-Z])/g, '$1 $2');
+        }
 
         async function fetchLinks() {
             const response = await fetch('https://testanki1.github.io/page-resources/source.txt');
@@ -119,55 +144,57 @@
                 resources[selectedExtension].forEach(link => {
                     const extension = link.split('.').pop().toLowerCase();
                     const fileNameWithExtension = link.split('/').pop(); // 获取完整的文件名
-                    // 将文件名中的大写字母前面添加空格
                     const fileName = fileNameWithExtension
-                    .replace(/\.[^.]+$/, '') // 去掉后缀名
-                    .slice(0, -9) // 去掉最后9个字符
-                    .replace(/_/g, ' ') // 将下划线替换为空格
-                    .replace(/([A-Z])/g, ' $1') // 在大写字母前加上空格
-                    .trim(); // 去除开头或结尾的空格
+                        .replace(/\.[^.]+$/, '') // 去掉后缀名
+                        .slice(0, -9) // 去掉最后8个字符
+                        .replace(/_/g, ' '); // 将下划线替换为空格
 
+                    // 使用 addSpaceBeforeUppercase 函数处理文件名
+                    const formattedFileName = addSpaceBeforeUppercase(fileName);
+
+                    // 创建资源项的容器
+                    const resourceItem = document.createElement('div');
+                    resourceItem.classList.add('resource-item');
 
                     // 创建一个显示文件名的元素
                     const fileNameElement = document.createElement('div');
-                    fileNameElement.textContent = fileName; // 显示处理后的文件名
+                    fileNameElement.textContent = formattedFileName; // 显示处理后的文件名
+
+                    resourceItem.appendChild(fileNameElement); // 将文件名添加到资源项中
 
                     if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) {
                         // 如果是图片，直接创建img标签
                         const img = document.createElement('img');
                         img.src = link;
-                        resourcesDiv.appendChild(fileNameElement);
-                        resourcesDiv.appendChild(img);
+                        resourceItem.appendChild(img);  // 将图片添加到资源项中
                     } else if (['mp3'].includes(extension)) {
                         // 显示为音频播放器
                         const audio = document.createElement('audio');
                         audio.controls = true;
                         audio.src = link;
-                        resourcesDiv.appendChild(fileNameElement);
-                        resourcesDiv.appendChild(audio);
+                        resourceItem.appendChild(audio); // 将音频播放器添加到资源项中
                     } else if (['mp4', 'webm'].includes(extension)) {
                         // 显示为视频播放器
                         const video = document.createElement('video');
                         video.controls = true;
                         video.src = link;
-                        resourcesDiv.appendChild(fileNameElement);
-                        resourcesDiv.appendChild(video);
+                        resourceItem.appendChild(video); // 将视频播放器添加到资源项中
                     } else if (['pdf', 'doc', 'docx'].includes(extension)) {
                         // 显示为可下载链接
                         const a = document.createElement('a');
                         a.href = link;
                         a.textContent = `下载 ${fileNameWithExtension}`; // 显示原文件名
                         a.target = '_blank';
-                        resourcesDiv.appendChild(fileNameElement);
-                        resourcesDiv.appendChild(a);
-                        resourcesDiv.appendChild(document.createElement('br'));
+                        resourceItem.appendChild(a); // 将下载链接添加到资源项中
                     } else {
                         // 其他文件类型显示为文本链接
                         const pre = document.createElement('pre');
                         pre.textContent = link;
-                        resourcesDiv.appendChild(fileNameElement);
-                        resourcesDiv.appendChild(pre);
+                        resourceItem.appendChild(pre); // 将链接添加到资源项中
                     }
+
+                    // 将资源项添加到资源列表
+                    resourcesDiv.appendChild(resourceItem);
                 });
             } else {
                 resourcesDiv.innerHTML = '<pre>没有找到相关资源。</pre>';
