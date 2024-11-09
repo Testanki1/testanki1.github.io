@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         地图替换
+// @name         3D坦克皮肤模型替换
 // @namespace    http://tampermonkey.net/
-// @version      1.1.1
+// @version      1.1.2
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-        const currentVersionCode = 3;
+        const currentVersionCode = 4;
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     // 检查更新
@@ -44,23 +44,6 @@
         });
     
 const currentUrl = window.location.href;
-    // 设定镭射炮、极速炮默认值
-    let shaftDefault;
-    if (/^https:\/\/3dtank\.com\/play\//.test(currentUrl)) {
-        // 如果是国服网址
-        shaftDefault = "0/114/160/315/31033605025210";
-    } else {
-        // 其他网址
-        shaftDefault = "622/21305/321/374/31105044674676"; // 默认 HD
-    }
-    let vulcanDefault;
-    if (/^https:\/\/3dtank\.com\/play\//.test(currentUrl)) {
-        // 如果是国服网址
-        vulcanDefault = "0/16722/20/40/31033604715057";
-    } else {
-        // 其他网址
-        vulcanDefault = "622/107753/242/303/31122501347624"; // 默认 HD
-    }
 	const turretsRedirectMap = {
 		"firebird": {
 			"default": "573/113511/153/137/31033604622310",
@@ -112,8 +95,7 @@ const currentUrl = window.location.href;
 			"RF": "577/176465/41/10/31033605000151"
 		},
 		"vulcan": {
-			"default": vulcanDefault,
-                        "HD": "622/107753/242/303/31122501347624",
+			"default": "622/107753/242/303/31122501347624",
 			"XT": "0/16722/260/334/31033604733427",
 			"PR": "556/15741/256/125/31033605241104",
 			"UT": "560/31363/210/347/31033604717360",
@@ -165,8 +147,7 @@ const currentUrl = window.location.href;
 			"IC": "614/75662/326/41/31033604602505"
 		},
 		"shaft": {
-			"default": shaftDefault,
-                        "HD": "622/21305/321/374/31105044674676",
+			"default": "622/21305/321/374/31105044674676",
 			"XT": "546/73531/62/216/31033605014624",
 			"LC": "600/170471/174/26/31033605260624",
                         "DC": "622/107573/220/101/31123207764670"
@@ -263,15 +244,15 @@ const currentUrl = window.location.href;
 	};
     const festivalsRedirectMap = {
     "garage": {
-        "default": "544/77313/263/311/30545211407625",
-        "万圣节": "570/174542/371/60/30544532052123"
+        "default": "601/166176/165/206/30545000710421",
+        "万圣节": "613/2501/252/46/30545000710615"
     }
 };
 
 
 // 允许的选项正则表达式
 	const hullsPattern = /^(XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
-	const turretsPattern = /^(HD|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP)$/i;
+	const turretsPattern = /^(XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP)$/i;
 	const dronesPattern = /^(XT)$/i;
     const festivalsPattern = /^(万圣节)$/i;
 
@@ -297,13 +278,13 @@ const currentUrl = window.location.href;
 	}
 
 	// 选择炮塔，确保用户输入合法
-	let userChoiceTurret = prompt("请选择要使用的炮塔模型替换 (HD(高清)/XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）):", lastTurretChoice);
+	let userChoiceTurret = prompt("请选择要使用的炮塔模型替换 (XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）):", lastTurretChoice);
 	if (userChoiceTurret === null) {
 		userChoiceTurret = ''; // 用户点击取消，设置为空
 	} else {
 		while (!turretsPattern.test(userChoiceTurret)) {
-			alert("输入无效，请输入有效的炮塔皮肤系列：HD, XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP");
-			userChoiceTurret = prompt("请选择要使用的炮塔模型替换 (HD（高清）/XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）):", lastTurretChoice);
+			alert("输入无效，请输入有效的炮塔皮肤系列：XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP");
+			userChoiceTurret = prompt("请选择要使用的炮塔模型替换 (XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）):", lastTurretChoice);
 			if (userChoiceTurret === null) {
 				userChoiceTurret = ''; // 用户点击取消，设置为空
 				break;
@@ -356,20 +337,12 @@ const currentUrl = window.location.href;
 						const newSrc = hullsMap[key][userChoiceHull];
 						if (newSrc) {
 							tag.src = tag.src.replace(hullsMap[key].default, newSrc);
-							// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-							if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
-								tag.src = tag.src.replace("res.3dtank.com", "s.eu.tankionline.com");
-							}
 						}
 					}
 					if (tag.href && tag.href.includes(hullsMap[key].default)) {
 						const newHref = hullsMap[key][userChoiceHull];
 						if (newHref) {
 							tag.href = tag.href.replace(hullsMap[key].default, newHref);
-							// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-							if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
-								tag.href = tag.href.replace("res.3dtank.com", "s.eu.tankionline.com");
-							}
 						}
 					}
 				}
@@ -386,18 +359,12 @@ const currentUrl = window.location.href;
 						const newSrc = turretMap[key][userChoiceTurret];
 						if (newSrc) {
 							tag.src = tag.src.replace(turretMap[key].default, newSrc);
-                            if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
-								tag.src = tag.src.replace("res.3dtank.com", "s.eu.tankionline.com");
-							}
 						}
 					}
 					if (tag.href && tag.href.includes(turretMap[key].default)) {
 						const newHref = turretMap[key][userChoiceTurret];
 						if (newHref) {
 							tag.href = tag.href.replace(turretMap[key].default, newHref);
-                            if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
-								tag.href = tag.href.replace("res.3dtank.com", "s.eu.tankionline.com");
-							}
 						}
 					}
 				}
@@ -450,19 +417,12 @@ if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
 				for (const key in hullsRedirectMap) {
 					if (input.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHull.toUpperCase()]) {
 						input = input.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHull.toUpperCase()]);
-						// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-						if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
-							input = input.replace("res.3dtank.com", "s.eu.tankionline.com");
-						}
 						break;
 					}
 				}
 				for (const key in turretsRedirectMap) {
 					if (input.includes(turretsRedirectMap[key].default) && turretsRedirectMap[key][userChoiceTurret.toUpperCase()]) {
 						input = input.replace(turretsRedirectMap[key].default, turretsRedirectMap[key][userChoiceTurret.toUpperCase()]);
-                        if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
-							input = input.replace("res.3dtank.com", "s.eu.tankionline.com");
-						}
 						break;
 					}
 				}
@@ -488,19 +448,12 @@ if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
 			for (const key in hullsRedirectMap) {
 				if (url.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHull.toUpperCase()]) {
 					url = url.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHull.toUpperCase()]);
-					// Check if replacing 'dictator' to 'SP' and replace URL accordingly
-					if (key === "dictator" && userChoiceHull.toUpperCase() === "SP") {
-						url = url.replace("res.3dtank.com", "s.eu.tankionline.com");
-					}
 					break;
 				}
 			}
 			for (const key in turretsRedirectMap) {
 				if (url.includes(turretsRedirectMap[key].default) && turretsRedirectMap[key][userChoiceTurret.toUpperCase()]) {
 					url = url.replace(turretsRedirectMap[key].default, turretsRedirectMap[key][userChoiceTurret.toUpperCase()]);
-                    if (((key === "shaft" || key === "vulcan") && userChoiceTurret.toUpperCase() === "HD") || key=== "shaft" && userChoiceTurret.toUpperCase() === "DC") {
-						url = url.replace("res.3dtank.com", "s.eu.tankionline.com");
-					}
 					break;
 				}
 			}
