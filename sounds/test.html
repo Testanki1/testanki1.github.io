@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D坦克游戏音效</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #001926;
+            font-family: 'Rubik', 'M PLUS 1p';
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #76FF33;
+        }
+
+        .button-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            justify-items: center;
+        }
+
+        button {
+            background-color: #76FF33;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #001926;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #64e029;
+        }
+
+        button:active {
+            background-color: #56c22e;
+        }
+
+        .audio-list {
+            margin-top: 20px;
+        }
+
+        .audio-item {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+
+        .audio-item button {
+            background-color: transparent;
+            color: #76FF33;
+            font-size: 14px;
+            text-align: left;
+            border: 1px solid #76FF33;
+            width: 100%;
+        }
+
+        .audio-item button:hover {
+            background-color: #76FF33;
+            color: #001926;
+        }
+
+        .folder {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>3D坦克游戏音效</h1>
+    <div class="button-container">
+        <button onclick="showAudioList('炮塔')">炮塔</button>
+        <button onclick="showAudioList('底盘')">底盘</button>
+        <button onclick="showAudioList('手榴弹')">手榴弹</button>
+        <button onclick="showAudioList('模式')">模式</button>
+        <button onclick="showAudioList('地图环境音效')">地图环境音效</button>
+        <button onclick="showAudioList('幸运礼盒')">幸运礼盒</button>
+        <button onclick="showAudioList('界面背景音效')">界面背景音效</button>
+        <button onclick="showAudioList('其他')">其他</button>
+    </div>
+
+    <div id="audio-list" class="audio-list"></div>
+
+    <script>
+        const audioData = {
+            "炮塔": [
+                "炮塔/电磁炮/瞄准.mp3",
+                "炮塔/电磁炮/蓄力.mp3",
+                "炮塔/滑膛炮/换弹.mp3",
+                "炮塔/离子炮/发射.mp3",
+                "炮塔/特斯拉/未击中 3.wav",
+                // 更多音效...
+            ],
+            "底盘": [
+                "底盘/过速装置延迟.wav",
+                "底盘/履带底盘/中型履带底盘/移动3.wav",
+                "底盘/履带底盘/中型履带底盘/猎人中甲/过速装置.mp3",
+                "底盘/履带底盘/中型履带底盘/维京/使用中.mp3",
+                // 更多音效...
+            ],
+            "手榴弹": [
+                "手榴弹/未知1.mp3",
+                "手榴弹/倒计时2.mp3",
+                "手榴弹/爆炸.mp3",
+                // 更多音效...
+            ],
+            // 其他类别...
+        };
+
+        // 展示音频列表
+        function showAudioList(category) {
+            const audioListContainer = document.getElementById('audio-list');
+            audioListContainer.innerHTML = ''; // 清空现有列表
+
+            const audioFiles = audioData[category] || [];
+            const fileStructure = buildFileStructure(audioFiles);
+
+            displayStructure(fileStructure, audioListContainer);
+        }
+
+        // 解析音频文件路径并生成层级结构
+        function buildFileStructure(files) {
+            const structure = {};
+
+            files.forEach(file => {
+                const parts = file.split('/');
+                let current = structure;
+
+                parts.forEach((part, index) => {
+                    if (!current[part]) {
+                        current[part] = index === parts.length - 1 ? null : {};
+                    }
+                    current = current[part];
+                });
+            });
+
+            return structure;
+        }
+
+        // 递归展示结构
+        function displayStructure(structure, parentElement) {
+            for (const [key, value] of Object.entries(structure)) {
+                const div = document.createElement('div');
+                div.classList.add('audio-item');
+
+                if (value === null) {
+                    // 如果是文件，显示文件按钮
+                    const button = document.createElement('button');
+                    button.textContent = key; // 只显示文件名
+                    button.onclick = () => playAudio(key);
+                    div.appendChild(button);
+                } else {
+                    // 如果是文件夹，显示文件夹按钮并处理展开/收起
+                    const folderButton = document.createElement('button');
+                    folderButton.textContent = key;
+                    folderButton.classList.add('folder');
+                    folderButton.onclick = () => {
+                        const children = div.querySelector('.children');
+                        children.classList.toggle('hidden');
+                    };
+                    div.appendChild(folderButton);
+
+                    // 创建一个子目录显示区域
+                    const childrenDiv = document.createElement('div');
+                    childrenDiv.classList.add('children', 'hidden');
+                    div.appendChild(childrenDiv);
+
+                    // 递归显示子目录
+                    displayStructure(value, childrenDiv);
+                }
+
+                parentElement.appendChild(div);
+            }
+        }
+
+        // 播放音频
+        function playAudio(filePath) {
+            const fullPath = `https://testanki1.github.io/sounds/${filePath}`;
+            console.log(`Playing audio: ${fullPath}`);
+            const audio = new Audio(fullPath);
+            audio.play();
+        }
+    </script>
+</body>
+</html>
