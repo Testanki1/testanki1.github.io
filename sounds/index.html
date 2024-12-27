@@ -47,6 +47,7 @@
         }
         .audio-item {
             margin: 5px 0;
+            padding-left: 20px;
         }
         .audio-item button {
             background-color: transparent;
@@ -60,17 +61,29 @@
             background-color: #76FF33;
             color: #001926;
         }
+        .folder {
+            cursor: pointer;
+        }
     </style>
+
 <h1>
 	3D坦克游戏音效
 </h1>
 <div class="button-container">
-	<button onclick="showAudioList('炮塔')">炮塔</button> <button onclick="showAudioList('底盘')">底盘</button> <button onclick="showAudioList('手榴弹')">手榴弹</button> <button onclick="showAudioList('模式')">模式</button> <button onclick="showAudioList('地图环境音效')">地图环境音效</button> <button onclick="showAudioList('幸运礼盒')">幸运礼盒</button> <button onclick="showAudioList('界面背景音效')">界面背景音效</button> <button onclick="showAudioList('其他')">其他</button> 
+	<button onclick="showAudioList('炮塔')">炮塔</button>
+	<button onclick="showAudioList('底盘')">底盘</button>
+	<button onclick="showAudioList('手榴弹')">手榴弹</button>
+	<button onclick="showAudioList('模式')">模式</button>
+	<button onclick="showAudioList('地图环境音效')">地图环境音效</button>
+	<button onclick="showAudioList('幸运礼盒')">幸运礼盒</button>
+	<button onclick="showAudioList('界面背景音效')">界面背景音效</button>
+	<button onclick="showAudioList('其他')">其他</button> 
 </div>
-<div id="audio-list" class="audio-list">
-</div>
+
+<div id="audio-list" class="audio-list"></div>
+
 <script>
-        const audioData = {
+    const audioData = {
   "炮塔": [
     "炮塔/电磁炮/瞄准.mp3",
     "炮塔/电磁炮/蓄力.mp3",
@@ -343,22 +356,73 @@
     "其他/道具.mp3"
   ]
 };
-        function showAudioList(category) {
-            const audioListContainer = document.getElementById('audio-list');
-            audioListContainer.innerHTML = ''; // 清空现有列表
-            const audioFiles = audioData[category] || [];
-            audioFiles.forEach(file => {
-                const audioItem = document.createElement('div');
-                audioItem.classList.add('audio-item');
-                const button = document.createElement('button');
-                button.textContent = file.replace(/^.*\//, ''); // 显示文件名
-                button.onclick = () => playAudio(`/sounds/${file}`);
-                audioItem.appendChild(button);
-                audioListContainer.appendChild(audioItem);
+
+    function showAudioList(category) {
+        const audioListContainer = document.getElementById('audio-list');
+        audioListContainer.innerHTML = ''; // 清空现有列表
+
+        const audioFiles = audioData[category] || [];
+        const structuredFiles = structureAudioFiles(audioFiles);
+        
+        // 遍历并显示分级的文件
+        renderAudioFiles(structuredFiles, audioListContainer);
+    }
+
+    function structureAudioFiles(files) {
+        const structure = {};
+
+        // 将文件按目录分组
+        files.forEach(file => {
+            const parts = file.split('/');
+            let current = structure;
+            parts.forEach((part, index) => {
+                if (!current[part]) {
+                    current[part] = index === parts.length - 1 ? null : {};
+                }
+                current = current[part];
             });
-        }
-        function playAudio(filePath) {
-            const audio = new Audio(filePath);
-            audio.play();
-        }
-    </script>
+        });
+
+        return structure;
+    }
+
+    function renderAudioFiles(structure, container) {
+        Object.keys(structure).forEach(key => {
+            const item = structure[key];
+            const div = document.createElement('div');
+            div.classList.add('audio-item');
+
+            if (item === null) {
+                // 文件
+                const button = document.createElement('button');
+                button.textContent = key;
+                button.onclick = () => playAudio(`/sounds/${key}`);
+                div.appendChild(button);
+            } else {
+                // 文件夹
+                const folderButton = document.createElement('button');
+                folderButton.textContent = key;
+                folderButton.classList.add('folder');
+                folderButton.onclick = () => toggleFolder(div);
+                div.appendChild(folderButton);
+
+                const nestedContainer = document.createElement('div');
+                nestedContainer.style.display = 'none';
+                renderAudioFiles(item, nestedContainer);
+                div.appendChild(nestedContainer);
+            }
+
+            container.appendChild(div);
+        });
+    }
+
+    function toggleFolder(folder) {
+        const nestedContainer = folder.querySelector('div');
+        nestedContainer.style.display = nestedContainer.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function playAudio(filePath) {
+        const audio = new Audio(filePath);
+        audio.play();
+    }
+</script>
