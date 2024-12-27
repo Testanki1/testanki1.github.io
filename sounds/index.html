@@ -1,14 +1,17 @@
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>
-	3D坦克游戏音效
-</title>
-<style>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D坦克游戏音效</title>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
+
         * {
             -webkit-tap-highlight-color: transparent;
         }
+
         body {
             background-color: #001926;
             font-family: 'Rubik', 'M PLUS 1p';
@@ -16,16 +19,19 @@
             margin: 0;
             padding: 20px;
         }
+
         h1 {
             text-align: center;
             color: #76FF33;
         }
+
         .button-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             justify-items: center;
         }
+
         button {
             background-color: #76FF33;
             border: none;
@@ -36,19 +42,24 @@
             border-radius: 5px;
             transition: background-color 0.3s ease;
         }
+
         button:hover {
             background-color: #64e029;
         }
+
         button:active {
             background-color: #56c22e;
         }
+
         .audio-list {
             margin-top: 20px;
         }
+
         .audio-item {
             margin: 5px 0;
             padding-left: 20px;
         }
+
         .audio-item button {
             background-color: transparent;
             color: #76FF33;
@@ -57,27 +68,33 @@
             border: 1px solid #76FF33;
             width: 100%;
         }
+
         .audio-item button:hover {
             background-color: #76FF33;
             color: #001926;
         }
+
         .folder {
             cursor: pointer;
         }
-        .folder-content {
-            margin-left: 20px;
-            display: none;
-        }
     </style>
-<h1>
-	3D坦克游戏音效
-</h1>
-<div class="button-container">
-	<button onclick="showAudioList('炮塔')">炮塔</button> <button onclick="showAudioList('底盘')">底盘</button> <button onclick="showAudioList('手榴弹')">手榴弹</button> <button onclick="showAudioList('模式')">模式</button> <button onclick="showAudioList('地图环境音效')">地图环境音效</button> <button onclick="showAudioList('幸运礼盒')">幸运礼盒</button> <button onclick="showAudioList('界面背景音效')">界面背景音效</button> <button onclick="showAudioList('其他')">其他</button> 
-</div>
-<div id="audio-list" class="audio-list">
-</div>
-<script>
+</head>
+<body>
+    <h1>3D坦克游戏音效</h1>
+    <div class="button-container">
+        <button onclick="showAudioList('炮塔')">炮塔</button>
+        <button onclick="showAudioList('底盘')">底盘</button>
+        <button onclick="showAudioList('手榴弹')">手榴弹</button>
+        <button onclick="showAudioList('模式')">模式</button>
+        <button onclick="showAudioList('地图环境音效')">地图环境音效</button>
+        <button onclick="showAudioList('幸运礼盒')">幸运礼盒</button>
+        <button onclick="showAudioList('界面背景音效')">界面背景音效</button>
+        <button onclick="showAudioList('其他')">其他</button>
+    </div>
+
+    <div id="audio-list" class="audio-list"></div>
+
+    <script>
         const audioData = {
   "炮塔": [
     "炮塔/电磁炮/瞄准.mp3",
@@ -351,45 +368,31 @@
     "其他/道具.mp3"
   ]
 };
+
         function showAudioList(category) {
             const audioListContainer = document.getElementById('audio-list');
             audioListContainer.innerHTML = ''; // 清空现有列表
+
             const audioFiles = audioData[category] || [];
-            const groupedFiles = groupByFolder(audioFiles);
-            Object.keys(groupedFiles).forEach(folder => {
-                const folderDiv = document.createElement('div');
-                folderDiv.classList.add('folder');
-                folderDiv.textContent = folder;
-                const folderContent = document.createElement('div');
-                folderContent.classList.add('folder-content');
-                groupedFiles[folder].forEach(filePath => {
-                    const fileDiv = document.createElement('div');
-                    const fileButton = document.createElement('button');
-                    fileButton.textContent = filePath.split('/').pop();
-                    fileButton.onclick = () => playAudio(filePath);
-                    fileDiv.appendChild(fileButton);
-                    folderContent.appendChild(fileDiv);
-                });
-                folderDiv.onclick = () => {
-                    folderContent.style.display = folderContent.style.display === 'none' ? 'block' : 'none';
-                };
-                audioListContainer.appendChild(folderDiv);
-                audioListContainer.appendChild(folderContent);
+            audioFiles.forEach(filePath => {
+                const div = document.createElement('div');
+                div.classList.add('audio-item');
+
+                const button = document.createElement('button');
+                button.textContent = filePath.split('/').pop(); // 只显示文件名
+                button.onclick = () => playAudio(filePath);  // 直接传递文件路径
+                div.appendChild(button);
+
+                audioListContainer.appendChild(div);
             });
         }
-        function groupByFolder(files) {
-            const grouped = {};
-            files.forEach(file => {
-                const folder = file.split('/')[0];
-                if (!grouped[folder]) {
-                    grouped[folder] = [];
-                }
-                grouped[folder].push(file);
-            });
-            return grouped;
-        }
+
         function playAudio(filePath) {
-            const audio = new Audio(filePath);
+            const fullPath = `https://testanki1.github.io/sounds/${filePath}`;  // 拼接完整路径
+            console.log(`Playing audio: ${fullPath}`); // 调试输出路径
+            const audio = new Audio(fullPath);
             audio.play();
         }
     </script>
+</body>
+</html>
