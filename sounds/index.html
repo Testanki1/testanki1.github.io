@@ -374,68 +374,21 @@
             audioListContainer.innerHTML = ''; // 清空现有列表
 
             const audioFiles = audioData[category] || [];
-            const structuredFiles = structureAudioFiles(audioFiles);
-            
-            // 遍历并显示分级的文件
-            renderAudioFiles(category, structuredFiles, audioListContainer);
-        }
-
-        function structureAudioFiles(files) {
-            const structure = {};
-
-            // 将文件按目录分组
-            files.forEach(file => {
-                const parts = file.split('/');
-                let current = structure;
-                parts.forEach((part, index) => {
-                    if (!current[part]) {
-                        current[part] = index === parts.length - 1 ? null : {};
-                    }
-                    current = current[part];
-                });
-            });
-
-            return structure;
-        }
-
-        function renderAudioFiles(category, structure, container) {
-            Object.keys(structure).forEach(key => {
-                const item = structure[key];
+            audioFiles.forEach(filePath => {
                 const div = document.createElement('div');
                 div.classList.add('audio-item');
 
-                if (item === null) {
-                    // 文件
-                    const button = document.createElement('button');
-                    button.textContent = key;
-                    button.onclick = () => playAudio(category, key);  // 传递 category 和文件路径
-                    div.appendChild(button);
-                } else {
-                    // 文件夹
-                    const folderButton = document.createElement('button');
-                    folderButton.textContent = key;
-                    folderButton.classList.add('folder');
-                    folderButton.onclick = () => toggleFolder(div);
-                    div.appendChild(folderButton);
+                const button = document.createElement('button');
+                button.textContent = filePath.split('/').pop(); // 只显示文件名
+                button.onclick = () => playAudio(filePath);  // 直接传递文件路径
+                div.appendChild(button);
 
-                    const nestedContainer = document.createElement('div');
-                    nestedContainer.style.display = 'none';
-                    renderAudioFiles(category, item, nestedContainer);  // 传递 category
-                    div.appendChild(nestedContainer);
-                }
-
-                container.appendChild(div);
+                audioListContainer.appendChild(div);
             });
         }
 
-        function toggleFolder(folder) {
-            const nestedContainer = folder.querySelector('div');
-            nestedContainer.style.display = nestedContainer.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function playAudio(category, filePath) {
-            // 拼接完整路径，确保路径格式正确
-            const fullPath = `/sounds/${category}/${filePath}`;
+        function playAudio(filePath) {
+            const fullPath = `https://testanki1.github.io/sounds/${filePath}`;  // 拼接完整路径
             console.log(`Playing audio: ${fullPath}`); // 调试输出路径
             const audio = new Audio(fullPath);
             audio.play();
