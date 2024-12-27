@@ -63,20 +63,10 @@
         }
         .folder {
             cursor: pointer;
-            font-weight: bold;
-        }
-        .folder-open {
-            color: #76FF33;
-        }
-        .folder-closed {
-            color: #FFEB3B;
         }
         .folder-content {
-            display: none;
             margin-left: 20px;
-        }
-        .folder.open .folder-content {
-            display: block;
+            display: none;
         }
     </style>
 <h1>
@@ -88,7 +78,7 @@
 <div id="audio-list" class="audio-list">
 </div>
 <script>
-        const audioFiles = {
+        const audioData = {
   "炮塔": [
     "炮塔/电磁炮/瞄准.mp3",
     "炮塔/电磁炮/蓄力.mp3",
@@ -361,67 +351,45 @@
     "其他/道具.mp3"
   ]
 };
-        // 将音频文件按目录分组
-        function structureAudioFiles(files) {
-            const structure = {};
-            files.forEach(file => {
-                const parts = file.split('/');
-                let current = structure;
-                parts.forEach((part, index) => {
-                    if (!current[part]) {
-                        current[part] = index === parts.length - 1 ? null : {};
-                    }
-                    current = current[part];
-                });
-            });
-            return structure;
-        }
-        // 渲染分级的音频文件列表
-        function renderAudioFiles(category, structure, container) {
-            Object.keys(structure).forEach(key => {
-                const item = structure[key];
-                const div = document.createElement('div');
-                div.classList.add('audio-item');
-                if (item && typeof item === 'object') {
-                    // 文件夹：显示为可展开/折叠的按钮
-                    const folderButton = document.createElement('button');
-                    folderButton.textContent = key;
-                    folderButton.classList.add('folder');
-                    folderButton.classList.add('folder-closed');
-                    folderButton.onclick = function () {
-                        const folderDiv = div.querySelector('.folder-content');
-                        const isOpen = folderDiv.style.display === 'block';
-                        folderDiv.style.display = isOpen ? 'none' : 'block';
-                        folderButton.classList.toggle('folder-open', !isOpen);
-                        folderButton.classList.toggle('folder-closed', isOpen);
-                    };
-                    div.appendChild(folderButton);
-                    const folderContent = document.createElement('div');
-                    folderContent.classList.add('folder-content');
-                    div.appendChild(folderContent);
-                    // 递归创建子文件夹
-                    renderAudioFiles(category, item, folderContent);
-                } else {
-                    // 文件：直接显示按钮
-                    const button = document.createElement('button');
-                    button.textContent = key;
-                    button.onclick = () => playAudio(`${category}/${key}`);
-                    div.appendChild(button);
-                }
-                container.appendChild(div);
-            });
-        }
         function showAudioList(category) {
             const audioListContainer = document.getElementById('audio-list');
             audioListContainer.innerHTML = ''; // 清空现有列表
-            const categoryFiles = audioFiles[category] || [];
-            const structuredFiles = structureAudioFiles(categoryFiles);
-            renderAudioFiles(category, structuredFiles, audioListContainer);
+            const audioFiles = audioData[category] || [];
+            const groupedFiles = groupByFolder(audioFiles);
+            Object.keys(groupedFiles).forEach(folder => {
+                const folderDiv = document.createElement('div');
+                folderDiv.classList.add('folder');
+                folderDiv.textContent = folder;
+                const folderContent = document.createElement('div');
+                folderContent.classList.add('folder-content');
+                groupedFiles[folder].forEach(filePath => {
+                    const fileDiv = document.createElement('div');
+                    const fileButton = document.createElement('button');
+                    fileButton.textContent = filePath.split('/').pop();
+                    fileButton.onclick = () => playAudio(filePath);
+                    fileDiv.appendChild(fileButton);
+                    folderContent.appendChild(fileDiv);
+                });
+                folderDiv.onclick = () => {
+                    folderContent.style.display = folderContent.style.display === 'none' ? 'block' : 'none';
+                };
+                audioListContainer.appendChild(folderDiv);
+                audioListContainer.appendChild(folderContent);
+            });
+        }
+        function groupByFolder(files) {
+            const grouped = {};
+            files.forEach(file => {
+                const folder = file.split('/')[0];
+                if (!grouped[folder]) {
+                    grouped[folder] = [];
+                }
+                grouped[folder].push(file);
+            });
+            return grouped;
         }
         function playAudio(filePath) {
-            const fullPath = `https://testanki1.github.io/sounds/${filePath}`;  // 拼接完整路径
-            console.log(`Playing audio: ${fullPath}`); // 调试输出路径
-            const audio = new Audio(fullPath);
+            const audio = new Audio(filePath);
             audio.play();
         }
     </script>
