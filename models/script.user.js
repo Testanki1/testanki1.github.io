@@ -1,7 +1,7 @@
 	// ==UserScript==
 // @name         3D坦克皮肤模型替换
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4
+// @version      1.1.5
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-        const currentVersionCode = 6;
+        const currentVersionCode = 7;
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     // 检查更新
@@ -79,7 +79,8 @@ const currentUrl = window.location.href;
 			"XT": "550/160307/363/221/31033604643362",
 			"LC": "601/166273/204/221/31033604634650",
 			"DC": "604/4215/36/135/31033605266363",
-            "IC": "623/41371/53/15/31150312633557"
+            "IC": "623/41371/53/15/31150312633557",
+            "GT": "623/151743/74/104/31173555130540"
 		},
 		"twins": {
 			"default": "575/4122/336/247/31167700272424",
@@ -129,7 +130,8 @@ const currentUrl = window.location.href;
 		"magnum": {
 			"default": "0/16723/57/323/31167700274631",
 			"XT": "550/75104/53/350/31033604732253",
-			"SP": "612/42416/374/133/31033604725533"
+			"SP": "612/42416/374/133/31033604725533",
+            "SNOWMAN": "575/77444/65/233/31167700273100"
 		},
 		"railgun": {
 			"default": "567/105205/202/122/31167700270037",
@@ -249,15 +251,36 @@ const currentUrl = window.location.href;
         "default": "601/166176/165/206/30545000710421",
         "万圣节": "613/2501/252/46/30545000710615",
         "新年_2025": "623/152656/155/20/31173045365546"
+    },
+    "sandbox": {
+        "default": "570/174542/371/61/30544540056777",
+        "FESTIVE_SEASON": "570/174542/371/62/30544541264567"
+    },
+    "forest": {
+        "default": "0/16723/204/143/30545207067664",
+        "FESTIVE_SEASON": "0/16723/204/144/30545210267003"
+    },
+    "new_years_library": {
+        "default": "553/105167/27/302/30546776460526",
+        "NEW_YEARS": "570/174542/371/71/31167243462337"
+    },
+    "new_years_map": {
+        "default": "544/77313/263/311/30545211407625",
+        "NEW_YEARS": "570/174542/371/72/31167257256577"
+    },
+    "new_years_music": {
+        "default": "602/103320/104/163/30654312275414",
+        "FESTIVE_SEASON": "575/163160/137/356/30653770533354",
+        "NEW_YEARS": "575/163160/137/356/30653770533354"
     }
 };
 
 
 // 允许的选项正则表达式
 	const hullsPattern = /^(XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
-	const turretsPattern = /^(XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP)$/i;
+	const turretsPattern = /^(XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|SNOWMAN)$/i;
 	const dronesPattern = /^(XT)$/i;
-    const festivalsPattern = /^(万圣节|新年_2025)$/i;
+    const festivalsPattern = /^(万圣节|新年_2025|Festive_Season|New_Years)$/i;
 
 	// 从 localStorage 中获取上次的选择
 	let lastHullChoice = localStorage.getItem('userChoiceHull') || 'XT';
