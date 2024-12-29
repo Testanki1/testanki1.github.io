@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         3D坦克皮肤模型替换
+// @name         3D坦克皮肤模型替换（测试版）
 // @namespace    http://tampermonkey.net/
-// @version      1.1.5
-// @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品模型
+// @version      1.2
+// @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -275,13 +275,9 @@ const currentUrl = window.location.href;
     }
 };
 const paintsRedirectMap = {
-		"hyperion": {
-			"default": "556/107004/326/35/31167700276045",
-			"XT": "603/140170/104/322/30545000710642"
-		},
-		"crisis": {
-			"default": "562/45273/110/127/31167700270140",
-			"XT": "602/142250/300/167/30545000710756"
+		"lightmap": {
+			"橄榄绿": "0/0/332/376/30545000607534",
+			"中国红": "0/0/345/314/30545000606635"
 		}
 	};
 
@@ -290,15 +286,15 @@ const paintsRedirectMap = {
 	const turretsPattern = /^(XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|SNOWMAN)$/i;
 	const dronesPattern = /^(XT)$/i;
     const festivalsPattern = /^(万圣节|新年_2025|Festive_Season|New_Years)$/i;
-    const paintsPattern = /^(XT)$/i;
+    const paintsPattern = /^(橄榄绿|中国红)$/i;
 
 	// 从 localStorage 中获取上次的选择
 	let lastHullChoice = localStorage.getItem('userChoiceHull') || 'XT';
 	let lastTurretChoice = localStorage.getItem('userChoiceTurret') || 'XT';
 	let lastDroneChoice = localStorage.getItem('userChoiceDrone') || 'XT';
     let lastFestivalChoice = localStorage.getItem('userChoiceFestival') || '万圣节';
-    let lastOriginalPaintChoice = localStorage.getItem('originalChoicePaint') || 'XT';
-    let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || 'XT';
+    let lastOriginalPaintChoice = localStorage.getItem('originalChoicePaint') || '橄榄绿';
+    let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || '中国红';
 
 	// 选择底盘，确保用户输入合法
 	let userChoiceHull = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullChoice);
@@ -357,26 +353,26 @@ const paintsRedirectMap = {
 			}
 		}
 	}
-let originalChoicePaint = prompt("请选择要使用的无人机模型替换 (XT):", lastOriginalPaintChoice);
+let originalChoicePaint = prompt("请选择待替换迷彩 :", lastOriginalPaintChoice);
 	if (originalChoicePaint === null) {
 		originalChoicePaint = ''; // 用户点击取消，设置为空
 	} else {
 		while (!paintsPattern.test(originalChoicePaint)) {
-			alert("输入无效，请输入有效的无人机皮肤系列：XT");
-			originalChoicePaint = prompt("请选择要使用的无人机模型替换 (XT):", lastOriginalPaintChoice);
+			alert("输入无效，请输入有效的迷彩");
+			originalChoicePaint = prompt("请选择待替换迷彩:", lastOriginalPaintChoice);
 			if (originalChoicePaint === null) {
 				originalChoicePaint = ''; // 用户点击取消，设置为空
 				break;
 			}
 		}
 	}
-    let newChoicePaint = prompt("请选择要使用的无人机模型替换 (XT):", lastNewPaintChoice);
+    let newChoicePaint = prompt("请选择要使用的替换后迷彩:", lastNewPaintChoice);
 	if (newChoicePaint === null) {
 		newChoicePaint = ''; // 用户点击取消，设置为空
 	} else {
 		while (!paintsPattern.test(newChoicePaint)) {
-			alert("输入无效，请输入有效的无人机皮肤系列：XT");
-			newChoicePaint = prompt("请选择要使用的无人机模型替换 (XT):", lastNewPaintChoice);
+			alert("输入无效，请输入有效的迷彩");
+			newChoicePaint = prompt("请选择要使用的替换后迷彩:", lastNewPaintChoice);
 			if (newChoicePaint === null) {
 				newChoicePaint = ''; // 用户点击取消，设置为空
 				break;
@@ -384,7 +380,7 @@ let originalChoicePaint = prompt("请选择要使用的无人机模型替换 (XT
 		}
 	}
 	// 确认继续
-	const confirmationMessage = `您选择了底盘 ${userChoiceHull ? userChoiceHull.toUpperCase() : '未选择'}、炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '未选择'} 、无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '未选择'}、${userChoiceFestival ? userChoiceFestival.toUpperCase() : '未选择'}。点击确定继续。`;
+	const confirmationMessage = `您选择了底盘 ${userChoiceHull ? userChoiceHull.toUpperCase() : '未选择'}、炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '未选择'} 、无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '未选择'}、节日 ${userChoiceFestival ? userChoiceFestival.toUpperCase() : '未选择'}、迷彩将 ${originalChoicePaint ? originalChoicePaint.toUpperCase() : '未选择'} 替换为 ${newChoicePaint ? newChoicePaint.toUpperCase() : '未选择'}。点击确定继续。`;
 	if (confirm(confirmationMessage)) {
 		// 将用户选择存储到 localStorage
 		localStorage.setItem('userChoiceHull', userChoiceHull);
@@ -475,20 +471,22 @@ if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
 				}
 			});
 		}
-if (newChoicePaint && paintsRedirectMap[newChoicePaint]) {
+if (originalChoicePaint && paintsRedirectMap[originalChoicePaint] && newChoicePaint && paintsRedirectMap[newChoicePaint]) {
 			const paintMap = paintsRedirectMap;
 			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
 				for (const key in paintMap) {
-					if (tag.src && tag.src.includes(paintMap[key].default)) {
-						const newSrc = paintMap[key][newChoicePaint];
+					if (tag.src && tag.src.includes(paintMap[key][originalChoicePaint])) {
+						const oldSrc = paintMap[key][originalChoicePaint];
+                        const newSrc = paintMap[key][newChoicePaint];
 						if (newSrc) {
-							tag.src = tag.src.replace(paintMap[key].default, newSrc);
+							tag.src = tag.src.replace(oldSrc, newSrc);
 						}
 					}
-					if (tag.href && tag.href.includes(paintMap[key].default)) {
-						const newHref = paintMap[key][originalChoicePaint];
+					if (tag.href && tag.href.includes(paintMap[key][originalChoicePaint])) {
+						const oldHref = paintMap[key][originalChoicePaint];
+                        const newHref = paintMap[key][newChoicePaint];
 						if (newHref) {
-							tag.href = tag.href.replace(paintMap[key].default, newHref);
+							tag.href = tag.href.replace(oldHref, newHref);
 						}
 					}
 				}
@@ -522,6 +520,12 @@ if (newChoicePaint && paintsRedirectMap[newChoicePaint]) {
 						break;
 					}
 				}
+                for (const key in paintsRedirectMap) {
+					if (input.includes(paintsRedirectMap[key][originalChoicePaint.toUpperCase()]) && paintsRedirectMap[key][newChoicePaint.toUpperCase()]) {
+						input = input.replace(paintsRedirectMap[key][originalChoicePaint.toUpperCase()], paintsRedirectMap[key][newChoicePaint.toUpperCase()]);
+						break;
+					}
+				}
 			}
 			return originalFetch(input, init);
 		};
@@ -550,6 +554,12 @@ if (newChoicePaint && paintsRedirectMap[newChoicePaint]) {
             for (const key in festivalsRedirectMap) {
 				if (url.includes(festivalsRedirectMap[key].default) && festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]) {
 					url = url.replace(festivalsRedirectMap[key].default, festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]);
+					break;
+				}
+			}
+            for (const key in paintsRedirectMap) {
+				if (url.includes(paintsRedirectMap[key][originalChoicePaint.toUpperCase()]) && paintsRedirectMap[key][newChoicePaint.toUpperCase()]) {
+					url = url.replace(paintsRedirectMap[key][originalChoicePaint.toUpperCase()], paintsRedirectMap[key][newChoicePaint.toUpperCase()]);
 					break;
 				}
 			}
