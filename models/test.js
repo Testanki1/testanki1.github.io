@@ -30,9 +30,9 @@
 
 			if (latestVersionCode > currentVersionCode) {
 				const message = `
-                    有新版本可用！\n
-                    最新版本：${latestVersion}\n
-                    更新内容：${updateInfo}\n
+                    有新版本可用！
+                    最新版本：${latestVersion}
+                    更新内容：${updateInfo}
                 `;
 				if (confirm(message + "点击确定下载新版本？")) {
 					window.location.href = downloadUrl;
@@ -297,90 +297,78 @@
 	let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || '中国红';
 
 	// 选择底盘，确保用户输入合法
-	let userChoiceHull = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullChoice);
-	if (userChoiceHull === null) {
-		userChoiceHull = ''; // 用户点击取消，设置为空
-	} else {
-		while (!hullsPattern.test(userChoiceHull)) {
-			alert("输入无效，请输入有效的底盘皮肤系列：XT, XT_HD, LC, PR, UT, DC, GT, RF, SP");
-			userChoiceHull = prompt("请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）):", lastHullChoice);
-			if (userChoiceHull === null) {
-				userChoiceHull = ''; // 用户点击取消，设置为空
-				break;
+	function getUserChoice(promptMessage, lastChoice, pattern, invalidMessage) {
+		let userChoice = prompt(promptMessage, lastChoice);
+		if (userChoice === null) {
+			return ''; // 用户点击取消，返回空字符串
+		} else {
+			while (!pattern.test(userChoice)) {
+				alert(invalidMessage);
+				userChoice = prompt(promptMessage, lastChoice);
+				if (userChoice === null) {
+					return ''; // 用户点击取消，返回空字符串
+				}
 			}
 		}
+		return userChoice;
 	}
 
-	// 选择炮塔，确保用户输入合法
-	let userChoiceTurret = prompt("请选择要使用的炮塔模型替换 (XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）):", lastTurretChoice);
-	if (userChoiceTurret === null) {
-		userChoiceTurret = ''; // 用户点击取消，设置为空
-	} else {
-		while (!turretsPattern.test(userChoiceTurret)) {
-			alert("输入无效，请输入有效的炮塔皮肤系列：XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP");
-			userChoiceTurret = prompt("请选择要使用的炮塔模型替换 (XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）):", lastTurretChoice);
-			if (userChoiceTurret === null) {
-				userChoiceTurret = ''; // 用户点击取消，设置为空
-				break;
-			}
-		}
-	}
+	// 获取底盘模型
+	let userChoiceHull = getUserChoice(
+		"请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）)（点击取消可不进行替换）:",
+		lastHullChoice,
+		hullsPattern,
+		"输入无效，请输入有效的底盘皮肤系列：XT, XT_HD, LC, PR, UT, DC, GT, RF, SP"
+	);
 
-	// 选择无人机，确保用户输入合法
-	let userChoiceDrone = prompt("请选择要使用的无人机模型替换 (XT):", lastDroneChoice);
-	if (userChoiceDrone === null) {
-		userChoiceDrone = ''; // 用户点击取消，设置为空
-	} else {
-		while (!dronesPattern.test(userChoiceDrone)) {
-			alert("输入无效，请输入有效的无人机皮肤系列：XT");
-			userChoiceDrone = prompt("请选择要使用的无人机模型替换 (XT):", lastDroneChoice);
-			if (userChoiceDrone === null) {
-				userChoiceDrone = ''; // 用户点击取消，设置为空
-				break;
-			}
-		}
-	}
-	let userChoiceFestival = prompt("请选择要使用的节日替换 (万圣节/新年_2025)（点击取消可不进行替换）:", lastFestivalChoice);
-	if (userChoiceFestival === null) {
-		userChoiceFestival = ''; // 用户点击取消，设置为空
-	} else {
-		while (!festivalsPattern.test(userChoiceFestival)) {
-			alert("输入无效，请输入有效的节日：万圣节, 新年_2025");
-			userChoiceFestival = prompt("请选择要使用的节日替换 (万圣节/新年_2025):", lastFestivalChoice);
-			if (userChoiceFestival === null) {
-				userChoiceFestival = ''; // 用户点击取消，设置为空
-				break;
-			}
-		}
-	}
-	let originalChoicePaint = prompt("请选择待替换迷彩 :", lastOriginalPaintChoice);
-	if (originalChoicePaint === null) {
-		originalChoicePaint = ''; // 用户点击取消，设置为空
-	} else {
-		while (!paintsPattern.test(originalChoicePaint)) {
-			alert("输入无效，请输入有效的迷彩");
-			originalChoicePaint = prompt("请选择待替换迷彩:", lastOriginalPaintChoice);
-			if (originalChoicePaint === null) {
-				originalChoicePaint = ''; // 用户点击取消，设置为空
-				break;
-			}
-		}
-	}
-	let newChoicePaint = prompt("请选择要使用的替换后迷彩:", lastNewPaintChoice);
-	if (newChoicePaint === null) {
-		newChoicePaint = ''; // 用户点击取消，设置为空
-	} else {
-		while (!paintsPattern.test(newChoicePaint)) {
-			alert("输入无效，请输入有效的迷彩");
-			newChoicePaint = prompt("请选择要使用的替换后迷彩:", lastNewPaintChoice);
-			if (newChoicePaint === null) {
-				newChoicePaint = ''; // 用户点击取消，设置为空
-				break;
-			}
-		}
-	}
+	// 获取炮塔模型
+	let userChoiceTurret = getUserChoice(
+		"请选择要使用的炮塔模型替换 (XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）)（点击取消可不进行替换）:",
+		lastTurretChoice,
+		turretsPattern,
+		"输入无效，请输入有效的炮塔皮肤系列：XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP"
+	);
+
+	// 获取无人机模型
+	let userChoiceDrone = getUserChoice(
+		"请选择要使用的无人机模型替换 (XT)（点击取消可不进行替换）:",
+		lastDroneChoice,
+		dronesPattern,
+		"输入无效，请输入有效的无人机皮肤系列：XT"
+	);
+
+	// 获取节日替换
+	let userChoiceFestival = getUserChoice(
+		"请选择要使用的节日替换 (万圣节/新年_2025)（点击取消可不进行替换）:",
+		lastFestivalChoice,
+		festivalsPattern,
+		"输入无效，请输入有效的节日：万圣节, 新年_2025"
+	);
+
+	// 获取原始迷彩选择
+	let originalChoicePaint = getUserChoice(
+		"请选择待替换迷彩（点击取消可不进行替换） :",
+		lastOriginalPaintChoice,
+		paintsPattern,
+		"输入无效，请输入有效的迷彩"
+	);
+
+	// 获取新迷彩选择
+	let newChoicePaint = getUserChoice(
+		"请选择要使用的替换后迷彩（点击取消可不进行替换）:",
+		lastNewPaintChoice,
+		paintsPattern,
+		"输入无效，请输入有效的迷彩"
+	);
 	// 确认继续
-	const confirmationMessage = `您选择了底盘 ${userChoiceHull ? userChoiceHull.toUpperCase() : '未选择'}、炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '未选择'} 、无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '未选择'}、节日 ${userChoiceFestival ? userChoiceFestival.toUpperCase() : '未选择'}、迷彩将 ${originalChoicePaint ? originalChoicePaint.toUpperCase() : '未选择'} 替换为 ${newChoicePaint ? newChoicePaint.toUpperCase() : '未选择'}。点击确定继续。`;
+	const confirmationMessage = `
+    您选择了：
+    底盘 ${userChoiceHull ? userChoiceHull.toUpperCase() : '不替换'}
+    炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '不替换'}
+    无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '不替换'}
+    节日 ${userChoiceFestival ? userChoiceFestival.toUpperCase() : '不替换'}
+    迷彩将 ${originalChoicePaint ? originalChoicePaint.toUpperCase() : '不替换'} 替换为 ${newChoicePaint ? newChoicePaint.toUpperCase() : '不替换'}。
+    点击确定继续。`;
 	if (confirm(confirmationMessage)) {
 		// 将用户选择存储到 localStorage
 		localStorage.setItem('userChoiceHull', userChoiceHull);
@@ -390,87 +378,42 @@
 		localStorage.setItem('originalChoicePaint', originalChoicePaint);
 		localStorage.setItem('newChoicePaint', newChoicePaint);
 
-		if (userChoiceHull && hullsRedirectMap[userChoiceHull]) {
-			const hullsMap = hullsRedirectMap;
-			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-				for (const key in hullsMap) {
-					if (tag.src && tag.src.includes(hullsMap[key].default)) {
-						const newSrc = hullsMap[key][userChoiceHull];
-						if (newSrc) {
-							tag.src = tag.src.replace(hullsMap[key].default, newSrc);
+		function replaceResources(redirectMap, userChoice) {
+			if (userChoice && redirectMap[userChoice]) {
+				const map = redirectMap;
+				document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
+					for (const key in map) {
+						// 替换 src 属性
+						if (tag.src && tag.src.includes(map[key].default)) {
+							const newSrc = map[key][userChoice];
+							if (newSrc) {
+								tag.src = tag.src.replace(map[key].default, newSrc);
+							}
+						}
+						// 替换 href 属性
+						if (tag.href && tag.href.includes(map[key].default)) {
+							const newHref = map[key][userChoice];
+							if (newHref) {
+								tag.href = tag.href.replace(map[key].default, newHref);
+							}
 						}
 					}
-					if (tag.href && tag.href.includes(hullsMap[key].default)) {
-						const newHref = hullsMap[key][userChoiceHull];
-						if (newHref) {
-							tag.href = tag.href.replace(hullsMap[key].default, newHref);
-						}
-					}
-				}
-			});
+				});
+			}
 		}
-
 
 		// 替换炮塔资源
-		if (userChoiceTurret && turretsRedirectMap[userChoiceTurret]) {
-			const turretMap = turretsRedirectMap;
-			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-				for (const key in turretMap) {
-					if (tag.src && tag.src.includes(turretMap[key].default)) {
-						const newSrc = turretMap[key][userChoiceTurret];
-						if (newSrc) {
-							tag.src = tag.src.replace(turretMap[key].default, newSrc);
-						}
-					}
-					if (tag.href && tag.href.includes(turretMap[key].default)) {
-						const newHref = turretMap[key][userChoiceTurret];
-						if (newHref) {
-							tag.href = tag.href.replace(turretMap[key].default, newHref);
-						}
-					}
-				}
-			});
-		}
+		replaceResources(hullsRedirectMap, userChoiceHull);
+
+		// 替换炮塔资源
+		replaceResources(turretsRedirectMap, userChoiceTurret);
 
 		// 替换无人机资源
-		if (userChoiceDrone && dronesRedirectMap[userChoiceDrone]) {
-			const droneMap = dronesRedirectMap;
-			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-				for (const key in droneMap) {
-					if (tag.src && tag.src.includes(droneMap[key].default)) {
-						const newSrc = droneMap[key][userChoiceDrone];
-						if (newSrc) {
-							tag.src = tag.src.replace(droneMap[key].default, newSrc);
-						}
-					}
-					if (tag.href && tag.href.includes(droneMap[key].default)) {
-						const newHref = droneMap[key][userChoiceDrone];
-						if (newHref) {
-							tag.href = tag.href.replace(droneMap[key].default, newHref);
-						}
-					}
-				}
-			});
-		}
-		if (userChoiceFestival && festivalsRedirectMap[userChoiceFestival]) {
-			const festivalMap = festivalsRedirectMap;
-			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-				for (const key in festivalMap) {
-					if (tag.src && tag.src.includes(festivalMap[key].default)) {
-						const newSrc = festivalMap[key][userChoiceFestival];
-						if (newSrc) {
-							tag.src = tag.src.replace(festivalMap[key].default, newSrc);
-						}
-					}
-					if (tag.href && tag.href.includes(festivalMap[key].default)) {
-						const newHref = festivalMap[key][userChoiceFestival];
-						if (newHref) {
-							tag.href = tag.href.replace(festivalMap[key].default, newHref);
-						}
-					}
-				}
-			});
-		}
+		replaceResources(dronesRedirectMap, userChoiceDrone);
+
+		// 替换节日资源
+		replaceResources(festivalsRedirectMap, userChoiceFestival);
+
 		if (originalChoicePaint && paintsRedirectMap[originalChoicePaint] && newChoicePaint && paintsRedirectMap[newChoicePaint]) {
 			const paintMap = paintsRedirectMap;
 			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
@@ -496,30 +439,23 @@
 		const originalFetch = window.fetch;
 		window.fetch = function(input, init) {
 			if (typeof input === 'string') {
-				for (const key in hullsRedirectMap) {
-					if (input.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHull.toUpperCase()]) {
-						input = input.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHull.toUpperCase()]);
-						break;
+				function replaceInputResource(input, redirectMap, userChoice) {
+					const choiceKey = userChoice.toUpperCase();
+					for (const key in redirectMap) {
+						if (input.includes(redirectMap[key].default) && redirectMap[key][choiceKey]) {
+							input = input.replace(redirectMap[key].default, redirectMap[key][choiceKey]);
+							break; // 找到第一个匹配后就停止替换
+						}
 					}
+					return input;
 				}
-				for (const key in turretsRedirectMap) {
-					if (input.includes(turretsRedirectMap[key].default) && turretsRedirectMap[key][userChoiceTurret.toUpperCase()]) {
-						input = input.replace(turretsRedirectMap[key].default, turretsRedirectMap[key][userChoiceTurret.toUpperCase()]);
-						break;
-					}
-				}
-				for (const key in dronesRedirectMap) {
-					if (input.includes(dronesRedirectMap[key].default) && dronesRedirectMap[key][userChoiceDrone.toUpperCase()]) {
-						input = input.replace(dronesRedirectMap[key].default, dronesRedirectMap[key][userChoiceDrone.toUpperCase()]);
-						break;
-					}
-				}
-				for (const key in festivalsRedirectMap) {
-					if (input.includes(festivalsRedirectMap[key].default) && festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]) {
-						input = input.replace(festivalsRedirectMap[key].default, festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]);
-						break;
-					}
-				}
+
+				// 替换资源
+				input = replaceInputResource(input, hullsRedirectMap, userChoiceHull);
+				input = replaceInputResource(input, turretsRedirectMap, userChoiceTurret);
+				input = replaceInputResource(input, dronesRedirectMap, userChoiceDrone);
+				input = replaceInputResource(input, festivalsRedirectMap, userChoiceFestival);
+
 				for (const key in paintsRedirectMap) {
 					if (input.includes(paintsRedirectMap[key][originalChoicePaint.toUpperCase()]) && paintsRedirectMap[key][newChoicePaint.toUpperCase()]) {
 						input = input.replace(paintsRedirectMap[key][originalChoicePaint.toUpperCase()], paintsRedirectMap[key][newChoicePaint.toUpperCase()]);
@@ -533,30 +469,23 @@
 		// 拦截 XMLHttpRequest 请求
 		const originalOpen = XMLHttpRequest.prototype.open;
 		XMLHttpRequest.prototype.open = function(method, url) {
-			for (const key in hullsRedirectMap) {
-				if (url.includes(hullsRedirectMap[key].default) && hullsRedirectMap[key][userChoiceHull.toUpperCase()]) {
-					url = url.replace(hullsRedirectMap[key].default, hullsRedirectMap[key][userChoiceHull.toUpperCase()]);
-					break;
+			function replaceUrlResource(url, redirectMap, userChoice) {
+				const choiceKey = userChoice.toUpperCase();
+				for (const key in redirectMap) {
+					if (url.includes(redirectMap[key].default) && redirectMap[key][choiceKey]) {
+						url = url.replace(redirectMap[key].default, redirectMap[key][choiceKey]);
+						break; // 找到第一个匹配后就停止替换
+					}
 				}
+				return url;
 			}
-			for (const key in turretsRedirectMap) {
-				if (url.includes(turretsRedirectMap[key].default) && turretsRedirectMap[key][userChoiceTurret.toUpperCase()]) {
-					url = url.replace(turretsRedirectMap[key].default, turretsRedirectMap[key][userChoiceTurret.toUpperCase()]);
-					break;
-				}
-			}
-			for (const key in dronesRedirectMap) {
-				if (url.includes(dronesRedirectMap[key].default) && dronesRedirectMap[key][userChoiceDrone.toUpperCase()]) {
-					url = url.replace(dronesRedirectMap[key].default, dronesRedirectMap[key][userChoiceDrone.toUpperCase()]);
-					break;
-				}
-			}
-			for (const key in festivalsRedirectMap) {
-				if (url.includes(festivalsRedirectMap[key].default) && festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]) {
-					url = url.replace(festivalsRedirectMap[key].default, festivalsRedirectMap[key][userChoiceFestival.toUpperCase()]);
-					break;
-				}
-			}
+
+			// 替换资源
+			url = replaceUrlResource(url, hullsRedirectMap, userChoiceHull);
+			url = replaceUrlResource(url, turretsRedirectMap, userChoiceTurret);
+			url = replaceUrlResource(url, dronesRedirectMap, userChoiceDrone);
+			url = replaceUrlResource(url, festivalsRedirectMap, userChoiceFestival);
+
 			for (const key in paintsRedirectMap) {
 				if (url.includes(paintsRedirectMap[key][originalChoicePaint.toUpperCase()]) && paintsRedirectMap[key][newChoicePaint.toUpperCase()]) {
 					url = url.replace(paintsRedirectMap[key][originalChoicePaint.toUpperCase()], paintsRedirectMap[key][newChoicePaint.toUpperCase()]);
