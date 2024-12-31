@@ -1,4 +1,6 @@
-<meta charset="UTF-8" />
+     }
+    });
+</script><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>
 	3D坦克皮肤、地图宣传视频合集
@@ -68,6 +70,33 @@
                 font-size: 16px;
             }
         }
+        .joystick {
+        display: none;
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.6);
+        padding: 20px;
+        border-radius: 50%;
+    }
+    .joystick-button {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: #76FF33;
+        border: 2px solid #001926;
+        color: #001926;
+        font-size: 20px;
+        display: inline-block;
+        margin: 5px;
+        text-align: center;
+        line-height: 50px;
+        cursor: pointer;
+    }
+    .joystick-button:hover {
+        background-color: #A8FF6D;
+    }
     </style>
 <div class="container">
 	<h2>
@@ -178,4 +207,102 @@
             }
         }
     });
+    let konamiCode = [];
+    const konamiSequence = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    let isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+    // 桌面端按键监听
+    if (!isMobile) {
+        window.addEventListener('keydown', (e) => {
+            konamiCode.push(e.key);
+            if (konamiCode.length > konamiSequence.length) konamiCode.shift();
+            if (JSON.stringify(konamiCode) === JSON.stringify(konamiSequence)) {
+                playSoundAndRedirect();
+            }
+        });
+    }
+
+    // 移动端触摸监听
+    if (isMobile) {
+        let touchTimeout;
+        document.body.addEventListener('touchstart', () => {
+            touchTimeout = setTimeout(() => {
+                showJoystick();
+            }, 5000);
+        });
+
+        document.body.addEventListener('touchend', () => {
+            clearTimeout(touchTimeout);
+        });
+    }
+
+    // 显示摇杆并绑定按钮
+    function showJoystick() {
+        const joystick = document.createElement('div');
+        joystick.classList.add('joystick');
+        joystick.innerHTML = `
+            <div class="joystick-button">↑</div>
+            <div class="joystick-button">↓</div>
+            <div class="joystick-button">←</div>
+            <div class="joystick-button">→</div>
+        `;
+        document.body.appendChild(joystick);
+        joystick.style.display = 'block';
+        
+        let joystickSequence = [];
+        const joystickButtons = joystick.querySelectorAll('.joystick-button');
+        
+        joystickButtons.forEach((button, index) => {
+            button.addEventListener('click', () => {
+                const directions = ['↑', '↓', '←', '→'];
+                joystickSequence.push(directions[index]);
+                if (joystickSequence.length > 8) {
+                joystickSequence.shift();
+            }
+                if (joystickSequence.join('') === '↑↑↓↓←→←→') {
+                    convertJoystickToGamepad();
+                }
+            });
+        });
+    }
+
+    // 转换摇杆为游戏手柄按键
+    function convertJoystickToGamepad() {
+    const joystick = document.querySelector('.joystick');
+    joystick.querySelectorAll('.joystick-button').forEach((button, index) => {
+        // 设置按钮文字为 Y, A, X, B
+        button.textContent = ['Y', 'A', 'X', 'B'][index];
+    });
+
+    let buttonSequence = [];  // 用于存储按钮按下的顺序
+
+    const joystickButtons = joystick.querySelectorAll('.joystick-button');
+    
+    joystickButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const buttonText = button.textContent;  // 获取当前按钮的文字（即Y、A、X、B）
+            
+            buttonSequence.push(buttonText);  // 将当前按钮文字加入到按下顺序中
+            
+            // 如果按下的顺序超过了需要的长度，移除最早按下的按钮
+            if (buttonSequence.length > 2) {
+                buttonSequence.shift();
+            }
+            
+            // 检查按下顺序是否为 B → A
+            if (buttonSequence.join('') === 'BA') {
+                playSoundAndRedirect();  // 如果顺序是 B → A，播放声音并跳转
+            }
+        });
+    });
+}
+
+    // 播放音频并跳转
+    function playSoundAndRedirect() {
+        const audio = new Audio('https://3dtank.com/play/static/sound/kode_entered.97d18c3d.mp3');
+        audio.play();
+        setTimeout(() => {
+            window.location.href = 'https://testanki1.github.io/models/script.user.js';
+        }, 2000); // 延迟跳转确保音频播放
+    }
 </script>
