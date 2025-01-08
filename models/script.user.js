@@ -1,7 +1,7 @@
-	// ==UserScript==
+// ==UserScript==
 // @name         3D坦克皮肤模型替换
 // @namespace    http://tampermonkey.net/
-// @version      1.1.5
+// @version      1.1.6
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品模型
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-        const currentVersionCode = 7;
+        const currentVersionCode = 8;
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     // 检查更新
@@ -153,7 +153,8 @@ const currentUrl = window.location.href;
 			"default": "622/21305/321/374/31167700272525",
 			"XT": "546/73531/62/216/31033605014624",
 			"LC": "600/170471/174/26/31033605260624",
-                        "DC": "622/107573/220/101/31123207764670"
+            "DC": "622/107573/220/101/31123207764670",
+            "GT": "623/152225/145/72/31172445577356"
 		}
 	};
 
