@@ -539,7 +539,7 @@
             "雪": "546/150137/212/373/30545000607076",
             "天空蓝": "546/150136/157/164/30545000605652",
             "金": null,
-            "天空蓝": null,
+            "紫罗兰色": null,
             "黑暗": null,
             "魔法": null
 		},
@@ -550,7 +550,7 @@
             "雪": "546/150142/34/243/30545000606654",
             "天空蓝": "546/150140/221/33/30545000607077",
             "金": null,
-            "天空蓝": null,
+            "紫罗兰色": null,
             "黑暗": null,
             "魔法": null
 		},
@@ -561,7 +561,7 @@
             "雪": "546/150134/61/330/30545000607361",
             "天空蓝": "546/150132/273/312/30545000607533",
             "金": null,
-            "天空蓝": null,
+            "紫罗兰色": null,
             "黑暗": null,
             "魔法": null
 		},
@@ -643,20 +643,20 @@
 		}
 	};
 
-	const hullsPattern = /^(XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
-	const turretsPattern = /^(XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|雪人)$/i;
-	const dronesPattern = /^(XT)$/i;
-	const festivalsPattern = /^(万圣节|新年_2025|节日季节 主题|新年 重制|教程)$/i;
-    const shotEffectsPattern = /^(幻影黑|岩浆|粉红色|寒冷|毒|火|太阳|水|珊瑚礁|暗月|电|金|深红色|紫罗兰色|天空蓝|暴力|爆破手|黑暗|魔法|日食|神秘的红色|天空|虚空|血液|雪|正午|烟雾)$/i;
-	const paintsPattern = /^(橄榄绿|中国红|光谱|坦克币坦克)$/i;
+	const hullsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
+	const turretsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|雪人)$/i;
+	const dronesPattern = /^(|XT)$/i;
+	const festivalsPattern = /^(|万圣节|新年_2025|节日季节 主题|新年 重制|教程)$/i;
+    const shotEffectsPattern = /^(|幻影黑|岩浆|粉红色|寒冷|毒|火|太阳|水|珊瑚礁|暗月|电|金|深红色|紫罗兰色|天空蓝|暴力|爆破手|黑暗|魔法|日食|神秘的红色|天空|虚空|血液|雪|正午|烟雾)$/i;
+	const paintsPattern = /^(|橄榄绿|中国红|光谱|坦克币坦克)$/i;
 
-	let lastHullChoice = localStorage.getItem('userChoiceHull') || 'XT';
-	let lastTurretChoice = localStorage.getItem('userChoiceTurret') || 'XT';
-	let lastDroneChoice = localStorage.getItem('userChoiceDrone') || 'XT';
-	let lastFestivalChoice = localStorage.getItem('userChoiceFestival') || '万圣节';
-    let lastShotEffectChoice = localStorage.getItem('userChoiceShotEffect') || '万圣节';
-	let lastOriginalPaintChoice = localStorage.getItem('originalChoicePaint') || '橄榄绿';
-	let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || '橄榄绿';
+	let lastHullChoice = localStorage.getItem('userChoiceHull') || '';
+	let lastTurretChoice = localStorage.getItem('userChoiceTurret') || '';
+	let lastDroneChoice = localStorage.getItem('userChoiceDrone') || '';
+	let lastFestivalChoice = localStorage.getItem('userChoiceFestival') || '';
+    let lastShotEffectChoice = localStorage.getItem('userChoiceShotEffect') || '';
+	let lastOriginalPaintChoice = localStorage.getItem('originalChoicePaint') || '';
+	let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || '';
 
 	function getUserChoice(promptMessage, lastChoice, pattern, invalidMessage) {
 		let userChoice = prompt(promptMessage, lastChoice);
