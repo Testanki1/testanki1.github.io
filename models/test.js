@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克美化包（非官方）
 // @namespace    http://tampermonkey.net/
-// @version      1.2_Beta_1
+// @version      1.2_Beta_2
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-	const currentVersionCode = 8;
+	const currentVersionCode = 9;
 	const versionUrl = 'https://testanki1.github.io/models/version.json';
 
 	fetch(versionUrl)
