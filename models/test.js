@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克美化包（非官方）
 // @namespace    http://tampermonkey.net/
-// @version      1.2_Beta_2
+// @version      1.2_Beta_1
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -13,7 +13,7 @@
 
 (function() {
 	'use strict';
-	const currentVersionCode = 9;
+	const currentVersionCode = 8;
 	const versionUrl = 'https://testanki1.github.io/models/version.json';
 
 	fetch(versionUrl)
@@ -397,6 +397,10 @@
 			"电": "546/145213/171/0/30545000702716",
 			"爆破手": null
 		},
+        "twins_sound": {
+            "default": "0/114/113/232/30654312334330",
+            "爆破手": null
+        },
 		"ricochet_1": {
 			"default": "546/147741/131/160/30545000606467",
 			"电": "546/147741/302/146/30545000607410",
@@ -445,6 +449,18 @@
 			"水": "546/147746/341/23/30545000607474",
 			"爆破手": null
 		},
+        "richchet_sound_1": {
+            "default": "0/114/141/75/30653771331544",
+            "爆破手": null
+        },
+        "richchet_sound_2": {
+            "default": "0/114/141/74/30653771331450",
+            "爆破手": null
+        },
+        "richchet_sound_3": {
+            "default": "0/114/141/110/30653771331253",
+            "爆破手": null
+        },
 		"vulcan_1": {
 			"default": "546/145213/124/120/30545000703060",
 			"神秘的红色": "560/33733/324/111/30545000702647"
