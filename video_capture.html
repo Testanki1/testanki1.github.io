@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频帧提取和保存</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        video {
+            max-width: 100%;
+            height: auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>选择本地视频并提取当前视频帧</h1>
+
+<!-- 文件选择控件 -->
+<input type="file" id="videoFile" accept="video/*">
+<br><br>
+
+<!-- 视频播放区域 -->
+<video id="videoPlayer" controls>
+    <source id="videoSource" type="video/mp4">
+    你的浏览器不支持 HTML5 视频播放。
+</video>
+
+<br>
+
+<!-- 提取并保存按钮 -->
+<button id="captureBtn">提取当前视频帧并保存</button>
+
+<script>
+    // 获取相关元素
+    const videoFileInput = document.getElementById('videoFile');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    const captureBtn = document.getElementById('captureBtn');
+
+    // 创建一个隐藏的画布，用于提取帧
+    const hiddenCanvas = document.createElement('canvas');
+    const context = hiddenCanvas.getContext('2d');
+
+    // 当前视频文件的名称
+    let videoFileName = '';
+
+    // 当用户选择文件时
+    videoFileInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            videoFileName = file.name.split('.')[0]; // 获取视频文件名，不包括扩展名
+            const url = URL.createObjectURL(file);
+            videoSource.src = url;
+            videoPlayer.load();
+            videoPlayer.play();
+        }
+    });
+
+    // 更新画布尺寸，确保与视频原始尺寸一致
+    videoPlayer.addEventListener('loadedmetadata', function() {
+        hiddenCanvas.width = videoPlayer.videoWidth;
+        hiddenCanvas.height = videoPlayer.videoHeight;
+    });
+
+    // 当点击按钮时提取当前视频帧
+    captureBtn.addEventListener('click', function() {
+        // 确保视频正在播放或暂停
+        if (videoPlayer.paused || !videoPlayer.ended) {
+            // 获取当前视频帧绘制到隐藏的画布
+            context.drawImage(videoPlayer, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+            // 获取当前时间戳
+            const timestamp = new Date().getTime();
+
+            // 创建图片数据
+            const imageUrl = hiddenCanvas.toDataURL('image/png');
+            
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = `${videoFileName}_${timestamp}.png`; // 文件名为视频文件名 + 时间戳
+            link.click();
+        }
+    });
+</script>
+
+</body>
+</html>
