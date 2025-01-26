@@ -1,8 +1,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>
-    3D坦克游戏资源大小计算
-</title>
+<title>3D坦克游戏资源大小计算</title>
 <style>
     body {
         font-family: Arial, sans-serif;
@@ -47,20 +45,18 @@
         margin-top: 5px;
     }
 </style>
-<h1>
-    3D坦克游戏资源大小计算
-</h1>
-<textarea id="linksInput" placeholder="每行输入一个链接，每个链接会计算其内容的总大小"></textarea>
+<h1>3D坦克游戏资源大小计算</h1>
+<textarea id="linksInput" placeholder="每行输入一个链接，每个链接会计算其内容的总大小"></textarea><br>
+<input type="checkbox" id="excludeKtxTnk"> <label for="excludeKtxTnk">省略 .ktx 和 .tnk 文件</label><br>
 <button onclick="calculateTotalSize()">计算总大小</button>
-<div id="progress-container">
-</div>
-<div id="output">
-</div>
+<div id="progress-container"></div>
+<div id="output"></div>
 
 <script>
     async function calculateTotalSize() {
         const linksText = document.getElementById('linksInput').value;
         const links = linksText.split('\n').filter(link => link.trim() !== ''); // 获取每行链接
+        const excludeKtxTnk = document.getElementById('excludeKtxTnk').checked; // 获取复选框状态
         let totalSizeInBytes = 0;
         let processedLinks = 0;
         const batchSize = 1000;  // 每批最多处理1000个链接
@@ -93,9 +89,15 @@
                 return fetch(link)
                     .then(response => response.json())
                     .then(data => {
+                        // 过滤掉 .ktx 和 .tnk 文件（如果用户勾选了复选框）
+                        if (excludeKtxTnk) {
+                            data = data.filter(item => !item.name.endsWith('.ktx') && !item.name.endsWith('.tnk'));
+                        }
+                        
                         // 计算当前链接的大小总和
                         const sizeSum = data.reduce((sum, item) => sum + item.size, 0);
                         totalSizeInBytes += sizeSum;
+                        
                         // 更新已处理链接数量
                         processedLinks++;
                         // 更新总进度条
@@ -116,7 +118,7 @@
                 const outputDiv = document.getElementById('output');
                 outputDiv.innerHTML = `
                     <p>
-                        所有资源（不包括非高清地图）的总大小为: ${totalSizeInMB.toFixed(2)} MB
+                        所有资源（${excludeKtxTnk ? '省略 .ktx 和 .tnk 文件' : '包含所有文件'}）（不包括非高清地图）的总大小为: ${totalSizeInMB.toFixed(2)} MB
                     </p>
                 `;
             }
