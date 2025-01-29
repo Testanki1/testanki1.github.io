@@ -5,11 +5,15 @@ from googletrans import Translator
 
 # 目标存放路径
 OUTPUT_DIR = "wiki"
-BASE_URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
+BASE_URL = "https://en.tankiwiki.com/"
 
-# 设置 User-Agent 伪装成浏览器
+# 伪装成真实用户
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.google.com/",
+    "DNT": "1",
+    "Connection": "keep-alive"
 }
 
 # 初始化翻译器
@@ -21,7 +25,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def fetch_and_translate(url, filename):
     """抓取页面并翻译"""
     print(f"Fetching {url}...")
-    response = requests.get(url, headers=HEADERS)
+    response = requests.get(url, headers=HEADERS, timeout=10)
     
     if response.status_code != 200:
         print(f"Failed to fetch {url} - Status Code: {response.status_code}")
@@ -53,7 +57,7 @@ def fetch_and_translate(url, filename):
 def scrape_wiki():
     """爬取 Tanki Wiki 并翻译"""
     print(f"Accessing {BASE_URL}...")
-    response = requests.get(BASE_URL, headers=HEADERS)
+    response = requests.get(BASE_URL, headers=HEADERS, timeout=10)
     
     if response.status_code != 200:
         print(f"Failed to access main page - Status Code: {response.status_code}")
