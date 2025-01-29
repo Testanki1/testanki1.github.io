@@ -36,7 +36,7 @@ def translate_text(text):
         return text  # 翻译失败时，保留原文本
 
 def fetch_and_translate(url, output_file):
-    """完整爬取网页 HTML 并翻译正文内容"""
+    """爬取 HTML 并翻译正文部分"""
     print(f"Fetching {url}...")
     driver.get(url)
     time.sleep(5)  # 等待页面加载完毕
@@ -44,21 +44,63 @@ def fetch_and_translate(url, output_file):
     # 获取完整 HTML 结构
     soup = BeautifulSoup(driver.page_source, "html.parser")
 
-    # 遍历所有文本节点并翻译（使用 string=True 修复警告）
-    for tag in soup.find_all(string=True):
+    # **提取目标部分：从 <h1 class="firstHeading"> 到 <small>**
+    first_heading = soup.find("h1", class_="firstHeading")
+    if not first_heading:
+        print("❌ 未找到 <h1 class='firstHeading'>，可能页面结构有变动！")
+        return
+
+    # 找到 <small> 结束点
+    small_tag = first_heading.find_next("small")
+
+    # 只提取这段 HTML
+    extracted_html = ""
+    current_element = first_heading
+    while current_element and current_element != small_tag:
+        extracted_html += str(current_element)
+        current_element = current_element.find_next_sibling()
+
+    # 解析提取的 HTML 结构
+    content_soup = BeautifulSoup(extracted_html, "html.parser")
+
+    # **翻译正文内容**
+    for tag in content_soup.find_all(string=True):
         if tag.parent.name not in ["script", "style", "meta", "link"]:  # 跳过非正文内容
             translated_text = translate_text(tag.string)
             tag.replace_with(translated_text)
 
-    # 确保保存路径存在
+    # 生成完整 HTML 文件（包含 head）
+    final_html = f"""
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Tanki Online Wiki - 中文翻译</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                max-width: 900px;
+                line-height: 1.6;
+            }}
+            h1 {{
+                color: #333;
+            }}
+        </style>
+    </head>
+    <body>
+        {str(content_soup)}
+    </body>
+    </html>
+    """
+
+    # **保存 HTML 文件**
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     file_path = os.path.join(OUTPUT_DIR, output_file)
 
-    # 保存完整 HTML 文件
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write(str(soup.prettify()))  # 美化 HTML 结构
+        f.write(final_html)
 
-    print(f"Saved: {file_path}")
+    print(f"✅ 保存成功: {file_path}")
 
 # 运行爬取和翻译
 if __name__ == "__main__":
