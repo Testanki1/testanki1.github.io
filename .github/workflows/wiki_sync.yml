@@ -1,33 +1,68 @@
-name: Auto Sync and Translate Tanki Wiki
+import os
+import requests
+from bs4 import BeautifulSoup
+from googletrans import Translator
 
-on:
-  schedule:
-    - cron: '0 0 * * *'  # 每天 00:00 运行
-  workflow_dispatch:  # 允许手动触发
+# 目标存放路径
+OUTPUT_DIR = "wiki"
+BASE_URL = "https://en.tankiwiki.com/"
 
-jobs:
-  sync_and_translate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+# 初始化翻译器
+translator = Translator()
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+# 确保目标目录存在
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-      - name: Install dependencies
-        run: |
-          pip install requests beautifulsoup4 googletrans==4.0.0-rc1 lxml
+def fetch_and_translate(url, filename):
+    """抓取页面并翻译"""
+    print(f"Fetching {url}...")
+    response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    
+    if response.status_code != 200:
+        print(f"Failed to fetch {url}")
+        return
+    
+    soup = BeautifulSoup(response.text, "lxml")
 
-      - name: Run Wiki Scraper and Translator
-        run: python scripts/wiki_scraper.py
+    # 仅提取主要内容区域
+    content_div = soup.find("div", {"id": "mw-content-text"})
+    if not content_div:
+        print(f"No content found for {url}")
+        return
+    
+    text = content_div.get_text("\n", strip=True)
 
-      - name: Commit and push changes
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Auto update Tanki Wiki translated pages" || echo "No changes to commit"
-          git push
+    # 翻译文本
+    print(f"Translating {filename}...")
+    translated_text = translator.translate(text, src="en", dest="zh-cn").text
+
+    # 保存到 wiki 目录
+    file_path = os.path.join(OUTPUT_DIR, f"{filename}.md")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(f"# {filename}\n\n")
+        f.write(translated_text)
+
+    print(f"Saved: {file_path}")
+
+# 爬取首页的所有链接
+def scrape_wiki():
+    """爬取 Tanki Wiki 并翻译"""
+    response = requests.get(BASE_URL, headers={"User-Agent": "Mozilla/5.0"})
+    if response.status_code != 200:
+        print("Failed to access main page")
+        return
+
+    soup = BeautifulSoup(response.text, "lxml")
+
+    # 获取所有 Wiki 文章链接
+    links = soup.select("a[href^='/wiki/']")
+    urls = {BASE_URL + link["href"][6:]: link["href"].split("/")[-1] for link in links}
+
+    print(f"Found {len(urls)} pages to scrape...")
+
+    for url, filename in urls.items():
+        fetch_and_translate(url, filename)
+
+# 运行爬取
+if __name__ == "__main__":
+    scrape_wiki()
