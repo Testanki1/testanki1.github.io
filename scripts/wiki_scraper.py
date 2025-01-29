@@ -2,6 +2,7 @@ import os
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from googletrans import Translator
 from bs4 import BeautifulSoup
@@ -9,12 +10,12 @@ from bs4 import BeautifulSoup
 # 目标页面和存放路径
 URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
 OUTPUT_DIR = "wiki"
-OUTPUT_FILE = "Tanki_Online_Wiki.html"  # 目标输出文件为 .html
+OUTPUT_FILE = "Tanki_Online_Wiki.html"  # 生成 HTML 文件
 
 # 初始化翻译器
 translator = Translator()
 
-# 初始化 Selenium
+# 配置 Selenium WebDriver
 options = webdriver.ChromeOptions()
 options.add_argument("--headless")  # 无头模式
 options.add_argument("--disable-gpu")
@@ -24,61 +25,38 @@ options.add_argument("--disable-software-rasterizer")
 # 启动 Selenium WebDriver
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
+def translate_text(text):
+    """使用 Google 翻译文本"""
+    if not text.strip():  # 空文本不翻译
+        return text
+    try:
+        return translator.translate(text, src="en", dest="zh-cn").text
+    except Exception as e:
+        print(f"翻译失败: {e}")
+        return text  # 翻译失败时，保留原文本
+
 def fetch_and_translate(url, output_file):
-    """使用 Selenium 爬取页面并翻译"""
+    """完整爬取网页 HTML 并翻译正文内容"""
     print(f"Fetching {url}...")
     driver.get(url)
-    time.sleep(5)  # 等待页面加载完毕，避免被防护拦截
+    time.sleep(5)  # 等待页面加载完毕
 
-    # 获取页面内容
-    soup = BeautifulSoup(driver.page_source, "lxml")
+    # 获取完整 HTML 结构
+    soup = BeautifulSoup(driver.page_source, "html.parser")
 
-    # 提取主要内容区域
-    content_div = soup.find("div", {"id": "mw-content-text"})
-    if not content_div:
-        print(f"No content found for {url}")
-        return
+    # 遍历所有文本节点并翻译
+    for tag in soup.find_all(text=True):
+        if tag.parent.name not in ["script", "style", "meta", "link"]:  # 跳过非正文内容
+            translated_text = translate_text(tag.string)
+            tag.replace_with(translated_text)
 
-    text = content_div.get_text("\n", strip=True)
-
-    # 翻译文本
-    print("Translating content...")
-    translated_text = translator.translate(text, src="en", dest="zh-cn").text
-
-    # 创建 HTML 文件内容
+    # 确保保存路径存在
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     file_path = os.path.join(OUTPUT_DIR, output_file)
 
-    # 创建 HTML 基本结构
-    html_content = f"""
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Tanki Online Wiki - 中文翻译</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                margin: 20px;
-            }}
-            h1 {{
-                color: #333;
-            }}
-            p {{
-                font-size: 14px;
-                line-height: 1.6;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1>Tanki Online Wiki</h1>
-        <p>{translated_text}</p>
-    </body>
-    </html>
-    """
-
-    # 保存 HTML 文件
+    # 保存完整 HTML 文件
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
+        f.write(str(soup.prettify()))  # 美化 HTML 结构
 
     print(f"Saved: {file_path}")
 
