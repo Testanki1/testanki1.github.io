@@ -50,19 +50,16 @@ def fetch_and_translate(url, output_file):
         print("❌ 未找到 <h1 class='firstHeading'>，可能页面结构有变动！")
         return
 
-    # 找到 <small> 结束点
-    small_tag = first_heading.find_next("small")
-
-    # 只提取这段 HTML，包括 <h1> 到 <small> 之间的内容
+    # 获取从 <h1> 到 <small> 之间的所有内容
     extracted_html = ""
     current_element = first_heading
-    while current_element and current_element != small_tag:
-        extracted_html += str(current_element)
-        current_element = current_element.find_next_sibling()
 
-    # 如果 <small> 后面有内容，包含它
-    if small_tag:
-        extracted_html += str(small_tag)
+    # 遍历直到找到 <small> 标签
+    while current_element:
+        extracted_html += str(current_element)
+        if current_element.name == "small":
+            break
+        current_element = current_element.find_next_sibling()
 
     # 解析提取的 HTML 结构
     content_soup = BeautifulSoup(extracted_html, "html.parser")
