@@ -12,7 +12,7 @@ URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
 OUTPUT_DIR = "wiki"
 OUTPUT_FILE = "Tanki_Online_Wiki.html"  # 生成 HTML 文件
 
-# **修正翻译语言代码**
+# 初始化翻译器
 translator = GoogleTranslator(source="en", target="zh-CN")
 
 # 配置 Selenium WebDriver
@@ -44,7 +44,7 @@ def fetch_and_translate(url, output_file):
     # 获取完整 HTML 结构
     soup = BeautifulSoup(driver.page_source, "html.parser")
 
-    # **提取目标部分：从 <h1 class="firstHeading"> 到 <small>**
+    # 提取目标部分：从 <h1 class="firstHeading"> 到 <small>
     first_heading = soup.find("h1", class_="firstHeading")
     if not first_heading:
         print("❌ 未找到 <h1 class='firstHeading'>，可能页面结构有变动！")
@@ -53,17 +53,21 @@ def fetch_and_translate(url, output_file):
     # 找到 <small> 结束点
     small_tag = first_heading.find_next("small")
 
-    # 只提取这段 HTML
+    # 只提取这段 HTML，包括 <h1> 到 <small> 之间的内容
     extracted_html = ""
     current_element = first_heading
     while current_element and current_element != small_tag:
         extracted_html += str(current_element)
         current_element = current_element.find_next_sibling()
 
+    # 如果 <small> 后面有内容，包含它
+    if small_tag:
+        extracted_html += str(small_tag)
+
     # 解析提取的 HTML 结构
     content_soup = BeautifulSoup(extracted_html, "html.parser")
 
-    # **翻译正文内容**
+    # 翻译正文内容
     for tag in content_soup.find_all(string=True):
         if tag.parent.name not in ["script", "style", "meta", "link"]:  # 跳过非正文内容
             translated_text = translate_text(tag.string)
@@ -93,7 +97,7 @@ def fetch_and_translate(url, output_file):
     </html>
     """
 
-    # **保存 HTML 文件**
+    # 保存 HTML 文件
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     file_path = os.path.join(OUTPUT_DIR, output_file)
 
