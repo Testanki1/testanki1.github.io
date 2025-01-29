@@ -1,45 +1,45 @@
 import os
-import requests
-from bs4 import BeautifulSoup
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 from googletrans import Translator
+from bs4 import BeautifulSoup
 
 # 目标页面和存放路径
 URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
 OUTPUT_DIR = "wiki"
 OUTPUT_FILE = "Tanki_Online_Wiki.md"
 
-# 设置请求头，伪装成浏览器
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.google.com/",
-    "DNT": "1",
-    "Connection": "keep-alive"
-}
-
 # 初始化翻译器
 translator = Translator()
 
-# 确保目录存在
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# 初始化 Selenium
+options = webdriver.ChromeOptions()
+options.add_argument("--headless")  # 无头模式
+options.add_argument("--disable-gpu")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-software-rasterizer")
+
+# 启动 Selenium WebDriver
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 def fetch_and_translate(url, output_file):
-    """抓取指定页面并翻译"""
+    """使用 Selenium 爬取页面并翻译"""
     print(f"Fetching {url}...")
-    response = requests.get(url, headers=HEADERS, timeout=10)
-    
-    if response.status_code != 200:
-        print(f"Failed to fetch {url} - Status Code: {response.status_code}")
-        return
-    
-    soup = BeautifulSoup(response.text, "lxml")
+    driver.get(url)
+    time.sleep(5)  # 等待页面加载完毕，避免被防护拦截
 
-    # 仅提取主要内容区域
+    # 获取页面内容
+    soup = BeautifulSoup(driver.page_source, "lxml")
+
+    # 提取主要内容区域
     content_div = soup.find("div", {"id": "mw-content-text"})
     if not content_div:
         print(f"No content found for {url}")
         return
-    
+
     text = content_div.get_text("\n", strip=True)
 
     # 翻译文本
@@ -47,6 +47,7 @@ def fetch_and_translate(url, output_file):
     translated_text = translator.translate(text, src="en", dest="zh-cn").text
 
     # 保存到 markdown 文件
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     file_path = os.path.join(OUTPUT_DIR, output_file)
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(f"# Tanki Online Wiki\n\n")
@@ -57,3 +58,6 @@ def fetch_and_translate(url, output_file):
 # 运行爬取和翻译
 if __name__ == "__main__":
     fetch_and_translate(URL, OUTPUT_FILE)
+
+# 关闭浏览器
+driver.quit()
