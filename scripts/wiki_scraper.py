@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from googletrans import Translator
 
-# 定义目标目录
+# 目标存放路径
 OUTPUT_DIR = "wiki"
 BASE_URL = "https://en.tankiwiki.com/"
 
@@ -36,7 +36,7 @@ def fetch_and_translate(url, filename):
     print(f"Translating {filename}...")
     translated_text = translator.translate(text, src="en", dest="zh-cn").text
 
-    # 保存为 Markdown
+    # 保存到 wiki 目录
     file_path = os.path.join(OUTPUT_DIR, f"{filename}.md")
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(f"# {filename}\n\n")
