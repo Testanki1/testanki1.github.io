@@ -7,6 +7,11 @@ from googletrans import Translator
 OUTPUT_DIR = "wiki"
 BASE_URL = "https://en.tankiwiki.com/"
 
+# 设置 User-Agent 伪装成浏览器
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+}
+
 # 初始化翻译器
 translator = Translator()
 
@@ -16,10 +21,10 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def fetch_and_translate(url, filename):
     """抓取页面并翻译"""
     print(f"Fetching {url}...")
-    response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    response = requests.get(url, headers=HEADERS)
     
     if response.status_code != 200:
-        print(f"Failed to fetch {url}")
+        print(f"Failed to fetch {url} - Status Code: {response.status_code}")
         return
     
     soup = BeautifulSoup(response.text, "lxml")
@@ -47,9 +52,11 @@ def fetch_and_translate(url, filename):
 # 爬取首页的所有链接
 def scrape_wiki():
     """爬取 Tanki Wiki 并翻译"""
-    response = requests.get(BASE_URL, headers={"User-Agent": "Mozilla/5.0"})
+    print(f"Accessing {BASE_URL}...")
+    response = requests.get(BASE_URL, headers=HEADERS)
+    
     if response.status_code != 200:
-        print("Failed to access main page")
+        print(f"Failed to access main page - Status Code: {response.status_code}")
         return
 
     soup = BeautifulSoup(response.text, "lxml")
