@@ -5,7 +5,7 @@ from googletrans import Translator
 
 # 目标存放路径
 OUTPUT_DIR = "wiki"
-BASE_URL = "https://en.tankiwiki.com/"
+BASE_URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
 
 # 设置 User-Agent 伪装成浏览器
 HEADERS = {
