@@ -12,8 +12,8 @@ URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
 OUTPUT_DIR = "wiki"
 OUTPUT_FILE = "Tanki_Online_Wiki.html"  # 生成 HTML 文件
 
-# 初始化翻译器
-translator = GoogleTranslator(source="en", target="zh-cn")
+# **修正翻译语言代码**
+translator = GoogleTranslator(source="en", target="zh-CN")
 
 # 配置 Selenium WebDriver
 options = webdriver.ChromeOptions()
