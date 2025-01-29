@@ -2,7 +2,6 @@ import os
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from googletrans import Translator
 from bs4 import BeautifulSoup
@@ -10,7 +9,7 @@ from bs4 import BeautifulSoup
 # 目标页面和存放路径
 URL = "https://en.tankiwiki.com/Tanki_Online_Wiki"
 OUTPUT_DIR = "wiki"
-OUTPUT_FILE = "Tanki_Online_Wiki.md"
+OUTPUT_FILE = "Tanki_Online_Wiki.html"  # 目标输出文件为 .html
 
 # 初始化翻译器
 translator = Translator()
@@ -46,12 +45,40 @@ def fetch_and_translate(url, output_file):
     print("Translating content...")
     translated_text = translator.translate(text, src="en", dest="zh-cn").text
 
-    # 保存到 markdown 文件
+    # 创建 HTML 文件内容
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     file_path = os.path.join(OUTPUT_DIR, output_file)
+
+    # 创建 HTML 基本结构
+    html_content = f"""
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Tanki Online Wiki - 中文翻译</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }}
+            h1 {{
+                color: #333;
+            }}
+            p {{
+                font-size: 14px;
+                line-height: 1.6;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Tanki Online Wiki</h1>
+        <p>{translated_text}</p>
+    </body>
+    </html>
+    """
+
+    # 保存 HTML 文件
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write(f"# Tanki Online Wiki\n\n")
-        f.write(translated_text)
+        f.write(html_content)
 
     print(f"Saved: {file_path}")
 
