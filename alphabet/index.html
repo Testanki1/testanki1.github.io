@@ -338,34 +338,45 @@ async function solvePuzzle() {
 
         // 处理字母点击
         function handleLetterClick(button, letter) {
-            if (button.disabled) return; // 如果字母按钮已被禁用，返回
+    if (button.disabled) return; // 如果字母按钮已被禁用，返回
 
-            let correctGuess = false;
-            for (let i = 0; i < targetWord.length; i++) {
-                if (targetWord[i] === letter) {
-                    guessedLetters[i] = letter; // 填入字母
-                    correctGuess = true;
-                }
-            }
-
-            updateWordDisplay();
-            attempts++;
-            attemptsSpan.textContent = attempts;
-
-            if (correctGuess) {
-                guessResult.textContent = '正确！';
-                button.style.backgroundColor = '#76FF33';  // 正确选择的颜色
-            } else {
-                guessResult.textContent = '错误！';
-                button.style.backgroundColor = '#FF6666';  // 错误选择的颜色
-            }
-
-            button.disabled = true;  // 禁用已选择的字母按钮
-
-            if (!guessedLetters.includes('_')) {
-                guessResult.textContent = '恭喜你，猜对了！';
-            }
+    let correctGuess = false;
+    for (let i = 0; i < targetWord.length; i++) {
+        if (targetWord[i] === letter) {
+            guessedLetters[i] = letter; // 填入字母
+            correctGuess = true;
         }
+    }
+
+    updateWordDisplay();
+    attempts++;
+    attemptsSpan.textContent = attempts;
+
+    if (correctGuess) {
+        guessResult.textContent = '正确！';
+        button.style.backgroundColor = '#76FF33';  // 正确选择的颜色
+    } else {
+        guessResult.textContent = '错误！';
+        button.style.backgroundColor = '#FF6666';  // 错误选择的颜色
+    }
+
+    button.disabled = true;  // 禁用已选择的字母按钮
+
+    // 检查是否已猜对所有字母
+    if (!guessedLetters.includes('_')) {
+        guessResult.textContent = '恭喜你，猜对了！';
+        disableAllButtons(); // 禁用所有字母按钮
+    }
+}
+
+// 禁用所有字母按钮
+function disableAllButtons() {
+    const allButtons = document.querySelectorAll('#lettersList button');
+    allButtons.forEach(button => {
+        button.disabled = true;
+    });
+}
+
 
         function switchTab(tab) {
             const puzzleTab = document.getElementById('puzzleTab');
