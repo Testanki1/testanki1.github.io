@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克字母表解谜</title>
+    <title>3D坦克字母表</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
@@ -238,6 +238,48 @@
             const text = await response.text();
             return text.split('\n').map(word => word.trim()).filter(word => word.length > 0);
         }
+async function solvePuzzle() {
+    const wordLength = parseInt(document.getElementById('length').value);
+    const lettersInput = document.getElementById('letters').value.trim().toLowerCase();
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '';
+    
+    if (!wordLength || !lettersInput) {
+        resultDiv.innerHTML = '<p class="error">请确保输入了单词长度和字母。</p>';
+        return;
+    }
+
+    try {
+        // 获取词汇库
+        const words = await fetchWords(); // 调用外部获取单词库的函数
+
+        // 将输入字母转换为集合
+        const lettersSet = new Set(lettersInput.split(''));
+
+        // 筛选符合条件的单词
+        const matchingWords = words.filter(word => {
+            // 检查单词长度
+            if (word.length !== wordLength) return false;
+            // 检查单词的所有字母是否都在输入的字母集合中
+            return [...word.toLowerCase()].every(char => lettersSet.has(char));
+        });
+
+        if (matchingWords.length > 0) {
+            resultDiv.innerHTML = '<h3>符合条件的单词：</h3>';
+            matchingWords.forEach(word => {
+                const wordElement = document.createElement('p');
+                wordElement.classList.add('result');
+                wordElement.textContent = word;
+                resultDiv.appendChild(wordElement);
+            });
+        } else {
+            resultDiv.innerHTML = '<p class="error">没有找到符合条件的单词。</p>';
+        }
+    } catch (error) {
+        resultDiv.innerHTML = '<p class="error">获取单词列表时出错，请稍后再试。</p>';
+        console.error(error);
+    }
+}
 
         // 随机选择一个单词
         function chooseRandomWord(words) {
