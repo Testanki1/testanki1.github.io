@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克字母表</title>
+    <title>3D坦克字母表解谜</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
@@ -308,22 +308,33 @@ async function solvePuzzle() {
 
         // 设置字母选择按钮
         function setupLetterButtons() {
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            const targetLetters = Array.from(new Set(targetWord.split(''))); // 获取目标单词中的所有不重复字母
-            const remainingLetters = letters.split('').filter(letter => !targetLetters.includes(letter));
-            const allLetters = [...targetLetters, ...remainingLetters.slice(0, 16 - targetLetters.length)];
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';  // 字母表
+    const targetLetters = Array.from(new Set(targetWord.split('')));  // 获取目标单词中的所有不重复字母
+    const remainingLetters = letters.split('').filter(letter => !targetLetters.includes(letter));  // 排除已出现的字母
 
-            // 按字母表顺序排列字母
-            allLetters.sort();  // 排序字母
+    // 从剩余字母中随机抽取，直到总字母数为 16
+    const randomLetters = [];
+    while (randomLetters.length < 16 - targetLetters.length) {
+        const randomIndex = Math.floor(Math.random() * remainingLetters.length);
+        randomLetters.push(remainingLetters[randomIndex]);
+        remainingLetters.splice(randomIndex, 1);  // 移除已选择的字母，避免重复
+    }
 
-            lettersListDiv.innerHTML = ''; // 清空旧的按钮
-            allLetters.forEach(letter => {
-                const button = document.createElement('button');
-                button.textContent = letter;
-                button.onclick = () => handleLetterClick(button, letter);
-                lettersListDiv.appendChild(button);
-            });
-        }
+    // 将目标单词的字母和随机字母合并
+    const allLetters = [...targetLetters, ...randomLetters];
+
+    // 按字母表顺序排列所有字母
+    allLetters.sort();  // 默认按字母表升序排列
+
+    // 创建字母选择按钮
+    lettersListDiv.innerHTML = '';  // 清空旧的按钮
+    allLetters.forEach(letter => {
+        const button = document.createElement('button');
+        button.textContent = letter;
+        button.onclick = () => handleLetterClick(button, letter);
+        lettersListDiv.appendChild(button);
+    });
+}
 
         // 处理字母点击
         function handleLetterClick(button, letter) {
