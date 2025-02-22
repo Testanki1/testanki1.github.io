@@ -136,12 +136,51 @@
         }
 
         .reproduce-section {
-            background-color: #BFD5FF;
-            color: #001926;
+            background-color: #002b36;
+            color: #76FF33;
             padding: 20px;
             border-radius: 8px;
             font-size: 1.2rem;
             text-align: left;
+        }
+
+        #lettersList button {
+            margin: 5px;
+            padding: 10px;
+            background-color: #00303b;
+            color: white;
+            border: 2px solid #00303b;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+
+        #lettersList button:hover {
+            background-color: #64e629;
+        }
+
+        #lettersList button:disabled {
+            background-color: #444;
+            cursor: not-allowed;
+        }
+
+        #wordDisplay {
+            font-size: 1.5rem;
+            letter-spacing: 10px;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        #attempts {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        #lettersList {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 10px;
+            justify-items: center;
         }
 
     </style>
@@ -162,7 +201,7 @@
         <input type="number" id="length" placeholder="单词长度" min="1">
         </br>
         <label for="letters">请输入该单词中可能含有的字母：</label>
-        <input type="text" id="letters" placeholder="字母输入" maxlength="26">
+        <input type="text" id="letters" placeholder="字母输入" maxlength="16"> 
         </br>
         <button onclick="solvePuzzle()">解谜！</button>
         
@@ -171,54 +210,108 @@
 
     <div class="section" id="reproduceSection">
         <div class="reproduce-section">
-            <h3>敬请期待！</h3>
-            <p>“再现”部分将很快上线，敬请期待！</p>
+            <h3>游戏再现</h3>
+            <p>选择字母并猜出单词！</p>
+            <div id="letterContainer">
+                <p>字母选择：</p>
+                <div id="lettersList"></div>
+            </div>
+            <div id="wordDisplay"></div>
+            <p id="guessResult"></p>
+            <p>选择次数：<span id="attempts">0</span></p>
+            <button onclick="startGame()">开始新游戏</button>
         </div>
     </div>
 
     <script>
+        let targetWord = '';  // 存储随机抽取的单词
+        let wordLength = 0;   // 单词长度
+        let guessedLetters = [];  // 用户选择的字母
+        let attempts = 0;  // 选择次数
+        const lettersListDiv = document.getElementById('lettersList');
+        const wordDisplayDiv = document.getElementById('wordDisplay');
+        const attemptsSpan = document.getElementById('attempts');
+        const guessResult = document.getElementById('guessResult');
+
         async function fetchWords() {
             const response = await fetch('https://testanki1.github.io/alphabet/words.txt');
             const text = await response.text();
             return text.split('\n').map(word => word.trim()).filter(word => word.length > 0);
         }
 
-        function solvePuzzle() {
-            const wordLength = parseInt(document.getElementById('length').value);
-            const lettersInput = document.getElementById('letters').value.trim().toLowerCase();
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '';
+        // 随机选择一个单词
+        function chooseRandomWord(words) {
+            const randomWord = words[Math.floor(Math.random() * words.length)].toUpperCase();
+            targetWord = randomWord;
+            wordLength = randomWord.length;
+            guessedLetters = new Array(wordLength).fill('_'); // 填充空格
+            updateWordDisplay();
+        }
 
-            if (!wordLength || !lettersInput) {
-                resultDiv.innerHTML = '<p class="error">请确保输入了单词长度和字母。</p>';
-                return;
+        // 更新单词显示
+        function updateWordDisplay() {
+            wordDisplayDiv.innerHTML = guessedLetters.join(' ');
+        }
+
+        // 开始新游戏
+        function startGame() {
+            fetchWords().then(words => {
+                chooseRandomWord(words);
+                attempts = 0;
+                attemptsSpan.textContent = attempts;
+                guessResult.textContent = '';
+                setupLetterButtons();
+            });
+        }
+
+        // 设置字母选择按钮
+        function setupLetterButtons() {
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const targetLetters = Array.from(new Set(targetWord.split(''))); // 获取目标单词中的所有不重复字母
+            const remainingLetters = letters.split('').filter(letter => !targetLetters.includes(letter));
+            const allLetters = [...targetLetters, ...remainingLetters.slice(0, 16 - targetLetters.length)];
+
+            // 按字母表顺序排列字母
+            allLetters.sort();  // 排序字母
+
+            lettersListDiv.innerHTML = ''; // 清空旧的按钮
+            allLetters.forEach(letter => {
+                const button = document.createElement('button');
+                button.textContent = letter;
+                button.onclick = () => handleLetterClick(button, letter);
+                lettersListDiv.appendChild(button);
+            });
+        }
+
+        // 处理字母点击
+        function handleLetterClick(button, letter) {
+            if (button.disabled) return; // 如果字母按钮已被禁用，返回
+
+            let correctGuess = false;
+            for (let i = 0; i < targetWord.length; i++) {
+                if (targetWord[i] === letter) {
+                    guessedLetters[i] = letter; // 填入字母
+                    correctGuess = true;
+                }
             }
 
-            const lettersSet = new Set(lettersInput.split(''));
-            
-            fetchWords().then(words => {
-                const matchingWords = words.filter(word => {
-                    // 检查单词长度
-                    if (word.length !== wordLength) return false;
-                    // 检查单词的所有字母是否都在输入的字母中
-                    return [...word.toLowerCase()].every(char => lettersSet.has(char));
-                });
+            updateWordDisplay();
+            attempts++;
+            attemptsSpan.textContent = attempts;
 
-                if (matchingWords.length > 0) {
-                    resultDiv.innerHTML = '<h3>符合条件的单词：</h3>';
-                    matchingWords.forEach(word => {
-                        const wordElement = document.createElement('p');
-                        wordElement.classList.add('result');
-                        wordElement.textContent = word;
-                        resultDiv.appendChild(wordElement);
-                    });
-                } else {
-                    resultDiv.innerHTML = '<p class="error">没有找到符合条件的单词。</p>';
-                }
-            }).catch(error => {
-                resultDiv.innerHTML = '<p class="error">获取单词列表时出错，请稍后再试。</p>';
-                console.error(error);
-            });
+            if (correctGuess) {
+                guessResult.textContent = '正确！';
+                button.style.backgroundColor = '#76FF33';  // 正确选择的颜色
+            } else {
+                guessResult.textContent = '错误！';
+                button.style.backgroundColor = '#FF6666';  // 错误选择的颜色
+            }
+
+            button.disabled = true;  // 禁用已选择的字母按钮
+
+            if (!guessedLetters.includes('_')) {
+                guessResult.textContent = '恭喜你，猜对了！';
+            }
         }
 
         function switchTab(tab) {
@@ -240,6 +333,7 @@
             } else {
                 reproduceTab.classList.add('active');
                 reproduceSection.classList.add('active');
+                startGame(); // 开始新游戏
             }
         }
     </script>
