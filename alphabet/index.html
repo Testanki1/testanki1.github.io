@@ -228,19 +228,23 @@
         let wordLength = 0;   // 单词长度
         let guessedLetters = [];  // 用户选择的字母
         let attempts = 0;  // 选择次数
+        let usedLetters = [];  // 存储已使用的字母
         const lettersListDiv = document.getElementById('lettersList');
         const wordDisplayDiv = document.getElementById('wordDisplay');
         const attemptsSpan = document.getElementById('attempts');
         const guessResult = document.getElementById('guessResult');
 
+document.getElementById('letters').addEventListener('input', function (e) {
+        // 只允许输入字母，且不允许重复输入字母（大小写不敏感）
+        const inputValue = this.value.toUpperCase();
+        this.value = inputValue.split('').filter((letter, index, self) => self.indexOf(letter) === index).join('');
+        this.value = this.value.replace(/[^A-Za-z]/g, '');
+    });
         async function fetchWords() {
             const response = await fetch('https://testanki1.github.io/alphabet/words.txt');
             const text = await response.text();
             return text.split('\n').map(word => word.trim()).filter(word => word.length > 0);
         }
-document.getElementById('letters').addEventListener('input', function (e) {
-    this.value = this.value.replace(/[^A-Za-z]/g, ''); // 只保留字母
-});
 
 async function solvePuzzle() {
     const wordLength = parseInt(document.getElementById('length').value);
