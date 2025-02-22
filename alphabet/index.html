@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D坦克字母表解谜</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #001926;
+            color: white;
+            font-family: 'Rubik', 'M PLUS 1p';
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        /* Tab Styles */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            margin: 0 10px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            background-color: #00303b;
+            color: white;
+            border: 2px solid #00303b;
+            border-radius: 8px;
+        }
+
+        .tab:hover {
+            background-color: #64e629;
+        }
+
+        .tab.active {
+            background-color: #76FF33;
+            color: #001926;
+            border-color: #76FF33;
+        }
+
+        /* Section Styles */
+        .section {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        label {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        input, button {
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 2px solid #76FF33;
+            background-color: #002b36;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        input {
+            width: 100%;
+            max-width: 320px;
+        }
+
+        input:focus {
+            border-color: #64e629;
+            outline: none;
+            box-shadow: 0 0 8px rgba(103, 255, 51, 0.5);
+        }
+
+        button {
+            background-color: #76FF33;
+            color: #001926;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #64e629;
+        }
+
+        .result {
+            color: #76FF33;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-top: 20px;
+        }
+
+        .error {
+            color: red;
+            font-size: 1.2rem;
+            margin-top: 20px;
+        }
+
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result p {
+            margin: 10px 0;
+        }
+
+        .reproduce-section {
+            background-color: #BFD5FF;
+            color: #001926;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            text-align: left;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>3D坦克字母表</h1>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" id="puzzleTab" onclick="switchTab('puzzle')">单词解谜</div>
+        <div class="tab" id="reproduceTab" onclick="switchTab('reproduce')">游戏再现</div>
+    </div>
+
+    <!-- Sections -->
+    <div class="section active" id="puzzleSection">
+        <label for="length">请输入单词的长度：</label>
+        <input type="number" id="length" placeholder="单词长度" min="1">
+        </br>
+        <label for="letters">请输入该单词中可能含有的字母：</label>
+        <input type="text" id="letters" placeholder="字母输入" maxlength="26">
+        </br>
+        <button onclick="solvePuzzle()">解谜！</button>
+        
+        <div id="result" class="results-container"></div>
+    </div>
+
+    <div class="section" id="reproduceSection">
+        <div class="reproduce-section">
+            <h3>敬请期待！</h3>
+            <p>“再现”部分将很快上线，敬请期待！</p>
+        </div>
+    </div>
+
+    <script>
+        async function fetchWords() {
+            const response = await fetch('https://testanki1.github.io/alphabet/words.txt');
+            const text = await response.text();
+            return text.split('\n').map(word => word.trim()).filter(word => word.length > 0);
+        }
+
+        function solvePuzzle() {
+            const wordLength = parseInt(document.getElementById('length').value);
+            const lettersInput = document.getElementById('letters').value.trim().toLowerCase();
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+
+            if (!wordLength || !lettersInput) {
+                resultDiv.innerHTML = '<p class="error">请确保输入了单词长度和字母。</p>';
+                return;
+            }
+
+            const lettersSet = new Set(lettersInput.split(''));
+            
+            fetchWords().then(words => {
+                const matchingWords = words.filter(word => {
+                    // 检查单词长度
+                    if (word.length !== wordLength) return false;
+                    // 检查单词的所有字母是否都在输入的字母中
+                    return [...word.toLowerCase()].every(char => lettersSet.has(char));
+                });
+
+                if (matchingWords.length > 0) {
+                    resultDiv.innerHTML = '<h3>符合条件的单词：</h3>';
+                    matchingWords.forEach(word => {
+                        const wordElement = document.createElement('p');
+                        wordElement.classList.add('result');
+                        wordElement.textContent = word;
+                        resultDiv.appendChild(wordElement);
+                    });
+                } else {
+                    resultDiv.innerHTML = '<p class="error">没有找到符合条件的单词。</p>';
+                }
+            }).catch(error => {
+                resultDiv.innerHTML = '<p class="error">获取单词列表时出错，请稍后再试。</p>';
+                console.error(error);
+            });
+        }
+
+        function switchTab(tab) {
+            const puzzleTab = document.getElementById('puzzleTab');
+            const reproduceTab = document.getElementById('reproduceTab');
+            const puzzleSection = document.getElementById('puzzleSection');
+            const reproduceSection = document.getElementById('reproduceSection');
+
+            // Reset tab active state
+            puzzleTab.classList.remove('active');
+            reproduceTab.classList.remove('active');
+            puzzleSection.classList.remove('active');
+            reproduceSection.classList.remove('active');
+
+            // Activate selected tab and section
+            if (tab === 'puzzle') {
+                puzzleTab.classList.add('active');
+                puzzleSection.classList.add('active');
+            } else {
+                reproduceTab.classList.add('active');
+                reproduceSection.classList.add('active');
+            }
+        }
+    </script>
+
+</body>
+</html>
