@@ -287,6 +287,33 @@
             margin-top:10px;
         }
 
+        /* Style for word display in reproduce section */
+        #wordDisplayContainer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .reproduce-letter-box {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #76FF33;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.6rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 2px;
+            text-align: center;
+            transition: background-color 0.2s, color 0.2s;
+        }
+          .reproduce-letter-box.filled {
+            background-color: #76FF33;
+            color: #001926;
+        }
+
     </style>
 </head>
 <body>
@@ -343,7 +370,7 @@
             <p>字母选择：</p>
             <div id="lettersList"></div>
         </div>
-        <div id="wordDisplay"></div>
+        <div id="wordDisplayContainer"></div>  <!-- Container for the letter boxes -->
         <p id="guessResult"></p>
         <p>选择次数：<span id="attempts">0</span></p>
         <button onclick="startGame()">开始新游戏</button>
@@ -357,7 +384,7 @@
     let attempts = 0;
     let usedLetters = [];
     const lettersListDiv = document.getElementById('lettersList');
-    const wordDisplayDiv = document.getElementById('wordDisplay');
+    const wordDisplayContainer = document.getElementById('wordDisplayContainer'); // Changed to container
     const attemptsSpan = document.getElementById('attempts');
     const guessResult = document.getElementById('guessResult');
 
@@ -521,7 +548,7 @@
     // 随机选择单词
     function chooseRandomWord(words) {
         if (words.length === 0) {
-            wordDisplayDiv.innerHTML = "词库为空，请选择其他词库。";
+            wordDisplayContainer.innerHTML = "词库为空，请选择其他词库。"; // Use container
             disableAllButtons();
             return;
         }
@@ -529,13 +556,22 @@
         targetWord = randomWord;
         wordLength = randomWord.length;
         guessedLetters = new Array(wordLength).fill('_');
-        updateWordDisplay();
+        updateWordDisplay(); // Update the display with boxes
         usedLetters = [];
     }
 
-    // 更新单词显示
+     // 更新单词显示 (using boxes)
     function updateWordDisplay() {
-        wordDisplayDiv.innerHTML = guessedLetters.join(' ');
+        wordDisplayContainer.innerHTML = ''; // Clear previous boxes
+        for (let i = 0; i < wordLength; i++) {
+            const box = document.createElement('div');
+            box.classList.add('reproduce-letter-box');
+            box.textContent = guessedLetters[i];
+            if (guessedLetters[i] !== '_') {
+                box.classList.add('filled');
+            }
+            wordDisplayContainer.appendChild(box);
+        }
     }
 
     // 开始新游戏
@@ -590,7 +626,7 @@
             }
         }
 
-        updateWordDisplay();
+        updateWordDisplay(); // Update with boxes
         attempts++;
         attemptsSpan.textContent = attempts;
         usedLetters.push(letter);
