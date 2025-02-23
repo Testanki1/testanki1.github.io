@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D坦克字母表游戏</title>
     <style>
-        /* (Your CSS - No Changes Needed) */
+        /* (Your CSS - Changes to .known-letter-box and .known-letter-box-container) */
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
 
@@ -205,6 +205,34 @@
             border: 1px solid #76FF33;
             border-radius: 8px;
             min-height: 30px; /* Ensure it's visible even when empty */
+            display: flex; /* Use flexbox for layout */
+            flex-wrap: wrap; /* Allow wrapping */
+            gap: 5px; /* Spacing between boxes */
+        }
+       .known-letter-box-container {
+          display: flex;
+          flex-direction: column; /* Stack elements vertically */
+          align-items: center; /* Center items horizontally */
+          margin-bottom: 10px; /* Add some vertical spacing */
+        }
+
+        .known-letter-box {
+            width: 50px; /* Even Larger */
+            height: 50px; /* Even Larger */
+            border: 2px solid #76FF33;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.6rem; /* Even Larger */
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 2px;
+            text-align: center;
+            transition: background-color 0.2s, color 0.2s; /* Smooth transition */
+        }
+        .known-letter-box.filled {
+            background-color: #76FF33; /* Green background */
+            color: #001926;          /* Black text */
         }
 
         .letter-position-input {
@@ -242,10 +270,23 @@
             border-radius: 4px;
             cursor: pointer;
         }
+         .delete-letter-btn {
+            background-color: #FF6666;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 5px 10px;
+            margin-top: 5px;
+        }
 
         #knownLetterInputs {
             margin-top: 10px;
         }
+        #createLetterBoxesBtn {
+            margin-top:10px;
+        }
+
     </style>
 </head>
 <body>
@@ -270,12 +311,13 @@
     </div>
     <label for="length">请输入单词的长度：</label>
     <input type="number" id="length" placeholder="单词长度" min="1">
+    <!-- Removed the button -->
     </br>
     <label for="letters">请输入该单词中可能含有的字母：</label>
     <input type="text" id="letters" placeholder="字母输入">
     </br>
-    <button id="addKnownLetterBtn">添加已知字母</button>
-    <button onclick="clearKnownLetters()">清除已知字母</button>
+    <!-- Removed addKnownLetterBtn and related elements -->
+
     <div id="knownLetterInputs"></div>
     <div id="knownLettersDisplay"></div>
 
@@ -345,120 +387,77 @@
     let knownLetterPositions = {};
     let hasInvalidInput = false; // Flag to track input errors
 
-    function addKnownLetterInput() {
+   function createLetterBoxes() {
         const wordLength = parseInt(document.getElementById('length').value, 10);
         if (isNaN(wordLength) || wordLength <= 0) {
             alert("请先输入有效的单词长度。");
             return;
         }
 
-        const container = document.createElement('div');
-        container.classList.add('letter-position-input');
+        const container = document.getElementById('knownLettersDisplay');
+        container.innerHTML = ''; // Clear previous boxes
+        knownLetterPositions = {}; // Reset known letters
 
-        const letterInput = document.createElement('input');
-        letterInput.type = 'text';
-        letterInput.placeholder = '字母';
-        letterInput.maxLength = 1;
-        letterInput.addEventListener('input', () => {
-            letterInput.value = letterInput.value.toUpperCase().replace(/[^A-Z]/g, '');
-            updateKnownLetters(); // Update on every change
-        });
+        for (let i = 0; i < wordLength; i++) {
+             const boxContainer = document.createElement('div');
+            boxContainer.classList.add('known-letter-box-container');
 
-        const positionInput = document.createElement('input');
-        positionInput.type = 'text';
-        positionInput.placeholder = '位置 (逗号（英文）分隔)';
-        positionInput.classList.add('positions-input');
-        positionInput.addEventListener('input', updateKnownLetters); // Update on every change
+            const box = document.createElement('input');
+            box.type = 'text';
+            box.maxLength = 1;
+            box.classList.add('known-letter-box');
+            box.dataset.index = i;
+            box.addEventListener('input', handleLetterBoxInput);
+            // Select all text on focus (for easy replacement)
+            box.addEventListener('focus', (event) => {
+                event.target.select();
+            });
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '删除';
-        deleteBtn.onclick = () => {
-            container.remove();
-            updateKnownLetters(); // Update after removing
-        };
 
-        container.appendChild(letterInput);
-        container.appendChild(positionInput);
-        container.appendChild(deleteBtn);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'X';
+            deleteBtn.classList.add('delete-letter-btn');
+            deleteBtn.onclick = () => deleteLetterBox(i);
 
-        document.getElementById('knownLetterInputs').appendChild(container);
+            boxContainer.appendChild(box);
+            boxContainer.appendChild(deleteBtn); //deleteBtn is now below box
+            container.appendChild(boxContainer);
+        }
     }
+    function deleteLetterBox(index) {
+        const container = document.getElementById('knownLettersDisplay');
+        const box = container.querySelector(`.known-letter-box[data-index="${index}"]`);
 
-    function updateKnownLetters() {
-        const wordLength = parseInt(document.getElementById('length').value, 10);
-        knownLetterPositions = {}; // Reset the object
-        hasInvalidInput = false;   // Reset error flag
-        let errorMessage = '';
-
-        const containers = document.querySelectorAll('#knownLetterInputs .letter-position-input');
-        containers.forEach(container => {
-            const letterInput = container.querySelector('input[type="text"]:not(.positions-input)');
-            const positionInput = container.querySelector('.positions-input');
-
-            const letter = letterInput.value.trim().toLowerCase();
-            const positionsStr = positionInput.value.trim();
-
-            // Letter validation
-            if (letter && (letter.length !== 1 || !/[a-z]/.test(letter))) {
-                letterInput.classList.add('invalid');
-                hasInvalidInput = true;
-                errorMessage = "存在无效的字母输入。";
-            } else {
-                letterInput.classList.remove('invalid');
-            }
-
-            // Position validation
-            if (positionsStr) {
-                const positions = positionsStr.split(',')
-                    .map(posStr => parseInt(posStr.trim(), 10))
-                    .filter(pos => !isNaN(pos)); // Filter out non-numeric values
-
-                if (positions.some(pos => pos < 1 || pos > wordLength)) {
-                    positionInput.classList.add('invalid');
-                    hasInvalidInput = true;
-                    errorMessage = `存在超出范围的位置，请输入 1 到 ${wordLength} 之间的数字。`;
-                } else if (positions.some(isNaN)) {
-                    hasInvalidInput = true;
-                    positionInput.classList.add('invalid');
-                    errorMessage = `存在无效的位置，请输入数字。`;
-                } else {
-                    positionInput.classList.remove('invalid');
-                    if (letter) { // Only add if the letter is valid
-                        knownLetterPositions[letter] = positions.map(p => p - 1); // 0-indexed
-                    }
-                }
-            } else {
-                // If position input is empty but letter input isn't, that's okay;
-                // we just won't have any positions for that letter.
-                positionInput.classList.remove('invalid');
-            }
-        });
-
-        updateKnownLettersDisplay();
-        if (hasInvalidInput) {
-            document.getElementById('result').innerHTML = `<p class="error">${errorMessage}</p>`;
+        if (box) {
+            box.value = ''; // Clear the letter
+            delete knownLetterPositions[index]; // Remove from the object
+            box.classList.remove('filled'); // Remove the filled class
         }
     }
 
-    function updateKnownLettersDisplay() {
-        const display = document.getElementById('knownLettersDisplay');
-        display.innerHTML = ''; // Clear previous content
+     function handleLetterBoxInput(event) {
+        const box = event.target;
+        const index = parseInt(box.dataset.index, 10);
+        const letter = box.value.toUpperCase();
 
-        for (const letter in knownLetterPositions) {
-            const positions = knownLetterPositions[letter].map(pos => pos + 1).join(', '); // 1-indexed for display
-            const entry = document.createElement('p');
-            entry.textContent = `字母 ${letter.toUpperCase()} 在位置: ${positions}`;
-            display.appendChild(entry);
+        if (letter.match(/[A-Z]/)) {
+            knownLetterPositions[index] = letter;
+            box.style.borderColor = '#76FF33';
+            box.classList.add('filled'); // Add the filled class
+
+        } else if (letter === "") {
+            delete knownLetterPositions[index];
+            box.style.borderColor = '#76FF33';
+            box.classList.remove('filled'); // Remove filled class
+        } else {
+            box.style.borderColor = 'red';
+            delete knownLetterPositions[index];
+             box.classList.remove('filled');
         }
     }
 
-    function clearKnownLetters() {
-        knownLetterPositions = {};
-        document.getElementById('knownLetterInputs').innerHTML = ''; // Clear inputs
-        updateKnownLettersDisplay();
-    }
-
-    document.getElementById('addKnownLetterBtn').addEventListener('click', addKnownLetterInput);
+    // Removed the event listener for the button, added to length input
+    document.getElementById('length').addEventListener('input', createLetterBoxes);
 
 
     // 解谜函数
@@ -472,47 +471,30 @@
             resultDiv.innerHTML = '<p class="error">请输入单词长度。</p>';
             return;
         }
-        if (hasInvalidInput) {
-            resultDiv.innerHTML = '<p class="error">请先修正已知字母和位置的错误。</p>';
-            return;
-        }
-
 
         try {
-            // 获取选中的词库
             const wordlistSelect = document.getElementById('wordlistSelect');
-            const selectedWordFileURL = wordlistSelect.value; // 获取 URL
+            const selectedWordFileURL = wordlistSelect.value;
             const words = await fetchWords(selectedWordFileURL);
             const lettersSet = new Set(lettersInput.split(''));
 
-            // 筛选符合条件的单词
             const matchingWords = words.filter(word => {
                 if (word.length !== wordLength) return false;
 
                 const lowerCaseWord = word.toLowerCase();
 
-                // Check if all characters in the word are in the allowed letters set
                 if (lettersInput && ![...lowerCaseWord].every(char => lettersSet.has(char))) {
                     return false;
                 }
 
-                // Check known letter positions
-                for (const letter in knownLetterPositions) {
-                    const positions = knownLetterPositions[letter];
-                    //  Use a Set for faster lookup.
-                    const positionSet = new Set(positions);
-
-                    // Check that the letter appears *only* at the specified positions
-                    for(let i = 0; i < lowerCaseWord.length; i++){
-                        if (lowerCaseWord[i] === letter) {
-                            if (!positionSet.has(i)) {
-                                return false; // Letter found at an incorrect position
-                            }
-                        } else {
-                             if (positionSet.has(i)) {
-                                return false;  // Expected letter not at correct position.
-                            }
-                        }
+                // Strict matching: Check known letter positions.
+                for (let i = 0; i < wordLength; i++) {
+                    if (knownLetterPositions[i] && knownLetterPositions[i].toLowerCase() !== lowerCaseWord[i]) {
+                        return false; // Letter at this position doesn't match.
+                    }
+                    // Check if a letter *not* in knownLetterPositions appears where it shouldn't.
+                    if(!knownLetterPositions[i] && Object.values(knownLetterPositions).includes(lowerCaseWord[i].toUpperCase())) {
+                        return false;
                     }
                 }
 
