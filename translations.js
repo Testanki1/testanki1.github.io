@@ -1,4 +1,3 @@
-// dictionary.js
 const replacementDict = {
     'turret': '炮塔',
     'turrets': '炮塔',
