@@ -127,6 +127,7 @@
 
     <section>
         <p>目前只支持翻译游戏物品名称（作为独立单词或词组），不支持翻译整句话。替换时会优先处理较长的词组（例如 "Tanki Online" 会在 "Tank" 之前被替换）。<strong>大小写规则：</strong>如果字典键中的字母为大写，原文对应位置也必须为大写才替换（例如字典有 "Future"，原文 "Future" 会替换，"future" 不会）。</p>
+        <p><strong>新增：</strong>翻译结果中，如果两个中文字符间有空格，会自动移除空格。</p> <!-- Added explanation -->
         <label for="inputText">输入英文物品名称：</label>
         <textarea id="inputText" oninput="replaceAndDisplay()" placeholder="在此处粘贴或输入英文名称..."></textarea>
         <button onclick="copyResult()"><span style="color:#000000;">复制结果</span></button>
@@ -187,7 +188,7 @@
             return true; // All uppercase constraints in the key are met
         }
 
-        // 更新的替换逻辑 (包含大小写和单词边界)
+        // 更新的替换逻辑 (包含大小写和单词边界，以及中文间空格移除)
         function replaceAndDisplay() {
             const inputTextElement = document.getElementById('inputText');
             let originalInput = inputTextElement.value;
@@ -249,10 +250,8 @@
 
                         // 防止零宽度匹配和可能的无限循环
                         if (matchedText.length === 0) {
-                            // 对于零宽度匹配（虽然理论上加了\b不太可能），手动前进
                             regex.lastIndex++;
                         }
-                        // exec 在 'g' 模式下会自动更新 lastIndex，无需手动设置
                     }
                  } catch (e) {
                      console.error(`处理键 "${key}" (带边界) 的正则表达式时出错: `, e);
@@ -285,6 +284,23 @@
                 output += originalInput.substring(currentIndex);
             }
 
+            // --- 新增步骤：移除中文之间的空格 ---
+            // 5. 使用正则表达式查找 "中文 空格+ 中文" 的模式，并移除空格
+            // [\u4E00-\u9FFF] 匹配一个中文字符 (Unicode CJK Unified Ideographs block)
+            // ( +) 匹配一个或多个空格 (注意是空格 ' ' 不是 \s) 并捕获它们
+            // g 标志表示全局替换
+            try {
+                 // $1 引用第一个捕获组 (第一个中文字符)
+                 // $3 引用第三个捕获组 (第二个中文字符)
+                 // 这样就拼接了两个中文字符，跳过了中间的空格 (第二个捕获组)
+                output = output.replace(/([\u4E00-\u9FFF])( +)([\u4E00-\u9FFF])/g, '$1$3');
+            } catch (e) {
+                console.error("移除中文间空格时发生错误: ", e);
+                // 如果正则出错，至少保证之前的翻译结果能显示
+            }
+            // --- 中文间空格移除结束 ---
+
+
             // 将最终结果显示在输出元素中
             if (outputElement.tagName === 'TEXTAREA') {
                 outputElement.value = output;
@@ -293,7 +309,7 @@
             }
         }
 
-        // --- 其他辅助函数 (copyResult, fallbackCopyTextToClipboard, saveToFile) 保持不变 ---
+        // --- 其他辅助函数 (copyResult, fallbackCopyTextToClipboard, saveToFile) ---
 
         function copyResult() {
             let textToCopy;
@@ -306,11 +322,13 @@
 
             if (!textToCopy) return; // 没有内容可复制
 
+            // 优先使用 Clipboard API
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     showNotification();
                 }).catch(err => {
                     console.error('无法使用 Clipboard API 复制: ', err);
+                    // 回退到旧方法 (仅对 textarea 有效)
                     if (outputElement.tagName === 'TEXTAREA') {
                          fallbackCopyTextToClipboard(outputElement);
                     } else {
@@ -318,21 +336,25 @@
                     }
                 });
             } else if (outputElement.tagName === 'TEXTAREA') {
+                 // 如果 Clipboard API 不可用，并且是 textarea，尝试旧方法
                  console.warn('Clipboard API 不可用，回退到 execCommand。');
                  fallbackCopyTextToClipboard(outputElement);
             } else {
+                 // 如果 Clipboard API 不可用，且不是 textarea，则无法自动复制
                  alert('您的浏览器不支持自动复制，请手动选择并复制文本。');
             }
 
+             // 尝试取消选择，避免文本一直高亮
              if (window.getSelection) { window.getSelection().removeAllRanges(); }
              else if (document.selection) { document.selection.empty(); }
         }
 
+        // 旧版浏览器的回退复制方法 (仅适用于 INPUT/TEXTAREA)
         function fallbackCopyTextToClipboard(element) {
              if (element.tagName !== 'TEXTAREA' && element.tagName !== 'INPUT') return;
-            element.select();
+            element.select(); // 选择文本
              try {
-                 var successful = document.execCommand('copy');
+                 var successful = document.execCommand('copy'); // 执行复制命令
                  if (successful) { showNotification(); }
                  else {
                      console.error('使用 execCommand 复制失败');
@@ -346,40 +368,50 @@
 
         function saveToFile() {
             let fileNameInput = document.getElementById('fileName');
-            let fileName = fileNameInput.value.trim();
+            let fileName = fileNameInput.value.trim(); // 获取并去除首尾空格
 
+            // 如果文件名为空，则生成带时间戳的默认文件名
             if (!fileName) {
                 const now = new Date();
                 const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
                 fileName = `translation_${timestamp}`;
             } else {
+                // 清理文件名，替换非法字符和多余空格为下划线
                 fileName = fileName.replace(/[^a-zA-Z0-9._-\s]/g, '_').replace(/\s+/g, '_');
             }
 
+            // 确保文件名以 .txt 结尾
             if (!fileName.toLowerCase().endsWith('.txt')) {
                 fileName += '.txt';
             }
 
             let resultText;
+             // 从输出元素获取文本内容
             if (outputElement.tagName === 'TEXTAREA') {
                 resultText = outputElement.value;
             } else {
                 resultText = outputElement.textContent;
             }
 
+            // 创建 Blob 对象
             const blob = new Blob([resultText], { type: 'text/plain;charset=utf-8' });
+
+            // 创建下载链接
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = fileName;
+            link.download = fileName; // 设置下载的文件名
 
-            document.body.appendChild(link);
+            // 模拟点击下载
+            document.body.appendChild(link); // 需要添加到 DOM 中才能触发点击 (某些浏览器)
             link.click();
-            document.body.removeChild(link);
+            document.body.removeChild(link); // 下载后移除链接
+
+            // 释放 Blob URL
             URL.revokeObjectURL(link.href);
         }
 
         // 初始加载时不自动处理，等待用户输入
-        // window.onload = replaceAndDisplay;
+        // window.onload = replaceAndDisplay; // 取消页面加载时自动执行
 
     </script>
 </body>
