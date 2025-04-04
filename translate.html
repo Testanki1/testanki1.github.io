@@ -126,7 +126,7 @@
     </header>
 
     <section>
-        <p>目前只支持翻译游戏物品名称，不支持翻译整句话。替换时会优先处理较长的词组（例如 "Tanki Online" 会在 "Tanki" 之前被替换）。</p>
+        <p>目前只支持翻译游戏物品名称（作为独立单词或词组），不支持翻译整句话。替换时会优先处理较长的词组（例如 "Tanki Online" 会在 "Tank" 之前被替换）。<strong>大小写规则：</strong>如果字典键中的字母为大写，原文对应位置也必须为大写才替换（例如字典有 "Future"，原文 "Future" 会替换，"future" 不会）。</p>
         <label for="inputText">输入英文物品名称：</label>
         <textarea id="inputText" oninput="replaceAndDisplay()" placeholder="在此处粘贴或输入英文名称..."></textarea>
         <button onclick="copyResult()"><span style="color:#000000;">复制结果</span></button>
@@ -137,14 +137,11 @@
 
     <section>
         <label for="outputBox">翻译结果：</label>
-        <!-- 使用 div 显示结果 -->
         <div id="outputBox" aria-readonly="true" role="textbox"></div>
-        <!-- 如果你仍然偏好 textarea，请使用下面的代码替换上面的 div -->
-        <!-- <textarea id="outputBox" readonly="readonly"></textarea> -->
     </section>
 
     <footer>
-        <p>&copy; 2023 翻译器工具</p>
+        <p>&copy; 2023-2024 翻译器工具</p>
         <div id="customNotification">文本已成功复制到剪贴板！</div>
     </footer>
 
@@ -167,118 +164,120 @@
 
         // 辅助函数：转义正则表达式特殊字符
         function escapeRegExp(string) {
-            // $& 表示整个匹配到的字符串
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
-        // ======================================================
-        // !! 新的替换逻辑，处理重叠和包含关系 !!
-        // ======================================================
+        // 辅助函数：检查大小写匹配规则
+        function isValidCaseMatch(dictKey, matchedText) {
+            if (dictKey.length !== matchedText.length) {
+                return false;
+            }
+            for (let i = 0; i < dictKey.length; i++) {
+                const keyChar = dictKey[i];
+                const matchedChar = matchedText[i];
+                const isKeyCharUpper = keyChar >= 'A' && keyChar <= 'Z';
+
+                if (isKeyCharUpper) {
+                    const isMatchedCharLower = matchedChar >= 'a' && matchedChar <= 'z';
+                    if (isMatchedCharLower) {
+                        return false; // Key is uppercase, but matched text is lowercase
+                    }
+                }
+            }
+            return true; // All uppercase constraints in the key are met
+        }
+
+        // 更新的替换逻辑 (包含大小写和单词边界)
         function replaceAndDisplay() {
             const inputTextElement = document.getElementById('inputText');
-            // outputElement is already defined globally in this script scope
             let originalInput = inputTextElement.value;
             let output = '';
             let currentIndex = 0;
 
-            // 检查 replacementDict 是否已加载
+            // 检查 replacementDict 是否已加载和有效
             if (typeof replacementDict === 'undefined' || replacementDict === null) {
-                console.error("错误：replacementDict 未定义或为 null。请确保 translations.js 已正确加载并且包含有效的字典对象。");
+                console.error("错误：replacementDict 未定义或为 null。");
                 const errorMsg = "错误：翻译词典加载失败。";
-                if (outputElement.tagName === 'TEXTAREA') {
-                    outputElement.value = errorMsg;
-                } else {
-                    outputElement.textContent = errorMsg;
-                }
-                return; // 提前退出
+                if (outputElement.tagName === 'TEXTAREA') { outputElement.value = errorMsg; }
+                else { outputElement.textContent = errorMsg; }
+                return;
             }
-             // 添加一个检查，确保 replacementDict 是一个对象
             if (typeof replacementDict !== 'object') {
-                console.error("错误：replacementDict 不是一个有效的对象。请检查 translations.js 的内容。");
+                console.error("错误：replacementDict 不是一个有效的对象。");
                 const errorMsg = "错误：翻译词典格式无效。";
-                 if (outputElement.tagName === 'TEXTAREA') {
-                    outputElement.value = errorMsg;
-                } else {
-                    outputElement.textContent = errorMsg;
-                }
-                return; // 提前退出
+                 if (outputElement.tagName === 'TEXTAREA') { outputElement.value = errorMsg; }
+                 else { outputElement.textContent = errorMsg; }
+                return;
             }
 
-
-            // --- 开始新的替换逻辑 ---
-
-            // 1. 查找所有可能的匹配项及其位置信息
+            // 1. 查找所有可能的、符合条件的匹配项及其位置信息
             const allMatches = [];
             const keys = Object.keys(replacementDict);
 
             for (const key of keys) {
-                // 跳过空键或非字符串键（增加健壮性）
-                if (!key || typeof key !== 'string') continue;
+                if (!key || typeof key !== 'string') continue; // 跳过无效键
 
                 const escapedKey = escapeRegExp(key);
-                // 使用 'gi' 进行全局、不区分大小写的匹配
-                // 考虑单词边界 \b 可能有助于提高精度，但对于包含空格的key可能不工作
-                // 可以尝试添加 \b: new RegExp(`\\b${escapedKey}\\b`, 'gi');
-                // 当前使用不带 \b 的版本，依赖排序处理重叠
-                const regex = new RegExp(escapedKey, 'gi');
+                // !! 使用单词边界 \\b !!
+                // 'gi' - 全局(g), 不区分大小写(i) 进行初步查找
+                const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
                 let match;
 
                 try {
-                    // 使用 exec 循环查找所有匹配
                     while ((match = regex.exec(originalInput)) !== null) {
-                        // 确保 replacementDict[key] 存在且是字符串
-                        const replacementValue = replacementDict[key];
-                         if (typeof replacementValue !== 'string') {
-                            console.warn(`警告：键 "${key}" 的替换值不是字符串，已跳过。`);
-                            continue;
+                        const matchedText = match[0]; // 实际匹配到的文本
+                        const startIndex = match.index;
+                        const endIndex = startIndex + matchedText.length;
+
+                        // !! 先检查大小写规则 !!
+                        if (isValidCaseMatch(key, matchedText)) {
+                            // 大小写规则满足，再添加
+                            const replacementValue = replacementDict[key];
+                             if (typeof replacementValue !== 'string') {
+                                console.warn(`警告：键 "${key}" 的替换值不是字符串，已跳过。`);
+                                continue;
+                            }
+
+                            allMatches.push({
+                                start: startIndex,
+                                end: endIndex,
+                                value: replacementValue,
+                                keyLength: matchedText.length // 用于排序
+                            });
                         }
+                        // 如果大小写不匹配，则忽略这个匹配项
 
-                        // 存储匹配信息：起始位置, 结束位置, 对应的替换值
-                        allMatches.push({
-                            start: match.index,
-                            end: match.index + match[0].length, // 使用匹配到的实际长度
-                            value: replacementValue, // 存储要替换成的值
-                            keyLength: match[0].length // 存储匹配到的长度用于排序
-                        });
-
-                        // 防止零宽度匹配导致的无限循环
-                        if (match[0].length === 0) {
-                             regex.lastIndex++;
+                        // 防止零宽度匹配和可能的无限循环
+                        if (matchedText.length === 0) {
+                            // 对于零宽度匹配（虽然理论上加了\b不太可能），手动前进
+                            regex.lastIndex++;
                         }
-                        // 重置 lastIndex 对于全局搜索很重要，以防 exec 出现意外行为
-                        // 虽然理论上循环会处理，但在某些复杂正则下显式处理可能更安全
-                         // regex.lastIndex = match.index + 1; // 这种方式可能导致跳过紧邻的匹配，慎用
-
+                        // exec 在 'g' 模式下会自动更新 lastIndex，无需手动设置
                     }
                  } catch (e) {
-                     console.error(`处理键 "${key}" 的正则表达式时出错: `, e);
-                     // 可以选择跳过这个键或显示错误信息
+                     console.error(`处理键 "${key}" (带边界) 的正则表达式时出错: `, e);
                  }
             }
 
-            // 2. 排序匹配项：优先按起始位置升序，然后按匹配长度降序 (最关键的一步)
+            // 2. 排序匹配项：优先按起始位置升序，然后按匹配长度降序
             allMatches.sort((a, b) => {
                 if (a.start !== b.start) {
-                    return a.start - b.start; // 起始位置早的优先
+                    return a.start - b.start;
                 }
-                // 起始位置相同，匹配长度长的优先
-                return b.keyLength - a.keyLength;
+                return b.keyLength - a.keyLength; // 长者优先
             });
 
             // 3. 构建输出字符串，处理非重叠的最长匹配
             for (const match of allMatches) {
-                // 如果当前匹配的起始位置在 currentIndex 之后 (或等于)
-                // 这意味着它没有与上一个被选中的匹配项重叠或在其内部
                 if (match.start >= currentIndex) {
-                    // a. 先将上一个匹配结束到当前匹配开始之间的原始文本追加到输出
+                    // 添加上一个匹配结束到当前匹配开始之间的原文
                     output += originalInput.substring(currentIndex, match.start);
-                    // b. 追加当前匹配的替换值
+                    // 添加替换值
                     output += match.value;
-                    // c. 更新 currentIndex 到当前匹配的结束位置
+                    // 更新当前索引
                     currentIndex = match.end;
                 }
-                // 如果 match.start < currentIndex，说明这个匹配与之前处理过的
-                // (更长或起始位置更早的) 匹配重叠了，因此忽略它。
+                // 忽略重叠的、较短的或已被覆盖的匹配项 (因为排序保证了先处理长/早的)
             }
 
             // 4. 追加最后一个匹配项之后的所有剩余原始文本
@@ -286,20 +285,15 @@
                 output += originalInput.substring(currentIndex);
             }
 
-            // --- 结束新的替换逻辑 ---
-
-            // 将最终结果显示在输出元素中 (兼容 div 和 textarea)
+            // 将最终结果显示在输出元素中
             if (outputElement.tagName === 'TEXTAREA') {
                 outputElement.value = output;
             } else {
-                // 对于 div，使用 textContent 来防止 HTML 注入
                 outputElement.textContent = output;
             }
         }
-        // ======================================================
-        // !! 结束新的替换逻辑 !!
-        // ======================================================
 
+        // --- 其他辅助函数 (copyResult, fallbackCopyTextToClipboard, saveToFile) 保持不变 ---
 
         function copyResult() {
             let textToCopy;
@@ -308,31 +302,15 @@
                 try { outputElement.select(); } catch(e) { console.warn("无法选择 textarea 内容"); }
             } else {
                 textToCopy = outputElement.textContent;
-                 // 尝试选择 div 内容 (可能不适用于所有浏览器，且用户体验可能不佳)
-                /*
-                if (window.getSelection && document.createRange) {
-                    const range = document.createRange();
-                    range.selectNodeContents(outputElement);
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
-                */
             }
 
-            if (!textToCopy) {
-                // 可以加一个提示，或者静默失败
-                // console.log("没有内容可复制。");
-                return;
-            }
+            if (!textToCopy) return; // 没有内容可复制
 
-            // 优先使用 navigator.clipboard API
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     showNotification();
                 }).catch(err => {
                     console.error('无法使用 Clipboard API 复制: ', err);
-                    // 回退到 document.execCommand (如果 output 是 textarea)
                     if (outputElement.tagName === 'TEXTAREA') {
                          fallbackCopyTextToClipboard(outputElement);
                     } else {
@@ -340,31 +318,23 @@
                     }
                 });
             } else if (outputElement.tagName === 'TEXTAREA') {
-                 // 回退到 execCommand
                  console.warn('Clipboard API 不可用，回退到 execCommand。');
                  fallbackCopyTextToClipboard(outputElement);
             } else {
                  alert('您的浏览器不支持自动复制，请手动选择并复制文本。');
             }
 
-             // 复制后取消文本选择 (如果之前选择了)
-            if (window.getSelection) {
-                window.getSelection().removeAllRanges();
-            } else if (document.selection) {
-                document.selection.empty();
-            }
+             if (window.getSelection) { window.getSelection().removeAllRanges(); }
+             else if (document.selection) { document.selection.empty(); }
         }
 
-        // 回退复制方法 (仅适用于 <textarea>)
         function fallbackCopyTextToClipboard(element) {
-             // 确保元素是 textarea 或 input 才能 select()
              if (element.tagName !== 'TEXTAREA' && element.tagName !== 'INPUT') return;
             element.select();
              try {
                  var successful = document.execCommand('copy');
-                 if (successful) {
-                     showNotification();
-                 } else {
+                 if (successful) { showNotification(); }
+                 else {
                      console.error('使用 execCommand 复制失败');
                      alert('复制失败，请手动选择并复制文本。');
                  }
@@ -408,8 +378,8 @@
             URL.revokeObjectURL(link.href);
         }
 
-        // 初始加载时可以不清空，或者根据需要调用 replaceAndDisplay
-        // window.onload = replaceAndDisplay; // 如果希望加载时就处理输入框内容
+        // 初始加载时不自动处理，等待用户输入
+        // window.onload = replaceAndDisplay;
 
     </script>
 </body>
