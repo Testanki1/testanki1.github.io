@@ -1,3 +1,4 @@
+// dictionary.js
 const replacementDict = {
     'turret': '炮塔',
     'turrets': '炮塔',
@@ -98,7 +99,7 @@ const replacementDict = {
     'battery': '电池',
     'batteries': '电池',
     'Nuclear Energy': '核能',
-    'matchm‪aking': '匹配',
+    'matchmaking': '匹配',
     'MM': '匹配',
     'group': '小组',
     'groups': '小组',
@@ -117,14 +118,14 @@ const replacementDict = {
     'CTF': '互夺军旗',
     'Control Points': '控制点',
     'CP': '控制点',
-    'Assault': '突袭',
+    //'Assault': '突袭', // 注意：Assault 在 drone 部分已定义为 '突袭'，这里注释掉避免潜在冲突，或确认是否需要不同翻译
     'ASL': '突袭',
     'Rugby': '橄榄球',
     'RGB': '橄榄球',
     'SUR': '幸存者',
     'Team Juggernaut': '团队剑圣',
     'TJR': '团队剑圣',
-    'Siege': '围城大战',
+    'Siege': '围城大战', // 注意：Siege 在 map 部分已定义为 '围城大战'
     'SGE': '围城大战',
     'Deathmatch': '死亡混战',
     'DM': '死亡混战',
@@ -216,19 +217,17 @@ const replacementDict = {
     'Clan founder': '军团创始人',
     'license': '许可证',
     'position': '职务',
-    'Supreme Commander': '最高指挥官',
-    'Commander': '指挥官',
+    // 'Commander': '指挥官', // 注意：Commander 在 rank 部分已定义为 '统帅'，这里注释掉，或根据上下文调整
     'Officer': '军官',
-    'Sergeant': '上士',
+    'Sergeant': '上士', // 注意：Sergeant 在 rank 部分已定义为 '上士'
     'Veteran': '老兵',
     'Novice': '新兵',
     'Tanki': '3D坦克',
     'Tanki Online': '3D坦克',
-    'TO': '3D坦克',
     'player': '玩家',
     'upgrade': '升级',
     'announcement': '公告',
-    'nickname': '昵称',
+    'nickname': '昵称', // 注意：nickname 在 profile 部分已定义为 '昵称'
     'score': '分数',
     'speed-up': '立即完成',
     'shot effect': '射击效果',
@@ -236,7 +235,7 @@ const replacementDict = {
     'GS': '战斗力',
     'defeat': '失败',
     'draw': '平局',
-    'victory': '胜利',
+    'victory': '胜利', // 注意：victory 在 offer 部分已定义为 '胜利'
     'd': '击杀',
     'l': '死亡',
     'killboard': '击杀面板',
@@ -292,14 +291,14 @@ const replacementDict = {
     'bundle': '礼包',
     'buy': '购买',
     'free': '免费',
-    'victory': '胜利',
+    //'victory': '胜利', // 已在上方定义
     'paint': '迷彩',
     'paints': '迷彩',
     'skin': '皮肤',
     'skins': '皮肤',
     'kit': '套件',
     'product kit': '套件',
-    'equip': '装备',
+    //'equip': '装备', // 已在上方定义
     'unequip': '取消装备',
     'stats': '统计',
     'flag': '旗子',
@@ -330,13 +329,13 @@ const replacementDict = {
     'reward': '奖励',
     'profile': '简介',
     'challenge': '星级挑战',
-    'level': '等级',
+    'level': '等级', // 注意：level 在 rank 部分已定义为 '等级'
     'Silver Tier': '白银奖励',
     'Gold Tier': '黄金奖励',
     'Battle Pass': '解锁星级挑战奖励加成',
     'experience': '经验',
     'exp': '经验',
-    'nickname': '昵称',
+    //'nickname': '昵称', // 已在上方定义
     'password': '密码',
     'sign in': '登录',
     'license agreement': '许可协议',
@@ -362,7 +361,7 @@ const replacementDict = {
   "Gefreiter": "一等兵",
   "Corporal": "下士",
   "Master Corporal": "中士",
-  "Sergeant": "上士",
+  // "Sergeant": "上士", // 已在上方定义
   "Staff Sergeant": "三级军士长",
   "Master Sergeant": "二级军士长",
   "First Sergeant": "一级军士长",
@@ -385,10 +384,9 @@ const replacementDict = {
   "General": "上将",
   "Marshal": "元帅",
   "Fieldmarshal": "陆军元帅",
-  "Commander": "统帅",
+  "Commander": "统帅", // 注意：Commander 在 clan 部分已定义为 '指挥官'，根据实际需要调整
   "Generalissimo": "大元帅",
   "Legend": "传奇",
-
   // 地图
   "map": "地图",
   "Aleksandrovsk": "亚历山大罗夫斯克",
@@ -457,7 +455,7 @@ const replacementDict = {
   "Scope": "辽源",
   "Serpuhov": "山城3C",
   "Short Bridge": "小桥之战-1",
-  "Siege": "围城大战",
+  //"Siege": "围城大战", // 已在上方定义
   "Silence": "寂静",
   "Skylark": "混乱城市",
   "Skyscrapers": "摩天大楼",
@@ -472,7 +470,6 @@ const replacementDict = {
   "Year 2042": "2042",
   "Yorkshire": "约克郡",
   "Zone": "动感区域",
-
   // 设置
   "settings": "设置",
   "GAME": "游戏",
@@ -560,8 +557,7 @@ const replacementDict = {
   "e-mail": "电子邮件",
   "creator tag": "创建者标记",
   "hide your profile": "隐藏您的个人资料",
-
-  // 属性
+  // 属性 (注：部分属性可能与上面重复，如需区分请调整键名或值)
   "critical": "暴击",
   "damage": "伤害",
   "impact force": "冲击力",
@@ -631,4 +627,4 @@ const replacementDict = {
   "speed": "速度",
   "weight": "重量",
   "size": "大小",
-        }
+};
