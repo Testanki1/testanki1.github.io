@@ -345,7 +345,7 @@ const replacementDict = {
 "Legend": "传奇",
 "map": "地图",
 "Aleksandrovsk": "亚历山大罗夫斯克",
-"Archipelago MM": "群岛 MM",
+"Archipelago": "群岛",
 "Arena": "竞技场",
 "Atra": "天空管道",
 "Barda": "城镇3C",
