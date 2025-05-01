@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" />
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap" rel="stylesheet" />
     <style>
+        /* CSS styles remain the same as before */
         * {
             -webkit-tap-highlight-color: transparent;
         }
@@ -37,24 +38,24 @@
         label {
             display: block;
             margin-bottom: 8px;
-            font-weight: 500; /* Slightly bolder labels */
+            font-weight: 500;
         }
         textarea {
             width: 100%;
-            height: 180px; /* Adjusted height slightly */
-            padding: 10px; /* Increased padding */
-            margin-bottom: 15px; /* Increased margin */
+            height: 180px;
+            padding: 10px;
+            margin-bottom: 15px;
             box-sizing: border-box;
             border: 1px solid #bfd5ff;
             border-radius: 4px;
-            resize: vertical; /* Allow vertical resize */
-            background-color: #002033; /* Slightly lighter background */
+            resize: vertical;
+            background-color: #002033;
             color: white;
-            font-size: 14px; /* Explicit font size */
-            line-height: 1.5; /* Improved readability */
+            font-size: 14px;
+            line-height: 1.5;
         }
-        input[type="text"] { /* Style text input */
-            width: calc(100% - 22px); /* Adjust width considering padding */
+        input[type="text"] {
+            width: calc(100% - 22px);
             padding: 10px;
             margin-bottom: 15px;
             box-sizing: border-box;
@@ -66,16 +67,16 @@
         }
         button {
             background-color: #76FF33;
-            color: #000000; /* Black text for better contrast */
-            padding: 10px 20px; /* Increased padding */
+            color: #000000;
+            padding: 10px 20px;
             border: none;
             border-radius: 25px;
             cursor: pointer;
             margin-right: 10px;
-            margin-bottom: 10px; /* Added margin for spacing */
+            margin-bottom: 10px;
             font-size: 16px;
-            font-weight: 500; /* Slightly bolder text */
-            transition: background-color 0.2s ease; /* Smooth hover effect */
+            font-weight: 500;
+            transition: background-color 0.2s ease;
         }
         button:hover {
             background-color: #65e32b;
@@ -83,40 +84,40 @@
         #customNotification {
             display: none;
             position: fixed;
-            top: 20px; /* Adjusted position */
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
             background-color: #76FF33;
-            color: #000000; /* Black text */
-            padding: 12px 20px; /* Adjusted padding */
+            color: #000000;
+            padding: 12px 20px;
             border-radius: 5px;
-            z-index: 1000; /* Ensure it's on top */
+            z-index: 1000;
             font-size: 14px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Added shadow */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
         #outputBox {
             width: 100%;
-            min-height: 180px; /* Use min-height to allow content expansion */
-            height: auto;      /* Allow height to adjust based on content */
+            min-height: 180px;
+            height: auto;
             margin-bottom: 10px;
             padding: 10px;
             border: 1px solid #bfd5ff;
             border-radius: 5px;
-            overflow-y: auto; /* Add scrollbar if content overflows min-height */
+            overflow-y: auto;
             font-size: 14px;
-            background-color: #002033; /* Consistent background */
+            background-color: #002033;
             color: white;
             line-height: 1.5;
-            white-space: pre-wrap; /* Preserve whitespace and wrap */
-            word-wrap: break-word; /* Break long words */
-            box-sizing: border-box; /* Include padding in width/height */
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            box-sizing: border-box;
         }
         footer {
             text-align: center;
-            padding: 15px; /* Increased padding */
-            margin-top: 20px; /* Added margin */
+            padding: 15px;
+            margin-top: 20px;
             color: #ccc;
-            font-size: 12px; /* Smaller font size */
+            font-size: 12px;
         }
     </style>
 </head>
@@ -127,7 +128,8 @@
 
     <section>
         <p>目前只支持翻译游戏物品名称（作为独立单词或词组），不支持翻译整句话。替换时会优先处理较长的词组（例如 "Tanki Online" 会在 "Tank" 之前被替换）。<strong>大小写规则：</strong>如果字典键中的字母为大写，原文对应位置也必须为大写才替换（例如字典有 "Future"，原文 "Future" 会替换，"future" 不会）。</p>
-        <p><strong>新增：</strong>翻译结果中，如果两个中文字符间有空格，会自动移除空格。</p> <!-- Added explanation -->
+        <p><strong>新增：</strong>翻译结果中，如果两个中文字符间有空格，会自动移除空格。</p>
+        <p><strong>匹配逻辑：</strong>使用智能单词边界。仅在字典词条的开头/结尾是字母、数字或下划线时，才要求匹配原文的单词边界，以同时兼容普通单词和带符号的词组。</p> <!-- Updated explanation -->
         <label for="inputText">输入英文物品名称：</label>
         <textarea id="inputText" oninput="replaceAndDisplay()" placeholder="在此处粘贴或输入英文名称..."></textarea>
         <button onclick="copyResult()"><span style="color:#000000;">复制结果</span></button>
@@ -168,6 +170,11 @@
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
+        // Helper function to check if a character is a "word character" (alphanumeric or underscore)
+        function isWordChar(char) {
+            return /[a-zA-Z0-9_]/.test(char);
+        }
+
         // 辅助函数：检查大小写匹配规则
         function isValidCaseMatch(dictKey, matchedText) {
             if (dictKey.length !== matchedText.length) {
@@ -177,25 +184,20 @@
                 const keyChar = dictKey[i];
                 const matchedChar = matchedText[i];
                 const isKeyCharUpper = keyChar >= 'A' && keyChar <= 'Z';
-
-                if (isKeyCharUpper) {
-                    const isMatchedCharLower = matchedChar >= 'a' && matchedChar <= 'z';
-                    if (isMatchedCharLower) {
-                        return false; // Key is uppercase, but matched text is lowercase
-                    }
+                if (isKeyCharUpper && !(matchedChar >= 'A' && matchedChar <= 'Z')) {
+                    return false;
                 }
             }
-            return true; // All uppercase constraints in the key are met
+            return true;
         }
 
-        // 更新的替换逻辑 (包含大小写和单词边界，以及中文间空格移除)
+        // 更新的替换逻辑 (使用条件性 \b, 包含大小写和中文间空格移除)
         function replaceAndDisplay() {
             const inputTextElement = document.getElementById('inputText');
             let originalInput = inputTextElement.value;
             let output = '';
             let currentIndex = 0;
 
-            // 检查 replacementDict 是否已加载和有效
             if (typeof replacementDict === 'undefined' || replacementDict === null) {
                 console.error("错误：replacementDict 未定义或为 null。");
                 const errorMsg = "错误：翻译词典加载失败。";
@@ -211,28 +213,52 @@
                 return;
             }
 
-            // 1. 查找所有可能的、符合条件的匹配项及其位置信息
             const allMatches = [];
             const keys = Object.keys(replacementDict);
 
+            // Regex to check if a character is a word character
+            const wordCharRegex = /[a-zA-Z0-9_]/;
+
             for (const key of keys) {
-                if (!key || typeof key !== 'string') continue; // 跳过无效键
+                 if (!key || typeof key !== 'string' || !replacementDict[key]) continue;
 
                 const escapedKey = escapeRegExp(key);
-                // !! 使用单词边界 \\b !!
-                // 'gi' - 全局(g), 不区分大小写(i) 进行初步查找
-                const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
-                let match;
 
+                // --- Conditional Boundary Logic ---
+                let prefix = '';
+                let suffix = '';
+
+                // Add \b prefix ONLY if the key starts with a word character
+                if (key.length > 0 && wordCharRegex.test(key[0])) {
+                    prefix = '\\b';
+                }
+
+                // Add \b suffix ONLY if the key ends with a word character
+                if (key.length > 0 && wordCharRegex.test(key[key.length - 1])) {
+                    suffix = '\\b';
+                }
+
+                // Construct the final regex string
+                const regexString = `${prefix}${escapedKey}${suffix}`;
+                // --- End Conditional Boundary Logic ---
+
+                // Create the RegExp object with 'gi' flags
+                let regex;
+                try {
+                   regex = new RegExp(regexString, 'gi');
+                } catch (e) {
+                   console.error(`创建键 "${key}" 的正则表达式 "${regexString}" 时出错: `, e);
+                   continue; // Skip this key if regex is invalid
+                }
+
+                let match;
                 try {
                     while ((match = regex.exec(originalInput)) !== null) {
-                        const matchedText = match[0]; // 实际匹配到的文本
+                        const matchedText = match[0];
                         const startIndex = match.index;
                         const endIndex = startIndex + matchedText.length;
 
-                        // !! 先检查大小写规则 !!
                         if (isValidCaseMatch(key, matchedText)) {
-                            // 大小写规则满足，再添加
                             const replacementValue = replacementDict[key];
                              if (typeof replacementValue !== 'string') {
                                 console.warn(`警告：键 "${key}" 的替换值不是字符串，已跳过。`);
@@ -243,65 +269,57 @@
                                 start: startIndex,
                                 end: endIndex,
                                 value: replacementValue,
-                                keyLength: matchedText.length // 用于排序
+                                keyLength: matchedText.length
                             });
                         }
-                        // 如果大小写不匹配，则忽略这个匹配项
 
-                        // 防止零宽度匹配和可能的无限循环
                         if (matchedText.length === 0) {
-                            regex.lastIndex++;
+                             console.warn(`Zero-length match encountered for key: ${key}, regex: ${regexString}. Breaking loop.`);
+                             break; // Safety break
                         }
+                         // Ensure regex progresses
+                         if (regex.lastIndex === match.index) {
+                            regex.lastIndex++;
+                         }
                     }
                  } catch (e) {
-                     console.error(`处理键 "${key}" (带边界) 的正则表达式时出错: `, e);
+                     console.error(`执行键 "${key}" (Regex: ${regexString}) 的正则表达式时出错: `, e);
+                     // Continue with the next key even if one regex fails during execution
                  }
             }
 
-            // 2. 排序匹配项：优先按起始位置升序，然后按匹配长度降序
+            // Sort matches: Start position ascending, then length descending
             allMatches.sort((a, b) => {
                 if (a.start !== b.start) {
                     return a.start - b.start;
                 }
-                return b.keyLength - a.keyLength; // 长者优先
+                return b.keyLength - a.keyLength; // Longer matches first at same start position
             });
 
-            // 3. 构建输出字符串，处理非重叠的最长匹配
+            // Build output string using sorted, non-overlapping matches
+            currentIndex = 0;
+            output = '';
             for (const match of allMatches) {
                 if (match.start >= currentIndex) {
-                    // 添加上一个匹配结束到当前匹配开始之间的原文
                     output += originalInput.substring(currentIndex, match.start);
-                    // 添加替换值
                     output += match.value;
-                    // 更新当前索引
                     currentIndex = match.end;
                 }
-                // 忽略重叠的、较短的或已被覆盖的匹配项 (因为排序保证了先处理长/早的)
             }
 
-            // 4. 追加最后一个匹配项之后的所有剩余原始文本
+            // Append remaining text
             if (currentIndex < originalInput.length) {
                 output += originalInput.substring(currentIndex);
             }
 
-            // --- 新增步骤：移除中文之间的空格 ---
-            // 5. 使用正则表达式查找 "中文 空格+ 中文" 的模式，并移除空格
-            // [\u4E00-\u9FFF] 匹配一个中文字符 (Unicode CJK Unified Ideographs block)
-            // ( +) 匹配一个或多个空格 (注意是空格 ' ' 不是 \s) 并捕获它们
-            // g 标志表示全局替换
+            // Remove spaces between Chinese characters
             try {
-                 // $1 引用第一个捕获组 (第一个中文字符)
-                 // $3 引用第三个捕获组 (第二个中文字符)
-                 // 这样就拼接了两个中文字符，跳过了中间的空格 (第二个捕获组)
                 output = output.replace(/([\u4E00-\u9FFF])( +)([\u4E00-\u9FFF])/g, '$1$3');
             } catch (e) {
                 console.error("移除中文间空格时发生错误: ", e);
-                // 如果正则出错，至少保证之前的翻译结果能显示
             }
-            // --- 中文间空格移除结束 ---
 
-
-            // 将最终结果显示在输出元素中
+            // Display result
             if (outputElement.tagName === 'TEXTAREA') {
                 outputElement.value = output;
             } else {
@@ -309,8 +327,8 @@
             }
         }
 
-        // --- 其他辅助函数 (copyResult, fallbackCopyTextToClipboard, saveToFile) ---
-
+        // --- Other helper functions (copyResult, fallbackCopyTextToClipboard, saveToFile) ---
+        // (These functions remain unchanged)
         function copyResult() {
             let textToCopy;
              if (outputElement.tagName === 'TEXTAREA') {
@@ -319,112 +337,59 @@
             } else {
                 textToCopy = outputElement.textContent;
             }
-
-            if (!textToCopy) return; // 没有内容可复制
-
-            // 优先使用 Clipboard API
+            if (!textToCopy) return;
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     showNotification();
                 }).catch(err => {
                     console.error('无法使用 Clipboard API 复制: ', err);
-                    // 回退到旧方法 (仅对 textarea 有效)
-                    if (outputElement.tagName === 'TEXTAREA') {
-                         fallbackCopyTextToClipboard(outputElement);
-                    } else {
-                        alert('自动复制失败，请手动选择并复制文本。');
-                    }
+                    if (outputElement.tagName === 'TEXTAREA') { fallbackCopyTextToClipboard(outputElement); }
+                    else { alert('自动复制失败，请手动选择并复制文本。'); }
                 });
             } else if (outputElement.tagName === 'TEXTAREA') {
-                 // 如果 Clipboard API 不可用，并且是 textarea，尝试旧方法
                  console.warn('Clipboard API 不可用，回退到 execCommand。');
                  fallbackCopyTextToClipboard(outputElement);
             } else {
-                 // 如果 Clipboard API 不可用，且不是 textarea，则无法自动复制
                  alert('您的浏览器不支持自动复制，请手动选择并复制文本。');
             }
-
-             // 尝试取消选择，避免文本一直高亮
              if (window.getSelection) { window.getSelection().removeAllRanges(); }
              else if (document.selection) { document.selection.empty(); }
         }
-
-        // 旧版浏览器的回退复制方法 (仅适用于 INPUT/TEXTAREA)
         function fallbackCopyTextToClipboard(element) {
              if (element.tagName !== 'TEXTAREA' && element.tagName !== 'INPUT') return;
-            element.select(); // 选择文本
+            element.select();
              try {
-                 var successful = document.execCommand('copy'); // 执行复制命令
+                 var successful = document.execCommand('copy');
                  if (successful) { showNotification(); }
-                 else {
-                     console.error('使用 execCommand 复制失败');
-                     alert('复制失败，请手动选择并复制文本。');
-                 }
-             } catch (err) {
-                 console.error('使用 execCommand 复制时出错: ', err);
-                 alert('复制出错，请手动选择并复制文本。');
-             }
+                 else { console.error('使用 execCommand 复制失败'); alert('复制失败，请手动选择并复制文本。'); }
+             } catch (err) { console.error('使用 execCommand 复制时出错: ', err); alert('复制出错，请手动选择并复制文本。'); }
         }
-
         function saveToFile() {
             let fileNameInput = document.getElementById('fileName');
-            let rawFileName = fileNameInput.value.trim(); // 获取原始输入并去除首尾空格
-            let finalFileName; // 用于存储最终的文件名
-
-            // 检查用户是否输入了文件名
+            let rawFileName = fileNameInput.value.trim();
+            let finalFileName;
             if (!rawFileName) {
-                // 用户未输入，生成带时间戳的默认文件名，并添加 .txt 后缀
                 const now = new Date();
                 const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-                finalFileName = `translation_${timestamp}.txt`; // 默认文件名直接加 .txt
+                finalFileName = `translation_${timestamp}.txt`;
             } else {
-                // 用户输入了文件名，先进行清理
-                // 替换非法字符和多余空格为下划线 (保留点号 '.' 用于后缀判断)
                 let cleanedFileName = rawFileName.replace(/[^a-zA-Z0-9._\-\s]/g, '_').replace(/\s+/g, '_');
-
-                // --- 核心逻辑修改 ---
-                // 检查清理后的文件名是否包含有效的扩展名
-                // 有效扩展名的定义：字符串中包含点 ('.')，且点不是最后一个字符，也不是第一个字符 (避免像 .bashrc 这样的文件被误判后不加 .txt)
                 const lastDotIndex = cleanedFileName.lastIndexOf('.');
                 const hasExtension = lastDotIndex > 0 && lastDotIndex < cleanedFileName.length - 1;
-
-                // 如果清理后的文件名 *没有* 检测到有效的扩展名，则添加 .txt
-                if (!hasExtension) {
-                    finalFileName = cleanedFileName + '.txt';
-                } else {
-                    // 如果用户已经输入了扩展名 (如 data.csv, notes.log)，则直接使用清理后的文件名
-                    finalFileName = cleanedFileName;
-                }
-                 // --- 修改结束 ---
+                if (!hasExtension) { finalFileName = cleanedFileName + '.txt'; }
+                else { finalFileName = cleanedFileName; }
             }
-
-
             let resultText;
-            // 从输出元素获取文本内容
-            if (outputElement.tagName === 'TEXTAREA') {
-                resultText = outputElement.value;
-            } else {
-                resultText = outputElement.textContent;
-            }
-
-            // 创建 Blob 对象
+            if (outputElement.tagName === 'TEXTAREA') { resultText = outputElement.value; }
+            else { resultText = outputElement.textContent; }
             const blob = new Blob([resultText], { type: 'text/plain;charset=utf-8' });
-
-            // 创建下载链接
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = finalFileName; // 使用最终确定的文件名
-
-            // 模拟点击下载
-            document.body.appendChild(link); // 需要添加到 DOM 中才能触发点击 (某些浏览器)
-            link.click();
-            document.body.removeChild(link); // 下载后移除链接
-
-            // 释放 Blob URL
+            link.download = finalFileName;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
         }
-
-        // 初始加载时不自动处理，等待用户输入
-        // window.onload = replaceAndDisplay; // 取消页面加载时自动执行    </script>
+        // window.onload = replaceAndDisplay; // Keep disabled
+    </script>
 </body>
 </html>
