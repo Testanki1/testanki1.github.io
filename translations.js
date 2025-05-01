@@ -110,7 +110,7 @@ const replacementDict = {
 'CTF': '互夺军旗',
 'Control Points': '控制点',
 'CP': '控制点',
-//'Assault': '突袭', // 注意：Assault 在 drone 部分已定义为 '突袭'，这里注释掉避免潜在冲突，或确认是否需要不同翻译
+'Assault': '突袭',
 'ASL': '突袭',
 'Rugby': '橄榄球',
 'RGB': '橄榄球',
@@ -303,13 +303,13 @@ const replacementDict = {
 'reward': '奖励',
 'profile': '简介',
 'challenge': '星级挑战',
-'level': '等级', // 注意：level 在 rank 部分已定义为 '等级'
+'level': '等级',
 'Silver Tier': '白银奖励',
 'Gold Tier': '黄金奖励',
 'Battle Pass': '解锁星级挑战奖励加成',
 'experience': '经验',
 'exp': '经验',
-//'nickname': '昵称', // 已在上方定义
+'nickname': '昵称',
 'password': '密码',
 'sign in': '登录',
 'license agreement': '许可协议',
@@ -358,10 +358,9 @@ const replacementDict = {
 "General": "上将",
 "Marshal": "元帅",
 "Fieldmarshal": "陆军元帅",
-"Commander": "统帅", // 注意：Commander 在 clan 部分已定义为 '指挥官'，根据实际需要调整
+"Commander": "统帅",
 "Generalissimo": "大元帅",
 "Legend": "传奇",
-// 地图
 "map": "地图",
 "Aleksandrovsk": "亚历山大罗夫斯克",
 "Archipelago MM": "群岛 MM",
@@ -429,7 +428,6 @@ const replacementDict = {
 "Scope": "辽源",
 "Serpuhov": "山城3C",
 "Short Bridge": "小桥之战-1",
-//"Siege": "围城大战", // 已在上方定义
 "Silence": "寂静",
 "Skylark": "混乱城市",
 "Skyscrapers": "摩天大楼",
@@ -444,7 +442,6 @@ const replacementDict = {
 "Year 2042": "2042",
 "Yorkshire": "约克郡",
 "Zone": "动感区域",
-// 设置
 "settings": "设置",
 "GAME": "游戏",
 "GRAPHIC": "图形",
@@ -531,7 +528,6 @@ const replacementDict = {
 "e-mail": "电子邮件",
 "creator tag": "创建者标记",
 "hide your profile": "隐藏您的个人资料",
-// 属性 (注：部分属性可能与上面重复，如需区分请调整键名或值)
 "critical": "暴击",
 "damage": "伤害",
 "impact force": "冲击力",
