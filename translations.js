@@ -807,6 +807,12 @@ const replacementDict = {
 "Scout": "侦察机",
 "Shotgun": "滑膛炮",
 "Elite": "精英",
+"Bomb": "炸弹",
+"Pumpkin": "南瓜",
+"Snowball": "雪球",
+"Oracle": "神谕者",
+"Salyut": "礼炮",
+"Tsar": "沙皇",
 "dragon gold": "龙之黄金",
 "butchers": "屠夫",
 };
