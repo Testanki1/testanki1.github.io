@@ -806,5 +806,7 @@ const replacementDict = {
 "Spear": "矛",
 "Scout": "侦察机",
 "Shotgun": "滑膛炮",
-"Elite": "精英"
+"Elite": "精英",
+"dragon gold": "龙之黄金",
+"butchers": "屠夫",
 };
