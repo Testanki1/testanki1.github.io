@@ -854,4 +854,5 @@ const replacementDict = {
   "Spear": "矛",
   "Scout": "侦察机",
   "Shotgun": "滑膛炮",
+  "Elite": "精英"
   };
