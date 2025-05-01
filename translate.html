@@ -7,24 +7,40 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" />
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap" rel="stylesheet" />
     <style>
-        /* CSS styles remain the same as before */
         * {
             -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box; /* Apply box-sizing globally */
         }
-        * {
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif; /* Added sans-serif fallback */
+        *:not(input):not(textarea) {
+             user-select: none; /* Prevent text selection on non-input elements */
+             -webkit-user-select: none; /* Safari */
+             -moz-user-select: none; /* Firefox */
+             -ms-user-select: none; /* IE */
         }
-        body {
+        html, body {
             margin: 0;
             padding: 0;
+            height: 100%; /* Ensure body takes full height */
+        }
+        body {
             background-color: #001926;
             color: white;
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif; /* Added sans-serif fallback */
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
         }
         header {
             background-color: #001926;
             color: white;
             padding: 15px;
             text-align: center;
+            flex-shrink: 0; /* Prevent header from shrinking */
+        }
+        /* Main content area styling */
+        main {
+             flex-grow: 1; /* Allow main content to take available space */
+             overflow-y: auto; /* Add scroll if content exceeds viewport */
+             padding: 0 10px; /* Add some horizontal padding */
         }
         section {
             max-width: 800px;
@@ -33,92 +49,194 @@
             color: white;
             padding: 20px;
             border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            /* Remove box-shadow if you prefer a flatter look */
+            /* box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); */
+        }
+        p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #c0d5ff; /* Slightly lighter color for paragraphs */
+        }
+        strong {
+            color: #76FF33; /* Accent color for emphasis */
+            font-weight: 500;
         }
         label {
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
+            color: #e0f0ff; /* Slightly lighter label color */
         }
-        textarea {
+        textarea, input[type="text"] {
             width: 100%;
-            height: 180px;
-            padding: 10px;
+            padding: 12px; /* Slightly more padding */
             margin-bottom: 15px;
             box-sizing: border-box;
-            border: 1px solid #bfd5ff;
+            border: 1px solid #2c3e50; /* Darker border */
             border-radius: 4px;
-            resize: vertical;
-            background-color: #002033;
+            background-color: #002033; /* Darker background */
             color: white;
             font-size: 14px;
             line-height: 1.5;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Add transition */
+            user-select: text; /* Allow text selection in inputs */
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
         }
-        input[type="text"] {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin-bottom: 15px;
-            box-sizing: border-box;
-            border: 1px solid #bfd5ff;
-            border-radius: 4px;
-            background-color: #002033;
-            color: white;
-            font-size: 14px;
+        textarea {
+            height: 180px;
+            resize: vertical;
         }
+        textarea:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #76FF33; /* Highlight border on focus */
+            box-shadow: 0 0 0 2px rgba(118, 255, 51, 0.3); /* Subtle glow on focus */
+        }
+
         button {
             background-color: #76FF33;
-            color: #000000;
+            color: #001926; /* Dark text for contrast on bright button */
             padding: 10px 20px;
             border: none;
-            border-radius: 25px;
+            border-radius: 25px; /* Pill shape */
             cursor: pointer;
             margin-right: 10px;
             margin-bottom: 10px;
-            font-size: 16px;
-            font-weight: 500;
-            transition: background-color 0.2s ease;
+            font-size: 15px; /* Slightly smaller font */
+            font-weight: 700; /* Bolder text */
+            transition: background-color 0.2s ease, transform 0.1s ease; /* Add transform */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
         button:hover {
-            background-color: #65e32b;
+            background-color: #65e32b; /* Slightly darker hover */
         }
+        button:active {
+             transform: scale(0.97); /* Press down effect */
+        }
+
         #customNotification {
             display: none;
             position: fixed;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #76FF33;
-            color: #000000;
-            padding: 12px 20px;
+            background-color: rgba(118, 255, 51, 0.9); /* Semi-transparent background */
+            color: #001926;
+            padding: 10px 18px;
             border-radius: 5px;
             z-index: 1000;
             font-size: 14px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            font-weight: 500;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+            backdrop-filter: blur(3px); /* Optional blur effect */
+            -webkit-backdrop-filter: blur(3px);
         }
         #outputBox {
             width: 100%;
             min-height: 180px;
             height: auto;
             margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #bfd5ff;
+            padding: 12px; /* Match input padding */
+            border: 1px solid #2c3e50; /* Match input border */
             border-radius: 5px;
             overflow-y: auto;
             font-size: 14px;
-            background-color: #002033;
+            background-color: #002033; /* Match input background */
             color: white;
-            line-height: 1.5;
+            line-height: 1.6; /* Slightly more line height for readability */
             white-space: pre-wrap;
             word-wrap: break-word;
             box-sizing: border-box;
+            user-select: text; /* Allow text selection */
+             -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
         }
         footer {
             text-align: center;
             padding: 15px;
-            margin-top: 20px;
-            color: #ccc;
+            margin-top: auto; /* Push footer to the bottom */
+            color: #6a8aaa; /* Dimmer footer text */
             font-size: 12px;
+            flex-shrink: 0; /* Prevent footer from shrinking */
         }
+
+        /* --- Custom Checkbox Styles --- */
+        .checkbox-label input[type="checkbox"] {
+            opacity: 0;
+            position: absolute;
+            width: 0;
+            height: 0;
+            margin: 0;
+            padding: 0;
+        }
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            margin-bottom: 15px;
+            color: #bfd5ff;
+            font-size: 14px;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            padding-left: 26px; /* Space for the custom checkbox */
+            min-height: 18px;
+        }
+        .checkbox-custom {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 1px solid #4a6a8a; /* Slightly lighter border for checkbox */
+            border-radius: 3px;
+            background-color: #002033;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            flex-shrink: 0;
+        }
+        .checkbox-custom::after {
+            content: '';
+            display: block;
+            position: absolute;
+            left: 5px;
+            top: 1px;
+            width: 4px;
+            height: 8px;
+            border: solid white; /* Checkmark color */
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+             background-color: #76FF33;
+             border-color: #76FF33;
+        }
+        .checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+            opacity: 1;
+        }
+        .checkbox-label input[type="checkbox"]:focus + .checkbox-custom {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(118, 255, 51, 0.4); /* Focus glow */
+        }
+        .checkbox-label input[type="checkbox"]:disabled + .checkbox-custom {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .checkbox-label input[type="checkbox"]:disabled ~ span:not(.checkbox-custom) {
+             opacity: 0.6;
+             cursor: not-allowed;
+         }
+        /* --- End Custom Checkbox Styles --- */
     </style>
 </head>
 <body>
@@ -126,22 +244,40 @@
         <h1>3D坦克翻译器（完善中）</h1>
     </header>
 
-    <section>
-        <p>目前只支持翻译游戏物品名称（作为独立单词或词组），不支持翻译整句话。替换时会优先处理较长的词组（例如 "Tanki Online" 会在 "Tank" 之前被替换）。<strong>大小写规则：</strong>如果字典键中的字母为大写，原文对应位置也必须为大写才替换（例如字典有 "Future"，原文 "Future" 会替换，"future" 不会）。</p>
-        <p><strong>新增：</strong>翻译结果中，如果两个中文字符间有空格，会自动移除空格。</p>
-        <p><strong>匹配逻辑：</strong>使用智能单词边界。仅在字典词条的开头/结尾是字母、数字或下划线时，才要求匹配原文的单词边界，以同时兼容普通单词和带符号的词组。</p> <!-- Updated explanation -->
-        <label for="inputText">输入英文物品名称：</label>
-        <textarea id="inputText" oninput="replaceAndDisplay()" placeholder="在此处粘贴或输入英文名称..."></textarea>
-        <button onclick="copyResult()"><span style="color:#000000;">复制结果</span></button>
-        <label for="fileName" style="margin-top: 15px;">文件名（可选）：</label>
-        <input type="text" id="fileName" placeholder="输入保存的文件名 (例如: translated_items)" />
-        <button onclick="saveToFile()"><span style="color:#000000;">保存为文件</span></button>
-    </section>
+    <main>
+        <section>
+            <p>目前只支持翻译游戏物品名称（作为独立单词或词组），不支持翻译整句话。替换时会优先处理较长的词组。<strong>大小写规则（可开关）：</strong>默认开启，如果字典键中的字母为大写，原文对应位置也必须为大写才替换（例如字典有 "Firebird"，原文 "Firebird" 会替换，"firebird" 不会）。关闭此开关后，将忽略大小写进行匹配（例如 "firebird" 也会被 "Firebird" 键替换）。</p>
+            <p><strong>新增：</strong>翻译结果中，如果两个中文字符间有空格，会自动移除空格。</p>
+            <p><strong>新增：</strong>字典已自动尝试补充部分英文键的复数形式（如果原字典未提供且库能生成不同复数）。</p>
+            <p><strong>匹配逻辑：</strong>使用智能单词边界。仅在字典词条的开头/结尾是字母、数字或下划线时，才要求匹配原文的单词边界。</p>
 
-    <section>
-        <label for="outputBox">翻译结果：</label>
-        <div id="outputBox" aria-readonly="true" role="textbox"></div>
-    </section>
+            <label for="inputText">输入英文物品名称：</label>
+            <textarea id="inputText" oninput="replaceAndDisplay()" placeholder="在此处粘贴或输入英文名称..." rows="6"></textarea>
+
+            <!-- Case Sensitivity Toggle -->
+            <div>
+                 <label for="caseSensitiveToggle" class="checkbox-label">
+                    <input type="checkbox" id="caseSensitiveToggle" checked onchange="replaceAndDisplay()">
+                    <span class="checkbox-custom"></span> <!-- Custom checkbox visual element -->
+                    启用大小写规则 (大写键需匹配大写原文)
+                </label>
+            </div>
+
+            <div> <!-- Wrap buttons for better layout control if needed -->
+                <button onclick="copyResult()"><span style="color:#001926;">复制结果</span></button>
+                 <button onclick="saveToFile()"><span style="color:#001926;">保存为文件</span></button>
+            </div>
+
+            <label for="fileName" style="margin-top: 20px;">文件名（可选，用于保存）：</label>
+            <input type="text" id="fileName" placeholder="输入保存的文件名 (例如: translated_items)" />
+
+        </section>
+
+        <section>
+            <label for="outputBox">翻译结果：</label>
+            <div id="outputBox" aria-readonly="true" role="textbox"></div>
+        </section>
+    </main>
 
     <footer>
         <p>&copy; 2023-2025 翻译器工具</p>
@@ -151,245 +287,294 @@
     <!-- 1. 首先加载包含 replacementDict 的脚本 -->
     <script src="https://testanki1.github.io/translations.js"></script>
 
-    <!-- 2. 然后加载使用 replacementDict 的脚本 -->
-    <script>
-        // replacementDict 变量将由 translations.js 提供
+    <!-- 2. 加载 pluralize 库 -->
+    <script src="https://unpkg.com/pluralize@latest/pluralize.js"></script>
 
-        const outputElement = document.getElementById('outputBox'); // 获取输出元素
+    <!-- 3. 添加脚本以修改 replacementDict (添加复数) -->
+    <script>
+        // --- Script to add plurals to the dictionary ---
+        (function() {
+            if (typeof replacementDict === 'undefined' || replacementDict === null || typeof replacementDict !== 'object') {
+                console.error("错误：replacementDict 未加载或格式无效，无法添加复数。"); return;
+            }
+            if (typeof pluralize === 'undefined' || typeof pluralize !== 'function') {
+                console.error("错误：pluralize 库未加载，无法添加复数。"); return;
+            }
+            console.log("原始字典大小:", Object.keys(replacementDict).length);
+            const additions = {};
+            for (const key in replacementDict) {
+                if (replacementDict.hasOwnProperty(key)) {
+                    const value = replacementDict[key];
+                    if (typeof key === 'string' && key.length > 0) {
+                        try {
+                            const pluralKey = pluralize(key);
+                            if (pluralKey !== key && !replacementDict.hasOwnProperty(pluralKey) && !additions.hasOwnProperty(pluralKey)) {
+                                additions[pluralKey] = value;
+                            }
+                        } catch (e) {
+                            console.warn(`处理键 "${key}" 时 pluralize 出错:`, e);
+                        }
+                    }
+                }
+            }
+            Object.assign(replacementDict, additions);
+            console.log("添加复数尝试后字典大小:", Object.keys(replacementDict).length);
+        })();
+        // --- End of pluralization script ---
+    </script>
+
+    <!-- 4. 然后加载使用 *修改后* replacementDict 的脚本 (主逻辑) -->
+    <script>
+        const outputElement = document.getElementById('outputBox');
+        const inputTextElement = document.getElementById('inputText'); // Cache input element
 
         function showNotification() {
             const notification = document.getElementById('customNotification');
             notification.style.display = 'block';
-            setTimeout(() => {
+            // Clear previous timeouts if any
+            if (notification.timeoutId) clearTimeout(notification.timeoutId);
+            notification.timeoutId = setTimeout(() => {
                 notification.style.display = 'none';
-            }, 2000); // 显示 2 秒
+                notification.timeoutId = null; // Clear the stored timeout ID
+            }, 2000);
         }
 
-        // 辅助函数：转义正则表达式特殊字符
         function escapeRegExp(string) {
+            // Escape characters with special meaning in regex
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
-        // Helper function to check if a character is a "word character" (alphanumeric or underscore)
         function isWordChar(char) {
-            return /[a-zA-Z0-9_]/.test(char);
+             // Check if the character is alphanumeric or underscore
+             return typeof char === 'string' && char.length > 0 && /[a-zA-Z0-9_]/.test(char);
         }
 
-        // 辅助函数：检查大小写匹配规则
-        function isValidCaseMatch(dictKey, matchedText) {
-            if (dictKey.length !== matchedText.length) {
-                return false;
-            }
+        // Function to check case sensitivity rule (only if enabled)
+        function checkCaseRule(dictKey, matchedText) {
+            // Assumes length check is done elsewhere if needed
             for (let i = 0; i < dictKey.length; i++) {
                 const keyChar = dictKey[i];
                 const matchedChar = matchedText[i];
+                // Basic check for uppercase (ASCII A-Z)
                 const isKeyCharUpper = keyChar >= 'A' && keyChar <= 'Z';
-                if (isKeyCharUpper && !(matchedChar >= 'A' && matchedChar <= 'Z')) {
+                const isMatchedCharUpper = matchedChar >= 'A' && matchedChar <= 'Z';
+                // If dict key char is uppercase, matched char must also be uppercase
+                if (isKeyCharUpper && !isMatchedCharUpper) {
                     return false;
                 }
             }
+            // If the loop completes without returning false, the rule is satisfied
             return true;
         }
 
-        // 更新的替换逻辑 (使用条件性 \b, 包含大小写和中文间空格移除)
-        function replaceAndDisplay() {
-            const inputTextElement = document.getElementById('inputText');
+        // Debounce function to limit how often replaceAndDisplay runs
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Main translation logic
+        function performTranslation() {
+            const isCaseSensitiveEnabled = document.getElementById('caseSensitiveToggle').checked;
             let originalInput = inputTextElement.value;
             let output = '';
             let currentIndex = 0;
 
-            if (typeof replacementDict === 'undefined' || replacementDict === null) {
-                console.error("错误：replacementDict 未定义或为 null。");
-                const errorMsg = "错误：翻译词典加载失败。";
-                if (outputElement.tagName === 'TEXTAREA') { outputElement.value = errorMsg; }
-                else { outputElement.textContent = errorMsg; }
-                return;
-            }
-            if (typeof replacementDict !== 'object') {
-                console.error("错误：replacementDict 不是一个有效的对象。");
-                const errorMsg = "错误：翻译词典格式无效。";
-                 if (outputElement.tagName === 'TEXTAREA') { outputElement.value = errorMsg; }
-                 else { outputElement.textContent = errorMsg; }
+            // Check if dictionary is loaded and valid
+            if (typeof replacementDict === 'undefined' || replacementDict === null || typeof replacementDict !== 'object') {
+                console.error("错误：replacementDict 在翻译时未定义或无效。");
+                outputElement.textContent = "错误：翻译词典加载失败或格式无效。";
                 return;
             }
 
             const allMatches = [];
+            // Get keys ONCE and use the potentially modified dictionary
             const keys = Object.keys(replacementDict);
-
-            // Regex to check if a character is a word character
-            const wordCharRegex = /[a-zA-Z0-9_]/;
+            const wordCharRegex = /[a-zA-Z0-9_]/; // Reusable regex object
 
             for (const key of keys) {
-                 if (!key || typeof key !== 'string' || !replacementDict[key]) continue;
+                 // Basic validation for the key and its value
+                 if (!key || typeof key !== 'string' || typeof replacementDict[key] !== 'string') continue;
 
                 const escapedKey = escapeRegExp(key);
 
-                // --- Conditional Boundary Logic ---
+                // Conditional Boundary Logic for smarter word matching
                 let prefix = '';
                 let suffix = '';
-
-                // Add \b prefix ONLY if the key starts with a word character
-                if (key.length > 0 && wordCharRegex.test(key[0])) {
-                    prefix = '\\b';
-                }
-
-                // Add \b suffix ONLY if the key ends with a word character
-                if (key.length > 0 && wordCharRegex.test(key[key.length - 1])) {
-                    suffix = '\\b';
-                }
-
-                // Construct the final regex string
+                // Require word boundary at the start if key starts with a word char
+                if (key.length > 0 && isWordChar(key[0])) { prefix = '\\b'; }
+                // Require word boundary at the end if key ends with a word char
+                if (key.length > 0 && isWordChar(key[key.length - 1])) { suffix = '\\b'; }
                 const regexString = `${prefix}${escapedKey}${suffix}`;
-                // --- End Conditional Boundary Logic ---
 
-                // Create the RegExp object with 'gi' flags
                 let regex;
                 try {
+                   // Use 'gi' flags: global search, case-insensitive matching
+                   // Case sensitivity rule is applied *after* a potential match is found
                    regex = new RegExp(regexString, 'gi');
                 } catch (e) {
                    console.error(`创建键 "${key}" 的正则表达式 "${regexString}" 时出错: `, e);
-                   continue; // Skip this key if regex is invalid
+                   continue; // Skip this key if regex creation fails
                 }
 
                 let match;
                 try {
+                     regex.lastIndex = 0; // Reset lastIndex for global regex in loop
+
                     while ((match = regex.exec(originalInput)) !== null) {
                         const matchedText = match[0];
                         const startIndex = match.index;
                         const endIndex = startIndex + matchedText.length;
 
-                        if (isValidCaseMatch(key, matchedText)) {
-                            const replacementValue = replacementDict[key];
-                             if (typeof replacementValue !== 'string') {
-                                console.warn(`警告：键 "${key}" 的替换值不是字符串，已跳过。`);
-                                continue;
-                            }
+                        // Apply Case Sensitivity Check based on the toggle
+                        let isValidMatch = false;
+                        if (isCaseSensitiveEnabled) {
+                            // If rule is ON, check the specific case requirements
+                            isValidMatch = checkCaseRule(key, matchedText);
+                        } else {
+                            // If rule is OFF, any match found by the 'gi' regex is valid
+                            isValidMatch = true;
+                        }
 
+                        if (isValidMatch) {
+                            // Store valid matches with their details
                             allMatches.push({
                                 start: startIndex,
                                 end: endIndex,
-                                value: replacementValue,
-                                keyLength: matchedText.length
+                                value: replacementDict[key], // The Chinese translation
+                                keyLength: matchedText.length // Use actual matched length
                             });
                         }
-
-                        if (matchedText.length === 0) {
-                             console.warn(`Zero-length match encountered for key: ${key}, regex: ${regexString}. Breaking loop.`);
-                             break; // Safety break
-                        }
-                         // Ensure regex progresses
-                         if (regex.lastIndex === match.index) {
-                            regex.lastIndex++;
-                         }
+                        // Prevent infinite loops on zero-length matches (though unlikely with \b)
+                        if (match[0].length === 0) { regex.lastIndex++; }
                     }
                  } catch (e) {
                      console.error(`执行键 "${key}" (Regex: ${regexString}) 的正则表达式时出错: `, e);
-                     // Continue with the next key even if one regex fails during execution
+                     // Continue with the next key if execution fails
                  }
             }
 
-            // Sort matches: Start position ascending, then length descending
+            // Sort matches: primarily by start index (ascending), secondarily by length (descending)
+            // This ensures that longer matches at the same position take precedence
             allMatches.sort((a, b) => {
-                if (a.start !== b.start) {
-                    return a.start - b.start;
-                }
-                return b.keyLength - a.keyLength; // Longer matches first at same start position
+                if (a.start !== b.start) { return a.start - b.start; }
+                return b.keyLength - a.keyLength; // Longer match first
             });
 
-            // Build output string using sorted, non-overlapping matches
-            currentIndex = 0;
+            // Build the output string using the best non-overlapping matches
+            currentIndex = 0; // Track position in the original input
             output = '';
             for (const match of allMatches) {
+                // If this match starts at or after the current position (no overlap with a prior longer match)
                 if (match.start >= currentIndex) {
+                    // Append the portion of the original string before this match
                     output += originalInput.substring(currentIndex, match.start);
+                    // Append the translated value
                     output += match.value;
+                    // Update the current position to the end of this match
                     currentIndex = match.end;
                 }
             }
 
-            // Append remaining text
+            // Append any remaining part of the original string after the last match
             if (currentIndex < originalInput.length) {
                 output += originalInput.substring(currentIndex);
             }
 
-            // Remove spaces between Chinese characters
+            // Post-processing: Remove spaces between adjacent Chinese characters
             try {
+                // Regex: (Chinese char) (one or more spaces) (Chinese char) -> Replace with $1$3
                 output = output.replace(/([\u4E00-\u9FFF])( +)([\u4E00-\u9FFF])/g, '$1$3');
             } catch (e) {
                 console.error("移除中文间空格时发生错误: ", e);
             }
 
-            // Display result
-            if (outputElement.tagName === 'TEXTAREA') {
-                outputElement.value = output;
-            } else {
-                outputElement.textContent = output;
-            }
+            // Display the final translated result
+            outputElement.textContent = output;
         }
 
-        // --- Other helper functions (copyResult, fallbackCopyTextToClipboard, saveToFile) ---
-        // (These functions remain unchanged)
+        // Create a debounced version of the translation function
+        const replaceAndDisplay = debounce(performTranslation, 250); // Adjust delay (ms) as needed
+
+
+        // --- Other helper functions (copyResult, saveToFile) ---
         function copyResult() {
-            let textToCopy;
-             if (outputElement.tagName === 'TEXTAREA') {
-                textToCopy = outputElement.value;
-                try { outputElement.select(); } catch(e) { console.warn("无法选择 textarea 内容"); }
-            } else {
-                textToCopy = outputElement.textContent;
-            }
-            if (!textToCopy) return;
+            const textToCopy = outputElement.textContent;
+            if (!textToCopy) return; // Don't copy if empty
+
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
-                    showNotification();
+                    showNotification(); // Show success message
                 }).catch(err => {
                     console.error('无法使用 Clipboard API 复制: ', err);
-                    if (outputElement.tagName === 'TEXTAREA') { fallbackCopyTextToClipboard(outputElement); }
-                    else { alert('自动复制失败，请手动选择并复制文本。'); }
+                    alert('自动复制失败，请手动选择并复制文本。');
                 });
-            } else if (outputElement.tagName === 'TEXTAREA') {
-                 console.warn('Clipboard API 不可用，回退到 execCommand。');
-                 fallbackCopyTextToClipboard(outputElement);
             } else {
+                 // Fallback for browsers without Clipboard API
                  alert('您的浏览器不支持自动复制，请手动选择并复制文本。');
             }
+             // Deselect text after copying attempt
              if (window.getSelection) { window.getSelection().removeAllRanges(); }
              else if (document.selection) { document.selection.empty(); }
         }
-        function fallbackCopyTextToClipboard(element) {
-             if (element.tagName !== 'TEXTAREA' && element.tagName !== 'INPUT') return;
-            element.select();
-             try {
-                 var successful = document.execCommand('copy');
-                 if (successful) { showNotification(); }
-                 else { console.error('使用 execCommand 复制失败'); alert('复制失败，请手动选择并复制文本。'); }
-             } catch (err) { console.error('使用 execCommand 复制时出错: ', err); alert('复制出错，请手动选择并复制文本。'); }
-        }
+
         function saveToFile() {
             let fileNameInput = document.getElementById('fileName');
             let rawFileName = fileNameInput.value.trim();
             let finalFileName;
+
+            // Generate a timestamped filename if none is provided
             if (!rawFileName) {
                 const now = new Date();
                 const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
                 finalFileName = `translation_${timestamp}.txt`;
             } else {
-                let cleanedFileName = rawFileName.replace(/[^a-zA-Z0-9._\-\s]/g, '_').replace(/\s+/g, '_');
-                const lastDotIndex = cleanedFileName.lastIndexOf('.');
-                const hasExtension = lastDotIndex > 0 && lastDotIndex < cleanedFileName.length - 1;
-                if (!hasExtension) { finalFileName = cleanedFileName + '.txt'; }
-                else { finalFileName = cleanedFileName; }
+                // Sanitize the provided filename
+                let cleanedFileName = rawFileName
+                    .replace(/[^a-zA-Z0-9._\-\s]/g, '_') // Replace invalid chars with underscore
+                    .replace(/\s+/g, '_'); // Replace spaces with underscore
+                // Add .txt extension if none exists
+                if (!cleanedFileName.match(/\.[^.]+(?:[?#]|$)/)) { // Check if it ends with a common extension pattern
+                   if (!cleanedFileName.toLowerCase().endsWith('.txt')) {
+                        cleanedFileName += '.txt';
+                   }
+                }
+                finalFileName = cleanedFileName.substring(0, 200); // Limit filename length
             }
-            let resultText;
-            if (outputElement.tagName === 'TEXTAREA') { resultText = outputElement.value; }
-            else { resultText = outputElement.textContent; }
+
+            const resultText = outputElement.textContent; // Get text from the output div
+
+            // Create a Blob (Binary Large Object) with the text content
             const blob = new Blob([resultText], { type: 'text/plain;charset=utf-8' });
+
+            // Create a temporary link element for download
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = finalFileName;
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            link.href = URL.createObjectURL(blob); // Create a URL for the Blob
+            link.download = finalFileName; // Set the download filename
+
+            // Append, click, and remove the link to trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Release the object URL to free up memory
             URL.revokeObjectURL(link.href);
         }
-        // window.onload = replaceAndDisplay; // Keep disabled
+
+        // Optional: Trigger initial translation if the textarea has content on load
+         // window.addEventListener('load', () => {
+         //    if (inputTextElement.value) {
+         //       replaceAndDisplay();
+         //    }
+         // });
+
     </script>
 </body>
 </html>
