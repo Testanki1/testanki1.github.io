@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML 可视化/代码切换器</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #visualEditor {
+            border: 1px solid #ccc;
+            min-height: 250px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            overflow: auto; /* 如果内容过多，允许滚动 */
+        }
+        #codeEditor {
+            border: 1px solid #ccc;
+            width: 98%; /* 考虑边框和内边距 */
+            min-height: 250px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-family: monospace; /* 等宽字体适合代码 */
+            font-size: 14px;
+            background-color: #e9e9e9;
+            display: none; /* 默认隐藏 */
+            box-sizing: border-box; /* 让 padding 和 border 不增加总宽度 */
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>HTML 编辑器</h1>
+    <p>在此处粘贴您的 HTML 内容（可以直接从网页、Word 等复制粘贴）：</p>
+
+    <!-- 可视化编辑区域 -->
+    <div id="visualEditor" contenteditable="true">
+        <p>在这里<b>粘贴</b>或<i>编辑</i>内容...</p>
+        <ul>
+            <li>列表项 1</li>
+            <li>列表项 2</li>
+        </ul>
+    </div>
+
+    <!-- HTML 代码编辑区域 -->
+    <textarea id="codeEditor"></textarea>
+
+    <!-- 切换按钮 -->
+    <button id="toggleButton">查看 HTML 代码</button>
+</div>
+
+<script>
+    // 获取元素引用
+    const visualEditor = document.getElementById('visualEditor');
+    const codeEditor = document.getElementById('codeEditor');
+    const toggleButton = document.getElementById('toggleButton');
+
+    // 追踪当前视图状态 (false: 可视化, true: 代码)
+    let isCodeView = false;
+
+    // 按钮点击事件处理
+    toggleButton.addEventListener('click', () => {
+        if (isCodeView) {
+            // --- 从代码视图切换到可视化视图 ---
+            // 1. 获取代码编辑器的内容
+            const htmlCode = codeEditor.value;
+            // 2. 将 HTML 代码设置回可视化编辑器
+            visualEditor.innerHTML = htmlCode;
+            // 3. 显示可视化编辑器，隐藏代码编辑器
+            visualEditor.style.display = 'block';
+            codeEditor.style.display = 'none';
+            // 4. 更新按钮文字
+            toggleButton.textContent = '查看 HTML 代码';
+            // 5. 更新视图状态
+            isCodeView = false;
+        } else {
+            // --- 从可视化视图切换到代码视图 ---
+            // 1. 获取可视化编辑器的内部 HTML
+            const visualHTML = visualEditor.innerHTML;
+            // 2. 将 HTML 代码设置到代码编辑器（使用 .value）
+            codeEditor.value = visualHTML;
+            // 3. 隐藏可视化编辑器，显示代码编辑器
+            visualEditor.style.display = 'none';
+            codeEditor.style.display = 'block';
+            // 4. 更新按钮文字
+            toggleButton.textContent = '查看可视化效果';
+            // 5. 更新视图状态
+            isCodeView = true;
+        }
+    });
+
+    // (可选) 如果希望在可视化编辑器内容变化时自动更新代码编辑器的值（即使代码区不可见）
+    // visualEditor.addEventListener('input', () => {
+    //     if (!isCodeView) { // 只有在可视化视图下编辑时才更新隐藏的代码区
+    //         codeEditor.value = visualEditor.innerHTML;
+    //     }
+    // });
+
+    // (可选) 如果希望在代码编辑器内容变化时自动更新可视化编辑器的值（即使可视化区不可见）
+    // codeEditor.addEventListener('input', () => {
+    //     if (isCodeView) { // 只有在代码视图下编辑时才更新隐藏的可视化区
+    //          visualEditor.innerHTML = codeEditor.value; // 注意：这可能执行脚本，有安全风险！
+    //     }
+    // });
+    // **注意**: 上面代码编辑器实时更新可视化区的做法有潜在的 XSS 风险，
+    // 因为用户输入的代码会被直接执行。对于简单的切换，点击按钮时更新更安全。
+
+</script>
+
+</body>
+</html>
