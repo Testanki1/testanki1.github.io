@@ -138,12 +138,13 @@
 
         /* --- Data Card & Container Styles --- */
         .container {
-            display: flex;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            padding: 10px 0;
-            margin-bottom: 15px; /* Add some space between containers */
-        }
+             /* display: flex; */ /* Let JS control this */
+             display: none; /* Start hidden, JS will show if data exists */
+             flex-wrap: nowrap;
+             overflow-x: auto;
+             padding: 10px 0;
+             margin-bottom: 15px; /* Add some space between containers */
+         }
         .data-card {
             flex: 0 0 auto; /* Prevent shrinking/growing, base size on content */
             background-color: #0a192f;
@@ -249,6 +250,24 @@
             margin-top: 10px;
             font-size: 16px;
         }
+
+        /* --- List Title and No Data Styles (NEW) --- */
+         .list-title {
+             text-align: center;
+             margin-top: 25px; /* Space above title */
+             margin-bottom: 5px; /* Space between title and container/message */
+             font-size: 1.2em; /* Adjust size */
+             color: #BFD5FF; /* Lighter blue/cyan for title */
+             font-weight: 500;
+         }
+
+         .no-data-message {
+              text-align: center;
+              color: #aaa;
+              padding: 10px 0 15px 0; /* Spacing */
+              font-style: italic;
+         }
+
     </style>
 </head>
 <body>
@@ -296,8 +315,9 @@
     <!-- Rankings Table -->
     <div id="rankingsTable"></div>
 
-    <!-- Container for displaying lists -->
-    <div id="listContainers">
+    <!-- Wrapper for dynamic list content (titles + containers) -->
+    <div id="listContentWrapper">
+        <!-- Titles and containers will be inserted here by JavaScript -->
         <div id="turretsPlayedContainer" class="container"></div>
         <div id="hullsPlayedContainer" class="container"></div>
         <div id="dronesPlayedContainer" class="container"></div>
@@ -315,6 +335,7 @@
         const usernameInput = document.getElementById('username');
         const loader = document.getElementById('loader');
         const rankingsTable = document.getElementById('rankingsTable');
+        const listContentWrapper = document.getElementById('listContentWrapper'); // Get the wrapper
 
         // IDs for single stat display elements
         const statDisplayIds = [
@@ -334,6 +355,7 @@
         // Store element references
         const elements = {};
         statDisplayIds.forEach(id => elements[id] = document.getElementById(id));
+        // Get container elements dynamically as they are needed or store them now
         listContainerIds.forEach(id => elements[id] = document.getElementById(id));
 
         // --- Event Listener ---
@@ -342,7 +364,7 @@
         // --- Functions ---
 
         async function fetchProfile() {
-            const region = regionSelect.value; // Although 国服 is disabled, read the value
+            const region = regionSelect.value;
             const username = usernameInput.value.trim();
             const timestamp = Date.now();
 
@@ -361,19 +383,12 @@
             // Show loader
             loader.style.display = 'flex';
 
-            // --- Determine API URL ---
-            // Since 国服 is disabled, we primarily expect 外服.
-            // Kept the structure in case 国服 comes back online later.
             let baseUrl;
             if (region === '外服') {
                  baseUrl = `https://ratings.tankionline.com/api/eu/profile/?user=${username}&lang=cn&${timestamp}`;
             } else if (region === '国服') {
-                // This case should not happen with the disabled option, but handle defensively
                 baseUrl = `https://ratings.3dtank.com/get_stat/profile/?user=${username}&lang=cn&${timestamp}`;
-                 // Optionally display a message if this state is somehow reached
-                 // displayError('国服当前不可用');
-                 // loader.style.display = 'none';
-                 // return;
+                 // 国服 is disabled in dropdown, but keep logic just in case
             } else {
                  displayError('无效的服务器选择');
                  loader.style.display = 'none';
@@ -410,48 +425,35 @@
 
                         // --- Display Basic Stats ---
                         elements.nameDisplay.innerHTML = `昵称: ${profile.name || '未知昵称'}`;
-
                         const rank = profile.rank || 1;
                         let rankName = "未知等级";
                         if (rank > 0) {
-                            if (rank <= ranks.length) {
-                                rankName = ranks[rank - 1];
-                            } else {
-                                const legendRank = rank - ranks.length;
-                                rankName = `传奇 ${legendRank}`; // Legend starts at 0 (rank 31) -> 传奇 0, 传奇 1...
-                            }
+                            if (rank <= ranks.length) { rankName = ranks[rank - 1]; }
+                            else { rankName = `传奇 ${rank - ranks.length}`; }
                         }
                         elements.rankDisplay.innerHTML = `等级: ${rankName}`;
-
                         elements.experienceDisplay.innerHTML = `经验: ${profile.score || 0} / ${profile.scoreNext || 0}`;
                         elements.premiumStatus.innerHTML = profile.hasPremium ? '该玩家拥有 VIP' : '该玩家未拥有 VIP';
                         elements.gearScoreDisplay.innerHTML = `战斗力: ${profile.gearScore || 0}`;
-
                         const kills = profile.kills || 0;
                         const deaths = profile.deaths || 0;
                         elements.killsDisplay.innerHTML = `击杀: ${kills}`;
                         elements.deathsDisplay.innerHTML = `死亡: ${deaths}`;
                         const kdr = deaths === 0 ? '-' : (kills / deaths).toFixed(2);
                         elements.kdrDisplay.innerHTML = `杀/死: ${kdr}`;
-
                         elements.caughtGoldsDisplay.innerHTML = `已获得的金箱子: ${profile.caughtGolds || 0}`;
                         elements.earnedCrystalsDisplay.innerHTML = `已获得的水晶: ${profile.earnedCrystals || 0}`;
-
-                        // --- Calculate and Display Total Time Played ---
                         const hullsPlayed = profile.hullsPlayed || [];
                         let totalTimePlayedMs = hullsPlayed.reduce((total, hull) => total + (hull.timePlayed || 0), 0);
                         elements.timePlayedDisplay.innerHTML = `游戏时长: ${formatTime(totalTimePlayedMs)}`;
-
-                        // --- Calculate and Display Total Supplies Usage ---
                         const suppliesUsage = profile.suppliesUsage || [];
                         const totalSuppliesUsed = suppliesUsage.reduce((total, supply) => total + (supply.usages || 0), 0);
                         elements.suppliesUsageDisplay.innerHTML = `已使用的道具: ${totalSuppliesUsed}`;
 
-
                         // --- Display Rankings Table ---
                         displayRankingsTable(profile.previousRating || {}, profile.rating || {});
 
-                        // --- Display Lists using Loop ---
+                        // --- Display Lists using Loop (MODIFIED) ---
                         const listDataConfigs = [
                             { key: 'turretsPlayed', containerId: 'turretsPlayedContainer', title: '使用的炮塔' },
                             { key: 'hullsPlayed', containerId: 'hullsPlayedContainer', title: '使用的底盘' },
@@ -465,24 +467,43 @@
 
                         listDataConfigs.forEach(config => {
                             const data = profile[config.key] || [];
-                            const container = elements[config.containerId];
+                            const container = elements[config.containerId]; // Get the container element
+
                             if (container) {
-                                displayListData(data, container, config.title);
+                                // 1. Create and insert the title element *before* the container
+                                const titleElement = document.createElement('h3');
+                                titleElement.textContent = config.title;
+                                titleElement.classList.add('list-title');
+                                // Insert the title into the main wrapper before the container
+                                listContentWrapper.insertBefore(titleElement, container);
+
+                                // 2. Check if data is empty
+                                if (!data || !Array.isArray(data) || data.length === 0) {
+                                    // Data is empty: Add "无" message *after* the title
+                                    const noDataElement = document.createElement('p');
+                                    noDataElement.textContent = '无';
+                                    noDataElement.classList.add('no-data-message');
+                                    // Insert the message after the title (before the container)
+                                    listContentWrapper.insertBefore(noDataElement, container);
+                                    // Keep the container hidden (it should be hidden by default or by clearDisplay)
+                                    container.style.display = 'none';
+                                } else {
+                                    // Data exists: Make container visible and display data
+                                    container.style.display = 'flex'; // Show the container
+                                    displayListData(data, container, config.title); // Populate the container
+                                }
                             } else {
                                 console.warn(`Container element not found for ID: ${config.containerId}`);
                             }
                         });
 
                     } else {
-                        // Handle unexpected response structure
                         throw new Error('无效的响应数据格式');
                     }
                 } else {
-                    // Handle cases where allorigins might return empty contents or error structure
                      if (data && data.error) {
                          throw new Error(`Proxy Error: ${data.error}`);
                      } else if(data && typeof data.contents === 'string' && data.contents.trim() === '') {
-                         // Sometimes allorigins returns empty string for certain errors
                          throw new Error('API返回空响应，可能是昵称错误或服务器问题');
                      } else {
                          throw new Error('通过代理获取数据时发生未知错误');
@@ -490,9 +511,9 @@
                 }
             } catch (error) {
                 console.error('获取数据时出错:', error);
-                displayError(`获取数据失败: ${error.message}`); // Display error to user
+                displayError(`获取数据失败: ${error.message}`);
             } finally {
-                loader.style.display = 'none'; // Hide loader regardless of outcome
+                loader.style.display = 'none';
             }
         }
 
@@ -501,10 +522,24 @@
             statDisplayIds.forEach(id => {
                 if (elements[id]) elements[id].innerHTML = '';
             });
-            // Clear list containers
+
+            // --- MODIFIED START ---
+            // Remove previously added titles and "no data" messages from the wrapper
+            const oldTitles = listContentWrapper.querySelectorAll('.list-title');
+            oldTitles.forEach(title => title.remove());
+            const oldNoDataMessages = listContentWrapper.querySelectorAll('.no-data-message');
+            oldNoDataMessages.forEach(msg => msg.remove());
+
+            // Clear list containers and hide them
             listContainerIds.forEach(id => {
-                if (elements[id]) elements[id].innerHTML = '';
+                const container = elements[id]; // Use stored references
+                if (container) {
+                    container.innerHTML = '';
+                    container.style.display = 'none'; // Reset to hidden
+                }
             });
+            // --- MODIFIED END ---
+
             // Clear rankings table
             rankingsTable.innerHTML = '';
         }
@@ -512,14 +547,14 @@
          function displayError(message) {
             const existingErrorMessage = document.querySelector('#fetchButton + p.error-message');
             if (existingErrorMessage) {
-                existingErrorMessage.textContent = message; // Update existing message
+                existingErrorMessage.textContent = message;
             } else {
                 const errorMessageElement = document.createElement('p');
                 errorMessageElement.textContent = message;
-                errorMessageElement.style.color = '#FF6666'; // Error color
+                errorMessageElement.style.color = '#FF6666';
                 errorMessageElement.style.textAlign = 'center';
                 errorMessageElement.style.marginTop = '10px';
-                errorMessageElement.classList.add('error-message'); // Add class for potential selection
+                errorMessageElement.classList.add('error-message');
                 fetchButton.insertAdjacentElement('afterend', errorMessageElement);
             }
         }
@@ -532,9 +567,7 @@
                 { key: 'crystals', name: '水晶' },
                 { key: 'efficiency', name: '效率' }
             ];
-
             const getDisplayValue = (value) => (value === -1 || value === undefined || value === null) ? '-' : value;
-
             const tableRows = categories.map(category => {
                 const current = currentRating[category.key] || {};
                 const previous = previousRating[category.key] || {};
@@ -548,7 +581,6 @@
                     </tr>
                 `;
             }).join('');
-
             const tableHtml = `
                 <table cellpadding="1" cellspacing="0">
                     <thead>
@@ -560,9 +592,7 @@
                             <th>上周数值</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
+                    <tbody>${tableRows}</tbody>
                 </table>
             `;
             rankingsTable.innerHTML = tableHtml;
@@ -570,34 +600,29 @@
 
 
         function formatTime(milliseconds) {
-            if (!milliseconds || milliseconds <= 0) { // Check for null, undefined, 0
-                return '无记录'; // More descriptive than '未进行游戏'
+            if (!milliseconds || milliseconds <= 0) {
+                return '无记录';
             }
             let remainingMs = milliseconds;
             const hours = Math.floor(remainingMs / (3600 * 1000));
             remainingMs %= (3600 * 1000);
             const minutes = Math.floor(remainingMs / (60 * 1000));
             remainingMs %= (60 * 1000);
-            const seconds = remainingMs / 1000; // Use 1 decimal place for seconds
+            const seconds = remainingMs / 1000; // Show whole seconds
 
             let timeParts = [];
             if (hours > 0) timeParts.push(`${hours} 小时`);
             if (minutes > 0) timeParts.push(`${minutes} 分钟`);
-             // Always show seconds if there's any time, or if it's the only unit
-            if (seconds > 0 || timeParts.length === 0) timeParts.push(`${seconds} 秒`);
+            if (seconds > 0 || timeParts.length === 0) timeParts.push(`${seconds} 秒`); // Show seconds if non-zero or if it's the only unit
 
-            return timeParts.join(' ');
+            return timeParts.join(' ') || '0 秒'; // Handle case where time is < 1 second after rounding
         }
 
-        function displayListData(data, container, title) {
-            // Clear previous content in the specific container
-            container.innerHTML = '';
 
-            if (!data || !Array.isArray(data) || data.length === 0) {
-                 // Optionally display a message like "无可用数据" inside the container
-                 // container.innerHTML = `<p style='text-align: center; padding: 20px; color: #aaa;'>无${title}数据</p>`;
-                return;
-            }
+        // MODIFIED: Removed initial empty data check
+        function displayListData(data, container, title) {
+            // Clear previous content in the specific container (optional, as clearDisplay handles this now)
+            // container.innerHTML = '';
 
             // Specific sorting for presents
             if (title === "收到的礼物") {
@@ -617,7 +642,6 @@
 
             aggregatedData.forEach(item => {
                 const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
-                // Handle grade: null, -1, or valid index
                 const grade = (item.grade != null && item.grade >= 0 && item.grade < gradeMap.length)
                               ? gradeMap[item.grade]
                               : '-';
@@ -628,50 +652,42 @@
                 const properties = item.properties || '-';
                 const type = item.type || '-';
 
-                // Image URL transformation
                 let imageUrl = item.imageUrl || null;
                 if (imageUrl) {
                     imageUrl = imageUrl.replace(/s\.3dtank\.com\/.*\.tnk/g, match => match.replace('s.3dtank.com', 'res.3dtank.com').replace('.tnk', '.webp'))
-                                       .replace(/s\.eu.tankionline\.com\/.*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp')); // Corrected EU domain
+                                       .replace(/s\.eu.tankionline\.com\/.*\.tnk/g, match => match.replace('s.eu.tankionline.com', 'res.3dtank.com').replace('.tnk', '.webp'));
                 }
 
-
                 const scoreEarned = item.scoreEarned != null && item.scoreEarned !== -1 ? item.scoreEarned : '-';
-                // Use aggregated timePlayed for the main card display
                 const timePlayed = (item.timePlayed != null && item.timePlayed > 0) ? formatTime(item.timePlayed) : '-';
-
-                // Determine if type should be hidden (e.g., for modes with multiple types under one name)
-                 // Consider hiding type if the aggregated item represents multiple underlying types
-                 const hasMultipleTypes = item.detailedGrades && new Set(item.detailedGrades.map(dg => dg.type)).size > 1;
-                 const hideType = title === "玩过的模式" && hasMultipleTypes;
-
+                const hasMultipleTypes = item.detailedGrades && new Set(item.detailedGrades.map(dg => dg.type)).size > 1;
+                const hideType = title === "玩过的模式" && hasMultipleTypes;
 
                 const cardDiv = document.createElement('div');
                 cardDiv.classList.add('data-card');
 
                 let cardHTML = `<div class="item-name">${name}</div>`;
                 if (imageUrl) {
-                    cardHTML += `<img src="${imageUrl}" class="item-image" alt="${name}" loading="lazy" />`; // Added lazy loading
+                    cardHTML += `<img src="${imageUrl}" class="item-image" alt="${name}" loading="lazy" />`;
                 }
 
-                // Conditionally add details
                 if (!hideType && type !== '-') cardHTML += `<div>类型: ${type}</div>`;
                 if (grade !== '-') cardHTML += `<div>当前等级: ${grade}</div>`;
                 if (scoreEarned !== '-') cardHTML += `<div>获得经验: ${scoreEarned}</div>`;
-                if (timePlayed !== '-' && title !== '使用的道具' && title !== '收到的礼物') cardHTML += `<div>游戏时间: ${timePlayed}</div>`; // Don't show time for supplies/gifts
+                if (timePlayed !== '-' && title !== '使用的道具' && title !== '收到的礼物') cardHTML += `<div>游戏时间: ${timePlayed}</div>`;
                 if (count !== '-') cardHTML += `<div>数量: ${count}</div>`;
                 if (usages !== '-') cardHTML += `<div>使用量: ${usages}</div>`;
                 if (properties !== '-') cardHTML += `<div>特性: ${properties}</div>`;
 
-
-                // Add button for detailed view if applicable
                 if (item.detailedGrades && item.detailedGrades.length > 1) {
                     const buttonText = title === '玩过的模式' ? '查看各类型数据' : '查看各等级数据';
-                     // Sanitize JSON string for use in HTML attribute
-                     const detailedGradesJson = JSON.stringify(item.detailedGrades)
-                                                   .replace(/"/g, '&quot;')
-                                                   .replace(/'/g, '&#39;'); // Also escape single quotes
-                    cardHTML += `<button class="view-data-button" onclick="showDetailedGrades('${name.replace(/'/g, '&#39;')}', ${detailedGradesJson}, '${title.replace(/'/g, '&#39;')}')">${buttonText}</button>`;
+                    // Sanitize JSON and names for HTML attributes
+                    const sanitizedName = name.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                    const sanitizedTitle = title.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                    const detailedGradesJson = JSON.stringify(item.detailedGrades)
+                                                   .replace(/'/g, '&#39;') // Escape single quotes for JS string literal
+                                                   .replace(/"/g, '&quot;'); // Escape double quotes for HTML attribute value
+                    cardHTML += `<button class="view-data-button" onclick='showDetailedGrades("${sanitizedName}", ${JSON.stringify(item.detailedGrades)}, "${sanitizedTitle}")'>${buttonText}</button>`;
 
                 }
 
@@ -684,84 +700,64 @@
         function aggregateItemsByGrade(items) {
             const aggregatedItems = {};
             items.forEach(item => {
-                // Use a combination of name and potentially type for aggregation if needed,
-                // but for now, name seems sufficient based on original logic.
-                const key = item.name;
+                const key = item.name; // Aggregate primarily by name
                 if (!aggregatedItems[key]) {
                     aggregatedItems[key] = {
-                        ...item, // Copy base properties from the first occurrence
-                        grade: item.grade, // Store the first grade encountered
-                        timePlayed: item.timePlayed || 0, // Initialize sums
+                        ...item,
+                        timePlayed: item.timePlayed || 0,
                         scoreEarned: item.scoreEarned || 0,
-                        detailedGrades: [] // Initialize array for details
+                        detailedGrades: []
                     };
                 } else {
-                    // Update max grade if the current item's grade is higher
                     if (item.grade > aggregatedItems[key].grade) {
-                        aggregatedItems[key].grade = item.grade;
+                         aggregatedItems[key].grade = item.grade;
                     }
-                    // Accumulate time and score
                     aggregatedItems[key].timePlayed += (item.timePlayed || 0);
                     aggregatedItems[key].scoreEarned += (item.scoreEarned || 0);
                 }
-                // Add details for each individual entry (grade/type specific)
-                aggregatedItems[key].detailedGrades.push({
-                    grade: item.grade,
-                    type: item.type,
-                    scoreEarned: item.scoreEarned || 0,
-                    timePlayed: item.timePlayed || 0
-                });
+                 aggregatedItems[key].detailedGrades.push({
+                     grade: item.grade,
+                     type: item.type,
+                     scoreEarned: item.scoreEarned || 0,
+                     timePlayed: item.timePlayed || 0
+                 });
             });
             return Object.values(aggregatedItems);
         }
 
 
-        function showDetailedGrades(name, detailedGradesJson, title) {
-            // Create overlay
+        function showDetailedGrades(name, detailedGradesData, title) { // Now receives parsed object
             const overlay = document.createElement('div');
             overlay.classList.add('modal-overlay');
-            overlay.onclick = (event) => { // Close modal if clicking outside the content
-                if (event.target === overlay) {
-                   overlay.remove();
-                }
+            overlay.onclick = (event) => {
+                if (event.target === overlay) { overlay.remove(); }
             };
 
-
-            // Create modal content container
             const modal = document.createElement('div');
             modal.classList.add('modal-content');
-            // Prevent clicks inside the modal from closing it via the overlay handler
-             modal.onclick = (event) => event.stopPropagation();
-
+            modal.onclick = (event) => event.stopPropagation();
 
             const gradeMap = ['Mk1', 'Mk2', 'Mk3', 'Mk4', 'Mk5', 'Mk6', 'Mk7'];
             const headerText = title === '玩过的模式' ? `${name} 各类型数据` : `${name} 各等级数据`;
 
-             // Use the JSON data passed directly
-            const detailedGrades = detailedGradesJson;
-
-
-            // Sort by grade (or type for modes) before displaying
-            const sortedGrades = detailedGrades.sort((a, b) => {
+            // Sort the passed data object
+            const sortedGrades = detailedGradesData.sort((a, b) => {
                 if (title === '玩过的模式') {
-                     // Basic alphabetical sort for types, can be customized
                      return (a.type || '').localeCompare(b.type || '');
                 } else {
-                    return (a.grade ?? -1) - (b.grade ?? -1); // Sort by grade numerically, handle null/undefined
+                    return (a.grade ?? -1) - (b.grade ?? -1);
                 }
             });
 
             const tableRows = sortedGrades.map(gradeData => {
                  let displayIdentifier;
                  if (title === '玩过的模式') {
-                     displayIdentifier = gradeData.type || '-'; // Show type
+                     displayIdentifier = gradeData.type || '-';
                  } else {
-                     // Show grade, handle invalid/missing grades
                       displayIdentifier = (gradeData.grade != null && gradeData.grade >= 0 && gradeData.grade < gradeMap.length)
                                          ? gradeMap[gradeData.grade]
                                          : '未知等级';
                  }
-
                  return `
                     <tr>
                         <td>${displayIdentifier}</td>
@@ -770,7 +766,6 @@
                     </tr>
                  `;
             }).join('');
-
 
             modal.innerHTML = `
                 <h3>${headerText}</h3>
@@ -782,9 +777,7 @@
                             <th>获得经验</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
+                    <tbody>${tableRows}</tbody>
                 </table>
                 <button class="close-button" onclick="this.closest('.modal-overlay').remove()">关闭</button>
             `;
