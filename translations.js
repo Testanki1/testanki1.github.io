@@ -766,6 +766,7 @@ const replacementDict = {
 "Rapid-fire mode": "快速射击模式",
 "Healing Emitters": "治疗发射器",
 "Quasar": "类星体",
+"Excelsior": "精进者",
 "Heat Resistance": "耐热性",
 "Cold Resistance": "耐寒性",
 "Lightweight Construction": "轻型结构",
