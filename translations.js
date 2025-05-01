@@ -441,7 +441,6 @@ const replacementDict = {
 "Drop Mine": "掉落地雷",
 "shoot": "射击",
 "overdrive": "过速装置",
-"overdrives": "过速装置",
 "OD": "过速装置",
 "quick garage": "快速进入车库",
 "restore default buttons": "重置全部按键",
