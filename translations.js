@@ -94,7 +94,7 @@ const replacementDict = {
 'mode': '模式',
 'equipped': '装备',
 'equip': '装备',
-'team': '队伍',
+'team': '团队',
 'Team Deathmatch': '团队对战',
 'TDM': '团队对战',
 'Capture the Flag': '互夺军旗',
