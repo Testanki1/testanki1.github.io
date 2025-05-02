@@ -47,6 +47,7 @@ const replacementDict = {
 'Defender': '守卫者',
 'Hyperion': '亥伯龙神',
 'Crisis': '危机',
+'grenade': "手榴弹",
 'container': '幸运礼盒',
 'regular': '普通',
 'UT': '超高',
