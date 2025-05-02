@@ -1,19 +1,21 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      1.2.3
+// @version      1.3.0
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果等资源
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
-// @match        *://*.test-eu.tankionline.com/*
+// @match        *://*.test-eu.tankionline.com/browser-public/index.html*
 // @match        *://*.test-ru.tankionline.com/*
 // @grant        none
 // ==/UserScript==
 
 (function() {
 	'use strict';
-	const currentVersionCode = 18;
+	// --- START VERSION CHECK ---
+    const currentVersion = "1.3.0"
+	const currentVersionCode = 19
 	const versionUrl = 'https://testanki1.github.io/models/version.json';
 
 	fetch(versionUrl)
@@ -30,6 +32,7 @@
 			if (latestVersionCode > currentVersionCode) {
 				const message = `
                     资源替换脚本有新版本可用！
+                    当前版本：${currentVersion}
                     最新版本：${latestVersion}
                     更新内容：${updateInfo}
                 `;
@@ -41,8 +44,10 @@
 		.catch(error => {
 			console.error('更新检查失败:', error);
 		});
+	// --- END VERSION CHECK ---
 
 	const currentUrl = window.location.href;
+
 	const turretsRedirectMap = {
 		"firebird": {
 			"default": "573/113511/153/137/31167700271626",
@@ -68,7 +73,7 @@
 			"GT": "605/12655/270/246/31033604660301"
 		},
 		"tesla": {
-			"default": "567/20040/100/57/31167700274267",
+			"default": "567/20040/100/57/31254554136103",
 			"XT_HD": "567/20040/100/30/31033605140327",
 			"LC": "604/60235/244/25/31033605125726",
 			"RF": "616/167677/151/223/31033605130425"
@@ -168,7 +173,7 @@
 			"GT": "620/112773/325/5/31033610100325"
 		},
 		"hopper": {
-			"default": "564/5207/367/304/31167700276066",
+			"default": "564/5207/367/304/31244271140755",
 			"XT_HD": "564/41402/173/47/31033610315703",
 			"RF": "616/167677/151/211/31033607331063"
 		},
@@ -192,7 +197,7 @@
 			"DC": "604/7224/253/317/31033610256112"
 		},
 		"crusader": {
-			"default": "566/4547/232/306/31167700273327",
+			"default": "566/4547/232/306/31222260444020",
 			"XT_HD": "566/40410/335/237/31033610341433",
 			"RF": "607/24114/77/31/31033607224317"
 		},
@@ -226,8 +231,9 @@
 			"GT": "623/44515/116/176/31167700267466"
 		},
 		"ares": {
-			"default": "560/117661/334/334/31167700276015",
-			"XT_HD": "562/161162/24/375/31033610137021"
+			"default": "560/117661/334/334/31222260327005",
+			"XT_HD": "562/161162/24/375/31033610137021",
+            "RF": "626/36647/152/360/31310325573105"
 		},
 		"mammoth": {
 			"default": "600/67314/131/54/31167700271637",
@@ -254,10 +260,6 @@
 			"default": "601/166176/165/206/31167700267244",
 			"万圣节": "613/2501/252/46/30545000710615",
 			"新年_2025": "623/152656/155/20/31173045365546"
-		},
-		"sandbox_summer": {
-			"default": "570/174542/371/60/30544532052123",
-			"教程": "0/1/304/263/30741245714771"
 		},
 		"sandbox_winter": {
 			"default": "570/174542/371/61/30544540056777",
@@ -1152,10 +1154,12 @@
 	const hullsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
 	const turretsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|雪人)$/i;
 	const dronesPattern = /^(|XT)$/i;
-	const festivalsPattern = /^(|万圣节|新年_2025|节日季节 主题|新年 重制|教程)$/i;
-	const shotEffectsPattern = /^(|幻影黑|岩浆|粉红色|寒冷|毒|火|太阳|水|珊瑚礁|暗月|电|金|深红色|紫罗兰色|天空蓝|暴力|爆破手|黑暗|魔法|日食|神秘的红色|天空|虚空|血液|雪|正午|烟雾|危机)$/i;
-	const paintsPattern = /^(|橄榄绿|中国红|光谱|坦克币坦克|天空蓝|幻影黑|海蓝色|芥末|雪山飞狐|黄马甲|珊瑚色|苹果色|合金装备|平静|紫红色|褐红色|黄色|偏蓝色|紫罗兰色|金色|乌拉圭|喀麦隆|巴拿马|希腊|废墟|森林|法国|流沙|游击队|热带|磐石|红色城市|翡翠|锈斑|阿根廷|丛林杀手|五彩纸屑|俄罗斯|克罗地亚|冰岛|哥伦比亚|埃及|塞内加尔|威尔士|岩浆|意大利|摩洛哥|漩涡|智利|松针|比利时|沙漠|沼泽|波斯尼亚和黑塞哥维那|澳大利亚|瑞典|突尼斯|草原|葡萄牙|象牙海岸|雪松|风语者|加纳|墨西哥|巴西|幻影骑士|极地隐身|樱桃|洪都拉斯|海军|激浪|瑞士|秘鲁|美国|苔藓|阿尔及利亚|丛林|丹麦|伊朗伊斯兰共和国|像素|冬天|厄瓜多尔|哥斯达黎加|城市|塞尔维亚|尼日利亚|德国|日本|暴风雪|极地沼泽|毕加索|沙特阿拉伯|波兰|泥浆|火星|破绽|英格兰|荷兰|西班牙|隐身衣|韩国|万花筒|古典|斑纹|原子|外星伪装|宙斯|樱花|死亡骑士|涂鸦|火山|爱你一万年|牛仔裤|番茄玛丽|绿宝石|蜂巢|迪斯科|铁匠|龙鳞骑士|上帝之眼|伐木工|侵略者|像素心|初恋|地狱火|夜晚|宇宙空间|撒哈拉沙漠|毛线衣|浣熊|滑稽演员|犀牛|猛虎|碳纤|纳米|花火|蟒蛇|软花|金钱豹|链甲|镀铅|雪豹|非洲|52 区|E236|丁香花瓣|佩斯利冰|前卫派|包装长筒袜|声纳|游戏手柄|大都市|奇怪的鱼|帽子|恒星和火焰|抽象线条|撕碎|斯堪的那维亚|新年礼物|时尚坦克手|星光大道|春季花束|永恒|流行艺术|海滩|淘金者|烧焦|牛排|琥珀|生锈|病毒|睡衣|石灰爆裂|硅酸盐|祖母的沙发|神经元|神经网络|绿洲|落叶|蓝色几何|蓝色星球|薄荷|西瓜|超立方体|逆波|金星|钢微纤维|青柠|飞驰之星|450 纳米|UFO|VIP 迷彩|丑角|丰富的装饰品|亚当和夏娃|佩斯利火焰|俄罗斯方块|僵尸|冰霜|冷静兄弟！|创意工程师|化装舞会|压碎机|古奇旗子|可怕的事情|和平，工作，五月！|培乐多|塔兰图拉|复活节|外星人的秘密|外星人链甲|多米诺骨牌|大洋洲|天蓝|小木屋|山峰|巴布什卡的被子|干旱|平安夜|幻影|幻觉|彩色玻璃|微型砖石|微风|您所需要的是…|战舰|所有的好东西|故障|救生员|数独|新加坡|日落伪装|昆古尔冰洞|曲折|月球土壤|月球漫步者|木头迷彩|核能太阳|棒棒糖|橙色海胆|毯子|水彩画|波纹|流行它|液态金属|深蓝色像素|游戏玩家|火山喷发|火龙|炼乳|烤炉|烧烤|热带地区|狂野风格|玉鳞|环保型|珍贵的耳钉|理发店|白色星球|瞄准镜|矢量|礼物包装|神鸟|粉红色大象|红色星球|红色果酱|红色标记|红色西装|羽毛|翻滚|脉冲星|苏打水|草莓|芥麦|莫奈|莲花|蓝方块|蓝色果酱|薄荷糖|蛋糕|蜘蛛|观鸟者|视网膜|设计师氛围|越野车|路障胶带|进攻|远古巨龙|金光闪烁|钒|问题|陶艺家|雪花|雷暴球|靶子|飞镖|鱿鱼的手指|鹰眼|黑曜石|X 黑色|几何形状的霓虹灯|化学反应|困在内部|春天|正方体迷彩|片假名|篝火|网络手里剑|藤本植物|银砖|阴极射线管|雷达|LOL|七十年代的乐趣|不是一个灯笼|井字棋|像素等离子|兔子|全息|共生体|冰乱舞|冲浪|初吻|勇气|北极光|华丽的鳄鱼|南瓜浆果|卡普利亚特|印刷电路板|发光二极管|发光器|合金|在树下|地球人|赛博朋克|外星人再生|外星人皮肤|外星人绑架|外星星云|夜城|头部开膛手|宇宙爆炸|富士山|工艺剪刀|帕斯提拉|微生物学|快乐的季节|指北针|指尖玩具|搜捕|放射性果冻|旁观者|旋转器|时髦医学|时髦的霓虹灯|星座|构造板块|枫叶|梦魇|气候状况|泡泡糖|活体护甲|流动|流动的金属|流星雨|流行音乐合成器|火魔像|灵魂|烟幕|煎蛋|熔岩灯|爱的迷彩|獾-獾|玉兰|电动绵羊|电子人|电子蜂巢|眩晕|矩阵|破裂的光|碳星|神童 2.0|秘制酱料|符文|红色烟雾|纳米HUD|纳米防护装甲|绿色四边形|绿锆石|节日彩灯|荣誉|蓝色丁香|西伯利亚虎|视觉干扰者|触手|触摸寒冷|跳动的心|辉光|迅速蔓延|迪斯科 2.0|逆境|通感|遥远的北方|量子迷彩|金合金|金色齿轮|钢铁之心|钻石|铁丝网|银河|银河星爆|银河系|镍|防寒外套|集成电路|雷霆风暴|风扇|飞轮|马赛克|驾驶|魔术圈|鸭子|黑海|黑白|齿轮|三叶草小队|休斯顿坦克|佩佩加|免疫|冠军 1|冠军 2|冠军 3|冠军 4|冠军 5|冠军 6|冠军 7|冠军 8|勇气之火|南瓜泥|团队指针 1|团队指针 2|坦克-黑色|坦克猫|坦克的太阳|对开发人员|声望|新兵|奇点|妖精兄弟会|姜饼|强盗|怀旧之情|恐怖|愁云|手提袋|柑橘|毒|治安关|深红色|甜蜜的礼物|碎片|神圣|等离子体|红色通缉令|绿色随从|美洲驼坦克|黑兹尔装甲工程|黑色红宝石|退役机器人|雪域惊喜|青金石|青铜盔甲|高级监护人)$/i;
+	const festivalsPattern = /^(|万圣节|新年_2025|节日季节 主题|新年 重制)$/i;
+	const shotEffectsPattern = /^(|幻影黑|岩浆|粉红色|寒冷|毒|火|太阳|水|珊瑚礁|暗月|电|金|深红色|紫罗兰色|天空蓝|暴力|黑暗|日食|神秘的红色|天空|虚空|血液|雪|正午|烟雾|危机)$/i; // Added 危机
+	const paintsPattern = /^(|橄榄绿|中国红|光谱|坦克币坦克|天空蓝|幻影黑|海蓝色|芥末|雪山飞狐|黄马甲|珊瑚色|苹果色|合金装备|平静|紫红色|褐红色|黄色|偏蓝色|紫罗兰色|金色|乌拉圭|喀麦隆|巴拿马|希腊|废墟|森林|法国|流沙|游击队|热带|磐石|红色城市|翡翠|锈斑|阿根廷|丛林杀手|五彩纸屑|俄罗斯|克罗地亚|冰岛|哥伦比亚|埃及|塞内加尔|威尔士|岩浆|意大利|摩洛哥|漩涡|智利|松针|比利时|沙漠|沼泽|波斯尼亚和黑塞哥维那|澳大利亚|瑞典|突尼斯|草原|葡萄牙|象牙海岸|雪松|风语者|加纳|墨西哥|巴西|幻影骑士|极地隐身|樱桃|洪都拉斯|海军|激浪|瑞士|秘鲁|美国|苔藓|阿尔及利亚|丛林|丹麦|伊朗伊斯兰共和国|像素|冬天|厄瓜多尔|哥斯达黎加|城市|塞尔维亚|尼日利亚|德国|日本|暴风雪|极地沼泽|毕加索|沙特阿拉伯|波兰|泥浆|火星|破绽|英格兰|荷兰|西班牙|隐身衣|韩国|万花筒|古典|斑纹|原子|外星伪装|宙斯|樱花|死亡骑士|涂鸦|火山|爱你一万年|牛仔裤|番茄玛丽|绿宝石|蜂巢|迪斯科|铁匠|龙鳞骑士|上帝之眼|伐木工|侵略者|像素心|初恋|地狱火|夜晚|宇宙空间|撒哈拉沙漠|毛线衣|浣熊|滑稽演员|犀牛|猛虎|碳纤|纳米|花火|蟒蛇|软花|金钱豹|链甲|镀铅|雪豹|非洲|52 区|E236|丁香花瓣|佩斯利冰|前卫派|包装长筒袜|声纳|游戏手柄|大都市|奇怪的鱼|帽子|恒星和火焰|抽象线条|撕碎|斯堪的那维亚|新年礼物|时尚坦克手|星光大道|春季花束|永恒|流行艺术|海滩|淘金者|烧焦|牛排|琥珀|生锈|病毒|睡衣|石灰爆裂|硅酸盐|祖母的沙发|神经元|神经网络|绿洲|落叶|蓝色几何|蓝色星球|薄荷|西瓜|超立方体|逆波|金星|钢微纤维|青柠|飞驰之星|450 纳米|UFO|VIP 迷彩|丑角|丰富的装饰品|亚当和夏娃|佩斯利火焰|俄罗斯方块|僵尸|冰霜|冷静兄弟！|创意工程师|化装舞会|压碎机|古奇旗子|可怕的事情|和平，工作，五月！|培乐多|塔兰图拉|复活节|外星人的秘密|外星人链甲|多米诺骨牌|大洋洲|天蓝|小木屋|山峰|巴布什卡的被子|干旱|平安夜|幻影|幻觉|彩色玻璃|微型砖石|微风|您所需要的是…|战舰|所有的好东西|故障|救生员|数独|新加坡|日落伪装|昆古尔冰洞|曲折|月球土壤|月球漫步者|木头迷彩|核能太阳|棒棒糖|橙色海胆|毯子|水彩画|波纹|流行它|液态金属|深蓝色像素|游戏玩家|火山喷发|火龙|炼乳|烤炉|烧烤|热带地区|狂野风格|玉鳞|环保型|珍贵的耳钉|理发店|白色星球|瞄准镜|矢量|礼物包装|神鸟|粉红色大象|红色星球|红色果酱|红色标记|红色西装|羽毛|翻滚|脉冲星|苏打水|草莓|芥麦|莫奈|莲花|蓝方块|蓝色果酱|薄荷糖|蛋糕|蜘蛛|观鸟者|视网膜|设计师氛围|越野车|路障胶带|进攻|远古巨龙|金光闪烁|钒|问题|陶艺家|雪花|雷暴球|靶子|飞镖|鱿鱼的手指|鹰眼|黑曜石|X 黑色|几何形状的霓虹灯|化学反应|困在内部|春天|正方体迷彩|片假名|篝火|网络手里剑|藤本植物|银砖|阴极射线管|雷达|LOL|七十年代的乐趣|不是一个灯笼|井字棋|像素等离子|兔子|全息|共生体|冰乱舞|冲浪|初吻|勇气|北极光|华丽的鳄鱼|南瓜浆果|卡普利亚特|印刷电路板|发光二极管|发光器|合金|在树下|地球人|赛博朋克|外星人再生|外星人皮肤|外星人绑架|外星星云|夜城|头部开膛手|宇宙爆炸|富士山|工艺剪刀|帕斯提拉|微生物学|快乐的季节|指北针|指尖玩具|搜捕|放射性果冻|旁观者|旋转器|时髦医学|时髦的霓虹灯|星座|构造板块|枫叶|梦魇|气候状况|泡泡糖|活体护甲|流动|流动的金属|流星雨|流行音乐合成器|火魔像|灵魂|烟幕|煎蛋|熔岩灯|爱的迷彩|獾-獾|玉兰|电动绵羊|电子人|电子蜂巢|眩晕|矩阵|破裂的光|碳星|神童 2.0|秘制酱料|符文|红色烟雾|纳米HUD|纳米防护装甲|绿色四边形|绿锆石|节日彩灯|花火|荣誉|蓝色丁香|西伯利亚虎|视觉干扰者|触手|触摸寒冷|跳动的心|辉光|迅速蔓延|迪斯科 2.0|逆境|通感|遥远的北方|量子迷彩|金合金|金色齿轮|钢铁之心|钻石|铁丝网|银河|银河星爆|银河系|镍|防寒外套|集成电路|雷霆风暴|风扇|飞轮|马赛克|驾驶|魔术圈|鸭子|黑海|黑白|齿轮|三叶草小队|休斯顿坦克|佩佩加|免疫|冠军 1|冠军 2|冠军 3|冠军 4|冠军 5|冠军 6|冠军 7|冠军 8|勇气之火|南瓜泥|团队指针 1|团队指针 2|坦克-黑色|坦克猫|坦克的太阳|对开发人员|声望|新兵|奇点|妖精兄弟会|姜饼|强盗|怀旧之情|恐怖|愁云|手提袋|柑橘|毒|治安关|深红色|甜蜜的礼物|碎片|神圣|等离子体|红色通缉令|绿色随从|美洲驼坦克|银河系|黑兹尔装甲工程|黑色红宝石|退役机器人|钻石|雪域惊喜|青金石|青铜盔甲|高级监护人)$/i; // Added more paints
+	// --- END PATTERNS ---
 
+	// --- START GET LAST CHOICES ---
 	let lastHullChoice = localStorage.getItem('userChoiceHull') || '';
 	let lastTurretChoice = localStorage.getItem('userChoiceTurret') || '';
 	let lastDroneChoice = localStorage.getItem('userChoiceDrone') || '';
@@ -1163,82 +1167,177 @@
 	let lastShotEffectChoice = localStorage.getItem('userChoiceShotEffect') || '';
 	let lastOriginalPaintChoice = localStorage.getItem('originalChoicePaint') || '';
 	let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || '';
+	// --- END GET LAST CHOICES ---
 
+	// --- START HELPER FUNCTIONS ---
 	function getUserChoice(promptMessage, lastChoice, pattern, invalidMessage) {
 		let userChoice = prompt(promptMessage, lastChoice);
 		if (userChoice === null) {
+			return ''; // User cancelled
+		}
+		userChoice = userChoice.trim(); // Trim whitespace
+		// Allow empty input for "no replacement"
+		if (userChoice === '') {
 			return '';
-		} else {
-			while (!pattern.test(userChoice)) {
-				alert(invalidMessage);
-				userChoice = prompt(promptMessage, lastChoice);
-				if (userChoice === null) {
-					return '';
-				}
+		}
+		// Validate against pattern if not empty
+		while (!pattern.test(userChoice)) {
+			alert(invalidMessage);
+			userChoice = prompt(promptMessage, lastChoice);
+			if (userChoice === null) {
+				return ''; // User cancelled during re-prompt
+			}
+			userChoice = userChoice.trim();
+			if (userChoice === '') {
+				return ''; // Allow empty input during re-prompt
 			}
 		}
-		return userChoice;
+		return userChoice.toUpperCase(); // Standardize to uppercase for consistency
 	}
 
-	let userChoiceHull = getUserChoice(
-		"请选择要使用的底盘模型替换 (XT/XT_HD(XT 高清)/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/GT（跑车）/RF（复古未来）/SP（蒸汽朋克）)（点击取消可不进行替换）:",
-		lastHullChoice,
-		hullsPattern,
-		"输入无效，请输入有效的底盘皮肤系列：XT, XT_HD, LC, PR, UT, DC, GT, RF, SP"
-	);
+	function getPaintChoice(promptMessage, lastChoice, invalidMessage) {
+        // Paints need special handling because the map keys are Chinese
+		let userChoice = prompt(promptMessage, lastChoice);
+		if (userChoice === null) {
+			return ''; // User cancelled
+		}
+		userChoice = userChoice.trim(); // Trim whitespace
+		if (userChoice === '') {
+			return '';
+		}
+        // Check if the input (trimmed) exists as a key in the paint map's first level
+        // Requires paintsRedirectMap to be defined
+        /* // This check requires the paintsRedirectMap to be defined
+        if (!paintsRedirectMap || !paintsRedirectMap.paints || !paintsRedirectMap.paints[userChoice]) {
+             alert(invalidMessage);
+             // Re-prompt logic would go here, similar to getUserChoice
+             // For now, just return empty if invalid without re-prompting in this simplified version
+             return '';
+        }
+        */
+        // Simple validation using the pattern for now, as the map is omitted
+         while (!paintsPattern.test(userChoice)) {
+			alert(invalidMessage);
+			userChoice = prompt(promptMessage, lastChoice);
+			if (userChoice === null) {
+				return '';
+			}
+             userChoice = userChoice.trim();
+             if (userChoice === '') {
+                 return '';
+             }
+		}
 
-	let userChoiceTurret = getUserChoice(
-		"请选择要使用的炮塔模型替换 (XT/XT_HD（XT 高清）/LC（遗产）/PR（青春）/UT（超高）/DC（恶魔）/DC_OLD（恶魔旧）/IC（冰）/GT（跑车）/RF（复古未来）/SE（秘密）/SP（蒸汽朋克）)（点击取消可不进行替换）:",
-		lastTurretChoice,
-		turretsPattern,
-		"输入无效，请输入有效的炮塔皮肤系列：XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP"
-	);
+		return userChoice; // Return the exact input (case might matter for map keys)
+	}
+	// --- END HELPER FUNCTIONS ---
 
-	let userChoiceDrone = getUserChoice(
-		"请选择要使用的无人机模型替换 (XT)（点击取消可不进行替换）:",
-		lastDroneChoice,
-		dronesPattern,
-		"输入无效，请输入有效的无人机皮肤系列：XT"
-	);
+	// --- START USER INTERACTION ---
+	let userChoiceHull, userChoiceTurret, userChoiceDrone, userChoiceFestival, userChoiceShotEffect, originalChoicePaint, newChoicePaint;
+	let reuseLastChoices = false;
 
-	let userChoiceFestival = getUserChoice(
-		"请选择要使用的节日替换 (万圣节/新年_2025)（点击取消可不进行替换）:",
-		lastFestivalChoice,
-		festivalsPattern,
-		"输入无效，请输入有效的节日：万圣节, 新年_2025"
-	);
+	// Check if there are any saved choices
+	if (lastHullChoice || lastTurretChoice || lastDroneChoice || lastFestivalChoice || lastShotEffectChoice || (lastOriginalPaintChoice && lastNewPaintChoice) ) {
+		const lastChoicesSummary = `
+            上次选择：
+            底盘: ${lastHullChoice || '无'}
+            炮塔: ${lastTurretChoice || '无'}
+            无人机: ${lastDroneChoice || '无'}
+            节日: ${lastFestivalChoice || '无'}
+            射击效果: ${lastShotEffectChoice || '无'}
+            迷彩: ${lastOriginalPaintChoice || '无'} → ${lastNewPaintChoice || '无'}
 
-	let userChoiceShotEffect = getUserChoice(
-		"请选择要使用的射击效果替换 (幻影黑/岩浆/粉红色/寒冷/毒/火/太阳/水/珊瑚礁/暗月/电/金/深红色/紫罗兰色/天空蓝/暴力/黑暗/日食/神秘的红色/天空/虚空/血液/雪/正午/烟雾)（点击取消可不进行替换，爆破手和魔法不支持，只有音效）:",
-		lastShotEffectChoice,
-		shotEffectsPattern,
-		"输入无效，请输入有效的射击效果：幻影黑, 岩浆, 粉红色, 寒冷, 毒, 火, 太阳, 水, 珊瑚礁, 暗月, 电, 金, 深红色, 紫罗兰色, 天空蓝, 暴力, 黑暗, 日食, 神秘的红色, 天空, 虚空, 血液, 雪, 正午, 烟雾"
-	);
+            是否沿用上次的选择？ (点击 取消 重新选择)
+        `;
+		if (confirm(lastChoicesSummary)) {
+			reuseLastChoices = true;
+			userChoiceHull = lastHullChoice;
+			userChoiceTurret = lastTurretChoice;
+			userChoiceDrone = lastDroneChoice;
+			userChoiceFestival = lastFestivalChoice;
+			userChoiceShotEffect = lastShotEffectChoice;
+			originalChoicePaint = lastOriginalPaintChoice;
+			newChoicePaint = lastNewPaintChoice;
+		}
+	}
 
-	let originalChoicePaint = getUserChoice(
-		"请选择待替换迷彩（点击取消可不进行替换。若替换为动画迷彩，请确保原迷彩为动画迷彩，否则将显示为静态：若替换为非动画迷彩，请确保原迷彩为非动画迷彩，否则将发生系统错误）:",
-		lastOriginalPaintChoice,
-		paintsPattern,
-		"输入无效，请输入有效的迷彩"
-	);
+	// If not reusing last choices, prompt the user
+	if (!reuseLastChoices) {
+		userChoiceHull = getUserChoice(
+			"请选择要使用的底盘模型替换 (留空不替换)\n可用: XT, XT_HD, LC, PR, UT, DC, GT, RF, SP",
+			lastHullChoice,
+			hullsPattern,
+			"输入无效，请输入有效的底盘皮肤系列或留空"
+		);
 
-	let newChoicePaint = getUserChoice(
-		"请选择要使用的替换后迷彩（点击取消可不进行替换。若替换为动画迷彩，请确保原迷彩为动画迷彩，否则将显示为静态：若替换为非动画迷彩，请确保原迷彩为非动画迷彩，否则将发生系统错误）:",
-		lastNewPaintChoice,
-		paintsPattern,
-		"输入无效，请输入有效的迷彩"
-	);
+		userChoiceTurret = getUserChoice(
+			"请选择要使用的炮塔模型替换 (留空不替换)\n可用: XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP, 雪人",
+			lastTurretChoice,
+			turretsPattern,
+			"输入无效，请输入有效的炮塔皮肤系列或留空"
+		);
 
-	const confirmationMessage = `
-    您选择了：
-    底盘 ${userChoiceHull ? userChoiceHull.toUpperCase() : '不替换'}
-    炮塔 ${userChoiceTurret ? userChoiceTurret.toUpperCase() : '不替换'}
-    无人机 ${userChoiceDrone ? userChoiceDrone.toUpperCase() : '不替换'}
-    节日 ${userChoiceFestival ? userChoiceFestival.toUpperCase() : '不替换'}
-    射击效果 ${userChoiceShotEffect ? userChoiceShotEffect.toUpperCase() : '不替换'}
-    迷彩 ${originalChoicePaint ? originalChoicePaint.toUpperCase() : '不替换'} → ${newChoicePaint ? newChoicePaint.toUpperCase() : '不替换'}。
-    点击确定继续。`;
-	if (confirm(confirmationMessage)) {
+		userChoiceDrone = getUserChoice(
+			"请选择要使用的无人机模型替换 (留空不替换)\n可用: XT",
+			lastDroneChoice,
+			dronesPattern,
+			"输入无效，请输入有效的无人机皮肤系列或留空"
+		);
+
+		userChoiceFestival = getUserChoice(
+            "请选择要使用的节日替换 (留空不替换)\n可用: 万圣节, 新年_2025", // Added options
+			lastFestivalChoice,
+			festivalsPattern,
+			"输入无效，请输入有效的节日或留空"
+		);
+
+		userChoiceShotEffect = getUserChoice(
+			"请选择要使用的射击效果替换 (留空不替换)\n可用: 幻影黑, 岩浆, 粉红色, 寒冷, 毒, 火, 太阳, 水, 珊瑚礁, 暗月, 电, 金, 深红色, 紫罗兰色, 天空蓝, 暴力, 黑暗, 日食, 神秘的红色, 天空, 虚空, 血液, 雪, 正午, 烟雾", // Added 危机
+			lastShotEffectChoice,
+			shotEffectsPattern,
+			"输入无效，请输入有效的射击效果或留空"
+		);
+
+        // Use getPaintChoice for paints as keys are specific strings
+		originalChoicePaint = getPaintChoice(
+			"请选择待替换迷彩 (留空不替换)\n(提示: 动画/非动画需匹配，否则可能出错)",
+			lastOriginalPaintChoice,
+			"输入无效，请输入有效的迷彩名称或留空"
+		);
+
+        // Only ask for new paint if original paint was selected
+		if (originalChoicePaint) {
+			newChoicePaint = getPaintChoice(
+				`选择要将 [${originalChoicePaint}] 替换为哪个迷彩？ (留空不替换)`,
+				lastNewPaintChoice,
+				"输入无效，请输入有效的迷彩名称或留空"
+			);
+            // If user cancels new paint selection, cancel the paint swap
+            if (!newChoicePaint) {
+                originalChoicePaint = '';
+            }
+		} else {
+            newChoicePaint = ''; // Ensure new paint is empty if original is empty
+        }
+	}
+	// --- END USER INTERACTION ---
+
+
+	// --- START APPLY CHOICES ---
+	const finalConfirmationMessage = `
+        将应用以下替换：
+        底盘: ${userChoiceHull || '不替换'}
+        炮塔: ${userChoiceTurret || '不替换'}
+        无人机: ${userChoiceDrone || '不替换'}
+        节日: ${userChoiceFestival || '不替换'}
+        射击效果: ${userChoiceShotEffect || '不替换'}
+        迷彩: ${originalChoicePaint ? `[${originalChoicePaint}] → [${newChoicePaint}]` : '不替换'}
+
+        点击 确定 继续应用替换。
+    `;
+
+	if (confirm(finalConfirmationMessage)) {
+		// Save choices whether reused or newly selected
 		localStorage.setItem('userChoiceHull', userChoiceHull);
 		localStorage.setItem('userChoiceTurret', userChoiceTurret);
 		localStorage.setItem('userChoiceDrone', userChoiceDrone);
@@ -1247,115 +1346,179 @@
 		localStorage.setItem('originalChoicePaint', originalChoicePaint);
 		localStorage.setItem('newChoicePaint', newChoicePaint);
 
+		// --- Resource Replacement Logic ---
+        // [!] This part requires the redirect maps to be defined above!
+
 		function replaceResources(redirectMap, userChoice) {
-			if (userChoice && redirectMap[userChoice]) {
-				const map = redirectMap;
-				document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-					for (const key in map) {
-						if (tag.src && tag.src.includes(map[key].default)) {
-							const newSrc = map[key][userChoice];
-							if (newSrc) {
-								tag.src = tag.src.replace(map[key].default, newSrc);
-							}
-						}
-						if (tag.href && tag.href.includes(map[key].default)) {
-							const newHref = map[key][userChoice];
-							if (newHref) {
-								tag.href = tag.href.replace(map[key].default, newHref);
-							}
-						}
-					}
-				});
+            // Check if the map and choice are valid before proceeding
+            if (!redirectMap || !userChoice) {
+                // console.log('Skipping replacement: Invalid map or choice.', redirectMap, userChoice);
+                return;
+            }
+
+			const choiceKey = userChoice.toUpperCase(); // Use standardized key
+
+			// Iterate over main categories (e.g., "firebird", "wasp")
+			for (const categoryKey in redirectMap) {
+                const categoryMap = redirectMap[categoryKey];
+                // Check if the category exists and has a 'default' and the chosen skin
+                if (categoryMap && categoryMap.default && categoryMap[choiceKey]) {
+                    const defaultResource = categoryMap.default;
+                    const targetResource = categoryMap[choiceKey];
+
+                    // Apply to existing DOM elements (less common now with dynamic loading)
+                    document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
+                        if (tag.src && tag.src.includes(defaultResource)) {
+                            tag.src = tag.src.replace(defaultResource, targetResource);
+                            // console.log(`Replaced DOM src: ${defaultResource} -> ${targetResource}`);
+                        }
+                        if (tag.href && tag.href.includes(defaultResource)) {
+                            tag.href = tag.href.replace(defaultResource, targetResource);
+                             // console.log(`Replaced DOM href: ${defaultResource} -> ${targetResource}`);
+                        }
+                    });
+                }
 			}
 		}
 
-		replaceResources(hullsRedirectMap, userChoiceHull);
-		replaceResources(turretsRedirectMap, userChoiceTurret);
-		replaceResources(dronesRedirectMap, userChoiceDrone);
-		replaceResources(festivalsRedirectMap, userChoiceFestival);
-		replaceResources(shotEffectsRedirectMap, userChoiceShotEffect);
+        function replacePaintResources(paintMap, originalPaint, newPaint) {
+             if (!paintMap || !paintMap.paints || !originalPaint || !newPaint || !paintMap.paints[originalPaint] || !paintMap.paints[newPaint]) {
+                // console.log('Skipping paint replacement: Invalid map or paints.', paintMap, originalPaint, newPaint);
+                return;
+            }
+            const originalResource = paintMap.paints[originalPaint];
+            const newResource = paintMap.paints[newPaint];
 
-		if (originalChoicePaint && paintsRedirectMap[originalChoicePaint] && newChoicePaint && paintsRedirectMap[newChoicePaint]) {
-			const paintMap = paintsRedirectMap;
-			document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-				for (const key in paintMap) {
-					if (tag.src && tag.src.includes(paintMap[key][originalChoicePaint])) {
-						const oldSrc = paintMap[key][originalChoicePaint];
-						const newSrc = paintMap[key][newChoicePaint];
-						if (newSrc) {
-							tag.src = tag.src.replace(oldSrc, newSrc);
-						}
-					}
-					if (tag.href && tag.href.includes(paintMap[key][originalChoicePaint])) {
-						const oldHref = paintMap[key][originalChoicePaint];
-						const newHref = paintMap[key][newChoicePaint];
-						if (newHref) {
-							tag.href = tag.href.replace(oldHref, newHref);
-						}
-					}
-				}
-			});
-		}
+             if (!originalResource || !newResource) {
+                // console.log('Skipping paint replacement: Missing resource ID.', originalResource, newResource);
+                return;
+            }
 
+            document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
+                if (tag.src && tag.src.includes(originalResource)) {
+                    tag.src = tag.src.replace(originalResource, newResource);
+                     // console.log(`Replaced DOM Paint src: ${originalResource} -> ${newResource}`);
+                }
+                if (tag.href && tag.href.includes(originalResource)) {
+                    tag.href = tag.href.replace(originalResource, newResource);
+                    // console.log(`Replaced DOM Paint href: ${originalResource} -> ${newResource}`);
+                }
+            });
+        }
+
+
+        // Apply replacements if maps were defined
+        if (typeof hullsRedirectMap !== 'undefined') replaceResources(hullsRedirectMap, userChoiceHull);
+        if (typeof turretsRedirectMap !== 'undefined') replaceResources(turretsRedirectMap, userChoiceTurret);
+        if (typeof dronesRedirectMap !== 'undefined') replaceResources(dronesRedirectMap, userChoiceDrone);
+        if (typeof festivalsRedirectMap !== 'undefined') replaceResources(festivalsRedirectMap, userChoiceFestival);
+        if (typeof shotEffectsRedirectMap !== 'undefined') replaceResources(shotEffectsRedirectMap, userChoiceShotEffect);
+        if (typeof paintsRedirectMap !== 'undefined' && originalChoicePaint && newChoicePaint) {
+            replacePaintResources(paintsRedirectMap, originalChoicePaint, newChoicePaint);
+        }
+
+
+		// --- Intercept Fetch and XHR ---
 		const originalFetch = window.fetch;
 		window.fetch = function(input, init) {
 			if (typeof input === 'string') {
-				function replaceInputResource(input, redirectMap, userChoice) {
-					const choiceKey = userChoice.toUpperCase();
-					for (const key in redirectMap) {
-						if (input.includes(redirectMap[key].default) && redirectMap[key][choiceKey]) {
-							input = input.replace(redirectMap[key].default, redirectMap[key][choiceKey]);
-							break;
-						}
-					}
-					return input;
-				}
+                // Helper for fetch/XHR replacement
+                function replaceRequestUrl(url, redirectMap, userChoice) {
+                    if (!redirectMap || !userChoice) return url;
+                    const choiceKey = userChoice.toUpperCase();
+                    for (const categoryKey in redirectMap) {
+                        const categoryMap = redirectMap[categoryKey];
+                         if (categoryMap && categoryMap.default && categoryMap[choiceKey] && url.includes(categoryMap.default)) {
+                            // console.log(`Fetch replacing ${categoryMap.default} with ${categoryMap[choiceKey]} in ${url}`);
+                            return url.replace(categoryMap.default, categoryMap[choiceKey]);
+                        }
+                    }
+                    return url;
+                }
+                 function replacePaintRequestUrl(url, paintMap, originalPaint, newPaint) {
+                    if (!paintMap || !paintMap.paints || !originalPaint || !newPaint || !paintMap.paints[originalPaint] || !paintMap.paints[newPaint]) {
+                        return url;
+                    }
+                    const originalResource = paintMap.paints[originalPaint];
+                    const newResource = paintMap.paints[newPaint];
+                     if (!originalResource || !newResource) return url;
 
-				input = replaceInputResource(input, hullsRedirectMap, userChoiceHull);
-				input = replaceInputResource(input, turretsRedirectMap, userChoiceTurret);
-				input = replaceInputResource(input, dronesRedirectMap, userChoiceDrone);
-				input = replaceInputResource(input, festivalsRedirectMap, userChoiceFestival);
-				input = replaceInputResource(input, shotEffectsRedirectMap, userChoiceShotEffect);
+                    if (url.includes(originalResource)) {
+                        // console.log(`Fetch replacing Paint ${originalResource} with ${newResource} in ${url}`);
+                        return url.replace(originalResource, newResource);
+                    }
+                    return url;
+                }
 
-				for (const key in paintsRedirectMap) {
-					if (input.includes(paintsRedirectMap[key][originalChoicePaint.toUpperCase()]) && paintsRedirectMap[key][newChoicePaint.toUpperCase()]) {
-						input = input.replace(paintsRedirectMap[key][originalChoicePaint.toUpperCase()], paintsRedirectMap[key][newChoicePaint.toUpperCase()]);
-						break;
-					}
-				}
+                // Apply replacements
+                if (typeof hullsRedirectMap !== 'undefined') input = replaceRequestUrl(input, hullsRedirectMap, userChoiceHull);
+                if (typeof turretsRedirectMap !== 'undefined') input = replaceRequestUrl(input, turretsRedirectMap, userChoiceTurret);
+                if (typeof dronesRedirectMap !== 'undefined') input = replaceRequestUrl(input, dronesRedirectMap, userChoiceDrone);
+                if (typeof festivalsRedirectMap !== 'undefined') input = replaceRequestUrl(input, festivalsRedirectMap, userChoiceFestival);
+                if (typeof shotEffectsRedirectMap !== 'undefined') input = replaceRequestUrl(input, shotEffectsRedirectMap, userChoiceShotEffect);
+                if (typeof paintsRedirectMap !== 'undefined' && originalChoicePaint && newChoicePaint) {
+                     input = replacePaintRequestUrl(input, paintsRedirectMap, originalChoicePaint, newChoicePaint);
+                }
 			}
 			return originalFetch(input, init);
 		};
 
 		const originalOpen = XMLHttpRequest.prototype.open;
 		XMLHttpRequest.prototype.open = function(method, url) {
-			function replaceUrlResource(url, redirectMap, userChoice) {
-				const choiceKey = userChoice.toUpperCase();
-				for (const key in redirectMap) {
-					if (url.includes(redirectMap[key].default) && redirectMap[key][choiceKey]) {
-						url = url.replace(redirectMap[key].default, redirectMap[key][choiceKey]);
-						break; // 找到第一个匹配后就停止替换
-					}
-				}
-				return url;
-			}
+            // Use the same helper functions as fetch
+            function replaceRequestUrl(url, redirectMap, userChoice) {
+                 if (!redirectMap || !userChoice) return url;
+                 const choiceKey = userChoice.toUpperCase();
+                 for (const categoryKey in redirectMap) {
+                     const categoryMap = redirectMap[categoryKey];
+                      if (categoryMap && categoryMap.default && categoryMap[choiceKey] && url.includes(categoryMap.default)) {
+                         // console.log(`XHR replacing ${categoryMap.default} with ${categoryMap[choiceKey]} in ${url}`);
+                         return url.replace(categoryMap.default, categoryMap[choiceKey]);
+                     }
+                 }
+                 return url;
+             }
+            function replacePaintRequestUrl(url, paintMap, originalPaint, newPaint) {
+                 if (!paintMap || !paintMap.paints || !originalPaint || !newPaint || !paintMap.paints[originalPaint] || !paintMap.paints[newPaint]) {
+                     return url;
+                 }
+                 const originalResource = paintMap.paints[originalPaint];
+                 const newResource = paintMap.paints[newPaint];
+                 if (!originalResource || !newResource) return url;
 
-			url = replaceUrlResource(url, hullsRedirectMap, userChoiceHull);
-			url = replaceUrlResource(url, turretsRedirectMap, userChoiceTurret);
-			url = replaceUrlResource(url, dronesRedirectMap, userChoiceDrone);
-			url = replaceUrlResource(url, festivalsRedirectMap, userChoiceFestival);
-			url = replaceUrlResource(url, shotEffectsRedirectMap, userChoiceShotEffect);
+                 if (url.includes(originalResource)) {
+                    // console.log(`XHR replacing Paint ${originalResource} with ${newResource} in ${url}`);
+                    return url.replace(originalResource, newResource);
+                 }
+                 return url;
+            }
 
-			for (const key in paintsRedirectMap) {
-				if (url.includes(paintsRedirectMap[key][originalChoicePaint.toUpperCase()]) && paintsRedirectMap[key][newChoicePaint.toUpperCase()]) {
-					url = url.replace(paintsRedirectMap[key][originalChoicePaint.toUpperCase()], paintsRedirectMap[key][newChoicePaint.toUpperCase()]);
-					break;
-				}
-			}
+
+            // Apply replacements
+            if (typeof hullsRedirectMap !== 'undefined') url = replaceRequestUrl(url, hullsRedirectMap, userChoiceHull);
+            if (typeof turretsRedirectMap !== 'undefined') url = replaceRequestUrl(url, turretsRedirectMap, userChoiceTurret);
+            if (typeof dronesRedirectMap !== 'undefined') url = replaceRequestUrl(url, dronesRedirectMap, userChoiceDrone);
+            if (typeof festivalsRedirectMap !== 'undefined') url = replaceRequestUrl(url, festivalsRedirectMap, userChoiceFestival);
+            if (typeof shotEffectsRedirectMap !== 'undefined') url = replaceRequestUrl(url, shotEffectsRedirectMap, userChoiceShotEffect);
+            if (typeof paintsRedirectMap !== 'undefined' && originalChoicePaint && newChoicePaint) {
+                 url = replacePaintRequestUrl(url, paintsRedirectMap, originalChoicePaint, newChoicePaint);
+            }
+
 			originalOpen.call(this, method, url);
 		};
+		// --- End Intercept Fetch and XHR ---
 
 	} else {
-		alert("选择已取消，页面将继续加载原始内容。");
+		alert("替换已取消，页面将加载原始内容。");
+        // Clear saved choices if user cancels the final confirmation
+		localStorage.removeItem('userChoiceHull');
+		localStorage.removeItem('userChoiceTurret');
+		localStorage.removeItem('userChoiceDrone');
+		localStorage.removeItem('userChoiceFestival');
+		localStorage.removeItem('userChoiceShotEffect');
+		localStorage.removeItem('originalChoicePaint');
+		localStorage.removeItem('newChoicePaint');
 	}
+	// --- END APPLY CHOICES ---
+
 })();
