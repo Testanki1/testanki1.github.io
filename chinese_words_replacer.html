@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克国服屏蔽词替换器</title> <!-- Title also converted for consistency -->
+    <title>3D坦克国服屏蔽词替换器</title> <!-- Title remains standard width -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
@@ -34,16 +34,9 @@
             color: #ffffff;
             text-align: center;
             margin-bottom: 25px;
-            /* Apply conversion to H1 text */
-            font-feature-settings: "fwid"; /* Attempt CSS-based full-width, might not work universally for numbers/letters */
-            /* Manual conversion might be needed if CSS doesn't work */
+            /* Removed font-feature-settings: "fwid"; */
         }
-        /* Manually convert H1 title text */
-        h1::before {
-             content: "3D坦克国服屏蔽词替换器"; /* Content replaced by JS below */
-        }
-        h1 > span { display: none; } /* Hide original H1 text if using ::before */
-
+        /* Removed h1::before and h1 > span styles */
 
         label {
             display: block;
@@ -104,8 +97,8 @@
 </head>
 <body>
     <div class="container">
-        <!-- H1 content will be set by JS -->
-        <h1><span>3D坦克国服屏蔽词替换器</span></h1>
+        <!-- H1 content is now static HTML -->
+        <h1>3D坦克国服屏蔽词替换器</h1>
 
         <label for="inputText">输入文本:</label>
         <textarea id="inputText" placeholder="在这里输入需要处理的文字... 例如: abc 123 飞"></textarea>
@@ -119,10 +112,24 @@
     <script>
         // --- 屏蔽词字典 ---
         // 格式: "屏蔽词": "替换词"
-        // 注意：屏蔽词现在也可能包含全角字符，如果它们是由半角转换来的
         const censorDictionary = {
             "飞": "非",
             "服": "浮",
+            "挂": "絓",
+            "发": "乏",
+            "法": "氵‪去",
+            "客": "恪",
+            "官方": "官‪方",
+            "斌": "文武",
+            "号": "好",
+            "转化": "转‪化",
+            "管理": "管‪理",
+            "买": "么矮",
+            "卖": "么爱",
+            "出": "岀",
+            "狗": "訽",
+            "猪": "豬",
+            // Add more mappings as needed
             "测试词": "替换成功"
         };
         // --------------------
@@ -130,48 +137,16 @@
         const inputText = document.getElementById('inputText');
         const outputText = document.getElementById('outputText');
         const copyButton = document.getElementById('copyButton');
-        const h1Element = document.querySelector('h1 span'); // Get the span inside h1
+        // Removed h1Element selector as it's no longer needed for JS manipulation
 
-        // Function to convert half-width ASCII numbers and letters to full-width
-        function toFullWidth(str) {
-            let result = '';
-            for (let i = 0; i < str.length; i++) {
-                const charCode = str.charCodeAt(i);
+        // Removed toFullWidth function definition
 
-                // Check for half-width numbers (0-9)
-                if (charCode >= 48 && charCode <= 57) {
-                    result += String.fromCharCode(charCode + 0xFEE0);
-                }
-                // Check for half-width uppercase letters (A-Z)
-                else if (charCode >= 65 && charCode <= 90) {
-                    result += String.fromCharCode(charCode + 0xFEE0);
-                }
-                // Check for half-width lowercase letters (a-z)
-                else if (charCode >= 97 && charCode <= 122) {
-                    result += String.fromCharCode(charCode + 0xFEE0);
-                }
-                // Keep other characters as they are
-                else {
-                    result += str[i];
-                }
-            }
-            return result;
-        }
-
-        // Convert H1 title text to full-width
-        if (h1Element) {
-            h1Element.textContent = toFullWidth(h1Element.textContent);
-        }
-         // Also convert the main title tag
-        document.title = toFullWidth(document.title);
-
-
-        // 替换函数 (Now operates on text potentially containing full-width chars)
+        // 替换函数 (Operates on original text)
         function replaceCensoredWords(text) {
             let processedText = text;
             // 遍历字典中的每一个屏蔽词
             for (const key in censorDictionary) {
-                if (censorDictionary.hasOwnProperty(key)) {
+                if (censorDictionary.hasOwnProperty(key) && key !== "") { // Ensure key is not empty
                     // 使用 RegExp 进行全局替换，以处理字符串中的所有出现
                     // 'g' flag for global replacement
                     // Escape special regex characters in the key
@@ -186,10 +161,8 @@
         // 监听输入框的输入事件
         inputText.addEventListener('input', () => {
             const originalText = inputText.value;
-            // 1. Convert to full-width first
-            const fullWidthText = toFullWidth(originalText);
-            // 2. Then replace censored words
-            const replacedText = replaceCensoredWords(fullWidthText);
+            // Directly replace censored words on the original text
+            const replacedText = replaceCensoredWords(originalText);
             outputText.value = replacedText;
         });
 
@@ -197,41 +170,36 @@
         copyButton.addEventListener('click', () => {
             const textToCopy = outputText.value;
             if (!textToCopy) {
-                // Convert alert text to full-width
-                 alert(toFullWidth("没有内容可以复制！"));
+                 // Alert text is standard width now
+                 alert("没有内容可以复制！");
                 return;
             }
+
+            // Store original button text (standard width)
+            const originalButtonText = copyButton.textContent;
 
             // 使用 navigator.clipboard API 复制文本
             navigator.clipboard.writeText(textToCopy)
                 .then(() => {
                     // 复制成功提示
-                    const originalButtonText = copyButton.textContent;
-                    // Convert button text to full-width
-                    copyButton.textContent = toFullWidth('已复制!');
+                    // Button text is standard width now
+                    copyButton.textContent = '已复制!';
                     copyButton.style.backgroundColor = '#4CAF50'; // 暂时变绿表示成功
 
                     // 1.5秒后恢复按钮文字和颜色
                     setTimeout(() => {
-                        copyButton.textContent = toFullWidth(originalButtonText); // Restore original text (also converted)
+                        copyButton.textContent = originalButtonText; // Restore original standard width text
                         copyButton.style.backgroundColor = '#76FF33'; // 恢复原色
                     }, 1500);
                 })
                 .catch(err => {
                     console.error('无法复制文本: ', err);
-                     // Convert alert text to full-width
-                    alert(toFullWidth('复制失败，您的浏览器可能不支持或权限不足。请尝试手动复制。'));
+                     // Alert text is standard width now
+                    alert('复制失败，您的浏览器可能不支持或权限不足。请尝试手动复制。');
                 });
         });
 
-        // Initialize button text with full-width conversion
-        copyButton.textContent = toFullWidth(copyButton.textContent);
-
-         // Also convert labels
-         document.querySelectorAll('label').forEach(label => {
-             label.textContent = toFullWidth(label.textContent);
-         });
-
+        // Removed initial full-width conversion for button and labels
     </script>
 </body>
 </html>
