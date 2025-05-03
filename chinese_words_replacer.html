@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D坦克国服屏蔽词替换器</title>
+    <style>
+        body {
+            background-color: #001926; /* 网页背景颜色 */
+            color: #cccccc; /* 默认文字颜色，浅灰色以便在深色背景上阅读 */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* 使内容垂直居中 */
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: #002a3f; /* 容器的背景色，比body稍亮一点 */
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            width: 90%;
+            max-width: 600px; /* 限制最大宽度 */
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #aaddff; /* 标签颜色 */
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px; /* 最小高度 */
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #004466; /* 边框颜色 */
+            border-radius: 4px;
+            background-color: #001f33; /* 文本区域背景色 */
+            color: #e0e0e0; /* 文本区域文字颜色 */
+            font-size: 1em;
+            box-sizing: border-box; /* 防止padding撑开宽度 */
+            resize: vertical; /* 允许用户垂直调整大小 */
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #76FF33; /* 聚焦时边框变亮绿色 */
+            box-shadow: 0 0 5px rgba(118, 255, 51, 0.5);
+        }
+
+        #outputText {
+            background-color: #001520; /* 输出区域背景色稍暗 */
+            cursor: default; /* 表明不可编辑 */
+        }
+
+        button {
+            background-color: #76FF33; /* 按钮颜色 */
+            color: #001926; /* 按钮文字颜色，深色 */
+            border: none;
+            padding: 12px 25px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            display: block; /* 使按钮独占一行 */
+            width: 100%; /* 按钮宽度充满容器 */
+            box-sizing: border-box;
+        }
+
+        button:hover {
+            background-color: #68ef25; /* 鼠标悬停时颜色变深一点 */
+        }
+        
+        button:active {
+             transform: scale(0.98); /* 点击时轻微缩小 */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3D坦克国服屏蔽词替换器</h1>
+
+        <label for="inputText">输入文本:</label>
+        <textarea id="inputText" placeholder="在这里输入需要处理的文字..."></textarea>
+
+        <label for="outputText">替换结果:</label>
+        <textarea id="outputText" readonly placeholder="替换后的文字将显示在这里..."></textarea>
+
+        <button id="copyButton">复制结果</button>
+    </div>
+
+    <script>
+        // --- 屏蔽词字典 ---
+        // 格式: "屏蔽词": "替换词"
+        const censorDictionary = {
+            "飞": "非",
+            "服": "浮",
+            "挂": "高科技", // 示例：添加更多词
+            "挂壁": "高手",  // 示例
+            "傻逼": "可爱",  // 示例
+            "操": "cao",   // 示例
+            "尼玛": "好样的", // 示例
+            "TMD": "哇哦",  // 示例
+            // 在这里添加更多需要替换的词语和它们的替换词
+            "测试词": "替换成功" 
+        };
+        // --------------------
+
+        const inputText = document.getElementById('inputText');
+        const outputText = document.getElementById('outputText');
+        const copyButton = document.getElementById('copyButton');
+
+        // 替换函数
+        function replaceCensoredWords(text) {
+            let processedText = text;
+            // 遍历字典中的每一个屏蔽词
+            for (const key in censorDictionary) {
+                if (censorDictionary.hasOwnProperty(key)) {
+                    // 使用 String.prototype.replaceAll 进行全局替换
+                    // 注意：这会区分大小写。如果需要不区分，需要用正则表达式。
+                    // 为了简单起见，这里使用区分大小写的replaceAll。
+                    // 如果屏蔽词包含正则表达式特殊字符，直接用字符串替换是安全的。
+                    processedText = processedText.replaceAll(key, censorDictionary[key]);
+                }
+            }
+            return processedText;
+        }
+
+        // 监听输入框的输入事件
+        inputText.addEventListener('input', () => {
+            const originalText = inputText.value;
+            const replacedText = replaceCensoredWords(originalText);
+            outputText.value = replacedText;
+        });
+
+        // 监听复制按钮的点击事件
+        copyButton.addEventListener('click', () => {
+            const textToCopy = outputText.value;
+            if (!textToCopy) {
+                alert("没有内容可以复制！");
+                return;
+            }
+
+            // 使用 navigator.clipboard API 复制文本
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                    // 复制成功提示
+                    const originalButtonText = copyButton.textContent;
+                    copyButton.textContent = '已复制!';
+                    copyButton.style.backgroundColor = '#4CAF50'; // 暂时变绿表示成功
+                    
+                    // 1.5秒后恢复按钮文字和颜色
+                    setTimeout(() => {
+                        copyButton.textContent = originalButtonText;
+                        copyButton.style.backgroundColor = '#76FF33'; // 恢复原色
+                    }, 1500);
+                })
+                .catch(err => {
+                    console.error('无法复制文本: ', err);
+                    alert('复制失败，您的浏览器可能不支持或权限不足。请尝试手动复制。');
+                });
+        });
+
+    </script>
+</body>
+</html>
