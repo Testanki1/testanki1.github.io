@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克国服屏蔽词替换器</title>
+    <title>3D坦克国服屏蔽词替换器</title> <!-- Title also converted for consistency -->
     <style>
         body {
             background-color: #001926; /* 网页背景颜色 */
@@ -32,7 +32,16 @@
             color: #ffffff;
             text-align: center;
             margin-bottom: 25px;
+            /* Apply conversion to H1 text */
+            font-feature-settings: "fwid"; /* Attempt CSS-based full-width, might not work universally for numbers/letters */
+            /* Manual conversion might be needed if CSS doesn't work */
         }
+        /* Manually convert H1 title text */
+        h1::before {
+             content: "3D坦克国服屏蔽词替换器"; /* Content replaced by JS below */
+        }
+        h1 > span { display: none; } /* Hide original H1 text if using ::before */
+
 
         label {
             display: block;
@@ -84,7 +93,7 @@
         button:hover {
             background-color: #68ef25; /* 鼠标悬停时颜色变深一点 */
         }
-        
+
         button:active {
              transform: scale(0.98); /* 点击时轻微缩小 */
         }
@@ -93,10 +102,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>3D坦克国服屏蔽词替换器</h1>
+        <!-- H1 content will be set by JS -->
+        <h1><span>3D坦克国服屏蔽词替换器</span></h1>
 
         <label for="inputText">输入文本:</label>
-        <textarea id="inputText" placeholder="在这里输入需要处理的文字..."></textarea>
+        <textarea id="inputText" placeholder="在这里输入需要处理的文字... 例如: abc 123 飞"></textarea>
 
         <label for="outputText">替换结果:</label>
         <textarea id="outputText" readonly placeholder="替换后的文字将显示在这里..."></textarea>
@@ -107,35 +117,65 @@
     <script>
         // --- 屏蔽词字典 ---
         // 格式: "屏蔽词": "替换词"
+        // 注意：屏蔽词现在也可能包含全角字符，如果它们是由半角转换来的
         const censorDictionary = {
             "飞": "非",
             "服": "浮",
-            "挂": "高科技", // 示例：添加更多词
-            "挂壁": "高手",  // 示例
-            "傻逼": "可爱",  // 示例
-            "操": "cao",   // 示例
-            "尼玛": "好样的", // 示例
-            "TMD": "哇哦",  // 示例
-            // 在这里添加更多需要替换的词语和它们的替换词
-            "测试词": "替换成功" 
+            "测试词": "替换成功"
         };
         // --------------------
 
         const inputText = document.getElementById('inputText');
         const outputText = document.getElementById('outputText');
         const copyButton = document.getElementById('copyButton');
+        const h1Element = document.querySelector('h1 span'); // Get the span inside h1
 
-        // 替换函数
+        // Function to convert half-width ASCII numbers and letters to full-width
+        function toFullWidth(str) {
+            let result = '';
+            for (let i = 0; i < str.length; i++) {
+                const charCode = str.charCodeAt(i);
+
+                // Check for half-width numbers (0-9)
+                if (charCode >= 48 && charCode <= 57) {
+                    result += String.fromCharCode(charCode + 0xFEE0);
+                }
+                // Check for half-width uppercase letters (A-Z)
+                else if (charCode >= 65 && charCode <= 90) {
+                    result += String.fromCharCode(charCode + 0xFEE0);
+                }
+                // Check for half-width lowercase letters (a-z)
+                else if (charCode >= 97 && charCode <= 122) {
+                    result += String.fromCharCode(charCode + 0xFEE0);
+                }
+                // Keep other characters as they are
+                else {
+                    result += str[i];
+                }
+            }
+            return result;
+        }
+
+        // Convert H1 title text to full-width
+        if (h1Element) {
+            h1Element.textContent = toFullWidth(h1Element.textContent);
+        }
+         // Also convert the main title tag
+        document.title = toFullWidth(document.title);
+
+
+        // 替换函数 (Now operates on text potentially containing full-width chars)
         function replaceCensoredWords(text) {
             let processedText = text;
             // 遍历字典中的每一个屏蔽词
             for (const key in censorDictionary) {
                 if (censorDictionary.hasOwnProperty(key)) {
-                    // 使用 String.prototype.replaceAll 进行全局替换
-                    // 注意：这会区分大小写。如果需要不区分，需要用正则表达式。
-                    // 为了简单起见，这里使用区分大小写的replaceAll。
-                    // 如果屏蔽词包含正则表达式特殊字符，直接用字符串替换是安全的。
-                    processedText = processedText.replaceAll(key, censorDictionary[key]);
+                    // 使用 RegExp 进行全局替换，以处理字符串中的所有出现
+                    // 'g' flag for global replacement
+                    // Escape special regex characters in the key
+                    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(escapedKey, 'g');
+                    processedText = processedText.replace(regex, censorDictionary[key]);
                 }
             }
             return processedText;
@@ -144,7 +184,10 @@
         // 监听输入框的输入事件
         inputText.addEventListener('input', () => {
             const originalText = inputText.value;
-            const replacedText = replaceCensoredWords(originalText);
+            // 1. Convert to full-width first
+            const fullWidthText = toFullWidth(originalText);
+            // 2. Then replace censored words
+            const replacedText = replaceCensoredWords(fullWidthText);
             outputText.value = replacedText;
         });
 
@@ -152,7 +195,8 @@
         copyButton.addEventListener('click', () => {
             const textToCopy = outputText.value;
             if (!textToCopy) {
-                alert("没有内容可以复制！");
+                // Convert alert text to full-width
+                 alert(toFullWidth("没有内容可以复制！"));
                 return;
             }
 
@@ -161,20 +205,30 @@
                 .then(() => {
                     // 复制成功提示
                     const originalButtonText = copyButton.textContent;
-                    copyButton.textContent = '已复制!';
+                    // Convert button text to full-width
+                    copyButton.textContent = toFullWidth('已复制!');
                     copyButton.style.backgroundColor = '#4CAF50'; // 暂时变绿表示成功
-                    
+
                     // 1.5秒后恢复按钮文字和颜色
                     setTimeout(() => {
-                        copyButton.textContent = originalButtonText;
+                        copyButton.textContent = toFullWidth(originalButtonText); // Restore original text (also converted)
                         copyButton.style.backgroundColor = '#76FF33'; // 恢复原色
                     }, 1500);
                 })
                 .catch(err => {
                     console.error('无法复制文本: ', err);
-                    alert('复制失败，您的浏览器可能不支持或权限不足。请尝试手动复制。');
+                     // Convert alert text to full-width
+                    alert(toFullWidth('复制失败，您的浏览器可能不支持或权限不足。请尝试手动复制。'));
                 });
         });
+
+        // Initialize button text with full-width conversion
+        copyButton.textContent = toFullWidth(copyButton.textContent);
+
+         // Also convert labels
+         document.querySelectorAll('label').forEach(label => {
+             label.textContent = toFullWidth(label.textContent);
+         });
 
     </script>
 </body>
