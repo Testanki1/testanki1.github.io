@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
+// @version      1.3.2
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果等资源
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -14,8 +14,8 @@
 (function() {
 	'use strict';
 	// --- START VERSION CHECK ---
-    const currentVersion = "1.3.1"
-	const currentVersionCode = 20
+    const currentVersion = "1.3.2"
+	const currentVersionCode = 21
 	const versionUrl = 'https://testanki1.github.io/models/version.json';
 
 	fetch(versionUrl)
@@ -76,7 +76,8 @@
 			"default": "567/20040/100/57/31254554136103",
 			"XT_HD": "567/20040/100/30/31033605140327",
 			"LC": "604/60235/244/25/31033605125726",
-			"RF": "616/167677/151/223/31033605130425"
+			"RF": "616/167677/151/223/31033605130425",
+            "GT": "625/62766/332/145/31254576341037"
 		},
 		"hammer": {
 			"default": "611/147301/37/333/31167700274311",
@@ -194,7 +195,8 @@
 			"UT": "552/54655/57/366/31033610356100",
 			"GT": "603/64520/263/244/31033607745375",
 			"XT_HD": "606/155145/337/205/31033610020277",
-			"DC": "604/7224/253/317/31033610256112"
+			"DC": "604/7224/253/317/31033610256112",
+            "DK": "623/154646/120/352/31244201526461"
 		},
 		"crusader": {
 			"default": "566/4547/232/306/31222260444020",
@@ -1155,8 +1157,8 @@
 		}
 	};
 
-	const hullsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|GT|RF|SP)$/i;
-	const turretsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|雪人)$/i;
+	const hullsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|GT|RF|SP|DK)$/i;
+	const turretsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|DK|雪人)$/i;
 	const dronesPattern = /^(|XT)$/i;
 	const festivalsPattern = /^(|万圣节|新年_2025|五月假期_2025|节日季节 主题|新年 重制)$/i;
 	const shotEffectsPattern = /^(|幻影黑|岩浆|粉红色|寒冷|毒|火|太阳|水|珊瑚礁|暗月|电|金|深红色|紫罗兰色|天空蓝|暴力|黑暗|日食|神秘的红色|天空|虚空|血液|雪|正午|烟雾|危机)$/i; // Added 危机
@@ -1268,7 +1270,7 @@
 	// If not reusing last choices, prompt the user
 	if (!reuseLastChoices) {
 		userChoiceHull = getUserChoice(
-			"请选择要使用的底盘模型替换 (留空不替换)\n可用: XT, XT_HD, LC, PR, UT, DC, GT, RF, SP",
+			"请选择要使用的底盘模型替换 (留空不替换)\n可用: XT, XT_HD, LC, PR, UT, DC, GT, RF, SP, DK",
 			lastHullChoice,
 			hullsPattern,
 			"输入无效，请输入有效的底盘皮肤系列或留空"
