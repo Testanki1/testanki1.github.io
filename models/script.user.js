@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      1.3.2
+// @version      1.3.3
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果等资源
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -14,8 +14,8 @@
 (function() {
 	'use strict';
 	// --- START VERSION CHECK ---
-    const currentVersion = "1.3.2"
-	const currentVersionCode = 21
+    const currentVersion = "1.3.3"
+	const currentVersionCode = 22
 	const versionUrl = 'https://testanki1.github.io/models/version.json';
 
 	fetch(versionUrl)
@@ -128,7 +128,8 @@
 			"UT": "551/122165/142/136/31033605157155",
 			"LC": "545/14356/174/306/31033605151121",
 			"GT": "603/104171/41/115/31033605030161",
-			"XT_HD": "617/134472/113/60/31033605164111"
+			"XT_HD": "617/134472/113/60/31033605164111",
+            "DK": "623/154657/361/155/31247405107022"
 		},
 		"scorpion": {
 			"default": "600/40107/4/364/31172771520222",
@@ -162,7 +163,10 @@
 			"LC": "600/170471/174/26/31033605260624",
 			"DC": "622/107573/220/101/31123207764670",
 			"GT": "623/152225/145/72/31172445577356"
-		}
+		},
+        "B0-NK": {
+            "default": "572/36217/77/243/31167700275012"
+        }
 	};
 
 	const hullsRedirectMap = {
@@ -234,7 +238,7 @@
 		},
 		"ares": {
 			"default": "560/117661/334/334/31222260327005",
-			"XT_HD": "562/161162/24/375/31033610137021",
+			"XT_HD": "626/144373/14/54/31331666154335",
             "RF": "626/36647/152/360/31310325573105"
 		},
 		"mammoth": {
