@@ -116,7 +116,6 @@ const replacementDict = {
 'TAR': '团队军备竞赛',
 'PRO Battle': '专家战场',
 'format': '格式',
-'Classic': '经典',
 'Railgun master': '激光炮大师',
 'Sport': '运动会',
 'Parkour': '跑酷',
