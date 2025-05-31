@@ -2,14 +2,15 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>ResourceURL Path Generator (JS)</title>
+<title>ResourceURL Path Generator/Parser (JS)</title>
 <style>
   body { font-family: sans-serif; margin: 20px; }
   label { display: inline-block; width: 120px; margin-bottom: 5px;}
   input[type="text"] { width: 300px; margin-bottom: 10px; padding: 5px; }
-  button { padding: 8px 15px; }
-  #result { margin-top: 15px; font-weight: bold; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 4px;}
+  button { padding: 8px 15px; margin-right: 10px; }
+  .result-box { margin-top: 15px; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 4px; min-height: 20px;}
   .error { color: red; }
+  hr { margin: 20px 0; }
 </style>
 </head>
 <body>
@@ -26,62 +27,62 @@
   </div>
 
   <button onclick="generatePath()">生成路径</button>
+  <div id="resultGenerate" class="result-box"></div>
 
-  <div id="result"></div>
+  <hr>
+
+  <h2>ResourceURL Path Parser (JavaScript Implementation)</h2>
+  <div>
+    <label for="inputPath">Path String:</label>
+    <input type="text" id="inputPath" placeholder="输入路径字符串 (例如 2215053170/115274/336/360/167)">
+  </div>
+  <button onclick="parsePath()">解析路径</button>
+  <div id="resultParse" class="result-box"></div>
+
 
 <script>
   // 模拟 Kotlin 的 LongExtKt.high(long) -> Int
   // (this ushr 32).toInt()
+  // JS BigInt >> is arithmetic shift
   function getHighInt(longValBigInt) {
-    // 无符号右移32位，然后取低32位（模拟toInt()）
-    // BigInt 右移是算术右移，但因为我们后面会转 Number，
-    // 对于正数或能表示为32位正整数的范围，影响不大。
-    // 如果原始高位为负数形式的32位整数，BigInt >> 32n 会保留符号
-    // Number() 会尝试转换。
     return Number(longValBigInt >> 32n);
   }
 
   // 模拟 Kotlin 的 LongExtKt.low(long) -> Int
   // this.toInt()
+  // JS BigInt & 0xFFFFFFFFn gives the lower 32 bits as an unsigned BigInt.
+  // Number() converts it. If it's > 2^31-1, it's still positive.
+  // If it represents a negative 32-bit int, Number() will make it negative.
+  // However, the subsequent JS bitwise ops (>>>) treat it as 32-bit unsigned.
   function getLowInt(longValBigInt) {
-    // 取低32位，并作为有符号32位整数处理
-    // (longVal & 0xFFFFFFFFn) 确保我们只看低32位，
-    // Number() 会将其转换为JS Number。如果这个值超出了32位有符号整数的范围但仍在JS Number安全范围内，
-    // 后续的JS位操作符 (>>>) 会将其视为32位整数进行处理。
-    return Number(longValBigInt & 0xFFFFFFFFn);
+    // Get the lower 32 bits.
+    const low32Bits = longValBigInt & 0xFFFFFFFFn;
+    // If the 31st bit (sign bit for 32-bit signed int) is set,
+    // and we want to simulate Java's toInt(), we might need to adjust for sign.
+    // However, Number(low32Bits) will give a positive number if low32Bits <= MAX_SAFE_INTEGER.
+    // The crucial part is that downstream >>> operations in toPath will treat this Number
+    // as a 32-bit unsigned integer.
+    return Number(low32Bits);
   }
 
   function toPath(id, version) {
-    // 确保输入是 BigInt 类型
     const idBigInt = BigInt(id);
     const versionBigInt = BigInt(version);
 
     let pathParts = [];
 
-    // 对应 Java: String num = Integer.toString(LongExtKt.high(j), 8);
-    // LongExtKt.high(j) 返回一个 Int
     const highId = getHighInt(idBigInt);
     pathParts.push(highId.toString(8));
     pathParts.push("/");
 
-    // 对应 Java: int low = LongExtKt.low(j);
-    // LongExtKt.low(j) 返回一个 Int
-    const lowId = getLowInt(idBigInt); // 这是低32位对应的 JS Number
+    const lowId = getLowInt(idBigInt);
 
-    // 对应 Java: String num2 = Integer.toString((low >>> 16) & 65535, 8);
-    // JS 中的 >>> 会将操作数视为32位无符号整数
     pathParts.push(((lowId >>> 16) & 0xFFFF).toString(8));
     pathParts.push("/");
-
-    // 对应 Java: String num3 = Integer.toString((low >>> 8) & 255, 8);
     pathParts.push(((lowId >>> 8) & 0xFF).toString(8));
     pathParts.push("/");
-
-    // 对应 Java: String num4 = Integer.toString(low & 255, 8);
     pathParts.push((lowId & 0xFF).toString(8));
     pathParts.push("/");
-
-    // 对应 Java: String l = Long.toString(j2, 8);
     pathParts.push(versionBigInt.toString(8));
 
     return pathParts.join("");
@@ -90,7 +91,7 @@
   function generatePath() {
     const idStr = document.getElementById('inputId').value;
     const versionStr = document.getElementById('inputVersion').value;
-    const resultDiv = document.getElementById('result');
+    const resultDiv = document.getElementById('resultGenerate');
 
     if (!idStr || !versionStr) {
       resultDiv.innerHTML = '<span class="error">ID 和 Version 都不能为空！</span>';
@@ -98,38 +99,109 @@
     }
 
     try {
-      // 这里假设输入的是十进制字符串，BigInt可以处理
       const generatedPath = toPath(idStr, versionStr);
       resultDiv.textContent = "生成的路径: " + generatedPath;
       resultDiv.classList.remove('error');
 
-      // 打印一些中间值以供调试和比较 (可选)
-      console.log("Input ID:", idStr, "BigInt:", BigInt(idStr));
-      console.log("Input Version:", versionStr, "BigInt:", BigInt(versionStr));
-      const idBigInt = BigInt(idStr);
-      const highId = getHighInt(idBigInt);
-      const lowId = getLowInt(idBigInt);
-      console.log("highId (as int):", highId, "Octal:", highId.toString(8));
-      console.log("lowId (as int):", lowId);
-      console.log("Part2 ((lowId >>> 16) & 0xFFFF):", ((lowId >>> 16) & 0xFFFF), "Octal:", ((lowId >>> 16) & 0xFFFF).toString(8));
-      console.log("Part3 ((lowId >>> 8) & 0xFF):", ((lowId >>> 8) & 0xFF), "Octal:", ((lowId >>> 8) & 0xFF).toString(8));
-      console.log("Part4 (lowId & 0xFF):", (lowId & 0xFF), "Octal:", (lowId & 0xFF).toString(8));
-      console.log("Version Octal:", BigInt(versionStr).toString(8));
+      // For easy copy-paste to parser
+      document.getElementById('inputPath').value = generatedPath;
 
+      // Debugging (optional)
+      // console.log("--- Generation ---");
+      // console.log("Input ID:", idStr, "BigInt:", BigInt(idStr));
+      // console.log("Input Version:", versionStr, "BigInt:", BigInt(versionStr));
+      // const idBigInt = BigInt(idStr);
+      // const highId = getHighInt(idBigInt);
+      // const lowId = getLowInt(idBigInt);
+      // console.log("highId (as int):", highId, "Octal:", highId.toString(8));
+      // console.log("lowId (as int):", lowId); // This is Number(idBigInt & 0xFFFFFFFFn)
+      // console.log("Part2 ((lowId >>> 16) & 0xFFFF):", ((lowId >>> 16) & 0xFFFF), "Octal:", ((lowId >>> 16) & 0xFFFF).toString(8));
+      // console.log("Part3 ((lowId >>> 8) & 0xFF):", ((lowId >>> 8) & 0xFF), "Octal:", ((lowId >>> 8) & 0xFF).toString(8));
+      // console.log("Part4 (lowId & 0xFF):", (lowId & 0xFF), "Octal:", (lowId & 0xFF).toString(8));
+      // console.log("Version Octal:", BigInt(versionStr).toString(8));
 
     } catch (e) {
-      resultDiv.innerHTML = '<span class="error">输入错误: ' + e.message + '. 请确保输入的是有效的整数。</span>';
+      resultDiv.innerHTML = '<span class="error">生成错误: ' + e.message + '. 请确保输入的是有效的整数。</span>';
       console.error("Error in generatePath:", e);
     }
   }
 
-  // 设置一些默认值以便测试，与Java代码中的例子对应
-  // 例如，如果Java代码中的 j 是 0x123456789ABCDEF0L (十进制 1311768467294899696)
-  // version 是 0x77L (十进制 119)
-  // 预期输出: "2215053170/115274/336/360/167" (这是根据前面手动推导的结果)
+  function fromPath(pathStr) {
+    if (!pathStr || typeof pathStr !== 'string') {
+        throw new Error("输入路径不能为空且必须是字符串。");
+    }
+    const parts = pathStr.split('/');
+    if (parts.length !== 5) {
+      throw new Error("路径格式无效，必须有5个部分由'/'分隔。 例如: part1/part2/part3/part4/part5");
+    }
+
+    const parsedOctalParts = parts.map((part, index) => {
+      const num = parseInt(part, 8);
+      if (isNaN(num)) {
+        throw new Error(`路径部分 "${part}" (索引 ${index}) 不是有效的八进制数。`);
+      }
+      return num;
+    });
+
+    // Reconstruct ID
+    // parts[0] is highId (can be negative if original ID's high bits formed a negative 32-bit int)
+    const highId_val = BigInt(parsedOctalParts[0]);
+
+    // parts[1], parts[2], parts[3] form the low 32 bits (unsigned)
+    const lowId_p1_val = BigInt(parsedOctalParts[1]); // (lowId >>> 16) & 0xFFFF
+    const lowId_p2_val = BigInt(parsedOctalParts[2]); // (lowId >>> 8) & 0xFF
+    const lowId_p3_val = BigInt(parsedOctalParts[3]); // lowId & 0xFF
+
+    // Reconstruct the 32-bit unsigned low part as a BigInt
+    const reconstructedLowIdUnsigned = (lowId_p1_val << 16n) | (lowId_p2_val << 8n) | lowId_p3_val;
+
+    // Combine high and low parts.
+    // (highId_val << 32n) effectively places the highId_val into the upper 32 bits.
+    // | reconstructedLowIdUnsigned places the lower 32 bits.
+    // BigInt handles signs correctly during shifting.
+    const id = (highId_val << 32n) | reconstructedLowIdUnsigned;
+
+    // Reconstruct Version
+    const version = BigInt(parsedOctalParts[4]);
+
+    return { id, version };
+  }
+
+  function parsePath() {
+    const pathStr = document.getElementById('inputPath').value;
+    const resultDiv = document.getElementById('resultParse');
+
+    if (!pathStr) {
+      resultDiv.innerHTML = '<span class="error">路径字符串不能为空！</span>';
+      return;
+    }
+
+    try {
+      const { id, version } = fromPath(pathStr);
+      resultDiv.textContent = `解析结果: ID = ${id.toString()}, Version = ${version.toString()}`;
+      resultDiv.classList.remove('error');
+
+      // For easy copy-paste back to generator
+      document.getElementById('inputId').value = id.toString();
+      document.getElementById('inputVersion').value = version.toString();
+
+    } catch (e) {
+      resultDiv.innerHTML = '<span class="error">解析错误: ' + e.message + '</span>';
+      console.error("Error in parsePath:", e);
+    }
+  }
+
+
   window.onload = function() {
-    document.getElementById('inputId').value = "1311768467294899696"; // 0x123456789ABCDEF0
-    document.getElementById('inputVersion').value = "119";             // 0x77
+    const defaultId = "1311768467294899696"; // 0x123456789ABCDEF0
+    const defaultVersion = "119";             // 0x77
+    document.getElementById('inputId').value = defaultId;
+    document.getElementById('inputVersion').value = defaultVersion;
+
+    // Automatically generate path for default values on load
+    generatePath();
+    // And show what it would parse to (should be the same)
+    // parsePath(); // Can uncomment if you want to auto-parse the auto-generated path
   }
 
 </script>
