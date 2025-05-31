@@ -43,30 +43,68 @@
             justify-content: center;
             align-items: center;
         }
-        .table {
-            width: 80%;
-            max-width: 800px;
+        
+        #mainContent .table, #partnersContent .table { /* Common table parent styles */
+             width: 80%;
+             max-width: 800px;
+             gap: 20px;
+             padding: 20px;
+             background: rgba(255, 255, 255, 0.1);
+             border-radius: 10px;
+        }
+
+        #mainContent .table {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
-            gap: 20px;
         }
-        .cell {
+        #mainContent .cell {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+            /* Removed padding, background, border-radius as buttons will fill more */
         }
-        a {
+         #mainContent .cell p {
+            width: 100%; /* Allow p to guide button width */
+            margin: 5px 0;
+        }
+
+
+        #partnersContent .table {
+            max-height: 90vh;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Responsive columns */
+            justify-content: center;
+            grid-auto-rows: min-content;
+            overflow-y: auto;
+        }
+         #partnersContent .cell {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Align items to the top for potentially varying text lengths */
+            align-items: center;
+            text-align: center;
+             /* Removed padding, background, border-radius as buttons will fill more */
+        }
+        #partnersContent .cell p {
+            width: 100%; /* Allow p to guide button width */
+            margin: 5px 0; /* Space between multiple buttons/text in a cell */
+        }
+        #partnersContent .cell .info-text { /* For text like (暂不支持全屏) */
+            color: #FFFFFF;
+            font-size: 14px;
+            margin-top: 0px;
+        }
+
+
+        a { /* General link styles, not for styled-link-buttons */
             text-decoration: none;
             color: #BFD5FF;
             transition: color 0.3s;
         }
-        a:hover, a:active {
+        a:hover, a:active { /* General link hover/active, will be overridden by button specific active if applicable */
             color: #76ff33 !important;
         }
         a.no-color-change {
@@ -75,14 +113,14 @@
         a.no-color-change:hover, a.no-color-change:active {
             color: rgba(191, 213, 255, 0.5) !important;
         }
-        a:hover span,
+        /* a:hover span,
         a:active span {
-            color: inherit !important;
-        }
-        #backButton {
+            color: inherit !important; 
+        } */ /* This might be too general, handled by .styled-link-button span */
+
+        /* Common Button Styles (for top/bottom utility buttons) */
+        .common-button {
             position: absolute;
-            top: 10px;
-            left: 10px;
             background-color: #76ff33;
             padding: 10px;
             border: none;
@@ -91,43 +129,22 @@
             cursor: pointer;
             border-radius: 10px;
             transition: background-color 0.3s;
+            text-decoration: none; 
+            text-align: center;
         }
-        #backButton:hover {
+        .common-button:hover {
             background-color: #4CAF50;
         }
-        #moreButton {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: #76ff33;
-            padding: 10px;
-            border: none;
-            color: #001926;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 10px;
-            transition: background-color 0.3s;
-        }
-        #moreButton:hover {
-            background-color: #4CAF50;
-        }
-        #settingsButton {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background-color: #76ff33;
-            padding: 10px;
-            border: none;
-            color: #001926;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 10px;
-            transition: background-color 0.3s;
-        }
-        #settingsButton:hover {
-            background-color: #4CAF50;
-        }
-        #popup {
+
+        #mainServerStatusButton { top: 10px; left: 10px; }
+        #mainAboutButton { top: 10px; right: 10px; }
+        #mainSettingsButton { bottom: 10px; right: 10px; }
+        
+        #partnersBackButton { top: 10px; left: 10px; display: none; }
+        #partnersMobileButton { top: 10px; right: 10px; display: none; }
+
+        /* Popups */
+        .popup-container {
             display: none;
             position: fixed;
             top: 50%;
@@ -140,15 +157,15 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
             z-index: 1000;
         }
-        #popup a {
+        .popup-container a { /* Links inside popups */
             display: block;
             margin: 10px 0;
             color: #BFD5FF;
         }
-        #popup a:hover {
+        .popup-container a:hover {
             color: #76ff33;
         }
-        #popup button {
+        .popup-container button, .popup-container .popup-close-button {
             margin-top: 10px;
             background-color: #76ff33;
             border: none;
@@ -157,18 +174,66 @@
             cursor: pointer;
             border-radius: 5px;
         }
-        #popup button:hover {
+        .popup-container button:hover, .popup-container .popup-close-button:hover {
             background-color: #4CAF50;
         }
+        .popup-container .popup-close-button {
+            position: absolute; top: 5px; right: 10px; background: none;
+            color: #BFD5FF; font-size: 20px; padding: 0; margin:0;
+        }
+        .popup-container .popup-close-button:hover { color: #76ff33; background: none; }
+
+        /* Style for links that should look like main content buttons */
+        .styled-link-button {
+            display: block; 
+            width: 100%;    
+            padding: 15px 10px; 
+            margin: 0; /* Paragraphs will handle spacing */
+            border: 2px solid #BFD5FF;
+            border-radius: 8px;
+            color: #BFD5FF;
+            background-color: rgba(255, 255, 255, 0.05); 
+            font-size: 26px; 
+            text-align: center;
+            text-decoration: none;
+            transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+            cursor: pointer;
+            line-height: 1.3;
+        }
+
+        .styled-link-button span { /* For text within <a> that is wrapped in <span> */
+            color: inherit !important; /* Ensure span inherits color from <a> */
+            font-size: inherit !important; /* Ensure span inherits font-size from <a> */
+            /* No need to set color/font-size on span directly anymore */
+        }
+
+        .styled-link-button:hover {
+            color: #76FF33;
+            border-color: #76FF33;
+            background-color: rgba(118, 255, 51, 0.1); 
+        }
+
+        .styled-link-button:active {
+            color: #76FF33 !important; 
+            border-color: #76FF33 !important;
+            background-color: rgba(118, 255, 51, 0.2); 
+        }
+
     </style>
 </head>
 <body>
-    <a href="/status" id="backButton">查看服务器状态</a>
-    <a href="/about" id="moreButton">关于</a>
-    <button id="settingsButton">设置</button>
+    <!-- Buttons for Main View -->
+    <a href="/status" id="mainServerStatusButton" class="common-button">查看服务器状态</a>
+    <a href="/about" id="mainAboutButton" class="common-button">关于</a>
+    <button id="mainSettingsButton" class="common-button">设置</button>
 
-    <div id="popup">
-        <span class="closeButton" id="closeButton">×</span>
+    <!-- Buttons for Partners View -->
+    <button id="partnersBackButton" class="common-button">返回</button>
+    <button id="partnersMobileButton" class="common-button">移动版平台</button>
+
+    <!-- Settings Popup (for Main View) -->
+    <div id="settingsPopup" class="popup-container">
+        <span class="popup-close-button" id="closeSettingsPopup">×</span>
         <label for="customUrl">自定义网址：</label>
         <input type="text" id="customUrl" placeholder="输入网址" />
         <button id="redirectButton">跳转</button>
@@ -178,56 +243,122 @@
         </div>
     </div>
 
+    <!-- Mobile Platforms Popup (for Partners View) -->
+    <div id="mobilePlatformsPopup" class="popup-container">
+        <span class="popup-close-button" id="closeMobilePopup">×</span>
+        <a href="https://appgallery.huawei.com/app/C101972055">华为</a>
+        <a href="https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145">vivo</a>
+        <a href="https://app.mi.com/details?id=com.tankionline.mi">小米</a>
+        <a href="https://store.oppomobile.com/">OPPO</a>
+        <a href="https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640">荣耀</a>
+        <a href="https://www.ldmnq.com/app/8762.html">雷电模拟器</a>
+        <button class="popup-close-button" onclick="document.getElementById('mobilePlatformsPopup').style.display = 'none';">关闭</button> 
+    </div>
+
     <div id="modal-root"></div>
     
-    <div class="container">
+    <!-- Main Content Area -->
+    <div id="mainContent" class="container">
         <div class="table">
             <div class="cell">
-                <p><a href="https://3dtank.com/play" style="font-size:32px;">国服</a></p>
+                <p><a href="https://3dtank.com/play" class="styled-link-button" id="guofuLink">国服</a></p>
             </div>
             <div class="cell">
-                <p><a href="https://tankionline.com/play?resources=https://s-de.eu.tankionline.com" style="font-size:32px;">外服</a></p>
+                <p><a href="https://tankionline.com/play?resources=https://s-de.eu.tankionline.com" class="styled-link-button" id="waifuLink">外服</a></p>
             </div>
             <div class="cell">
-                <p><a href="/test" style="font-size:32px;">测试服</a></p>
+                <p><a href="/test" class="styled-link-button" id="testServerLink">测试服</a></p>
             </div>
             <div class="cell">
-                <p><a href="/partners" style="font-size:32px;">国服联运服</a></p>
-                <p class="channel-links">
-                    <span style="color:#FFFFFF;">（</span>
-                    <a href="https://my.4399.com/yxtk/">4399</a>
-                    <span style="color:#FFFFFF;">、</span>
-                    <a href="http://web.7k7k.com/stat/game.php?target=3dtk">7k7k</a>
-                    <span style="color:#FFFFFF;">、</span>
-                    <a href="https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1">YY</a>
-                    <span style="color:#FFFFFF;">、</span>
-                    <a href="http://wan.baidu.com/game?gameId=23699359">百度</a>
-                    <span style="color:#FFFFFF;">、</span>
-                    <a href="http://web.gamersky.com/Games/236.html">游民星空</a>
-                    <span style="color:#FFFFFF;">、</span>
-                    <a href="https://wans.ixinyou.com/games/tank/">心游</a>
-                    <span style="color:#FFFFFF;">、</span>
-                    <a href="https://game.qzone.qq.com/1102530450">QQ空间</a>
-                    <span style="color:#FFFFFF;">）</span>
-                </p>
+                <p><a href="#" id="navigateToPartners" class="styled-link-button">国服联运服</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Partners Content Area (initially hidden) -->
+    <div id="partnersContent" class="container" style="display: none;">
+        <div class="table">
+            <div class="cell">
+                <p><a href="https://my.4399.com/yxtk/" class="styled-link-button"><span>4399</span></a></p>
+                <p><a href="https://my.4399.com/yxtk/play?sid=1" class="styled-link-button"><span>-->自动登录>--</span></a></p>
+            </div>
+            <div class="cell">
+                <p><a href="http://web.7k7k.com/stat/game.php?target=3dtk" class="styled-link-button"><span>7k7k</span></a></p>
+                <p class="info-text">（暂不支持全屏）</p>
+            </div>
+            <div class="cell">
+                <p><a href="https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1" class="styled-link-button"><span>YY</span></a></p>
+            </div>
+            <div class="cell">
+                <p><a href="http://wan.baidu.com/game?gameId=23699359" class="styled-link-button"><span>百度</span></a></p>
+                <p class="info-text">（暂不支持全屏）</p>
+            </div>
+            <div class="cell">
+                <p><a href="http://web.gamersky.com/Games/236.html" class="styled-link-button"><span>游民星空</span></a></p>
+                <p class="info-text">（暂不支持全屏）</p>
+            </div>
+            <div class="cell">
+                <p><a href="https://wans.ixinyou.com/games/tank/" class="styled-link-button"><span>心游</span></a></p>
+                <p class="info-text">（暂不支持全屏）</p>
+            </div>
+            <div class="cell">
+                <p><a href="https://game.qzone.qq.com/1102530450" class="styled-link-button"><span>QQ空间</span></a></p>
+                <p class="info-text">（需要桌面版网站）</p>
+            </div>
+            <div class="cell">
+                <p><a href="https://wan.ludashi.com/yeyou/tk3d?s=1" class="styled-link-button"><span>鲁大师</span></a></p>
+                <p class="info-text">（暂不支持全屏）</p>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('settingsButton').addEventListener('click', function() {
-            document.getElementById('popup').style.display = 'block';
+        const mainContent = document.getElementById('mainContent');
+        const partnersContent = document.getElementById('partnersContent');
+        
+        const mainServerStatusButton = document.getElementById('mainServerStatusButton');
+        const mainAboutButton = document.getElementById('mainAboutButton');
+        const mainSettingsButton = document.getElementById('mainSettingsButton');
+        
+        const partnersBackButton = document.getElementById('partnersBackButton');
+        const partnersMobileButton = document.getElementById('partnersMobileButton');
+
+        const settingsPopup = document.getElementById('settingsPopup');
+        const mobilePlatformsPopup = document.getElementById('mobilePlatformsPopup');
+
+        // --- Navigation Logic ---
+        document.getElementById('navigateToPartners').addEventListener('click', function(e) {
+            e.preventDefault();
+            mainContent.style.display = 'none';
+            partnersContent.style.display = 'flex'; 
+            document.title = "3D坦克服务器列表 联运服";
+
+            mainServerStatusButton.style.display = 'none';
+            mainAboutButton.style.display = 'none';
+            mainSettingsButton.style.display = 'none';
+            partnersBackButton.style.display = 'block'; 
+            partnersMobileButton.style.display = 'block'; 
         });
 
-        document.getElementById('closeButton').addEventListener('click', function() {
-            document.getElementById('popup').style.display = 'none';
+        partnersBackButton.addEventListener('click', function() {
+            partnersContent.style.display = 'none';
+            mainContent.style.display = 'flex'; 
+            document.title = "3D坦克服务器列表";
+            
+            mainServerStatusButton.style.display = 'block'; 
+            mainAboutButton.style.display = 'block'; 
+            mainSettingsButton.style.display = 'block'; 
+            partnersBackButton.style.display = 'none';
+            partnersMobileButton.style.display = 'none';
         });
 
-        window.addEventListener('click', function(event) {
-            var popup = document.getElementById('popup');
-            if (event.target === popup) {
-                popup.style.display = 'none';
-            }
+        // --- Settings Popup Logic ---
+        mainSettingsButton.addEventListener('click', function() {
+            settingsPopup.style.display = 'block';
+        });
+
+        document.getElementById('closeSettingsPopup').addEventListener('click', function() {
+            settingsPopup.style.display = 'none';
         });
 
         document.getElementById('redirectButton').addEventListener('click', function() {
@@ -239,38 +370,73 @@
                 window.location.href = customUrl;
             }
         });
+        
+        window.addEventListener('click', function(event) {
+            if (event.target === settingsPopup) {
+                settingsPopup.style.display = 'none';
+            }
+            if (event.target === mobilePlatformsPopup) {
+                mobilePlatformsPopup.style.display = 'none';
+            }
+        });
 
+        // --- Chinese Mode Logic ---
+        const waifuLink = document.getElementById('waifuLink'); 
+        const originalWaifuHref = waifuLink.href; 
+
+        function updateWaifuLink(chineseModeEnabled) {
+            const baseLink = originalWaifuHref.split('?')[0];
+            const existingParams = originalWaifuHref.split('?')[1] ? new URLSearchParams(originalWaifuHref.split('?')[1]) : new URLSearchParams();
+
+            if (chineseModeEnabled) {
+                existingParams.set('locale', 'zh');
+            } else {
+                existingParams.delete('locale');
+            }
+            
+            let newHref = baseLink;
+            if (existingParams.toString()) {
+                newHref += '?' + existingParams.toString();
+            }
+            waifuLink.href = newHref;
+        }
+        
         window.addEventListener('DOMContentLoaded', function() {
             var chineseCheckbox = document.getElementById('chineseCheckbox');
             var chineseModeEnabled = localStorage.getItem('chineseModeEnabled') === 'true';
             chineseCheckbox.checked = chineseModeEnabled;
-            updateLinks(chineseModeEnabled);
+            updateWaifuLink(chineseModeEnabled); 
+
+            // Mobile Guofu Link
+            var guofuLink = document.getElementById('guofuLink');
+            if (isMobileDevice()) {
+                if (guofuLink.href.includes('?')) {
+                    guofuLink.href += '&distribution=generic_mobile_china';
+                } else {
+                    guofuLink.href += '?distribution=generic_mobile_china';
+                }
+            }
         });
 
         document.getElementById('chineseCheckbox').addEventListener('change', function() {
             var chineseModeEnabled = this.checked;
-            updateLinks(chineseModeEnabled);
+            updateWaifuLink(chineseModeEnabled);
             localStorage.setItem('chineseModeEnabled', chineseModeEnabled);
         });
 
-        function updateLinks(chineseModeEnabled) {
-            var links = document.querySelectorAll('a[href="https://tankionline.com/play"]');
-            links.forEach(function(link) {
-                link.href = chineseModeEnabled ? 'https://tankionline.com/play/?locale=zh' : 'https://tankionline.com/play';
-            });
+        // --- Mobile Device Detection ---
+        function isMobileDevice() {
+            return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         }
-function isMobileDevice() {
-        return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    }
 
-    // Update the links based on device type
-    window.addEventListener('DOMContentLoaded', function() {
-        var chineseLink = document.querySelector('a[href="https://3dtank.com/play"]');
-        if (isMobileDevice()) {
-            // Add the `distribution=generic_mobile_china` parameter for mobile users
-            chineseLink.href = 'https://3dtank.com/play/?distribution=generic_mobile_china';
-        }
-    });
+        // --- Mobile Platforms Popup Logic ---
+        partnersMobileButton.addEventListener('click', function() {
+            mobilePlatformsPopup.style.display = 'block';
+        });
+        document.getElementById('closeMobilePopup').addEventListener('click', function() {
+            mobilePlatformsPopup.style.display = 'none';
+        });
+
     </script>
 </body>
 </html>
