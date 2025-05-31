@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ResourceURL Path Generator (JS)</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  label { display: inline-block; width: 120px; margin-bottom: 5px;}
+  input[type="text"] { width: 300px; margin-bottom: 10px; padding: 5px; }
+  button { padding: 8px 15px; }
+  #result { margin-top: 15px; font-weight: bold; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 4px;}
+  .error { color: red; }
+</style>
+</head>
+<body>
+
+  <h2>ResourceURL Path Generator (JavaScript Implementation)</h2>
+
+  <div>
+    <label for="inputId">ID (long):</label>
+    <input type="text" id="inputId" placeholder="输入一个长整型数字 (例如 1234567890123456789)">
+  </div>
+  <div>
+    <label for="inputVersion">Version (long):</label>
+    <input type="text" id="inputVersion" placeholder="输入一个长整型数字 (例如 123)">
+  </div>
+
+  <button onclick="generatePath()">生成路径</button>
+
+  <div id="result"></div>
+
+<script>
+  // 模拟 Kotlin 的 LongExtKt.high(long) -> Int
+  // (this ushr 32).toInt()
+  function getHighInt(longValBigInt) {
+    // 无符号右移32位，然后取低32位（模拟toInt()）
+    // BigInt 右移是算术右移，但因为我们后面会转 Number，
+    // 对于正数或能表示为32位正整数的范围，影响不大。
+    // 如果原始高位为负数形式的32位整数，BigInt >> 32n 会保留符号
+    // Number() 会尝试转换。
+    return Number(longValBigInt >> 32n);
+  }
+
+  // 模拟 Kotlin 的 LongExtKt.low(long) -> Int
+  // this.toInt()
+  function getLowInt(longValBigInt) {
+    // 取低32位，并作为有符号32位整数处理
+    // (longVal & 0xFFFFFFFFn) 确保我们只看低32位，
+    // Number() 会将其转换为JS Number。如果这个值超出了32位有符号整数的范围但仍在JS Number安全范围内，
+    // 后续的JS位操作符 (>>>) 会将其视为32位整数进行处理。
+    return Number(longValBigInt & 0xFFFFFFFFn);
+  }
+
+  function toPath(id, version) {
+    // 确保输入是 BigInt 类型
+    const idBigInt = BigInt(id);
+    const versionBigInt = BigInt(version);
+
+    let pathParts = [];
+
+    // 对应 Java: String num = Integer.toString(LongExtKt.high(j), 8);
+    // LongExtKt.high(j) 返回一个 Int
+    const highId = getHighInt(idBigInt);
+    pathParts.push(highId.toString(8));
+    pathParts.push("/");
+
+    // 对应 Java: int low = LongExtKt.low(j);
+    // LongExtKt.low(j) 返回一个 Int
+    const lowId = getLowInt(idBigInt); // 这是低32位对应的 JS Number
+
+    // 对应 Java: String num2 = Integer.toString((low >>> 16) & 65535, 8);
+    // JS 中的 >>> 会将操作数视为32位无符号整数
+    pathParts.push(((lowId >>> 16) & 0xFFFF).toString(8));
+    pathParts.push("/");
+
+    // 对应 Java: String num3 = Integer.toString((low >>> 8) & 255, 8);
+    pathParts.push(((lowId >>> 8) & 0xFF).toString(8));
+    pathParts.push("/");
+
+    // 对应 Java: String num4 = Integer.toString(low & 255, 8);
+    pathParts.push((lowId & 0xFF).toString(8));
+    pathParts.push("/");
+
+    // 对应 Java: String l = Long.toString(j2, 8);
+    pathParts.push(versionBigInt.toString(8));
+
+    return pathParts.join("");
+  }
+
+  function generatePath() {
+    const idStr = document.getElementById('inputId').value;
+    const versionStr = document.getElementById('inputVersion').value;
+    const resultDiv = document.getElementById('result');
+
+    if (!idStr || !versionStr) {
+      resultDiv.innerHTML = '<span class="error">ID 和 Version 都不能为空！</span>';
+      return;
+    }
+
+    try {
+      // 这里假设输入的是十进制字符串，BigInt可以处理
+      const generatedPath = toPath(idStr, versionStr);
+      resultDiv.textContent = "生成的路径: " + generatedPath;
+      resultDiv.classList.remove('error');
+
+      // 打印一些中间值以供调试和比较 (可选)
+      console.log("Input ID:", idStr, "BigInt:", BigInt(idStr));
+      console.log("Input Version:", versionStr, "BigInt:", BigInt(versionStr));
+      const idBigInt = BigInt(idStr);
+      const highId = getHighInt(idBigInt);
+      const lowId = getLowInt(idBigInt);
+      console.log("highId (as int):", highId, "Octal:", highId.toString(8));
+      console.log("lowId (as int):", lowId);
+      console.log("Part2 ((lowId >>> 16) & 0xFFFF):", ((lowId >>> 16) & 0xFFFF), "Octal:", ((lowId >>> 16) & 0xFFFF).toString(8));
+      console.log("Part3 ((lowId >>> 8) & 0xFF):", ((lowId >>> 8) & 0xFF), "Octal:", ((lowId >>> 8) & 0xFF).toString(8));
+      console.log("Part4 (lowId & 0xFF):", (lowId & 0xFF), "Octal:", (lowId & 0xFF).toString(8));
+      console.log("Version Octal:", BigInt(versionStr).toString(8));
+
+
+    } catch (e) {
+      resultDiv.innerHTML = '<span class="error">输入错误: ' + e.message + '. 请确保输入的是有效的整数。</span>';
+      console.error("Error in generatePath:", e);
+    }
+  }
+
+  // 设置一些默认值以便测试，与Java代码中的例子对应
+  // 例如，如果Java代码中的 j 是 0x123456789ABCDEF0L (十进制 1311768467294899696)
+  // version 是 0x77L (十进制 119)
+  // 预期输出: "2215053170/115274/336/360/167" (这是根据前面手动推导的结果)
+  window.onload = function() {
+    document.getElementById('inputId').value = "1311768467294899696"; // 0x123456789ABCDEF0
+    document.getElementById('inputVersion').value = "119";             // 0x77
+  }
+
+</script>
+
+</body>
+</html>
