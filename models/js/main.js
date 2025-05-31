@@ -279,7 +279,7 @@ function buildThreeJSModel(a3dData) {
             } else {
                 objectMaterials.push(new THREE.MeshStandardMaterial({color: 0xdddddd}));
             }
-             if (objectMaterials.length === 1 && geometry.groups.length > 1) {
+             if (objectMaterials.length === 1 && meshInfo.geometry.groups.length > 1) {
                 // If only one material but multiple groups, Three.js might behave unexpectedly.
                 // It's better to ensure the material array matches group expectations or simplify.
                 // For now, we'll use the array. If issues, use just objectMaterials[0].
