@@ -11,6 +11,7 @@ let loadedTextures = {}; // { 'textureName.webp': THREE.Texture }
 
 const objectListUI = document.getElementById('objectList');
 const deleteButton = document.getElementById('deleteSelectedObject');
+const rotateModelCheckbox = document.getElementById('rotateModelCheckbox');
 
 function initThreeJS() {
     scene = new THREE.Scene();
@@ -50,6 +51,8 @@ function initThreeJS() {
     window.addEventListener('resize', onWindowResize, false);
     renderer.domElement.addEventListener('click', onMouseClick, false);
     renderer.domElement.addEventListener('touchstart', onTouchStart, false); // For mobile selection
+    rotateModelCheckbox.addEventListener('change', applyModelRotation);
+
 
     animate();
 }
@@ -97,6 +100,16 @@ function clearScene() {
     // loadedTextures are kept unless explicitly cleared
 }
 
+function applyModelRotation() {
+    if (modelGroup) {
+        if (rotateModelCheckbox.checked) {
+            modelGroup.rotation.x = -Math.PI / 2; // Rotate -90 degrees around X-axis
+        } else {
+            modelGroup.rotation.x = 0; // Reset rotation
+        }
+    }
+}
+
 function handleA3DFile(file) {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -113,9 +126,6 @@ function handleA3DFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-// js/main.js
-// ... (其他代码保持不变) ...
-
 function handleTextureFiles(files) {
     const textureLoader = new THREE.TextureLoader();
     let texturesToLoad = files.length;
@@ -126,13 +136,15 @@ function handleTextureFiles(files) {
         texturesToLoad--;
         if (texturesToLoad === 0) {
             console.log("All new textures processed. Re-applying materials.");
-            if (modelGroup && modelGroup.children.length > 0) {
+            // This implies you might need to rebuild/update materials on existing objects
+            // For simplicity, if a model is already loaded, you might need to re-process its materials
+            // Or, if textures are loaded BEFORE the model, buildThreeJSModel will pick them up.
+             if (modelGroup && modelGroup.children.length > 0) {
                 modelGroup.traverse(child => {
                     if (child.isMesh) {
-                        const a3dObj = child.userData.a3dObjectData;
-                        let nameBasedTextureApplied = false; // 标记是否通过名称自动应用了纹理
-
-                        // --- 1. 基于对象名称的自动纹理应用 ---
+                        const a3dObj = child.userData.a3dObjectData; // We need to store this
+                        const a3dMat = child.userData.a3dMaterialData; // And this
+                        
                         if (a3dObj && a3dObj.name) {
                             const objectNameLower = a3dObj.name.toLowerCase();
                             let textureToApply = null;
@@ -145,38 +157,23 @@ function handleTextureFiles(files) {
                             }
 
                             if (textureToApply) {
-                                nameBasedTextureApplied = true; // 标记成功应用
-                                if (Array.isArray(child.material)) {
-                                    child.material.forEach(mat => { 
-                                        if (mat.map !== textureToApply) mat.map = textureToApply; 
-                                        mat.needsUpdate = true; 
-                                    });
+                                 if (Array.isArray(child.material)) {
+                                    child.material.forEach(mat => { if(mat.map !== textureToApply) mat.map = textureToApply; mat.needsUpdate = true; });
                                 } else {
-                                    if (child.material.map !== textureToApply) child.material.map = textureToApply;
+                                    if(child.material.map !== textureToApply) child.material.map = textureToApply;
                                     child.material.needsUpdate = true;
                                 }
                             }
-                        }
-
-                        // --- 2. 基于A3D材质 diffuseMap 的纹理应用 ---
-                        // 仅当基于名称的纹理未应用时，或希望 diffuseMap 补充应用时执行
-                        // 此处逻辑：如果名称匹配的纹理已应用，则它优先。
-                        if (!nameBasedTextureApplied) {
-                            const materials = Array.isArray(child.material) ? child.material : [child.material];
-                            materials.forEach(matInstance => {
-                                // 从 THREE.Material 实例的 userData 中获取原始A3D材质数据
-                                const a3dMatData = matInstance.userData.a3dMaterialData; 
-                                if (a3dMatData && a3dMatData.diffuseMap) {
-                                    const diffuseMapName = a3dMatData.diffuseMap.toLowerCase().split(/[\\/]/).pop();
-                                    if (loadedTextures[diffuseMapName]) {
-                                        const textureFromDiffuse = loadedTextures[diffuseMapName];
-                                        if (matInstance.map !== textureFromDiffuse) { // 避免不必要的赋值
-                                            matInstance.map = textureFromDiffuse;
-                                            matInstance.needsUpdate = true;
-                                        }
-                                    }
-                                }
-                            });
+                        } else if (a3dMat && a3dMat.diffuseMap) {
+                            const diffuseMapName = a3dMat.diffuseMap.toLowerCase().split(/[\\/]/).pop();
+                             if (loadedTextures[diffuseMapName]) {
+                                if (Array.isArray(child.material)) {
+                                     child.material.forEach(mat => { if(mat.map !== loadedTextures[diffuseMapName]) mat.map = loadedTextures[diffuseMapName]; mat.needsUpdate = true; });
+                                 } else {
+                                     if(child.material.map !== loadedTextures[diffuseMapName]) child.material.map = loadedTextures[diffuseMapName];
+                                     child.material.needsUpdate = true;
+                                 }
+                             }
                         }
                     }
                 });
@@ -205,7 +202,7 @@ function handleTextureFiles(files) {
     }
 }
 
-// ... (main.js 文件中的其余代码保持不变) ...
+
 function buildThreeJSModel(a3dData) {
     const threeMaterials = a3dData.materials.map(matData => {
         const params = {
@@ -395,6 +392,8 @@ function buildThreeJSModel(a3dData) {
             modelGroup.add(obj); // Add to root if no parent or parent is self
         }
     });
+
+    applyModelRotation(); // Apply current rotation state from checkbox
 
     // Optional: Auto-zoom
     if (loadedObjects.length > 0) {
