@@ -29,28 +29,34 @@ function initThreeJS() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
+    // controls.minDistance = 10;
+    // controls.maxDistance = 500;
+    // controls.maxPolarAngle = Math.PI / 2;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Slightly brighter ambient
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Slightly brighter directional
-    directionalLight.position.set(1, 1.5, 1).normalize();
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(1, 1, 1).normalize();
     scene.add(directionalLight);
     
+    // Grid Helper
     const gridHelper = new THREE.GridHelper( 200, 20, 0x000000, 0x000000 );
     gridHelper.material.opacity = 0.2;
     gridHelper.material.transparent = true;
     scene.add( gridHelper );
 
+
     window.addEventListener('resize', onWindowResize, false);
     renderer.domElement.addEventListener('click', onMouseClick, false);
-    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+    renderer.domElement.addEventListener('touchstart', onTouchStart, false); // For mobile selection
 
     animate();
 }
 
 function computeViewerHeight() {
     const controlsHeight = document.getElementById('controls').offsetHeight;
-    return Math.max(100, window.innerHeight - controlsHeight); // Ensure a minimum height
+    return window.innerHeight - controlsHeight;
 }
 
 function onWindowResize() {
@@ -68,17 +74,14 @@ function animate() {
 function clearScene() {
     if (modelGroup) {
         scene.remove(modelGroup);
+        // Properly dispose of geometries and materials
         modelGroup.traverse(object => {
             if (object.isMesh) {
                 if (object.geometry) object.geometry.dispose();
                 if (object.material) {
                     if (Array.isArray(object.material)) {
-                        object.material.forEach(mat => {
-                            if (mat.map) mat.map.dispose();
-                            mat.dispose();
-                        });
+                        object.material.forEach(mat => mat.dispose());
                     } else {
-                        if (object.material.map) object.material.map.dispose();
                         object.material.dispose();
                     }
                 }
@@ -91,20 +94,19 @@ function clearScene() {
     selectedObject = null;
     objectListUI.innerHTML = '';
     deleteButton.disabled = true;
-    // Do not clear loadedTextures here, allow them to persist for next model
+    // loadedTextures are kept unless explicitly cleared
 }
 
 function handleA3DFile(file) {
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
-            clearScene(); // Clear previous model but keep textures
+            clearScene();
             const a3dData = new A3D().parse(event.target.result);
             console.log("Parsed A3D Data:", a3dData);
-            // console.log("Parsed A3D Materials for Texture Check:", JSON.stringify(a3dData.materials, null, 2));
             buildThreeJSModel(a3dData);
         } catch (error) {
-            console.error("Error parsing/building A3D model:", error.stack || error);
+            console.error("Error parsing A3D file:", error);
             alert(`Error parsing A3D: ${error.message}`);
         }
     };
@@ -120,17 +122,18 @@ function handleTextureFiles(files) {
     const checkAllLoaded = () => {
         texturesToLoad--;
         if (texturesToLoad === 0) {
-            console.log("All new textures processed. Re-applying materials if model exists.");
-            // console.log("Currently loaded textures:", loadedTextures);
+            console.log("All new textures processed. Re-applying materials.");
+            // This implies you might need to rebuild/update materials on existing objects
+            // For simplicity, if a model is already loaded, you might need to re-process its materials
+            // Or, if textures are loaded BEFORE the model, buildThreeJSModel will pick them up.
              if (modelGroup && modelGroup.children.length > 0) {
                 modelGroup.traverse(child => {
                     if (child.isMesh) {
-                        const a3dObj = child.userData.a3dObjectData;
+                        const a3dObj = child.userData.a3dObjectData; // We need to store this
+                        const a3dMat = child.userData.a3dMaterialData; // And this
                         
-                        let appliedByObjName = false;
-                        // Try applying by specific object name patterns (e.g., hull, track)
-                        if (a3dObj && (a3dObj.name || child.name)) {
-                            const objectNameLower = (a3dObj.name || child.name || "").toLowerCase();
+                        if (a3dObj && a3dObj.name) {
+                            const objectNameLower = a3dObj.name.toLowerCase();
                             let textureToApply = null;
                             if (objectNameLower.includes("hull") || objectNameLower.includes("turret")) {
                                 textureToApply = loadedTextures['lightmap.webp'];
@@ -141,33 +144,26 @@ function handleTextureFiles(files) {
                             }
 
                             if (textureToApply) {
-                                appliedByObjName = true;
-                                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                                materials.forEach(mat => {
-                                    if(mat.map !== textureToApply) { mat.map = textureToApply; mat.needsUpdate = true; }
-                                });
-                                // console.log(`Applied texture ${textureToApply.name} by object name rule to ${child.name}`);
-                            }
-                        }
-                        
-                        // If not applied by object name, try based on material's original diffuseMap
-                        if (!appliedByObjName) {
-                            const materialsToUpdate = Array.isArray(child.material) ? child.material : [child.material];
-                            materialsToUpdate.forEach(matInstance => {
-                                const originalMatData = matInstance.userData.a3dMaterialData;
-                                if (originalMatData && originalMatData.diffuseMap) {
-                                    const diffuseMapName = originalMatData.diffuseMap.toLowerCase().split(/[\\/]/).pop();
-                                     if (loadedTextures[diffuseMapName] && matInstance.map !== loadedTextures[diffuseMapName]) {
-                                         matInstance.map = loadedTextures[diffuseMapName];
-                                         matInstance.needsUpdate = true;
-                                         // console.log(`Re-applied texture ${diffuseMapName} from A3D material to ${child.name}`);
-                                     }
+                                 if (Array.isArray(child.material)) {
+                                    child.material.forEach(mat => { if(mat.map !== textureToApply) mat.map = textureToApply; mat.needsUpdate = true; });
+                                } else {
+                                    if(child.material.map !== textureToApply) child.material.map = textureToApply;
+                                    child.material.needsUpdate = true;
                                 }
-                            });
+                            }
+                        } else if (a3dMat && a3dMat.diffuseMap) {
+                            const diffuseMapName = a3dMat.diffuseMap.toLowerCase().split(/[\\/]/).pop();
+                             if (loadedTextures[diffuseMapName]) {
+                                if (Array.isArray(child.material)) {
+                                     child.material.forEach(mat => { if(mat.map !== loadedTextures[diffuseMapName]) mat.map = loadedTextures[diffuseMapName]; mat.needsUpdate = true; });
+                                 } else {
+                                     if(child.material.map !== loadedTextures[diffuseMapName]) child.material.map = loadedTextures[diffuseMapName];
+                                     child.material.needsUpdate = true;
+                                 }
+                             }
                         }
                     }
                 });
-                 renderer.render(scene, camera); // Re-render if textures changed
             }
         }
     };
@@ -177,10 +173,9 @@ function handleTextureFiles(files) {
         textureLoader.load(
             objectURL,
             (texture) => {
-                texture.name = file.name; 
-                const lowerCaseName = file.name.toLowerCase();
-                loadedTextures[lowerCaseName] = texture; 
-                console.log(`Loaded texture: ${file.name} (stored as ${lowerCaseName})`);
+                texture.name = file.name; // Store original file name
+                loadedTextures[file.name.toLowerCase()] = texture; // Store by lowercase name
+                console.log(`Loaded texture: ${file.name}`);
                 URL.revokeObjectURL(objectURL);
                 checkAllLoaded();
             },
@@ -196,304 +191,211 @@ function handleTextureFiles(files) {
 
 
 function buildThreeJSModel(a3dData) {
-    console.log("Building ThreeJS model. A3D File Version:", a3dData.version);
-
-    const threeMaterials = a3dData.materials.map((matData, matIndex) => {
+    const threeMaterials = a3dData.materials.map(matData => {
         const params = {
-            name: matData.name || `A3DMaterial_${matIndex}`,
+            name: matData.name,
             color: new THREE.Color().fromArray(matData.color),
-            roughness: 0.7, 
-            metalness: 0.2, 
-            side: THREE.FrontSide, // Default, can be THREE.DoubleSide if needed
+            roughness: 0.8, // Default
+            metalness: 0.1, // Default
         };
+        // Attempt to find texture
         if (matData.diffuseMap) {
-            const diffuseMapName = matData.diffuseMap.toLowerCase().split(/[\\/]/).pop();
+            const diffuseMapName = matData.diffuseMap.toLowerCase().split(/[\\/]/).pop(); // Get filename
             if (loadedTextures[diffuseMapName]) {
                 params.map = loadedTextures[diffuseMapName];
-                console.log(`Material '${params.name}': Applied texture '${diffuseMapName}' during material creation.`);
-            } else {
-                console.log(`Material '${params.name}': Texture '${diffuseMapName}' (from diffuseMap: ${matData.diffuseMap}) NOT FOUND in loadedTextures at build time.`);
             }
         }
         const material = new THREE.MeshStandardMaterial(params);
-        material.userData.a3dMaterialData = matData; 
+        material.userData.a3dMaterialData = matData; // Store original data
         return material;
     });
 
-    const threeMeshesData = a3dData.meshes.map((meshData, meshIndex) => {
-        const meshA3DName = (meshData && meshData.name) ? meshData.name : `UnnamedA3DMesh_${meshIndex}`;
-        console.log(`Processing mesh index: ${meshIndex}, A3D Mesh Name: '${meshA3DName}'`);
+    const threeMeshesData = a3dData.meshes.map(meshData => {
+        const geometry = new THREE.BufferGeometry();
+        let positions = [];
+        let uvs = [];
+        let normals = [];
 
-        if (!meshData) {
-            console.error(`CRITICAL: meshData at index ${meshIndex} is null or undefined! This indicates a parser issue. Skipping mesh.`);
-            return { geometry: null, a3dMeshData: { name: `ErrorMesh_${meshIndex}`, submeshes:[] } };
-        }
-
-        let currentMeshGeometry; // Use a distinct name
-        try {
-            currentMeshGeometry = new THREE.BufferGeometry();
-            currentMeshGeometry.name = `GeometryFor_${meshA3DName}`;
-            // console.log(`Mesh ${meshIndex} ('${meshA3DName}'): THREE.BufferGeometry created successfully.`);
-        } catch (e) {
-            console.error(`Mesh ${meshIndex} ('${meshA3DName}'): Error creating THREE.BufferGeometry:`, e.stack || e);
-            alert(`Error creating BufferGeometry for mesh ${meshIndex} ('${meshA3DName}'): ${e.message}`);
-            throw e; 
-        }
-
-        let positions = [], uvs = [], normals = [];
-        (meshData.vertexBuffers || []).forEach(vb => {
-            if (!vb || !vb.data) {
-                 console.warn(`Mesh ${meshIndex} ('${meshA3DName}'): Skipping malformed vertex buffer.`);
-                 return;
+        meshData.vertexBuffers.forEach(vb => {
+            if (vb.bufferType === A3D_VERTEXTYPE_COORDINATE) {
+                vb.data.forEach(v => positions.push(...v));
+            } else if (vb.bufferType === A3D_VERTEXTYPE_UV1) {
+                vb.data.forEach(uv => uvs.push(uv[0], 1.0 - uv[1])); // Mirror Y for UV
+            } else if (vb.bufferType === A3D_VERTEXTYPE_NORMAL1) {
+                vb.data.forEach(n => normals.push(...n));
             }
-            if (vb.bufferType === A3D_VERTEXTYPE_COORDINATE) vb.data.forEach(v => positions.push(...v));
-            else if (vb.bufferType === A3D_VERTEXTYPE_UV1) vb.data.forEach(uv => uvs.push(uv[0], 1.0 - uv[1])); 
-            else if (vb.bufferType === A3D_VERTEXTYPE_NORMAL1) vb.data.forEach(n => normals.push(...n));
+            // Add more vertex types if needed (UV2, Color, Normal2)
         });
 
-        if (positions.length > 0) {
-            if (!currentMeshGeometry) console.error(`Mesh ${meshIndex} ('${meshA3DName}'): currentMeshGeometry is undefined BEFORE setAttribute('position')`);
-            currentMeshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        } else {
-            console.warn(`Mesh ${meshIndex} ('${meshA3DName}'): No position data found!`);
-            // Return a dummy geometry to prevent downstream errors if this mesh is referenced
-            return { geometry: new THREE.BufferGeometry(), a3dMeshData: meshData };
-        }
-
-        if (uvs.length > 0) {
-            if (!currentMeshGeometry) console.error(`Mesh ${meshIndex} ('${meshA3DName}'): currentMeshGeometry is undefined BEFORE setAttribute('uv')`);
-            currentMeshGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-        } else {
-            console.log(`Mesh ${meshIndex} ('${meshA3DName}'): No UVs found in vertex buffers.`);
-        }
+        if (positions.length > 0) geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        if (uvs.length > 0) geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         
         if (normals.length > 0) {
-            if (!currentMeshGeometry) console.error(`Mesh ${meshIndex} ('${meshA3DName}'): currentMeshGeometry is undefined BEFORE setAttribute('normal')`);
-            currentMeshGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-        } else {
-            if (!currentMeshGeometry) console.error(`Mesh ${meshIndex} ('${meshA3DName}'): currentMeshGeometry is undefined BEFORE computeVertexNormals`);
-            currentMeshGeometry.computeVertexNormals(); 
-            console.log(`Mesh ${meshIndex} ('${meshA3DName}'): Normals computed as none were provided.`);
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+        } else if (positions.length > 0) {
+            geometry.computeVertexNormals(); // Calculate if not provided
         }
 
+        // Handle indices and material groups
         let allIndices = [];
-        if (meshData.submeshes && meshData.submeshes.length > 0) {
-            if (a3dData.version === 2) {
-                meshData.submeshes.forEach((sm, submeshIndex) => {
-                    if (!currentMeshGeometry) {
-                        const errorMsg = `CRITICAL ERROR: Mesh ${meshIndex} ('${meshA3DName}'), Submesh ${submeshIndex}: currentMeshGeometry is undefined BEFORE addGroup!`;
-                        console.error(errorMsg); alert(errorMsg); throw new Error(errorMsg);
-                    }
-                    if (sm && sm.indices && Array.isArray(sm.indices) && typeof sm.materialID !== 'undefined') { 
-                        currentMeshGeometry.addGroup(allIndices.length, sm.indices.length, sm.materialID !== null ? sm.materialID : 0);
-                        allIndices.push(...sm.indices);
-                    } else {
-                        console.warn(`Mesh ${meshIndex} ('${meshA3DName}'), Submesh ${submeshIndex}: Malformed V2 submesh data or missing indices. Skipping addGroup. Data:`, sm);
-                    }
+        if (meshData.submeshes.length > 0) {
+            if (a3dData.version === 2) { // V2: submeshes define material groups
+                meshData.submeshes.forEach((sm, index) => {
+                    geometry.addGroup(allIndices.length, sm.indices.length, sm.materialID !== null ? sm.materialID : 0);
+                    allIndices.push(...sm.indices);
                 });
-            } else { // V3
-                 meshData.submeshes.forEach((sm, submeshIndex) => {
-                    if (sm && sm.indices && Array.isArray(sm.indices)) {
-                        allIndices.push(...sm.indices);
-                    } else {
-                         console.warn(`Mesh ${meshIndex} ('${meshA3DName}'), V3 Submesh ${submeshIndex}: Malformed submesh data or missing indices. Data:`, sm);
-                    }
+            } else { // V3: submeshes are just index lists, materials assigned by A3DObject
+                 meshData.submeshes.forEach(sm => {
+                    allIndices.push(...sm.indices);
                 });
             }
-        } else {
-            console.log(`Mesh ${meshIndex} ('${meshA3DName}'): No submeshes defined or submeshes array is empty.`);
         }
-
-        if (allIndices.length > 0) {
-            if (!currentMeshGeometry) console.error(`Mesh ${meshIndex} ('${meshA3DName}'): currentMeshGeometry is undefined BEFORE setIndex`);
-            currentMeshGeometry.setIndex(allIndices);
-        } else if (positions.length > 0 && (!meshData.submeshes || meshData.submeshes.length === 0)) {
-            // If no submeshes provided indices, but we have positions, assume non-indexed geometry or direct vertex order
-            console.log(`Mesh ${meshIndex} ('${meshA3DName}'): No indices from submeshes. Will render as non-indexed or expect implicit indices.`);
-        }
+        if (allIndices.length > 0) geometry.setIndex(allIndices);
         
-        if (!currentMeshGeometry) console.error(`Mesh ${meshIndex} ('${meshA3DName}'): currentMeshGeometry is undefined BEFORE return from map function`);
-        return { geometry: currentMeshGeometry, a3dMeshData: meshData };
+        return { geometry, a3dMeshData: meshData };
     });
 
-    const objectMap = {}; 
+    const objectMap = {}; // For parenting { originalIndex: THREE.Object3D }
 
-    a3dData.objects.forEach((objData, objIndex) => {
-        const objA3DName = (objData && objData.name) ? objData.name : `UnnamedA3DObject_${objIndex}`;
-        // console.log(`Processing object index: ${objIndex}, A3D Object Name: '${objA3DName}'`);
-
-        if (!objData || typeof objData.meshID === 'undefined') {
-            console.warn(`Object ${objIndex} ('${objA3DName}'): Invalid object data or missing meshID. Skipping.`);
-            return;
-        }
+    a3dData.objects.forEach((objData, index) => {
         const meshInfo = threeMeshesData[objData.meshID];
-        if (!meshInfo || !meshInfo.geometry) {
-            console.warn(`Object ${objIndex} ('${objA3DName}'): Mesh ID ${objData.meshID} not found, or its geometry is null. Skipping object.`);
+        if (!meshInfo) {
+            console.warn(`Mesh ID ${objData.meshID} not found for object ${index}`);
             return;
         }
         
         let objectMaterials = [];
         if (a3dData.version === 2) {
+            // For V2, materials are per submesh, handled by geometry groups.
+            // We might need to collect all materials used by the submeshes of this mesh.
             const usedMaterialIndexes = new Set();
-            if (meshInfo.a3dMeshData && meshInfo.a3dMeshData.submeshes) {
-                meshInfo.a3dMeshData.submeshes.forEach(sm => {
-                    if (sm.materialID !== null && sm.materialID >= 0) usedMaterialIndexes.add(sm.materialID);
-                });
-            }
+            a3dData.meshes[objData.meshID].submeshes.forEach(sm => {
+                if (sm.materialID !== null) usedMaterialIndexes.add(sm.materialID);
+            });
             if (usedMaterialIndexes.size > 0) {
-                 usedMaterialIndexes.forEach(idx => {
-                    if (idx < threeMaterials.length) objectMaterials.push(threeMaterials[idx]);
-                    else console.warn(`Object ${objIndex} ('${objA3DName}'), V2: Invalid materialID ${idx} (max: ${threeMaterials.length-1}) found in submesh.`);
-                 });
-            } else if (threeMaterials.length > 0) { // If no specific submesh materials, or all were null
-                 objectMaterials.push(threeMaterials[0]); 
+                 usedMaterialIndexes.forEach(idx => objectMaterials.push(threeMaterials[idx]));
+            } else if (threeMaterials.length > 0) {
+                 objectMaterials.push(threeMaterials[0]); // Fallback or if no submesh mats
+            } else {
+                objectMaterials.push(new THREE.MeshStandardMaterial({color: 0xdddddd}));
             }
-             // If geometry has groups, material array must be used, even if it's one material repeated.
-            if (meshInfo.geometry.groups.length > 1 && objectMaterials.length === 1) {
-                // This scenario is fine, Three.js will use the single material for all groups.
-            } else if (meshInfo.geometry.groups.length > 0 && objectMaterials.length === 0 && threeMaterials.length > 0) {
-                objectMaterials.push(threeMaterials[0]); // Fallback if groups exist but no mats assigned
+             if (objectMaterials.length === 1 && geometry.groups.length > 1) {
+                // If only one material but multiple groups, Three.js might behave unexpectedly.
+                // It's better to ensure the material array matches group expectations or simplify.
+                // For now, we'll use the array. If issues, use just objectMaterials[0].
             }
-
 
         } else { // V3
-            if (objData.materialIDs && objData.materialIDs.length > 0) {
-                objData.materialIDs.forEach(matID => {
-                    if (matID >= 0 && matID < threeMaterials.length) {
-                        objectMaterials.push(threeMaterials[matID]);
-                    } else if (matID !== -1) { 
-                        console.warn(`Object ${objIndex} ('${objA3DName}'), V3: Invalid materialID ${matID} (max: ${threeMaterials.length-1}).`);
-                    }
-                });
-            }
-            // If V3 object has no materialIDs listed, or all were -1, use the first material as a default
+            objData.materialIDs.forEach(matID => {
+                if (matID >= 0 && matID < threeMaterials.length) {
+                    objectMaterials.push(threeMaterials[matID]);
+                }
+            });
             if (objectMaterials.length === 0 && threeMaterials.length > 0) {
-                objectMaterials.push(threeMaterials[0]); 
+                objectMaterials.push(threeMaterials[0]); // Default if no specific material
+            } else if (objectMaterials.length === 0) {
+                 objectMaterials.push(new THREE.MeshStandardMaterial({color: 0xcccccc})); // Ultimate fallback
             }
         }
-        // Ultimate fallback if no materials resolved
-        if (objectMaterials.length === 0) {
-            objectMaterials.push(new THREE.MeshStandardMaterial({color: 0xmagenta, name: `SuperFallbackMaterial_Obj${objIndex}`}));
-        }
 
 
-        const finalMaterial = objectMaterials.length > 1 ? objectMaterials : objectMaterials[0];
-        const threeMesh = new THREE.Mesh(meshInfo.geometry, finalMaterial);
+        const threeMesh = new THREE.Mesh(meshInfo.geometry, objectMaterials.length > 1 ? objectMaterials : objectMaterials[0]);
         
-        threeMesh.name = objData.name || meshInfo.a3dMeshData.name || `ThreeObject_${objIndex}`;
+        let objName = objData.name || meshInfo.a3dMeshData.name || `Object_${index}`;
+        threeMesh.name = objName;
 
         const transformData = a3dData.transforms[objData.transformID];
         if (transformData) {
             threeMesh.position.fromArray(transformData.position);
-            threeMesh.quaternion.fromArray(transformData.rotation); 
+            threeMesh.quaternion.fromArray(transformData.rotation); // x, y, z, w
             threeMesh.scale.fromArray(transformData.scale);
-             if (transformData.scale.every(s => Math.abs(s) < 1e-6)) { // Check for effectively zero scale
-                // console.warn(`Object ${threeMesh.name}: Transform scale was zero, resetting to 1,1,1.`);
+             if (transformData.scale.every(s => s === 0)) { // Reset empty transform scale
                 threeMesh.scale.set(1,1,1);
             }
         }
 
+        // Store original data for reference (e.g., texture auto-apply)
         threeMesh.userData.a3dObjectData = objData;
         threeMesh.userData.a3dTransformData = transformData;
-        // Store original a3dMaterialData on the THREE.Material instances themselves (done during threeMaterials.map)
-        // For quick access, can store reference on threeMesh.userData if needed, but primary is on mat instance
+        // Material data is more complex if multiple are used, could store an array of original material data
+        if(objectMaterials.length === 1) threeMesh.userData.a3dMaterialData = objectMaterials[0].userData.a3dMaterialData;
 
-        // Auto-apply textures by object name (e.g. 'lightmap.webp' for 'hull')
-        // This overrides textures set via A3D material diffuseMap if names match
-        const objectNameLower = threeMesh.name.toLowerCase();
-        let textureToApplyByName = null;
-        if (objectNameLower.includes("hull") || objectNameLower.includes("turret")) textureToApplyByName = loadedTextures['lightmap.webp'];
-        else if (objectNameLower.includes("track")) textureToApplyByName = loadedTextures['tracks.webp'];
-        else if (objectNameLower.includes("wheel")) textureToApplyByName = loadedTextures['wheels.webp'];
-        
-        if (textureToApplyByName) {
-            // console.log(`Object ${threeMesh.name}: Applying texture '${textureToApplyByName.name}' based on object name rule.`);
-            const matsToUpdate = Array.isArray(threeMesh.material) ? threeMesh.material : [threeMesh.material];
-            matsToUpdate.forEach(mat => {
-                mat.map = textureToApplyByName;
-                mat.needsUpdate = true;
-            });
+        // Attempt to auto-apply pre-loaded textures based on name
+        const objectNameLower = objName.toLowerCase();
+        let textureToApply = null;
+        if (objectNameLower.includes("hull") || objectNameLower.includes("turret")) {
+            textureToApply = loadedTextures['lightmap.webp'];
+        } else if (objectNameLower.includes("track")) {
+            textureToApply = loadedTextures['tracks.webp'];
+        } else if (objectNameLower.includes("wheel")) {
+            textureToApply = loadedTextures['wheels.webp'];
+        }
+        if (textureToApply) {
+            if (Array.isArray(threeMesh.material)) {
+                threeMesh.material.forEach(mat => mat.map = textureToApply);
+            } else {
+                threeMesh.material.map = textureToApply;
+            }
         }
 
+
         loadedObjects.push(threeMesh);
-        objectMap[objIndex] = threeMesh; 
-        addToListUI(threeMesh, objIndex);
+        objectMap[index] = threeMesh; // For parenting
+        // modelGroup.add(threeMesh); // Will be added via parenting or directly if no parent
+        addToListUI(threeMesh, index);
     });
 
     // Setup parenting
-    loadedObjects.forEach((threeJsObjInstance) => { // Renamed 'obj' to avoid confusion with a3d objData
-        const a3dObjDataForThisThreeMesh = threeJsObjInstance.userData.a3dObjectData;
-        if (!a3dObjDataForThisThreeMesh) {
-             console.warn(`Parenting: Cannot find original a3dObjectData for Three.js object ${threeJsObjInstance.name}. Adding to root.`);
-             modelGroup.add(threeJsObjInstance);
-             return;
-        }
-        const transformIDForObject = a3dObjDataForThisThreeMesh.transformID;
-         if (typeof transformIDForObject === 'undefined' || transformIDForObject === null || transformIDForObject >= a3dData.transforms.length) {
-            // console.log(`Parenting: Object ${threeJsObjInstance.name} has no valid transformID or out of bounds. Adding to root.`);
-            modelGroup.add(threeJsObjInstance);
-            return;
-        }
-
-        const parentTransformIndex = a3dData.transformParentIDs[transformIDForObject];
+    loadedObjects.forEach((obj, originalIndex) => {
+        const parentID = a3dData.transformParentIDs[a3dData.objects[originalIndex].transformID]; // This is tricky, parentID is for transform index
         
-        let actualParentTransformTargetIndex = -1; 
-        if (a3dData.version < 3) { 
-            actualParentTransformTargetIndex = (parentTransformIndex === 0 || typeof parentTransformIndex === 'undefined') ? -1 : parentTransformIndex;
-        } else { 
-             actualParentTransformTargetIndex = (parentTransformIndex === -1 || typeof parentTransformIndex === 'undefined') ? -1 : parentTransformIndex;
+        let actualParentId = -1;
+        if (a3dData.version < 3 && parentID === 0) { // V2 uses 0 for no parent
+            actualParentId = -1;
+        } else if (parentID === -1) { // V3 uses -1 for no parent
+             actualParentId = -1;
+        } else {
+            actualParentId = parentID;
         }
         
-        let parentThreeJsObject = null;
-        if (actualParentTransformTargetIndex !== -1) {
-            // Find which THREE.Object3D (loadedObject) USES this parentTransformIndex for ITS OWN transform
+        // Find the object that USES this transformID as its parent
+        // The parentID in transformParentIDs corresponds to the *index* of the parent transform in a3dData.transforms.
+        // We need to find which THREE.Object3D corresponds to that parent transform.
+        let parentObject = null;
+        if (actualParentId !== -1) {
+            // Find which loaded object (THREE.Mesh) uses this parent transform
             for (let i = 0; i < a3dData.objects.length; i++) {
-                const potentialParentA3dObj = a3dData.objects[i];
-                if (potentialParentA3dObj && potentialParentA3dObj.transformID === actualParentTransformTargetIndex) {
-                    parentThreeJsObject = objectMap[i]; // objectMap maps a3dData.objects index to THREE.Object3D
+                if (a3dData.objects[i].transformID === actualParentId) {
+                    parentObject = objectMap[i]; // objectMap stores THREE.Mesh by its original a3dData.objects index
                     break;
                 }
             }
         }
 
-        if (parentThreeJsObject && parentThreeJsObject !== threeJsObjInstance) {
-            parentThreeJsObject.add(threeJsObjInstance);
+
+        if (parentObject && parentObject !== obj) {
+            parentObject.add(obj);
         } else {
-            modelGroup.add(threeJsObjInstance); 
+            modelGroup.add(obj); // Add to root if no parent or parent is self
         }
     });
 
-    // Auto-zoom
-    if (loadedObjects.length > 0 && modelGroup.children.length > 0) {
+    // Optional: Auto-zoom
+    if (loadedObjects.length > 0) {
         const box = new THREE.Box3().setFromObject(modelGroup);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         
-        if (!isFinite(center.x) || !isFinite(size.x) || size.x < 0) {
-            console.warn("Auto-zoom: Invalid bounding box calculated. Skipping auto-zoom.", center, size);
-        } else {
-            controls.reset(); 
-            const maxSize = Math.max(size.x, size.y, size.z);
-            const fovInRadians = camera.fov * (Math.PI / 180);
-            let distance = maxSize / (2 * Math.tan(fovInRadians / 2));
-            distance /= camera.aspect; // Adjust for width if wider than high for typical aspect ratios
-            distance *= 1.5; // Zoom out a bit more
-            distance = Math.max(distance, Math.max(size.x, size.y, size.z) * 0.5); // ensure not too close for flat objects
-            distance = Math.max(distance, 10); // Minimum distance
+        controls.reset(); // Important before setting new target/position
 
-            const direction = new THREE.Vector3(0, 0.5, 1); // Default camera direction relative to target
-            direction.applyQuaternion(camera.quaternion); // Maintain current camera orientation if desired
-            direction.normalize().multiplyScalar(distance);
-            
-            controls.object.position.copy(center).add(direction);
-            controls.target.copy(center);
-            controls.update();
-        }
-    } else {
-        // console.log("Auto-zoom: No objects loaded or modelGroup is empty.");
-        controls.reset();
-        camera.position.set(50,50,50);
-        controls.target.set(0,0,0);
+        const maxSize = Math.max(size.x, size.y, size.z);
+        const fitHeightDistance = maxSize / (2 * Math.atan(Math.PI * camera.fov / 360));
+        const fitWidthDistance = fitHeightDistance / camera.aspect;
+        const distance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance);
+
+        const direction = controls.object.position.clone().sub(center).normalize().multiplyScalar(distance);
+        controls.object.position.copy(center).add(direction);
+        controls.target.copy(center);
         controls.update();
     }
 }
@@ -501,8 +403,8 @@ function buildThreeJSModel(a3dData) {
 
 function addToListUI(object, id) {
     const listItem = document.createElement('li');
-    listItem.textContent = `${object.name || `Unnamed Object`} (ID: ${id})`;
-    listItem.dataset.objectId = object.uuid; 
+    listItem.textContent = object.name || `Unnamed Object ${id}`;
+    listItem.dataset.objectId = object.uuid; // Use Three.js UUID
     listItem.addEventListener('click', () => {
         selectObjectUI(object);
     });
@@ -511,10 +413,11 @@ function addToListUI(object, id) {
 
 function selectObjectUI(object) {
     if (selectedObject) {
+        // Deselect previous: remove highlight, find its <li>
         selectedObject.traverse(child => {
             if (child.isMesh) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                materials.forEach(m => { if(m.emissive) m.emissive.setHex(0x000000) });
+                if (Array.isArray(child.material)) child.material.forEach(m => m.emissive.setHex(0x000000));
+                else child.material.emissive.setHex(0x000000);
             }
         });
         const oldLi = objectListUI.querySelector(`[data-object-id="${selectedObject.uuid}"]`);
@@ -524,10 +427,11 @@ function selectObjectUI(object) {
     selectedObject = object;
 
     if (selectedObject) {
+        // Select new: add highlight, find its <li>
         selectedObject.traverse(child => {
              if (child.isMesh) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                materials.forEach(m => { if(m.emissive) m.emissive.setHex(0x888800) }); // Brighter highlight
+                if (Array.isArray(child.material)) child.material.forEach(m => m.emissive.setHex(0x555500));
+                else child.material.emissive.setHex(0x555500); // Highlight
             }
         });
         const newLi = objectListUI.querySelector(`[data-object-id="${selectedObject.uuid}"]`);
@@ -536,50 +440,45 @@ function selectObjectUI(object) {
     } else {
         deleteButton.disabled = true;
     }
-     renderer.render(scene, camera); // Re-render for highlight change
 }
 
 function deleteSelected() {
     if (!selectedObject) return;
-    if (selectedObject.parent) { // Check if it has a parent before removing
-        selectedObject.parent.remove(selectedObject);
-    } else {
-        console.warn("Selected object has no parent, cannot remove from parent.", selectedObject);
-        // Potentially remove from modelGroup directly if it's a root object not handled by parenting logic
-        modelGroup.remove(selectedObject);
-    }
-    
+
+    // Remove from scene graph
+    selectedObject.parent.remove(selectedObject);
+
+    // Dispose geometry and material(s)
     selectedObject.traverse(child => {
         if (child.isMesh) {
             if (child.geometry) child.geometry.dispose();
             if (child.material) {
                 if (Array.isArray(child.material)) {
-                    child.material.forEach(mat => {
-                        if (mat.map) mat.map.dispose();
-                        mat.dispose();
-                    });
+                    child.material.forEach(mat => mat.dispose());
                 } else {
-                    if (child.material.map) child.material.map.dispose();
                     child.material.dispose();
                 }
             }
         }
     });
     
+    // Remove from our tracking array
     const index = loadedObjects.indexOf(selectedObject);
     if (index > -1) loadedObjects.splice(index, 1);
 
+    // Remove from UI list
     const listItem = objectListUI.querySelector(`[data-object-id="${selectedObject.uuid}"]`);
     if (listItem) listItem.remove();
 
     selectedObject = null;
     deleteButton.disabled = true;
-    renderer.render(scene, camera); // Re-render after deletion
 }
 
+// --- Raycasting for selection ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-let touchHandled = false; 
+let touchHandled = false; // Prevent click after touch
+
 
 function onMouseClick(event) {
     if (touchHandled) {
@@ -590,47 +489,40 @@ function onMouseClick(event) {
 }
 
 function onTouchStart(event) {
-    if (event.touches.length === 1) { 
+    if (event.touches.length === 1) { // single touch
         handleInteraction(event.touches[0].clientX, event.touches[0].clientY);
-        touchHandled = true; 
+        touchHandled = true; // Set flag
     }
 }
 
+
 function handleInteraction(x, y) {
+    // Adjust mouse position to be relative to the viewerContainer and normalized
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(modelGroup.children, true); // Intersect with direct children of modelGroup
+    const intersects = raycaster.intersectObjects(loadedObjects, true); // Intersect with children
 
     if (intersects.length > 0) {
         let intersectedObject = intersects[0].object;
-        // Traverse up to find the object that's directly in loadedObjects 
-        // (or is a direct child of modelGroup that we track)
+        // Traverse up to find the object that's directly in loadedObjects (the parent-most object we added)
         while(intersectedObject.parent && intersectedObject.parent !== modelGroup && loadedObjects.indexOf(intersectedObject) === -1) {
             intersectedObject = intersectedObject.parent;
         }
         if (loadedObjects.indexOf(intersectedObject) !== -1) {
              selectObjectUI(intersectedObject);
         } else {
-            // If not in loadedObjects (e.g. a part of a complex hierarchy not directly added)
-            // try selecting the top-level parent that is part of modelGroup
-            let topLevelChild = intersects[0].object;
-            while (topLevelChild.parent && topLevelChild.parent !== modelGroup) {
-                topLevelChild = topLevelChild.parent;
-            }
-            if (topLevelChild.parent === modelGroup && loadedObjects.includes(topLevelChild)) {
-                 selectObjectUI(topLevelChild);
-            } else {
-                selectObjectUI(null); 
-            }
+            selectObjectUI(null); // Clicked on something not in our main list
         }
     } else {
-        selectObjectUI(null); 
+        selectObjectUI(null); // Clicked on empty space
     }
 }
 
+
+// Event Listeners for UI
 document.getElementById('a3dFile').addEventListener('change', (event) => {
     if (event.target.files.length > 0) {
         handleA3DFile(event.target.files[0]);
@@ -645,4 +537,5 @@ document.getElementById('textureFiles').addEventListener('change', (event) => {
 
 deleteButton.addEventListener('click', deleteSelected);
 
+// --- Start ---
 initThreeJS();
