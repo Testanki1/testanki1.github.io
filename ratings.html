@@ -423,37 +423,40 @@
         }
     }
 
-    async function fetchProfileData(region, username) {
-        const baseUrl = API_CONFIG.baseUrls[region];
-        if (!baseUrl) throw new Error('无效的服务器选择');
+    // 修改后的代码 (适用于大多数其他代理)
+async function fetchProfileData(region, username) {
+    const baseUrl = API_CONFIG.baseUrls[region];
+    if (!baseUrl) throw new Error('无效的服务器选择');
+    
+    API_CONFIG.proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=';
+    
+    try {
+        const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`;
         
-        try {
-            const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`;
-            const apiUrl = `${API_CONFIG.proxyUrl}${encodeURIComponent(targetUrl)}`;
-            
-            const response = await fetch(apiUrl);
+        // 注意这里的 apiUrl 构造方式可能不同
+        // 对于 ?quest= 这种格式，构造方式不变
+        const apiUrl = `${API_CONFIG.proxyUrl}${encodeURIComponent(targetUrl)}`;
+        
+        const response = await fetch(apiUrl);
 
-            if (!response.ok) throw new Error(`网络响应错误: ${response.status}`);
+        if (!response.ok) throw new Error(`网络响应错误: ${response.status}`);
 
-            const data = await response.json();
-            if (!data.contents) {
-                if (data && data.error) throw new Error(`代理错误: ${data.error}`);
-                throw new Error('API 返回空响应，可能是昵称错误或服务器问题。');
-            }
+        // --- 主要修改在这里 ---
+        // 直接将响应解析为 JSON，不再需要 .contents
+        const profileData = await response.json(); 
+        // ----------------------
 
-            const profileData = JSON.parse(data.contents);
-            if (profileData?.responseType === 'NOT_FOUND') {
-                throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。');
-            } else if (profileData?.response) {
-                return profileData.response;
-            } else {
-                throw new Error('无效的响应数据格式');
-            }
-        } catch (err) {
-            throw err; // 重新抛出错误
+        if (profileData?.responseType === 'NOT_FOUND') {
+            throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。');
+        } else if (profileData?.response) {
+            return profileData.response;
+        } else {
+            throw new Error('无效的响应数据格式');
         }
+    } catch (err) {
+        throw err;
     }
-
+}
     // --- Monitoring ---
     function toggleMonitoring() {
         if (isMonitoring) {
