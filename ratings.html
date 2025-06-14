@@ -236,8 +236,8 @@
 
 <div class="form-container">
     <div class="form-group">
-        <label for="region">选择服务器：</label>
-        <select id="region">
+        <label for="server">选择服务器：</label>
+        <select id="server">
             <option value="国服" disabled>国服 (维护中)</option>
             <option value="eu" selected>外服</option>
         </select>
@@ -288,7 +288,6 @@
 <script>
     // --- CONFIGURATION ---
     const API_CONFIG = {
-        proxyUrl: 'https://api.allorigins.win/get?url=',
         baseUrls: {
             'eu': 'https://ratings.tankionline.com/api/eu/profile/',
             'cn': 'https://ratings.3dtank.com/get_stat/profile/'
@@ -328,7 +327,7 @@
     const elements = {
         fetchButton: document.getElementById('fetchButton'),
         monitorButton: document.getElementById('monitorButton'),
-        regionSelect: document.getElementById('region'),
+        serverSelect: document.getElementById('server'),
         usernameInput: document.getElementById('username'),
         loader: document.getElementById('loader'),
         errorMessage: document.getElementById('errorMessage'),
@@ -348,7 +347,7 @@
     let lastProfileData = null;
     let changeLog = [];
     let currentUsername = '';
-    let currentRegion = '';
+    let currentServer = '';
 
     // --- Event Listeners ---
     elements.fetchButton.addEventListener('click', handleFetch);
@@ -399,7 +398,7 @@
             return;
         }
 
-        currentRegion = elements.regionSelect.value;
+        currentServer = elements.serverSelect.value;
         currentUsername = elements.usernameInput.value.trim();
 
         if (!currentUsername) {
@@ -411,7 +410,7 @@
         setLoading(true);
 
         try {
-            const profileData = await fetchProfileData(currentRegion, currentUsername);
+            const profileData = await fetchProfileData(currentServer, currentUsername);
             updateDisplay(profileData);
             lastProfileData = profileData;
         } catch (error) {
@@ -424,8 +423,8 @@
     }
 
     // 修改后的代码 (适用于大多数其他代理)
-async function fetchProfileData(region, username) {
-    const baseUrl = API_CONFIG.baseUrls[region];
+async function fetchProfileData(server, username) {
+    const baseUrl = API_CONFIG.baseUrls[server];
     if (!baseUrl) throw new Error('无效的服务器选择');
     
     API_CONFIG.proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=';
@@ -478,7 +477,7 @@ async function fetchProfileData(region, username) {
         elements.monitorButton.classList.add('monitoring');
         elements.fetchButton.disabled = true;
         elements.usernameInput.disabled = true;
-        elements.regionSelect.disabled = true;
+        elements.serverSelect.disabled = true;
 
         displayError("监测已开启...");
         performMonitoringFetch(); // 立即执行第一次
@@ -492,7 +491,7 @@ async function fetchProfileData(region, username) {
         elements.monitorButton.classList.remove('monitoring');
         elements.fetchButton.disabled = false;
         elements.usernameInput.disabled = false;
-        elements.regionSelect.disabled = false;
+        elements.serverSelect.disabled = false;
 
         displayError('');
     }
@@ -501,7 +500,7 @@ async function fetchProfileData(region, username) {
         if (!isMonitoring) return;
 
         try {
-            const newData = await fetchProfileData(currentRegion, currentUsername);
+            const newData = await fetchProfileData(currentServer, currentUsername);
             if (isMonitoring) displayError('监测中...数据已刷新');
             updateDisplay(newData, lastProfileData);
             lastProfileData = newData;
