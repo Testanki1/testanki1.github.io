@@ -54,6 +54,10 @@
             margin-bottom: 15px;
         }
 
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
         .form-group label {
             display: block;
             margin-bottom: 8px;
@@ -72,6 +76,12 @@
             font-size: 16px;
             transition: border-color 0.3s;
         }
+        
+        .form-group input:disabled,
+        .form-group select:disabled {
+            background-color: #2a3b4c;
+            cursor: not-allowed;
+        }
 
         .form-group input:focus,
         .form-group select:focus {
@@ -86,7 +96,7 @@
             color: var(--primary-bg);
             border: none;
             border-radius: 8px;
-            transition: background-color 0.3s;
+            transition: background-color 0.3s, box-shadow 0.3s;
             cursor: pointer;
             font-size: 16px;
             font-weight: bold;
@@ -103,119 +113,63 @@
         .error-message {
             color: var(--error-color);
             text-align: center;
-            margin-top: 10px;
+            margin-top: 15px;
             min-height: 1.2em;
         }
         
-        /* --- Monitor Toggle --- */
-        .monitor-group {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px;
-            margin-bottom: 15px;
-            background-color: var(--primary-bg);
-            border-radius: 8px;
-        }
-        .monitor-group label {
-            margin: 0;
-            color: var(--text-light);
-            font-weight: 500;
-            cursor: pointer;
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 28px;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 28px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: var(--accent-color);
-        }
-        input:checked + .slider:before {
-            transform: translateX(22px);
-        }
-        
         /* --- Results Area --- */
-        .results-wrapper {
-            display: none;
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
+        .results-wrapper { display: none; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* --- Tabs --- */
-        .tabs {
-            display: flex;
-            justify-content: center;
+        /* --- Monitor Button --- */
+        .monitor-container {
+            text-align: center;
             margin-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
         }
-        .tab-button {
-            padding: 10px 20px;
-            cursor: pointer;
+        #monitorButton {
+            padding: 12px 24px;
             border: none;
-            background: none;
-            color: var(--text-light);
+            border-radius: 8px;
+            transition: background-color 0.3s, box-shadow 0.3s;
+            cursor: pointer;
             font-size: 16px;
-            font-weight: 500;
-            position: relative;
-            transition: color 0.3s;
+            font-weight: bold;
+            background-color: #00D4FF;
+            color: white;
         }
-        .tab-button:after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background-color: var(--accent-color);
-            transform: scaleX(0);
-            transition: transform 0.3s;
+        #monitorButton:hover:not(:disabled) {
+            background-color: #2e5a8e;
         }
-        .tab-button.active {
-            color: var(--accent-color);
+        #monitorButton:disabled {
+            background-color: #555;
+            cursor: not-allowed;
         }
-        .tab-button.active:after {
-            transform: scaleX(1);
+        #monitorButton.monitoring {
+            background-color: var(--error-color);
+            color: white;
+            animation: pulse 1.5s infinite;
         }
-        .tab-content {
-            display: none;
+        #monitorButton.monitoring:hover {
+            background-color: #cc5252;
         }
-        .tab-content.active {
-            display: block;
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 102, 102, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 102, 102, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 102, 102, 0); }
         }
+
+        /* --- Tabs --- */
+        .tabs { display: flex; justify-content: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+        .tab-button { padding: 10px 20px; cursor: pointer; border: none; background: none; color: var(--text-light); font-size: 16px; font-weight: 500; position: relative; transition: color 0.3s; }
+        .tab-button:after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 3px; background-color: var(--accent-color); transform: scaleX(0); transition: transform 0.3s; }
+        .tab-button.active { color: var(--accent-color); }
+        .tab-button.active:after { transform: scaleX(1); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
         /* --- Initial Message & Loader --- */
         #initialMessage { text-align: center; color: #aaa; padding: 40px 20px; font-style: italic; border: 2px dashed var(--border-color); border-radius: 12px; }
@@ -239,19 +193,10 @@
         tr:nth-child(odd) { background: rgba(125, 157, 186, 0.05); }
 
         /* --- Data Change Highlighting --- */
-        .change-indicator {
-            font-size: 0.8em;
-            font-weight: bold;
-            margin-left: 8px;
-            padding: 2px 5px;
-            border-radius: 4px;
-        }
+        .change-indicator { font-size: 0.8em; font-weight: bold; margin-left: 8px; padding: 2px 5px; border-radius: 4px; }
         .change-increase { color: var(--increase-color); }
         .change-decrease { color: var(--decrease-color); }
-        .field-changed {
-            color: var(--increase-color);
-            transition: color 0.3s ease-in-out;
-        }
+        .field-changed { color: var(--increase-color); transition: color 0.3s ease-in-out; }
 
         /* --- Dynamic Lists (Cards) --- */
         .list-section { margin-bottom: 30px; }
@@ -277,33 +222,12 @@
         .modal-content th { background: rgba(125, 157, 186, 0.2); }
         
         /* --- Change Log --- */
-        #changeLogContainer {
-            max-height: 80vh;
-            overflow-y: auto;
-            padding: 10px;
-            background-color: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-        }
-        .log-entry {
-            background-color: var(--primary-bg);
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            border-left: 4px solid var(--accent-color);
-        }
+        #changeLogContainer { max-height: 80vh; overflow-y: auto; padding: 10px; background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 12px; }
+        .log-entry { background-color: var(--primary-bg); padding: 12px; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid var(--accent-color); }
         .log-entry:last-child { margin-bottom: 0; }
-        .log-timestamp {
-            font-size: 12px;
-            color: #aaa;
-            margin-bottom: 8px;
-        }
-        .log-details {
-            font-size: 14px;
-        }
-        .log-details strong {
-            color: var(--text-light);
-        }
+        .log-timestamp { font-size: 12px; color: #aaa; margin-bottom: 8px; }
+        .log-details { font-size: 14px; }
+        .log-details strong { color: var(--text-light); }
     </style>
 </head>
 <body>
@@ -324,18 +248,11 @@
         <input type="text" id="username" placeholder="请输入坦克昵称" />
     </div>
     
-    <div class="monitor-group">
-        <label for="monitorToggle">开启实时监测</label>
-        <label class="switch">
-            <input type="checkbox" id="monitorToggle">
-            <span class="slider"></span>
-        </label>
+    <div class="form-group">
+        <button id="fetchButton">查询资料</button>
     </div>
 
-    <div class="form-group">
-        <button id="fetchButton">查询</button>
-        <div id="errorMessage" class="error-message"></div>
-    </div>
+    <div id="errorMessage" class="error-message"></div>
 </div>
 
 <div class="loader" id="loader">
@@ -345,6 +262,11 @@
 <div id="initialMessage">输入昵称以开始查询</div>
 
 <div id="resultsWrapper" class="results-wrapper">
+    
+    <div class="monitor-container">
+        <button id="monitorButton">开启监测</button>
+    </div>
+
     <div class="tabs">
         <button class="tab-button active" data-tab="profile">玩家资料</button>
         <button class="tab-button" data-tab="log">变更日志</button>
@@ -380,9 +302,9 @@
     // --- DOM Elements ---
     const elements = {
         fetchButton: document.getElementById('fetchButton'),
+        monitorButton: document.getElementById('monitorButton'),
         regionSelect: document.getElementById('region'),
         usernameInput: document.getElementById('username'),
-        monitorToggle: document.getElementById('monitorToggle'),
         loader: document.getElementById('loader'),
         errorMessage: document.getElementById('errorMessage'),
         initialMessage: document.getElementById('initialMessage'),
@@ -405,6 +327,7 @@
 
     // --- Event Listeners ---
     elements.fetchButton.addEventListener('click', handleFetch);
+    elements.monitorButton.addEventListener('click', toggleMonitoring);
     elements.usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleFetch(); });
     elements.tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -417,7 +340,11 @@
 
     // --- Main Functions ---
     async function handleFetch() {
-        stopMonitoring(); // Stop any previous monitoring
+        if (isMonitoring) {
+            displayError('请先停止监测再进行新的查询');
+            return;
+        }
+
         currentRegion = elements.regionSelect.value;
         currentUsername = elements.usernameInput.value.trim();
 
@@ -432,12 +359,7 @@
         try {
             const profileData = await fetchProfileData(currentRegion, currentUsername);
             updateDisplay(profileData);
-            lastProfileData = profileData; // Store initial data
-
-            if (elements.monitorToggle.checked) {
-                isMonitoring = true;
-                startMonitoring();
-            }
+            lastProfileData = profileData;
         } catch (error) {
             console.error('获取数据时出错:', error);
             displayError(error.message);
@@ -450,41 +372,72 @@
     async function fetchProfileData(region, username) {
         const baseUrl = API_CONFIG.baseUrls[region];
         if (!baseUrl) throw new Error('无效的服务器选择');
+        
+        try {
+            const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`;
+            const apiUrl = `${API_CONFIG.proxyUrl}${encodeURIComponent(targetUrl)}`;
+            
+            const response = await fetch(apiUrl);
 
-        const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`;
-        const apiUrl = `${API_CONFIG.proxyUrl}${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error(`网络响应错误: ${response.status}`);
+            if (!response.ok) throw new Error(`网络响应错误: ${response.status}`);
 
-        const data = await response.json();
-        if (!data.contents) {
-            if (data && data.error) throw new Error(`代理错误: ${data.error}`);
-            throw new Error('API 返回空响应，可能是昵称错误或服务器问题。');
-        }
+            const data = await response.json();
+            if (!data.contents) {
+                if (data && data.error) throw new Error(`代理错误: ${data.error}`);
+                throw new Error('API 返回空响应，可能是昵称错误或服务器问题。');
+            }
 
-        const profileData = JSON.parse(data.contents);
-        if (profileData?.responseType === 'NOT_FOUND') {
-            throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。');
-        } else if (profileData?.response) {
-            return profileData.response;
-        } else {
-            throw new Error('无效的响应数据格式');
+            const profileData = JSON.parse(data.contents);
+            if (profileData?.responseType === 'NOT_FOUND') {
+                throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。');
+            } else if (profileData?.response) {
+                return profileData.response;
+            } else {
+                throw new Error('无效的响应数据格式');
+            }
+        } catch (err) {
+            throw err; // 重新抛出错误
         }
     }
 
     // --- Monitoring ---
+    function toggleMonitoring() {
+        if (isMonitoring) {
+            stopMonitoring();
+        } else {
+            if (!lastProfileData) {
+                displayError('请先至少查询一次，再开启监测');
+                return;
+            }
+            isMonitoring = true;
+            startMonitoring();
+        }
+    }
+
     function startMonitoring() {
         if (!isMonitoring) return;
-        elements.fetchButton.textContent = "监测中...停止请再次查询";
-        elements.fetchButton.disabled = true; 
-        monitoringTimeoutId = setTimeout(performMonitoringFetch, API_CONFIG.monitorInterval);
+        
+        elements.monitorButton.textContent = "停止监测";
+        elements.monitorButton.classList.add('monitoring');
+        elements.fetchButton.disabled = true;
+        elements.usernameInput.disabled = true;
+        elements.regionSelect.disabled = true;
+
+        displayError("监测已开启...");
+        performMonitoringFetch(); // 立即执行第一次
     }
 
     function stopMonitoring() {
         isMonitoring = false;
         clearTimeout(monitoringTimeoutId);
-        elements.fetchButton.textContent = "查询";
+
+        elements.monitorButton.textContent = "开启监测";
+        elements.monitorButton.classList.remove('monitoring');
         elements.fetchButton.disabled = false;
+        elements.usernameInput.disabled = false;
+        elements.regionSelect.disabled = false;
+
+        displayError('');
     }
 
     async function performMonitoringFetch() {
@@ -492,15 +445,16 @@
 
         try {
             const newData = await fetchProfileData(currentRegion, currentUsername);
-            displayError(''); // Clear error on success
+            if (isMonitoring) displayError('监测中...数据已刷新');
             updateDisplay(newData, lastProfileData);
             lastProfileData = newData;
         } catch (error) {
             console.error("Monitoring fetch failed, will retry:", error);
-            displayError(`监测暂时中断，正在重试...`); // Show temporary error
+            if (isMonitoring) displayError(`监测中断: ${error.message} (${API_CONFIG.monitorInterval / 1000}秒后重试)`);
         } finally {
-            // ALWAYS reschedule the next check, whether it succeeded or failed.
-            startMonitoring();
+            if (isMonitoring) {
+                monitoringTimeoutId = setTimeout(performMonitoringFetch, API_CONFIG.monitorInterval);
+            }
         }
     }
 
@@ -584,7 +538,7 @@
             { label: 'VIP 状态', value: profile.hasPremium ? '已激活' : '未激活', isPremium: profile.hasPremium },
             { label: '战斗力', value: `${gearScore.value}${gearScore.changeHTML}` },
             { label: '击杀/死亡', value: `${kills.value}${kills.changeHTML} / ${deaths.value}${deaths.changeHTML}` },
-            { label: 'K/D', value: (deaths.value === '0' || deaths.value === 0) ? '∞' : (profile.kills / profile.deaths).toFixed(2) },
+            { label: 'K/D', value: (profile.deaths === 0) ? '∞' : (profile.kills / profile.deaths).toFixed(2) },
             { label: '游戏时长', value: formatTime(totalTimePlayedMs) },
             { label: '已用道具', value: totalSuppliesUsed.toLocaleString() },
             { label: '获得水晶', value: `${earnedCrystals.value}${earnedCrystals.changeHTML}` },
@@ -703,10 +657,10 @@
 
             let cardHTML = `<div class="item-name">${item.name || '-'}</div>`;
             if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`;
-            
-            if (item.type && item.type !== '-') cardHTML += `<div><strong>类型:</strong> ${item.type}</div>`;
-            if (item.grade != null) cardHTML += `<div><strong>当前等级:</strong> ${getGradeName(item.grade)}</div>`;
-            if (item.scoreEarned != null) cardHTML += createField('获得经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
+            if (item.properties != null) cardHTML += createField('特性', item.properties?.toLocaleString(), 'properties');
+            if (item.type && item.type !== '-' && item.name !== '剑圣') cardHTML += `<div><strong>类型:</strong> ${item.type}</div>`;
+            if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>当前等级:</strong> ${getGradeName(item.grade)}</div>`;
+            if (item.scoreEarned != null && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('获得经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
             if (item.timePlayed > 0 && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('游戏时间', formatTime(item.timePlayed), 'timePlayed');
             if (item.count != null) cardHTML += createField('数量', item.count?.toLocaleString(), 'count');
             if (item.usages != null) cardHTML += createField('使用量', item.usages?.toLocaleString(), 'usages');
@@ -716,7 +670,7 @@
             if (item.detailedGrades && item.detailedGrades.length > 1) {
                 const button = document.createElement('button');
                 button.className = 'view-data-button';
-                button.textContent = title === '玩过的模式' ? '查看各类型数据' : '查看各等级数据';
+                button.textContent = (title === '玩过的模式' || title=== '使用的迷彩') ? '查看各类型数据' : '查看各等级数据';
                 button.addEventListener('click', () => showDetailedGrades(item.name, item.detailedGrades, title));
                 cardDiv.appendChild(button);
             }
@@ -732,6 +686,7 @@
         elements.listsContainer.innerHTML = '';
         elements.errorMessage.textContent = '';
         if (fullReset) {
+            lastProfileData = null;
             changeLog = [];
             renderChangeLog();
         }
@@ -739,7 +694,7 @@
     
     function setLoading(isLoading) {
         elements.loader.style.display = isLoading ? 'flex' : 'none';
-        if (!isMonitoring) elements.fetchButton.disabled = isLoading;
+        elements.fetchButton.disabled = isLoading;
         if (isLoading) {
             elements.initialMessage.style.display = 'none';
             elements.errorMessage.textContent = '';
@@ -783,7 +738,7 @@
         if (!ms || ms <= 0) return '无记录';
         const h = Math.floor(ms / 3600000);
         const m = Math.floor((ms % 3600000) / 60000);
-        const s = (ms % 60000) / 1000;
+        const s = (ms % 60000) / 1000; // 精确显示到毫秒级（不改动）
         const parts = [];
         if (h > 0) parts.push(`${h} 小时`);
         if (m > 0) parts.push(`${m} 分钟`);
