@@ -125,6 +125,14 @@
             width: 100%;
             transition: opacity 0.3s ease-in-out;
         }
+        /* MODIFIED: Added media query for PC layout */
+        @media (min-width: 768px) {
+            #leaderboardCarouselContent {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+        }
         .carousel-nav-button {
             position: absolute;
             top: 50%;
@@ -164,10 +172,13 @@
             max-height: 550px;
             overflow-y: auto;
             overflow-x: hidden;
+            /* Added to ensure consistent height in grid */
+            display: flex;
+            flex-direction: column;
         }
-        .leaderboard-category h3 { margin: 0 0 15px 0; text-align: center; color: var(--accent-color); font-weight: 500; }
+        .leaderboard-category h3 { margin: 15px 0 15px 0; padding: 0 10px; text-align: center; color: var(--accent-color); font-weight: 500; }
         .leaderboard-table {
-            width: 100%;
+            width: 65%;
             border-collapse: collapse;
             table-layout: fixed;
         }
@@ -190,6 +201,7 @@
             width: 35%;
             text-align: right;
             white-space: nowrap;
+            padding-right: 10px;
         }
         .player-link { color: var(--text-color); text-decoration: none; cursor: pointer; transition: color 0.3s; }
         .player-link:hover { color: var(--accent-color); text-decoration: underline; }
@@ -223,7 +235,7 @@
         .view-data-button { background-color: var(--accent-color); color: var(--primary-bg); }
         .view-data-button:hover { background-color: var(--accent-color-hover); }
         .close-button { background-color: var(--error-color); color: #fff; }
-        .no-data-message { text-align: center; color: #aaa; padding: 20px; background-color: rgba(10, 25, 47, 0.5); border-radius: 8px; font-style: italic; }
+        .no-data-message { text-align: center; color: #aaa; padding: 20px; background-color: rgba(10, 25, 47, 0.5); border-radius: 8px; font-style: italic; flex-grow: 1; display: flex; align-items: center; justify-content: center;}
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(5px); }
         .modal-content { background-color: var(--primary-bg); padding: 20px; border-radius: 10px; width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border-color); text-align: center; }
         .modal-content h3 { margin-top: 0; color: var(--accent-color); }
@@ -331,7 +343,7 @@
     elements.fetchButton.addEventListener('click', handleFetch);
     elements.monitorButton.addEventListener('click', toggleMonitoring);
     elements.usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleFetch(); });
-    elements.backButton.addEventListener('click', showLeaderboardView); // NEW
+    elements.backButton.addEventListener('click', showLeaderboardView); 
     elements.tabs.forEach(tab => tab.addEventListener('click', () => {
         elements.tabs.forEach(t => t.classList.remove('active'));
         elements.tabContents.forEach(c => c.classList.remove('active'));
@@ -342,7 +354,7 @@
     // --- Translation Function ---
     function translateText(text) { if (typeof text !== 'string' || !text) return text; let translated = text; const replacementOrder = ['ROCKET_LAUNCHER', 'MACHINE_GUN', 'FIREBIRD', 'RESISTANCE', 'RICOCHET', 'ARTILLERY', 'SHOTGUN', 'THUNDER', 'CRITICAL', 'RAILGUN', 'FREEZE', 'SCORPIO', 'SMOKY', 'SHAFT', 'TWINS', 'GAUSS', 'TESLA', 'ISIS', 'MINE', 'JGR', 'TJR']; replacementOrder.forEach(key => { if (TRANSLATION_MAP[key]) translated = translated.replace(new RegExp(key, 'g'), TRANSLATION_MAP[key]); }); if (translated.includes('_')) translated = translated.replace(/_/g, ''); return translated; }
 
-    // --- View Control Functions (NEW) ---
+    // --- View Control Functions ---
     function showLeaderboardView() {
         elements.resultsWrapper.style.display = 'none';
         if (isMonitoring) { stopMonitoring(); }
@@ -373,30 +385,81 @@
         document.getElementById('leaderboardNext').addEventListener('click', showNextLeaderboard);
         renderCurrentLeaderboard();
     }
+
+    // MODIFIED: Function to render 1 or 2 leaderboards based on screen size
     function renderCurrentLeaderboard() {
         if (!leaderboardData) return;
-        const contentDiv = document.getElementById('leaderboardCarouselContent'); if (!contentDiv) return;
+        const contentDiv = document.getElementById('leaderboardCarouselContent');
+        if (!contentDiv) return;
+
         contentDiv.style.opacity = 0;
         setTimeout(() => {
-            const category = LEADERBOARD_CATEGORIES[currentLeaderboardIndex]; const categoryData = leaderboardData[category.key]; let html = `<div class="no-data-message">无 ${category.title} 数据</div>`;
-            if (categoryData && categoryData.length > 0) {
-                 html = `<div class="leaderboard-category"><h3 class="list-title">${category.title}</h3>
-                        <table class="leaderboard-table">
-                            <thead><tr><th class="rank-col">#</th><th class="player-col">昵称</th><th class="value-col">数值</th></tr></thead>
-                            <tbody>${categoryData.map((player, index) => `
-                                <tr>
-                                    <td class="rank-col">${index + 1}</td>
-                                    <td class="player-col"><a href="#" class="player-link" data-username="${player.uid}">${player.uid}</a></td>
-                                    <td class="value-col">${player.value.toLocaleString()}</td>
-                                </tr>`).join('')}
-                            </tbody>
-                        </table></div>`;
+            const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
+            const totalCategories = LEADERBOARD_CATEGORIES.length;
+            let combinedHtml = '';
+
+            for (let i = 0; i < itemsPerPage; i++) {
+                const categoryIndex = currentLeaderboardIndex + i;
+                if (categoryIndex >= totalCategories) {
+                    break; 
+                }
+
+                const category = LEADERBOARD_CATEGORIES[categoryIndex];
+                const categoryData = leaderboardData[category.key];
+                
+                let html = `<div class="leaderboard-category">`;
+                html += `<h3 class="list-title">${category.title}</h3>`;
+
+                if (categoryData && categoryData.length > 0) {
+                    html += `<table class="leaderboard-table">
+                                <thead><tr><th class="rank-col">#</th><th class="player-col">昵称</th><th class="value-col">数值</th></tr></thead>
+                                <tbody>${categoryData.map((player, index) => `
+                                    <tr>
+                                        <td class="rank-col">${index + 1}</td>
+                                        <td class="player-col"><a href="#" class="player-link" data-username="${player.uid}">${player.uid}</a></td>
+                                        <td class="value-col">${player.value.toLocaleString()}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>`;
+                } else {
+                    html += `<div class="no-data-message">无 ${category.title} 数据</div>`;
+                }
+                html += `</div>`;
+                combinedHtml += html;
             }
-            contentDiv.innerHTML = html; contentDiv.querySelectorAll('.player-link').forEach(link => link.addEventListener('click', handleLeaderboardClick)); contentDiv.style.opacity = 1;
+
+            contentDiv.innerHTML = combinedHtml;
+            contentDiv.querySelectorAll('.player-link').forEach(link => link.addEventListener('click', handleLeaderboardClick));
+            contentDiv.style.opacity = 1;
         }, 150);
     }
-    function showNextLeaderboard() { currentLeaderboardIndex = (currentLeaderboardIndex + 1) % LEADERBOARD_CATEGORIES.length; renderCurrentLeaderboard(); }
-    function showPrevLeaderboard() { currentLeaderboardIndex = (currentLeaderboardIndex - 1 + LEADERBOARD_CATEGORIES.length) % LEADERBOARD_CATEGORIES.length; renderCurrentLeaderboard(); }
+    
+    // MODIFIED: Navigation logic now respects items per page
+    function showNextLeaderboard() {
+        const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
+        const totalCategories = LEADERBOARD_CATEGORIES.length;
+        
+        currentLeaderboardIndex += itemsPerPage;
+        if (currentLeaderboardIndex >= totalCategories) {
+            currentLeaderboardIndex = 0; // Loop back to the start
+        }
+        renderCurrentLeaderboard();
+    }
+
+    // MODIFIED: Navigation logic now respects items per page
+    function showPrevLeaderboard() {
+        const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
+        const totalCategories = LEADERBOARD_CATEGORIES.length;
+        
+        currentLeaderboardIndex -= itemsPerPage;
+        if (currentLeaderboardIndex < 0) {
+            // Go to the start of the last page
+            const lastPageStartIndex = Math.floor((totalCategories - 1) / itemsPerPage) * itemsPerPage;
+            currentLeaderboardIndex = lastPageStartIndex;
+        }
+        renderCurrentLeaderboard();
+    }
+
     function handleLeaderboardClick(event) { event.preventDefault(); const username = event.target.dataset.username; if (username) { elements.usernameInput.value = username; elements.fetchButton.click(); } }
 
     // --- Main Functions ---
@@ -416,7 +479,7 @@
             elements.resultsWrapper.style.display = 'block';
             elements.resultsWrapper.classList.add('fade-in');
             setTimeout(() => elements.resultsWrapper.classList.remove('fade-in'), 500);
-            elements.backToLeaderboardContainer.style.display = 'block'; // MODIFIED: Show back button
+            elements.backToLeaderboardContainer.style.display = 'block'; 
         }
         displayProfileSummary(newData, oldData);
         displayRankingsTable(newData, oldData);
@@ -438,7 +501,7 @@
         elements.listsContainer.innerHTML = '';
         elements.errorMessage.textContent = '';
         if (fullReset) {
-            elements.backToLeaderboardContainer.style.display = 'none'; // MODIFIED: Hide back button on reset
+            elements.backToLeaderboardContainer.style.display = 'none'; 
             lastProfileData = null;
             changeLog = [];
             renderChangeLog();
@@ -449,7 +512,7 @@
         elements.fetchButton.disabled = isLoading;
         if (isLoading) {
             elements.leaderboardContainer.style.display = 'none';
-            elements.backToLeaderboardContainer.style.display = 'none'; // MODIFIED: Hide back button on load
+            elements.backToLeaderboardContainer.style.display = 'none';
             elements.errorMessage.textContent = '';
         }
     }
