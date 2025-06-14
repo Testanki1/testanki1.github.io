@@ -400,7 +400,7 @@
         }
         const htmlText = await response.text();
         const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlText, 'text/html'); // Corrected method call
+        const doc = parser.parseFromString(htmlText, 'text/html');
 
         const parseList = (selector, prizeParser) => {
             const list = doc.querySelector(selector);
@@ -503,7 +503,7 @@
                 html += `<h3 class="list-title">${category.title}</h3>`;
 
                 if (categoryData && categoryData.length > 0) {
-                    html += '<div class="leaderboard-table-wrapper">'; // Wrapper for scrolling
+                    html += '<div class="leaderboard-table-wrapper">';
                     if (category.key === 'stars_previous') {
                          html += `<table class="leaderboard-table" style="min-width: 600px;">
                                     <thead><tr><th class="rank-col" style="width: 10%;">#</th><th class="player-col" style="width: 35%;">昵称</th><th style="width: 35%; text-align: left; padding-left: 5px;">奖励</th><th class="value-col" style="width: 20%">星星</th></tr></thead>
@@ -530,7 +530,7 @@
                                     </tbody>
                                 </table>`;
                     }
-                    html += '</div>'; // Close wrapper
+                    html += '</div>';
                 } else {
                     html += `<div class="no-data-message">无 ${category.title} 数据</div>`;
                 }
@@ -583,7 +583,76 @@
     function displayProfileSummary(profile, oldProfile = null) { const getStat = (p, key, oldP, label) => { const value = p?.[key] ?? 0; if (!oldP) return { value: value.toLocaleString(), changeHTML: '' }; const oldValue = oldP?.[key] ?? 0; if (value !== oldValue) { logChange(label || key, oldValue, value); return { value: value.toLocaleString(), changeHTML: createChangeSpan(value - oldValue) }; } return { value: value.toLocaleString(), changeHTML: '' }; }; const kills = getStat(profile, 'kills', oldProfile, '击杀'), deaths = getStat(profile, 'deaths', oldProfile, '死亡'), score = getStat(profile, 'score', oldProfile, '经验值'), gearScore = getStat(profile, 'gearScore', oldProfile, '战斗力'), earnedCrystals = getStat(profile, 'earnedCrystals', oldProfile, '获得水晶'), caughtGolds = getStat(profile, 'caughtGolds', oldProfile, '获得金箱子'); const totalTimePlayedMs = (profile.hullsPlayed || []).reduce((t, h) => t + (h.timePlayed || 0), 0), totalSuppliesUsed = (profile.suppliesUsage || []).reduce((t, s) => t + (s.usages || 0), 0); const rankNum = profile.rank || 1, rankName = (rankNum > 0) ? (rankNum <= RANKS.length ? RANKS[rankNum - 1] : `传奇 ${rankNum - RANKS.length}`) : "未知等级"; const summaryData = [ { label: '昵称', value: profile.name || 'N/A' }, { label: '等级', value: rankName }, { label: '经验值', value: `${score.value}${score.changeHTML} / ${profile.scoreNext?.toLocaleString() || 0}` }, { label: 'VIP 状态', value: profile.hasPremium ? '已激活' : '未激活', isPremium: profile.hasPremium }, { label: '战斗力', value: `${gearScore.value}${gearScore.changeHTML}` }, { label: '击杀/死亡', value: `${kills.value}${kills.changeHTML} / ${deaths.value}${deaths.changeHTML}` }, { label: 'K/D', value: (profile.deaths === 0) ? '∞' : (profile.kills / profile.deaths).toFixed(2) }, { label: '游戏时长', value: formatTime(totalTimePlayedMs) }, { label: '已用道具', value: totalSuppliesUsed.toLocaleString() }, { label: '获得水晶', value: `${earnedCrystals.value}${earnedCrystals.changeHTML}` }, { label: '获得金箱子', value: `${caughtGolds.value}${caughtGolds.changeHTML}` }, ]; elements.profileSummary.innerHTML = summaryData.map(item => `<div class="summary-item"><span class="summary-label">${item.label}</span><span class="summary-value ${item.isPremium ? 'premium' : ''}">${item.value}</span></div>`).join(''); }
     function displayRankingsTable(newData, oldData = null) { const categories = [{ key: 'score', name: '经验值' }, { key: 'golds', name: '金箱子' }, { key: 'crystals', name: '水晶' }, { key: 'efficiency', name: '效率' }]; const currentRating = newData.rating || {}, previousRating = newData.previousRating || {}, oldRating = oldData ? (oldData.rating || {}) : null; const getDisplayValue = (value) => (value === -1 || value == null) ? '-' : value.toLocaleString(); const tableRows = categories.map(category => { const current = currentRating[category.key] || {}, previous = previousRating[category.key] || {}; let posChangeHTML = '', valChangeHTML = ''; if (oldRating && oldRating[category.key]) { const oldCat = oldRating[category.key]; if (current.position > 0 && oldCat.position > 0 && current.position !== oldCat.position) { posChangeHTML = createChangeSpan(oldCat.position - current.position); logChange(`${category.name} 排名`, oldCat.position, current.position); } if (current.value !== oldCat.value) { valChangeHTML = createChangeSpan(current.value - oldCat.value); logChange(`${category.name} 数值`, oldCat.value, current.value); } } return `<tr><td>${category.name}</td><td>${getDisplayValue(current.position)}${posChangeHTML}</td><td>${getDisplayValue(current.value)}${valChangeHTML}</td><td>${getDisplayValue(previous.position)}</td><td>${getDisplayValue(previous.value)}</td></tr>`; }).join(''); elements.rankingsTableContainer.innerHTML = `<h3 class="list-title">每周排名</h3><table cellpadding="1" cellspacing="0"><thead><tr><th>类别</th><th>当前排名</th><th>当前数值</th><th>上周排名</th><th>上周数值</th></tr></thead><tbody>${tableRows}</tbody></table>`; }
     function displayAllLists(newData, oldData = null) { elements.listsContainer.innerHTML = ''; LIST_DATA_CONFIGS.forEach(config => { const newItems = newData[config.key] || [], oldItems = oldData ? (oldData[config.key] || []) : []; const section = document.createElement('div'); section.className = 'list-section'; const title = document.createElement('h3'); title.className = 'list-title'; title.textContent = config.title; section.appendChild(title); if (newItems.length === 0) { section.appendChild(document.createElement('p')).className = 'no-data-message'; section.lastChild.textContent = '无数据'; } else { const container = document.createElement('div'); container.className = 'list-container'; displayListData(newItems, oldItems, container, config.title); section.appendChild(container); } elements.listsContainer.appendChild(section); }); }
-    function displayListData(newItems, oldItems, container, title) { const aggregatedNewData = aggregateItems(newItems, title), aggregatedOldData = aggregateItems(oldItems, title); const oldAggregatedMap = new Map(aggregatedOldData.map(item => [item.name, item])); aggregatedNewData.forEach(item => { item.changes = {}; item.hasChanged = false; const oldAggregatedItem = oldAggregatedMap.get(item.name); if (oldAggregatedItem) { const checkChange = (prop, label) => { if ((item[prop] || 0) > (oldAggregatedItem[prop] || 0)) { item.changes[prop] = true; item.hasChanged = true; logChange(`${item.name} ${label}`, oldAggregatedItem[prop], item[prop]); } }; checkChange('scoreEarned', '经验值'); checkChange('timePlayed', '游戏时间'); checkChange('usages', '使用量'); checkChange('count', '数量'); } }); aggregatedNewData.sort((a, b) => (b.hasChanged - a.hasChanged) || (b.timePlayed || b.usages || 0) - (a.timePlayed || a.usages || 0)); aggregatedNewData.forEach(item => { const cardDiv = document.createElement('div'); cardDiv.className = `data-card ${item.hasChanged ? 'changed' : ''}`; let imageUrl = item.imageUrl ? item.imageUrl.replace(/s\.(eu\.tankionline|3dtank)\.com/g, 'res.3dtank.com').replace(/\.tnk/g, '.webp') : null; const createField = (label, value, prop) => { const isChanged = item.changes[prop]; const diff = oldAggregatedMap.has(item.name) ? (item[prop] || 0) - (oldAggregatedMap.get(item.name)[prop] || 0) : 0; const changeHTML = isChanged ? createChangeSpan(diff) : ''; return `<div class="${isChanged ? 'field-changed' : ''}"><strong>${label}:</strong> ${value}${changeHTML}</div>`; }; let cardHTML = `<div class="item-name">${item.name || '-'}</div>`; if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`; if (item.properties != null) cardHTML += createField('特性', item.properties?.toLocaleString(), 'properties'); if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>当前等级:</strong> ${getGradeName(item.grade)}</div>`; if (item.scoreEarned != null && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('获得经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned'); if (item.timePlayed > 0 && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('游戏时间', formatTime(item.timePlayed), 'timePlayed'); if (item.count != null) cardHTML += createField('数量', item.count?.toLocaleString(), 'count'); if (item.usages != null) cardHTML += createField('使用量', item.usages?.toLocaleString(), 'usages'); cardDiv.innerHTML = translateText(cardHTML); if (item.detailedGrades && item.detailedGrades.length > 1) { const button = document.createElement('button'); button.className = 'view-data-button'; button.textContent = (title === '玩过的模式' || title=== '使用的迷彩') ? '查看各类型数据' : '查看各等级数据'; button.addEventListener('click', () => showDetailedGrades(item.name, item.detailedGrades, title)); cardDiv.appendChild(button); } container.appendChild(cardDiv); }); }
+    
+    function displayListData(newItems, oldItems, container, title) {
+        const aggregatedNewData = aggregateItems(newItems, title);
+        const aggregatedOldData = aggregateItems(oldItems, title);
+        const oldAggregatedMap = new Map(aggregatedOldData.map(item => [item.name, item]));
+        
+        aggregatedNewData.forEach(item => {
+            item.changes = {};
+            item.hasChanged = false;
+            const oldAggregatedItem = oldAggregatedMap.get(item.name);
+            if (oldAggregatedItem) {
+                const checkChange = (prop, label) => {
+                    if ((item[prop] || 0) > (oldAggregatedItem[prop] || 0)) {
+                        item.changes[prop] = true;
+                        item.hasChanged = true;
+                        logChange(`${item.name} ${label}`, oldAggregatedItem[prop], item[prop]);
+                    }
+                };
+                checkChange('scoreEarned', '经验值');
+                checkChange('timePlayed', '游戏时间');
+                checkChange('usages', '使用量');
+                checkChange('count', '数量');
+            }
+        });
+        
+        aggregatedNewData.sort((a, b) => (b.hasChanged - a.hasChanged) || (b.timePlayed || b.usages || 0) - (a.timePlayed || a.usages || 0));
+        
+        aggregatedNewData.forEach(item => {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `data-card ${item.hasChanged ? 'changed' : ''}`;
+            let imageUrl = item.imageUrl ? item.imageUrl.replace(/s\.(eu\.tankionline|3dtank)\.com/g, 'res.3dtank.com').replace(/\.tnk/g, '.webp') : null;
+            
+            const createField = (label, value, prop) => {
+                const isChanged = item.changes[prop];
+                const diff = oldAggregatedMap.has(item.name) ? (item[prop] || 0) - (oldAggregatedMap.get(item.name)[prop] || 0) : 0;
+                const changeHTML = isChanged ? createChangeSpan(diff) : '';
+                return `<div class="${isChanged ? 'field-changed' : ''}"><strong>${label}:</strong> ${value}${changeHTML}</div>`;
+            };
+    
+            let cardHTML = `<div class="item-name">${item.name || '-'}</div>`;
+            if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`;
+            if (item.properties != null) cardHTML += createField('特性', item.properties?.toLocaleString(), 'properties');
+            if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>当前等级:</strong> ${getGradeName(item.grade)}</div>`;
+            if (item.scoreEarned != null && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('获得经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
+            if (item.timePlayed > 0 && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('游戏时间', formatTime(item.timePlayed), 'timePlayed');
+            if (item.count != null) cardHTML += createField('数量', item.count?.toLocaleString(), 'count');
+            if (item.usages != null) cardHTML += createField('使用量', item.usages?.toLocaleString(), 'usages');
+            cardDiv.innerHTML = translateText(cardHTML);
+    
+            // Button logic for detailed data
+            if (item.detailedGrades && item.detailedGrades.length > 1) {
+                const button = document.createElement('button');
+                button.className = 'view-data-button';
+                
+                // Determine button text based on title
+                if (title === '玩过的模式') {
+                    button.textContent = '查看各类型数据';
+                } else if (title === '使用的迷彩') {
+                    button.textContent = '查看各版本数据';
+                } else {
+                    button.textContent = '查看各等级数据';
+                }
+                
+                button.addEventListener('click', () => showDetailedGrades(item.name, item.detailedGrades, title));
+                cardDiv.appendChild(button);
+            }
+            container.appendChild(cardDiv);
+        });
+    }
+
     function clearDisplay(fullReset = false) {
         elements.resultsWrapper.style.display = 'none';
         elements.profileSummary.innerHTML = '';
@@ -607,10 +676,71 @@
         }
     }
     function displayError(message) { elements.errorMessage.textContent = message; }
-    function aggregateItems(items, title) { const aggregated = {}; const keySelector = (item) => title === '使用的防御模块' ? `${item.name}-${item.resistance}` : item.name; items.forEach(item => { const key = keySelector(item); if (!aggregated[key]) aggregated[key] = { ...item, timePlayed: 0, scoreEarned: 0, detailedGrades: [] }; aggregated[key].timePlayed += item.timePlayed || 0; aggregated[key].scoreEarned += item.scoreEarned || 0; if (item.grade > (aggregated[key].grade || -1)) aggregated[key].grade = item.grade; aggregated[key].detailedGrades.push({ ...item }); }); return Object.values(aggregated); }
-    function showDetailedGrades(name, detailedGrades, title) { const isMode = title === '玩过的模式'; const sortedGrades = [...detailedGrades].sort((a, b) => isMode ? (a.type || '').localeCompare(b.type || '') : (a.grade ?? -1) - (b.grade ?? -1)); const tableRows = sortedGrades.map(data => { const typeOrGrade = isMode ? (data.type || '-') : getGradeName(data.grade); return `<tr><td>${translateText(typeOrGrade)}</td><td>${formatTime(data.timePlayed)}</td><td>${data.scoreEarned?.toLocaleString() || '-'}</td></tr>`; }).join(''); const modalHTML = `<div class="modal-overlay"><div class="modal-content"><h3>${translateText(name)} - ${isMode ? '各类型数据' : '各等级数据'}</h3><table style="width:100%;"><thead><tr><th>${isMode ? '类型' : '等级'}</th><th>游戏时间</th><th>获得经验值</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-button">关闭</button></div></div>`; document.body.insertAdjacentHTML('beforeend', modalHTML); const overlay = document.body.lastElementChild; overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('close-button')) overlay.remove(); }); }
-    function formatTime(ms) { if (!ms || ms <= 0) return '无记录'; const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = (ms % 60000) / 1000; const parts = []; if (h > 0) parts.push(`${h} 小时`); if (m > 0) parts.push(`${m} 分钟`); if (s > 0 || parts.length === 0) parts.push(`${s} 秒`); return parts.join(' '); }
-    function getGradeName(grade) { return grade != null ? `Mk${grade + 1}` : '-'; }
+    function aggregateItems(items, title) { const aggregated = {}; const keySelector = (item) => title === '使用的防御模块' ? `${item.name}-${item.resistance}` : item.name; items.forEach(item => { const key = keySelector(item); if (!aggregated[key]) aggregated[key] = { ...item, timePlayed: 0, scoreEarned: 0, usages: 0, count: 0, detailedGrades: [] }; aggregated[key].timePlayed += item.timePlayed || 0; aggregated[key].scoreEarned += item.scoreEarned || 0; aggregated[key].usages += item.usages || 0; aggregated[key].count += item.count || 0; if (item.grade > (aggregated[key].grade || -1)) aggregated[key].grade = item.grade; aggregated[key].detailedGrades.push({ ...item }); }); return Object.values(aggregated); }
+    
+    function showDetailedGrades(name, detailedGrades, title) {
+        const isMode = title === '玩过的模式';
+        const isPaint = title === '使用的迷彩';
+    
+        // Sort data based on its type
+        const sortedData = [...detailedGrades].sort((a, b) => {
+            if (isMode) {
+                return (a.type || '').localeCompare(b.type || '');
+            } else if (isPaint) {
+                return (a.id || 0) - (b.id || 0); // Sort by version ID
+            } else {
+                return (a.grade ?? -1) - (b.grade ?? -1); // Sort by grade
+            }
+        });
+    
+        // Determine column header and modal title suffix
+        let firstColumnHeader, modalTitleSuffix;
+        if (isMode) {
+            firstColumnHeader = '类型';
+            modalTitleSuffix = '各类型数据';
+        } else if (isPaint) {
+            firstColumnHeader = '版本';
+            modalTitleSuffix = '各版本数据';
+        } else {
+            firstColumnHeader = '等级';
+            modalTitleSuffix = '各等级数据';
+        }
+    
+        const tableRows = sortedData.map(data => {
+            let firstColumnValue;
+            if (isMode) {
+                firstColumnValue = data.type || '-';
+            } else if (isPaint) {
+                firstColumnValue = `${data.id}`;
+            } else {
+                firstColumnValue = getGradeName(data.grade);
+            }
+            return `<tr><td>${translateText(firstColumnValue)}</td><td>${formatTime(data.timePlayed)}</td><td>${data.scoreEarned?.toLocaleString() || '-'}</td></tr>`;
+        }).join('');
+    
+        const modalHTML = `<div class="modal-overlay">
+                            <div class="modal-content">
+                                <h3>${translateText(name)} - ${modalTitleSuffix}</h3>
+                                <table style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>${firstColumnHeader}</th>
+                                            <th>游戏时间</th>
+                                            <th>获得经验值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${tableRows}</tbody>
+                                </table>
+                                <button class="close-button">关闭</button>
+                            </div>
+                           </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        const overlay = document.body.lastElementChild;
+        overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('close-button')) overlay.remove(); });
+    }
+
+    function formatTime(ms) { if (!ms || ms <= 0) return '无记录'; const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000); const parts = []; if (h > 0) parts.push(`${h} 小时`); if (m > 0) parts.push(`${m} 分钟`); if (s > 0 || parts.length === 0) parts.push(`${s} 秒`); return parts.join(' '); }
+    function getGradeName(grade) { return grade != null && grade > -1 ? `Mk${grade + 1}` : '-'; }
 </script>
 </body>
 </html>
