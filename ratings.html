@@ -298,6 +298,31 @@
 
     const RANKS = ["新兵", "二等兵", "一等兵", "下士", "中士", "上士", "三级军士长", "二级军士长", "一级军士长", "军士长", "五级准尉", "四级准尉", "三级准尉", "二级准尉", "一级准尉", "特级准尉", "少尉", "中尉", "上尉", "少校", "中校", "上校", "准将", "少将", "中将", "上将", "元帅", "陆军元帅", "统帅", "大元帅", "传奇"];
     const LIST_DATA_CONFIGS = [{ key: 'turretsPlayed', title: '使用的炮塔' }, { key: 'hullsPlayed', title: '使用的底盘' }, { key: 'dronesPlayed', title: '使用的无人机' }, { key: 'resistanceModules', title: '使用的防御模块' }, { key: 'paintsPlayed', title: '使用的迷彩' }, { key: 'modesPlayed', title: '玩过的模式' }, { key: 'suppliesUsage', title: '使用的道具' }, { key: 'presents', title: '收到的礼物' }];
+    
+    // --- TRANSLATION MAP ---
+    const TRANSLATION_MAP = {
+        'JGR': '个人剑圣',
+        'TJR': '团队剑圣',
+        'RESISTANCE': '抗性',
+        'SHAFT': '镭射炮',
+        'THUNDER': '雷暴炮',
+        'CRITICAL': '暴击',
+        'MINE': '地雷',
+        'RAILGUN': '激光炮',
+        'FREEZE': '冰风暴',
+        'SMOKY': '轰天炮',
+        'RICOCHET': '火龙珠',
+        'ARTILLERY': '马格南',
+        'FIREBIRD': '火焰炮',
+        'TWINS': '离子炮',
+        'GAUSS': '电磁炮',
+        'ROCKET_LAUNCHER': '火箭炮',
+        'ISIS': '磁力炮',
+        'TESLA': '特斯拉',
+        'SCORPIO': '蝎子',
+        'MACHINE_GUN': '极速炮',
+        'SHOTGUN': '滑膛炮'
+    };
 
     // --- DOM Elements ---
     const elements = {
@@ -337,6 +362,35 @@
             document.querySelector(`#${tab.dataset.tab}Content`).classList.add('active');
         });
     });
+    
+    // --- Translation Function ---
+    function translateText(text) {
+        if (typeof text !== 'string' || !text) return text;
+
+        let translated = text;
+        // Using an array to define replacement order if necessary (longer keys first)
+        const replacementOrder = [
+            'ROCKET_LAUNCHER', 'MACHINE_GUN', 'FIREBIRD', 'RESISTANCE', 'RICOCHET', 
+            'ARTILLERY', 'SHOTGUN', 'THUNDER', 'CRITICAL', 'RAILGUN', 'FREEZE', 
+            'SCORPIO', 'SMOKY', 'SHAFT', 'TWINS', 'GAUSS', 'TESLA', 'ISIS', 'MINE',
+            'JGR', 'TJR'
+        ];
+
+        replacementOrder.forEach(key => {
+            if (TRANSLATION_MAP[key]) {
+                translated = translated.replace(new RegExp(key, 'g'), TRANSLATION_MAP[key]);
+            }
+        });
+
+        // As per request, remove the last underscore. Interpreted as removing all for cleaner suffixes.
+        // Example: SHAFT_LEGACY -> 镭射炮_LEGACY -> 镭射炮LEGACY
+        if (translated.includes('_')) {
+             translated = translated.replace(/_/g, '');
+        }
+
+        return translated;
+    }
+
 
     // --- Main Functions ---
     async function handleFetch() {
@@ -483,7 +537,7 @@
         const timestamp = new Date();
         const entry = {
             timestamp: timestamp.toLocaleString('zh-CN'),
-            item: item,
+            item: translateText(item),
             oldValue: oldValue?.toLocaleString() || 'N/A',
             newValue: newValue?.toLocaleString() || 'N/A'
         };
@@ -508,23 +562,23 @@
     }
 
     function displayProfileSummary(profile, oldProfile = null) {
-        const getStat = (p, key, oldP) => {
+        const getStat = (p, key, oldP, label) => {
             const value = p?.[key] ?? 0;
             if (!oldP) return { value: value.toLocaleString(), changeHTML: '' };
             const oldValue = oldP?.[key] ?? 0;
             if (value !== oldValue) {
-                logChange(key, oldValue, value);
+                logChange(label || key, oldValue, value);
                 return { value: value.toLocaleString(), changeHTML: createChangeSpan(value - oldValue) };
             }
             return { value: value.toLocaleString(), changeHTML: '' };
         };
 
-        const kills = getStat(profile, 'kills', oldProfile);
-        const deaths = getStat(profile, 'deaths', oldProfile);
-        const score = getStat(profile, 'score', oldProfile);
-        const gearScore = getStat(profile, 'gearScore', oldProfile);
-        const earnedCrystals = getStat(profile, 'earnedCrystals', oldProfile);
-        const caughtGolds = getStat(profile, 'caughtGolds', oldProfile);
+        const kills = getStat(profile, 'kills', oldProfile, '击杀');
+        const deaths = getStat(profile, 'deaths', oldProfile, '死亡');
+        const score = getStat(profile, 'score', oldProfile, '经验值');
+        const gearScore = getStat(profile, 'gearScore', oldProfile, '战斗力');
+        const earnedCrystals = getStat(profile, 'earnedCrystals', oldProfile, '获得水晶');
+        const caughtGolds = getStat(profile, 'caughtGolds', oldProfile, '获得金箱子');
         
         const totalTimePlayedMs = (profile.hullsPlayed || []).reduce((total, hull) => total + (hull.timePlayed || 0), 0);
         const totalSuppliesUsed = (profile.suppliesUsage || []).reduce((total, supply) => total + (supply.usages || 0), 0);
@@ -627,17 +681,17 @@
             const oldAggregatedItem = oldAggregatedMap.get(item.name);
             
             if (oldAggregatedItem) {
-                const checkChange = (prop) => {
+                const checkChange = (prop, label) => {
                     if ((item[prop] || 0) > (oldAggregatedItem[prop] || 0)) {
                         item.changes[prop] = true;
                         item.hasChanged = true;
-                        logChange(`${item.name} ${prop}`, oldAggregatedItem[prop], item[prop]);
+                        logChange(`${item.name} ${label}`, oldAggregatedItem[prop], item[prop]);
                     }
                 };
-                checkChange('scoreEarned');
-                checkChange('timePlayed');
-                checkChange('usages');
-                checkChange('count');
+                checkChange('scoreEarned', '经验值');
+                checkChange('timePlayed', '游戏时间');
+                checkChange('usages', '使用量');
+                checkChange('count', '数量');
             }
         });
 
@@ -658,14 +712,14 @@
             let cardHTML = `<div class="item-name">${item.name || '-'}</div>`;
             if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`;
             if (item.properties != null) cardHTML += createField('特性', item.properties?.toLocaleString(), 'properties');
-            if (item.type && item.type !== '-' && item.name !== '剑圣') cardHTML += `<div><strong>类型:</strong> ${item.type}</div>`;
             if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>当前等级:</strong> ${getGradeName(item.grade)}</div>`;
             if (item.scoreEarned != null && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('获得经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
             if (item.timePlayed > 0 && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('游戏时间', formatTime(item.timePlayed), 'timePlayed');
             if (item.count != null) cardHTML += createField('数量', item.count?.toLocaleString(), 'count');
             if (item.usages != null) cardHTML += createField('使用量', item.usages?.toLocaleString(), 'usages');
             
-            cardDiv.innerHTML = cardHTML;
+            // Translate the entire card's content before rendering
+            cardDiv.innerHTML = translateText(cardHTML);
 
             if (item.detailedGrades && item.detailedGrades.length > 1) {
                 const button = document.createElement('button');
@@ -727,8 +781,34 @@
     function showDetailedGrades(name, detailedGrades, title) {
         const isMode = title === '玩过的模式';
         const sortedGrades = [...detailedGrades].sort((a, b) => isMode ? (a.type || '').localeCompare(b.type || '') : (a.grade ?? -1) - (b.grade ?? -1));
-        const tableRows = sortedGrades.map(data => `<tr><td>${isMode ? (data.type || '-') : getGradeName(data.grade)}</td><td>${formatTime(data.timePlayed)}</td><td>${data.scoreEarned?.toLocaleString() || '-'}</td></tr>`).join('');
-        const modalHTML = `<div class="modal-overlay"><div class="modal-content"><h3>${name} - ${isMode ? '各类型数据' : '各等级数据'}</h3><table style="width:100%;"><thead><tr><th>${isMode ? '类型' : '等级'}</th><th>游戏时间</th><th>获得经验值</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-button">关闭</button></div></div>`;
+        
+        const tableRows = sortedGrades.map(data => {
+            const typeOrGrade = isMode ? (data.type || '-') : getGradeName(data.grade);
+            return `<tr>
+                        <td>${translateText(typeOrGrade)}</td>
+                        <td>${formatTime(data.timePlayed)}</td>
+                        <td>${data.scoreEarned?.toLocaleString() || '-'}</td>
+                    </tr>`;
+        }).join('');
+
+        const modalHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <h3>${translateText(name)} - ${isMode ? '各类型数据' : '各等级数据'}</h3>
+                    <table style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>${isMode ? '类型' : '等级'}</th>
+                                <th>游戏时间</th>
+                                <th>获得经验值</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                    <button class="close-button">关闭</button>
+                </div>
+            </div>`;
+        
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         const overlay = document.body.lastElementChild;
         overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('close-button')) { overlay.remove(); } });
