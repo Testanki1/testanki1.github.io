@@ -1,0 +1,162 @@
+name: Tanki Online Test Server Monitor
+
+on:
+  # 定时执行，这里设置为每小时执行一次。你可以根据需求调整 cron 表达式。
+  # '0 * * * *' = 每小时的第 0 分钟执行
+  schedule:
+    - cron: '0 * * * *'
+  
+  # 允许手动触发工作流，方便测试
+  workflow_dispatch:
+
+jobs:
+  check-servers:
+    runs-on: ubuntu-latest
+    # 授予工作流写入仓库内容的权限，以便更新状态文件
+    permissions:
+      contents: write
+      
+    steps:
+      # 步骤 1: 检出仓库代码，这样我们才能读取和写入状态文件
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 步骤 2: 运行检测脚本
+      - name: Run server check script
+        id: check_script
+        run: |
+          # --- 配置 ---
+          # 要检测的 URL 模板
+          URL_EU_TEMPLATE="https://public-deploy-{i}.test-eu.tankionline.com/browser-public/index.html"
+          URL_RU_TEMPLATE="https://client-review-{i}-public.test-ru.tankionline.com/"
+          # 状态文件路径
+          STATE_FILE="server_status.json"
+          # 通知消息数组
+          notifications=()
+          # 新状态 JSON 对象
+          new_status_json="{}"
+          
+          # --- 准备 URL 列表 ---
+          urls=()
+          for i in {1..10}; do
+            urls+=("${URL_EU_TEMPLATE//\{i\}/$i}")
+            urls+=("${URL_RU_TEMPLATE//\{i\}/$i}")
+          done
+
+          # --- 读取旧状态 ---
+          if [ -f "$STATE_FILE" ]; then
+            old_status_json=$(cat "$STATE_FILE")
+          else
+            echo "状态文件 $STATE_FILE 未找到，将创建新文件。"
+            old_status_json="{}"
+          fi
+          
+          # --- 循环检测每个 URL ---
+          for url in "${urls[@]}"; do
+            echo "正在检测: $url"
+            
+            # 使用 curl 获取 HTTP 状态码和内容
+            # --silent: 静默模式
+            # --location: 跟随重定向
+            # --write-out "%{http_code}": 在最后输出 HTTP 状态码
+            # --max-time 10: 超时时间为 10 秒
+            response=$(curl --silent --location --write-out "%{http_code}" --max-time 10 "$url")
+            http_code="${response: -3}"
+            body="${response:0:${#response}-3}"
+            
+            # 从旧状态文件中获取此 URL 的记录
+            old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
+            old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
+            old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
+            
+            current_hash="null"
+            message=""
+
+            if [ "$http_code" -eq 404 ]; then
+              # 当前是 404
+              if [ "$old_status" != "404" ] && [ "$old_status" != "null" ]; then
+                message="服务器已关闭 (404 Not Found)"
+                notifications+=("- **$url**: $message")
+              fi
+              current_status="404"
+            else
+              # 当前不是 404
+              current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
+              current_status="$http_code"
+
+              if [ "$old_status" == "404" ]; then
+                message="服务器已开放 (状态: $http_code)"
+                notifications+=("- **$url**: $message")
+              elif [ "$old_status" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
+                message="网页代码已更新 (状态: $http_code)"
+                notifications+=("- **$url**: $message")
+              elif [ "$old_status" == "null" ]; then
+                # 首次检测到，也算作一种通知
+                message="首次发现服务器 (状态: $http_code)"
+                notifications+=("- **$url**: $message")
+              fi
+            fi
+
+            # 构建新的状态条目
+            new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$current_status\", \"hash\": \"$current_hash\"}}")
+          done
+
+          # --- 判断是否有变化并设置输出 ---
+          if [ ${#notifications[@]} -gt 0 ]; then
+            echo "发现服务器状态变化。"
+            # 将数组转换为多行字符串
+            notification_body=$(printf "%s\n" "${notifications[@]}")
+            # 设置输出给后续步骤使用
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            # 使用特殊的分隔符来处理多行字符串
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "notification_body<<$EOF" >> $GITHUB_OUTPUT
+            echo "$notification_body" >> $GITHUB_OUTPUT
+            echo "$EOF" >> $GITHUB_OUTPUT
+            
+            # 将新的状态写入文件
+            echo "$new_status_json" | jq '.' > "$STATE_FILE"
+          else
+            echo "所有服务器状态无变化。"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 步骤 3: 如果有变化，则发送邮件
+      - name: Send notification email
+        # 仅当上一步的输出 has_changes 为 'true' 时执行
+        if: steps.check_script.outputs.has_changes == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          # SMTP 服务器配置
+          server_address: smtp.gmail.com # 如果使用 Gmail，就是这个。其他邮箱请相应修改
+          server_port: 465 # Gmail 的 SSL 端口
+          # 从 Secrets 获取的凭证
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          # 邮件内容
+          subject: "Tanki 测试服务器状态更新"
+          to: ${{ secrets.MAIL_TO }}
+          from: GitHub Actions Monitor <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            你好，
+            
+            检测到以下 Tanki Online 测试服务器状态发生变化：
+            
+            ${{ steps.check_script.outputs.notification_body }}
+            
+            此邮件由 GitHub Actions 自动发送。
+
+      # 步骤 4: 如果有变化，则提交状态文件
+      - name: Commit status file
+        if: steps.check_script.outputs.has_changes == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add server_status.json
+          # 检查是否有实际改动需要提交
+          if git diff --staged --quiet; then
+            echo "状态文件无变化，无需提交。"
+          else
+            git commit -m "chore: 更新服务器状态文件"
+            git push
+          fi
