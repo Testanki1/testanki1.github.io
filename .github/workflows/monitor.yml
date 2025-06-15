@@ -110,8 +110,10 @@ jobs:
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: smtp.gmail.com 
-          server_port: 465 
+          # --- 这里是需要修改的地方 ---
+          server_address: smtp.office365.com
+          server_port: 587
+          # --- 下面的部分不需要修改，它们会从 Secrets 读取 ---
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "Tanki 测试服务器状态更新"
@@ -125,7 +127,6 @@ jobs:
             ${{ steps.check_script.outputs.notification_body }}
             
             此邮件由 GitHub Actions 自动发送。
-
       # 步骤 4: 如果有变化，则提交状态文件
       - name: Commit status file
         if: steps.check_script.outputs.has_changes == 'true'
