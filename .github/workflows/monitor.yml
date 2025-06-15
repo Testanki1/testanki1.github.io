@@ -44,8 +44,8 @@ jobs:
           for url in "${urls[@]}"; do
             echo "正在检测: $url"
             
-            # 【重要修改】在这里添加了 --insecure 选项来跳过 SSL 证书验证
-            response=$(curl --insecure --silent --location --write-out "%{http_code}" --max-time 10 "$url")
+            # 【重要修改】添加 --insecure 和 || true 来处理 SSL 和连接错误
+            response=$(curl --insecure --silent --location --write-out "%{http_code}" --max-time 10 "$url" || true)
             http_code="${response: -3}"
             body="${response:0:${#response}-3}"
             
@@ -65,9 +65,9 @@ jobs:
               fi
               current_status="404"
             else
-              # 当前不是 404
+              # 当前不是 404 (包括连接失败导致 http_code 为空的情况)
               # 只有在请求成功时才计算哈希值
-              if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then # 仅在状态码为 2xx 时计算哈希
                 current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
               fi
               current_status="$http_code"
@@ -75,7 +75,7 @@ jobs:
               if [ "$old_status" == "404" ]; then
                 message="服务器已开放 (状态: $http_code)"
                 notifications+=("- **$url**: $message")
-              elif [ "$old_status" != "null" ] && [ "$old_hash" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
+              elif [ "$old_status" != "null" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
                 message="网页代码已更新 (状态: $http_code)"
                 notifications+=("- **$url**: $message")
               elif [ "$old_status" == "null" ]; then
