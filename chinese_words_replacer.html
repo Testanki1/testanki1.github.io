@@ -3,76 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克国服屏蔽词替换器</title> <!-- Title remains standard width -->
+    <title>3D坦克国服屏蔽词替换器</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
         body {
-            background-color: #001926; /* 网页背景颜色 */
-            color: #cccccc; /* 默认文字颜色，浅灰色以便在深色背景上阅读 */
+            background-color: #001926;
+            color: #cccccc;
             font-family: 'Rubik', 'M PLUS 1p';
             margin: 0;
             padding: 20px;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh; /* 使内容垂直居中 */
+            min-height: 100vh;
             box-sizing: border-box;
         }
-
         .container {
-            background-color: #002a3f; /* 容器的背景色，比body稍亮一点 */
+            background-color: #002a3f;
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
             width: 90%;
-            max-width: 600px; /* 限制最大宽度 */
+            max-width: 600px;
             box-sizing: border-box;
         }
-
         h1 {
             color: #ffffff;
             text-align: center;
             margin-bottom: 25px;
-            /* Removed font-feature-settings: "fwid"; */
         }
-        /* Removed h1::before and h1 > span styles */
-
         label {
             display: block;
             margin-bottom: 8px;
             font-weight: bold;
-            color: #aaddff; /* 标签颜色 */
+            color: #aaddff;
         }
-
         textarea {
             width: 100%;
-            min-height: 120px; /* 最小高度 */
+            min-height: 120px;
             padding: 10px;
             margin-bottom: 20px;
-            border: 1px solid #004466; /* 边框颜色 */
+            border: 1px solid #004466;
             border-radius: 4px;
-            background-color: #001f33; /* 文本区域背景色 */
-            color: #e0e0e0; /* 文本区域文字颜色 */
+            background-color: #001f33;
+            color: #e0e0e0;
             font-size: 1em;
-            box-sizing: border-box; /* 防止padding撑开宽度 */
-            resize: vertical; /* 允许用户垂直调整大小 */
+            box-sizing: border-box;
+            resize: vertical;
         }
-
         textarea:focus {
             outline: none;
-            border-color: #76FF33; /* 聚焦时边框变亮绿色 */
+            border-color: #76FF33;
             box-shadow: 0 0 5px rgba(118, 255, 51, 0.5);
         }
-
-        #outputText {
-            background-color: #001520; /* 输出区域背景色稍暗 */
-            cursor: default; /* 表明不可编辑 */
+        textarea:disabled {
+            background-color: #001520;
+            cursor: not-allowed;
         }
-
+        #outputText {
+            background-color: #001520;
+            cursor: default;
+        }
         button {
-            background-color: #76FF33; /* 按钮颜色 */
-            color: #001926; /* 按钮文字颜色，深色 */
+            background-color: #76FF33;
+            color: #001926;
             border: none;
             padding: 12px 25px;
             border-radius: 4px;
@@ -80,28 +75,24 @@
             font-size: 1em;
             font-weight: bold;
             transition: background-color 0.2s ease, transform 0.1s ease;
-            display: block; /* 使按钮独占一行 */
-            width: 100%; /* 按钮宽度充满容器 */
+            display: block;
+            width: 100%;
             box-sizing: border-box;
         }
-
         button:hover {
-            background-color: #68ef25; /* 鼠标悬停时颜色变深一点 */
+            background-color: #68ef25;
         }
-
         button:active {
-             transform: scale(0.98); /* 点击时轻微缩小 */
+             transform: scale(0.98);
         }
-
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- H1 content is now static HTML -->
         <h1>3D坦克国服屏蔽词替换器</h1>
 
         <label for="inputText">输入文本:</label>
-        <textarea id="inputText" placeholder="在这里输入需要处理的文字... 例如: abc 123 飞"></textarea>
+        <textarea id="inputText" placeholder="正在加载词典，请稍候..." disabled></textarea>
 
         <label for="outputText">替换结果:</label>
         <textarea id="outputText" readonly placeholder="替换后的文字将显示在这里..."></textarea>
@@ -110,46 +101,18 @@
     </div>
 
     <script>
-        // --- 屏蔽词字典 ---
-        // 格式: "屏蔽词": "替换词"
-        const censorDictionary = {
-            "飞": "非",
-            "服": "浮",
-            "挂": "絓",
-            "发": "乏",
-            "法": "氵‪去",
-            "客": "恪",
-            "官方": "官‪方",
-            "斌": "文武",
-            "号": "好",
-            "转化": "转‪化",
-            "管理": "管‪理",
-            "买": "么矮",
-            "卖": "么爱",
-            "出": "岀",
-            "狗": "訽",
-            "猪": "豬",
-            // Add more mappings as needed
-            "测试词": "替换成功"
-        };
-        // --------------------
+        // 将在这个作用域中存储从外部文件加载的字典
+        let censorDictionary = {};
 
         const inputText = document.getElementById('inputText');
         const outputText = document.getElementById('outputText');
         const copyButton = document.getElementById('copyButton');
-        // Removed h1Element selector as it's no longer needed for JS manipulation
 
-        // Removed toFullWidth function definition
-
-        // 替换函数 (Operates on original text)
+        // 替换函数
         function replaceCensoredWords(text) {
             let processedText = text;
-            // 遍历字典中的每一个屏蔽词
             for (const key in censorDictionary) {
-                if (censorDictionary.hasOwnProperty(key) && key !== "") { // Ensure key is not empty
-                    // 使用 RegExp 进行全局替换，以处理字符串中的所有出现
-                    // 'g' flag for global replacement
-                    // Escape special regex characters in the key
+                if (censorDictionary.hasOwnProperty(key) && key !== "") {
                     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     const regex = new RegExp(escapedKey, 'g');
                     processedText = processedText.replace(regex, censorDictionary[key]);
@@ -158,10 +121,35 @@
             return processedText;
         }
 
+        // 页面加载时执行的初始化函数
+        async function initialize() {
+            try {
+                // 从外部文件加载屏蔽词字典
+                const response = await fetch('dictionary.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                censorDictionary = await response.json();
+
+                console.log("屏蔽词典加载成功!");
+
+                // 词典加载成功后，启用输入框并更新提示文字
+                inputText.disabled = false;
+                inputText.placeholder = "在这里输入需要处理的文字... 例如: abc 123 飞";
+                
+            } catch (error) {
+                console.error("加载屏蔽词典失败:", error);
+                // 加载失败时提示用户
+                inputText.placeholder = "错误：无法加载屏蔽词典。请检查文件是否存在或网络连接。";
+                alert("错误：无法加载屏蔽词典！");
+            }
+        }
+
+        // ---- 事件监听器 ----
+
         // 监听输入框的输入事件
         inputText.addEventListener('input', () => {
             const originalText = inputText.value;
-            // Directly replace censored words on the original text
             const replacedText = replaceCensoredWords(originalText);
             outputText.value = replacedText;
         });
@@ -170,36 +158,29 @@
         copyButton.addEventListener('click', () => {
             const textToCopy = outputText.value;
             if (!textToCopy) {
-                 // Alert text is standard width now
                  alert("没有内容可以复制！");
                 return;
             }
 
-            // Store original button text (standard width)
             const originalButtonText = copyButton.textContent;
-
-            // 使用 navigator.clipboard API 复制文本
             navigator.clipboard.writeText(textToCopy)
                 .then(() => {
-                    // 复制成功提示
-                    // Button text is standard width now
                     copyButton.textContent = '已复制!';
-                    copyButton.style.backgroundColor = '#4CAF50'; // 暂时变绿表示成功
-
-                    // 1.5秒后恢复按钮文字和颜色
+                    copyButton.style.backgroundColor = '#4CAF50';
                     setTimeout(() => {
-                        copyButton.textContent = originalButtonText; // Restore original standard width text
-                        copyButton.style.backgroundColor = '#76FF33'; // 恢复原色
+                        copyButton.textContent = originalButtonText;
+                        copyButton.style.backgroundColor = '#76FF33';
                     }, 1500);
                 })
                 .catch(err => {
                     console.error('无法复制文本: ', err);
-                     // Alert text is standard width now
                     alert('复制失败，您的浏览器可能不支持或权限不足。请尝试手动复制。');
                 });
         });
 
-        // Removed initial full-width conversion for button and labels
+        // ---- 启动应用 ----
+        // 调用初始化函数来开始加载数据和设置页面
+        initialize();
     </script>
 </body>
 </html>
