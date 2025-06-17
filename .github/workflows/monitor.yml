@@ -1,8 +1,9 @@
-name: 3D坦克测试服务器监测
+name: 3D坦克测试服务器监测器
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    # 修改为每 5 分钟执行一次
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -110,15 +111,14 @@ jobs:
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
-          # --- 这是需要修改的地方，确保它们是 QQ 邮箱的配置 ---
           server_address: smtp.qq.com
           server_port: 465
-          # --- 下面的部分不需要修改，它们会自动从 Secrets 读取 ---
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO }}
-          from: GitHub Actions Monitor <${{ secrets.MAIL_USERNAME }}> # 发件人名称可以自定义
+          # 修改为发送至两个邮箱，从 secrets 中读取
+          to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }}
+          from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
           body: |
             你好，
             
@@ -127,6 +127,7 @@ jobs:
             ${{ steps.check_script.outputs.notification_body }}
             
             此邮件由 GitHub Actions 自动发送。
+            
       # 步骤 4: 如果有变化，则提交状态文件
       - name: Commit status file
         if: steps.check_script.outputs.has_changes == 'true'
