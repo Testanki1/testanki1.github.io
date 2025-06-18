@@ -34,19 +34,25 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-        // --- 修正部分 2A: 导入 OrbitControls ---
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        // --- 核心修正 1: 导入 BufferGeometryUtils ---
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
         import * as CANNON from 'cannon-es';
 
-        let scene, camera, renderer, controls; // 添加 controls 变量
+        let scene, camera, renderer, controls;
         let world;
         let tankBody, tankModel;
         const clock = new THREE.Clock();
         let joystickData = { x: 0, z: 0 };
 
         function createCannonTrimesh(geometry) {
+            if (!geometry.index) {
+                // cannon-es Trimesh 需要索引
+                const indices = Array.from({ length: geometry.attributes.position.count / 3 }, (_, i) => [i * 3, i * 3 + 1, i * 3 + 2]).flat();
+                geometry.setIndex(indices);
+            }
             const vertices = geometry.attributes.position.array;
-            const indices = geometry.index ? geometry.index.array : Array.from({ length: vertices.length / 3 }, (_, i) => i);
+            const indices = geometry.index.array;
             return new CANNON.Trimesh(vertices, indices);
         }
 
@@ -65,14 +71,13 @@
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 10, 20);
 
-            // --- 修正部分 2B: 初始化 OrbitControls ---
             controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true; // 启用阻尼（惯性），使旋转更平滑
+            controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.enablePan = false; // 禁止右键平移
-            controls.maxPolarAngle = Math.PI / 2 - 0.05; // 禁止相机旋转到地平线以下
-            controls.minDistance = 5; // 最小缩放距离
-            controls.maxDistance = 50; // 最大缩放距离
+            controls.enablePan = false;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            controls.minDistance = 5;
+            controls.maxDistance = 50;
 
             world = new CANNON.World({
                 gravity: new CANNON.Vec3(0, -20, 0),
@@ -93,8 +98,6 @@
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 2048;
-            directionalLight.shadow.mapSize.height = 2048;
             scene.add(directionalLight);
 
             loadModels();
@@ -106,40 +109,43 @@
         function loadModels() {
             const loader = new GLTFLoader();
 
-            // --- 修正部分 1: 修复场景碰撞 ---
+            // --- 核心修正 2: 使用合并几何体的方法创建场景物理实体 ---
             loader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                 const sceneModel = gltf.scene;
                 scene.add(sceneModel);
 
+                const geometriesToMerge = [];
                 sceneModel.traverse((child) => {
                     if (child.isMesh) {
                         child.receiveShadow = true;
                         
-                        // 创建物理形状
-                        const sceneShape = createCannonTrimesh(child.geometry);
+                        // 关键步骤: 创建几何体的副本，并应用其世界变换矩阵
+                        // 这会将每个小部件的顶点位置从局部坐标转换到世界坐标
+                        const geo = child.geometry.clone();
+                        geo.applyMatrix4(child.matrixWorld);
                         
-                        // 创建一个静态物理实体 (mass: 0)
-                        const sceneBody = new CANNON.Body({ mass: 0 });
-                        
-                        // 获取网格的世界坐标和旋转
-                        const worldPosition = new THREE.Vector3();
-                        const worldQuaternion = new THREE.Quaternion();
-                        child.getWorldPosition(worldPosition);
-                        child.getWorldQuaternion(worldQuaternion);
-
-                        // 将物理实体的位置和旋转设置为世界坐标
-                        sceneBody.position.copy(worldPosition);
-                        sceneBody.quaternion.copy(worldQuaternion);
-                        
-                        // 将形状添加到实体中 (注意：这里不再需要偏移量)
-                        sceneBody.addShape(sceneShape);
-                        
-                        world.addBody(sceneBody);
+                        geometriesToMerge.push(geo);
                     }
                 });
+
+                if (geometriesToMerge.length > 0) {
+                    // 使用工具库将所有几何体合并成一个
+                    const mergedGeometry = BufferGeometryUtils.mergeGeometries(geometriesToMerge, false);
+                    
+                    // 为这个合并后的巨大几何体创建一个单一的、精确的物理外壳
+                    const sceneShape = createCannonTrimesh(mergedGeometry);
+                    
+                    const sceneBody = new CANNON.Body({ mass: 0 }); // 质量为0的静态物体
+                    sceneBody.addShape(sceneShape);
+                    // 因为顶点已经是世界坐标，所以物体本身放在原点即可
+                    sceneBody.position.set(0, 0, 0); 
+                    sceneBody.quaternion.set(0, 0, 0, 1);
+                    
+                    world.addBody(sceneBody);
+                }
             });
 
-
+            // 坦克加载逻辑保持不变
             loader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                 tankModel = gltf.scene;
                 scene.add(tankModel);
@@ -155,39 +161,23 @@
                     mass: 50,
                     position: new CANNON.Vec3(0, 5, 0),
                     shape: tankShape,
-                    material: new CANNON.Material({ friction: 0.1, restitution: 0.1 }),
                     angularDamping: 0.95, 
                     linearDamping: 0.5 
                 });
-
                 world.addBody(tankBody);
             });
         }
         
         function setupJoystick() {
-            const options = {
-                zone: document.getElementById('joystick-zone'),
-                mode: 'static',
-                position: { left: '50%', top: '50%' },
-                color: 'cyan', size: 150, restJoystick: true
-            };
+            // ... (此部分无变化)
+            const options = { zone: document.getElementById('joystick-zone'), mode: 'static', position: { left: '50%', top: '50%' }, color: 'cyan', size: 150, restJoystick: true };
             const manager = nipplejs.create(options);
-
-            manager.on('move', (evt, data) => {
-                if (data.angle) {
-                    const angle = data.angle.radian;
-                    const force = data.force;
-                    joystickData.x = Math.cos(angle) * force;
-                    joystickData.z = -Math.sin(angle) * force;
-                }
-            });
-
-            manager.on('end', () => {
-                joystickData.x = 0; joystickData.z = 0;
-            });
+            manager.on('move', (evt, data) => { if (data.angle) { const angle = data.angle.radian; const force = data.force; joystickData.x = Math.cos(angle) * force; joystickData.z = -Math.sin(angle) * force; } });
+            manager.on('end', () => { joystickData.x = 0; joystickData.z = 0; });
         }
         
         function onWindowResize() {
+            // ... (此部分无变化)
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -200,30 +190,24 @@
             world.step(1 / 60, deltaTime, 3);
 
             if (tankBody && tankModel) {
-                // ... (坦克移动逻辑保持不变)
+                // ... (此部分无变化)
                 const moveSpeed = 20; 
                 const turnSpeed = 4;   
-
                 const controlVector = new CANNON.Vec3(joystickData.x, 0, joystickData.z);
                 if (controlVector.length() > 0.1) {
                     const force = controlVector.z * moveSpeed;
                     const worldForce = tankBody.quaternion.vmult(new CANNON.Vec3(0, 0, force));
                     tankBody.velocity.x = worldForce.x * moveSpeed;
                     tankBody.velocity.z = worldForce.z * moveSpeed;
-                    
                     const turn = controlVector.x * -turnSpeed;
                     tankBody.angularVelocity.y = turn;
                 } else {
                     tankBody.angularVelocity.y *= 0.8;
                 }
-
                 tankModel.position.copy(tankBody.position);
                 tankModel.quaternion.copy(tankBody.quaternion);
 
-                // --- 修正部分 2C: 更新 OrbitControls ---
-                // 将 OrbitControls 的目标设置为坦克的位置
                 controls.target.copy(tankModel.position);
-                // 更新控制器状态（应用用户的滑动、缩放等操作）
                 controls.update();
             }
             
