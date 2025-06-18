@@ -2,7 +2,7 @@ name: 3D坦克测试服务器监测器
 
 on:
   schedule:
-    # 修改为每 5 分钟执行一次
+    # 每 5 分钟执行一次
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -50,7 +50,7 @@ jobs:
             http_code="${response: -3}"
             body="${response:0:${#response}-3}"
             
-            # 【重要修正】检查服务器是否可用，同时排除 404 和 000 (连接失败) 状态
+            # 检查服务器是否可用 (非404, 非000, 且有响应) 并加入列表
             if [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]] && [[ -n "$http_code" ]]; then
               available_servers+=("$url (状态: $http_code)")
             fi
@@ -63,8 +63,6 @@ jobs:
             current_hash="null"
             message=""
 
-            # 这里处理通知的逻辑保持不变，因为它需要区分各种状态变化
-            # 例如从 200 变为 000 也是一种值得通知的变化 (服务器挂了)
             if [ "$http_code" -eq 404 ]; then
               if [ "$old_status" != "404" ] && [ "$old_status" != "null" ]; then
                 message="服务器已关闭 (404 Not Found)"
@@ -83,11 +81,10 @@ jobs:
               elif [ "$old_status" != "null" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
                 message="网页代码已更新 (状态: $http_code)"
                 notifications+=("- $url: $message")
-              elif [ "$old_status" == "null" ] && [[ "$http_code" -ne 404 ]]; then # 首次发现，也应该排除 404
+              elif [ "$old_status" == "null" ] && [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]]; then
                 message="首次发现服务器 (状态: $http_code)"
                 notifications+=("- $url: $message")
-              # 【可选】你也可以在这里添加一个从正常状态变为 000 的通知
-              elif [ "$old_status" != "000" ] && [ "$http_code" == "000" ]; then
+              elif [ "$old_status" != "000" ] && [ "$http_code" == "000" ] && [ "$old_status" != "null" ]; then
                 message="服务器连接失败 (状态: 000)"
                 notifications+=("- $url: $message")
               fi
@@ -135,10 +132,9 @@ jobs:
           subject: "3D坦克测试服务器状态更新"
           to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
+          # 【修改】移除了多余的介绍行，使邮件内容更简洁
           body: |
             你好，
-            
-            3D坦克测试服务器状态报告如下：
             
             ${{ steps.check_script.outputs.notification_body }}
             
