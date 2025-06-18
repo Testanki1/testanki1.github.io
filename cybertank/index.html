@@ -38,9 +38,7 @@
 
         let scene, camera, renderer;
 
-        // --- 核心改动 1: 将 init 函数声明为 async ---
         async function init() {
-            // --- 同步设置部分 (不变) ---
             scene = new THREE.Scene();
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -60,11 +58,9 @@
             
             console.log("Loading process started...");
 
-            // --- 核心改动 2: 使用 await 来强制加载顺序 ---
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
 
-            // 步骤 1: 等待背景图片加载完成
             console.log("1. Loading background environment...");
             const environmentTexture = await exrLoader.loadAsync('assets/Minigame_Synth_Environment_4096x2048.exr');
             environmentTexture.mapping = THREE.EquirectangularReflectionMapping;
@@ -72,13 +68,11 @@
             scene.environment = environmentTexture;
             console.log("   ...Background loaded.");
 
-            // 步骤 2: 背景加载后，再等待场景模型加载完成
             console.log("2. Loading scene model...");
             const sceneGltf = await gltfLoader.loadAsync('assets/Minigame_Synth_Scene.glb');
             scene.add(sceneGltf.scene);
             console.log("   ...Scene model loaded.");
 
-            // 步骤 3: 场景加载后，再等待坦克模型加载完成
             console.log("3. Loading tank model...");
             const tankGltf = await gltfLoader.loadAsync('assets/Minigame_Synth_Tank.glb');
             const tankModel = tankGltf.scene;
@@ -86,38 +80,31 @@
             tankModel.rotation.y = Math.PI;
             scene.add(tankModel);
             console.log("   ...Tank model loaded.");
-            console.log("All assets loaded successfully!");
+            console.log("All assets loaded successfully! Starting application.");
 
-            // --- 所有异步加载完成后，再设置控制器 ---
             setupFreeCameraControls();
             setupFullscreen();
             setupAudioControls();
             window.addEventListener('resize', onWindowResize);
         }
-
-        // --- 其他函数 (不变) ---
-        function setupAudioControls() { /* ... 不变 ... */ }
-        function setupFreeCameraControls() { /* ... 不变 ... */ }
-        function setupFullscreen() { /* ... 不变 ... */ }
-        function onWindowResize() { /* ... 不变 ... */ }
         
         function animate() {
             requestAnimationFrame(animate);
-            if (renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
+            // 移除了不必要的 if 判断，因为 animate 只有在所有东西都准备好后才会被调用
+            renderer.render(scene, camera);
         }
         
-        // --- 启动 ---
-        init(); // 调用 async 函数
-        animate();
+        // --- 核心改动: 正确的启动方式 ---
+        // 调用 async init 函数，并等待它完成后 (.then) 才启动动画循环
+        init().then(() => {
+            animate();
+        });
 
-        // 粘贴不变的函数到这里
+        // --- 所有不变的辅助函数 ---
         function setupAudioControls(){const a=document.getElementById("audio-control"),b=document.getElementById("background-music");a.addEventListener("click",()=>{b.paused?(b.play().catch(c=>console.error("Audio play failed:",c)),a.classList.add("playing")):(b.pause(),a.classList.remove("playing"))})}
         function onWindowResize(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight)}
         function setupFullscreen(){const a="ontouchstart" in window||navigator.maxTouchPoints>0,b=document.getElementById("fullscreen-prompt");a&&(setTimeout(()=>{b.style.opacity="1"},2e3),setTimeout(()=>{b.style.opacity="0"},7e3),window.addEventListener("click",()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(c=>{console.log(`Error attempting to enable full-screen mode: ${c.message} (${c.name})`)}))})}
         function setupFreeCameraControls(){const a=new THREE.Euler(0,0,0,"YXZ"),b=.05;let c,d,e=0,f=!1,g=0;function h(i){f=!0;g=i.touches?i.touches.length:1;1===g?(c=i.touches?i.touches[0].clientX:i.clientX,d=i.touches?i.touches[0].clientY:i.clientY):2===g&&(i=i.touches[0].clientX-i.touches[1].clientX,i=Math.sqrt(i*i+(i=i.touches[0].clientY-i.touches[1].clientY)*i),e=i)}function j(i){if(f){if(g=i.touches?i.touches.length:1,1===g){const k=i.touches?i.touches[0].clientX:i.clientX,l=i.touches?i.touches[0].clientY:i.clientY,m=k-c,n=l-d;a.setFromQuaternion(camera.quaternion);a.y-=m*.002;a.x-=n*.002;a.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,a.x));camera.quaternion.setFromEuler(a);c=k;d=l}else 2===g&&(i=i.touches[0].clientX-i.touches[1].clientX,i=Math.sqrt(i*i+(i=i.touches[0].clientY-i.touches[1].clientY)*i),i-=e,camera.position.addScaledVector((new THREE.Vector3(0,0,-1)).applyQuaternion(camera.quaternion),i*b*.1),e=i)}}function k(i){f=!1;e=0;g=i.touches?i.touches.length:0}const l=renderer.domElement;l.addEventListener("pointerdown",h);l.addEventListener("pointermove",j);l.addEventListener("pointerup",k);l.addEventListener("pointerleave",k)}
-
     </script>
 </body>
 </html>
