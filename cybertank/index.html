@@ -3,11 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Synth Tank Showcase - Free Camera</title>
+    <title>Synth Tank Showcase</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; }
-        canvas { display: block; }
-        #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+        }
+        #fullscreen-prompt {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        /* 音乐播放器样式 */
+        #audio-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
     </style>
     <script type="importmap">
         {
@@ -21,21 +48,27 @@
 <body>
     <div id="fullscreen-prompt">Tap to enter fullscreen</div>
 
+    <!-- 添加背景音乐播放器，默认关闭，带控制条，可循环 -->
+    <audio id="audio-controls" src="assets/bounce tanki loop cut (no intro).opus" loop controls></audio>
+
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-        // OrbitControls 不再是必须的，我们自己写控制逻辑
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        let scene, camera, renderer;
-        const loader = new GLTFLoader();
+        let scene, camera, renderer, controls;
+        const gltfLoader = new GLTFLoader();
+        const exrLoader = new EXRLoader();
 
         init();
         animate();
 
         function init() {
+            // 1. 场景
             scene = new THREE.Scene();
 
+            // 2. 渲染器
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -43,19 +76,20 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // 3. 相机
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 5, 15);
 
-            // --- 核心改动 1: 设置自由相机控制器 ---
-            setupFreeCameraControls();
+            // 4. 镜头控制器
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 2;
+            controls.maxDistance = 50;
+            controls.maxPolarAngle = Math.PI / 2;
 
-            const exrLoader = new EXRLoader();
-            exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
-                texture.mapping = THREE.EquirectangularReflectionMapping;
-                scene.background = texture;
-                scene.environment = texture;
-            });
-
+            // 5. 光照
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
 
@@ -63,107 +97,85 @@
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
-            loadModels();
+            // 6. 按顺序加载资源
+            loadAssetsInOrder();
+
+            // 7. 全屏处理
             setupFullscreen();
+            
+            // 8. 窗口大小调整
             window.addEventListener('resize', onWindowResize);
         }
 
-        function loadModels() {
-            loader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
-                scene.add(gltf.scene);
-            });
+        function loadAssetsInOrder() {
+            // 1. 先加载背景环境
+            exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;
+                scene.environment = texture;
+                console.log("Environment loaded.");
 
-            loader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                const tankModel = gltf.scene;
-                tankModel.position.set(0, 0.2, 0);
-                
-                // --- 核心改动 2: 旋转坦克模型 ---
-                // 围绕Y轴旋转180度 (PI 弧度)
-                tankModel.rotation.y = Math.PI; 
-                
-                scene.add(tankModel);
+                // 2. 背景加载完成后，再加载场景
+                gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
+                    scene.add(gltf.scene);
+                    console.log("Scene loaded.");
+
+                    // 3. 场景加载完成后，再加载坦克
+                    gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
+                        const tankModel = gltf.scene;
+                        
+                        // 将坦克模型稍微抬高，确保它在赛道平面之上
+                        tankModel.position.set(0, 0.2, 0); 
+                        
+                        // 【修改】将坦克沿 Y 轴旋转 180 度 (Math.PI 弧度)
+                        tankModel.rotation.y = Math.PI;
+
+                        scene.add(tankModel);
+                        console.log("Tank loaded.");
+
+                        // 将镜头控制器的目标设为坦克，这样镜头会围绕坦克旋转
+                        controls.target.set(0, 1, 0); 
+                        controls.update(); // 更新控制器以应用新的目标
+                    });
+                });
             });
         }
 
-        function setupFreeCameraControls() {
-            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-            const moveSpeed = 0.05;
-            let startX, startY, prevPinchDist = 0;
-            let isDragging = false;
-            let touchCount = 0;
+        function setupFullscreen() {
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const prompt = document.getElementById('fullscreen-prompt');
 
-            function onPointerDown(event) {
-                isDragging = true;
-                touchCount = event.touches ? event.touches.length : 1;
+            if (isTouchDevice) {
+                setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
+                setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
 
-                if (touchCount === 1) {
-                    startX = event.touches ? event.touches[0].clientX : event.clientX;
-                    startY = event.touches ? event.touches[0].clientY : event.clientY;
-                } else if (touchCount === 2) {
-                    const dx = event.touches[0].clientX - event.touches[1].clientX;
-                    const dy = event.touches[0].clientY - event.touches[1].clientY;
-                    prevPinchDist = Math.sqrt(dx * dx + dy * dy);
-                }
+                window.addEventListener('click', (event) => {
+                    // 检查点击事件是否发生在音频控制器上，如果是则不触发全屏
+                    if (document.getElementById('audio-controls').contains(event.target)) {
+                        return;
+                    }
+
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(err => {
+                            console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                        });
+                    }
+                    // 注意：标准的全屏API没有退出全屏的click事件，通常由UI按钮或ESC键触发
+                }, true); // 使用捕获阶段确保在其他点击事件前执行
             }
-
-            function onPointerMove(event) {
-                if (!isDragging) return;
-
-                touchCount = event.touches ? event.touches.length : 1;
-
-                if (touchCount === 1) {
-                    // 单指滑动：旋转视角
-                    const currentX = event.touches ? event.touches[0].clientX : event.clientX;
-                    const currentY = event.touches ? event.touches[0].clientY : event.clientY;
-                    const deltaX = currentX - startX;
-                    const deltaY = currentY - startY;
-
-                    euler.setFromQuaternion(camera.quaternion);
-                    euler.y -= deltaX * 0.002;
-                    euler.x -= deltaY * 0.002;
-                    euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x)); // 限制上下看的角度
-
-                    camera.quaternion.setFromEuler(euler);
-                    
-                    startX = currentX;
-                    startY = currentY;
-                } else if (touchCount === 2) {
-                    // 双指捏合：前后移动
-                    const dx = event.touches[0].clientX - event.touches[1].clientX;
-                    const dy = event.touches[0].clientY - event.touches[1].clientY;
-                    const currentPinchDist = Math.sqrt(dx * dx + dy * dy);
-                    const deltaPinch = currentPinchDist - prevPinchDist;
-
-                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                    camera.position.addScaledVector(forward, deltaPinch * moveSpeed * 0.1);
-
-                    prevPinchDist = currentPinchDist;
-                }
-            }
-
-            function onPointerUp(event) {
-                isDragging = false;
-                prevPinchDist = 0;
-                touchCount = event.touches ? event.touches.length : 0;
-            }
-
-            const canvas = renderer.domElement;
-            canvas.addEventListener('pointerdown', onPointerDown);
-            canvas.addEventListener('pointermove', onPointerMove);
-            canvas.addEventListener('pointerup', onPointerUp);
-            canvas.addEventListener('pointerleave', onPointerUp); // 如果手指滑出屏幕也算结束
         }
-
-        function setupFullscreen() { /* ... 此部分代码不变 ... */ }
-
-        function onWindowResize() { /* ... 此部分代码不变 ... */ }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
         function animate() {
             requestAnimationFrame(animate);
-            // 这里不再需要 controls.update()
+            controls.update();
             renderer.render(scene, camera);
         }
-
     </script>
 </body>
 </html>
