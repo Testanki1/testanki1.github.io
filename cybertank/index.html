@@ -28,20 +28,25 @@
             opacity: 0;
             transition: opacity 0.5s;
         }
-        /* 【修改】音乐播放按钮样式 */
+        /* 【修改】SVG 音乐播放按钮样式 */
         #music-toggle-btn {
             position: absolute;
             top: 20px;
             right: 20px;
             z-index: 100;
-            padding: 10px 15px;
-            font-family: sans-serif;
-            font-size: 14px;
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
-            border: 1px solid white;
-            border-radius: 5px;
+            width: 44px;
+            height: 44px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%; /* 圆形按钮 */
             cursor: pointer;
+            box-sizing: border-box;
+        }
+        #music-toggle-btn svg {
+            width: 100%;
+            height: 100%;
+            fill: white;
         }
     </style>
     <script type="importmap">
@@ -56,9 +61,11 @@
 <body>
     <div id="fullscreen-prompt">Tap to enter fullscreen</div>
 
-    <!-- 【修改】添加音频元素(无控制器)和自定义的播放按钮 -->
+    <!-- 【修改】添加音频元素和带 SVG 图标的按钮 -->
     <audio id="bg-music" src="assets/bounce tanki loop cut (no intro).opus" loop></audio>
-    <button id="music-toggle-btn">Play Music</button>
+    <button id="music-toggle-btn">
+        <!-- 初始状态为播放图标 -->
+    </button>
 
     <script type="module">
         import * as THREE from 'three';
@@ -66,14 +73,17 @@
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        let scene, camera, renderer, controls;
+        let scene, camera, renderer, controls, cameraRig;
         const gltfLoader = new GLTFLoader();
         const exrLoader = new EXRLoader();
 
-        // 【新增】用于自由镜头控制的变量
         let isDragging = false;
         let previousTouch = { x: 0, y: 0 };
-        const rotationSpeed = 0.004; // 调整拖动灵敏度
+        const rotationSpeed = 0.003;
+
+        // 【新增】SVG 图标内容
+        const playIconSVG = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>`;
+        const pauseIconSVG = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>`;
 
         init();
         animate();
@@ -88,44 +98,41 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 1.5, 5); // 将相机放在一个类似人眼的高度
+            // --- 【核心修改】设置 Camera Rig ---
+            // 1. 创建相机支架 (cameraRig)，它是一个普通的3D对象
+            cameraRig = new THREE.Object3D();
+            cameraRig.position.set(0, 1.5, 5); // 将支架放在观察点
+            scene.add(cameraRig);
 
-            // --- 【核心修改】镜头控制 ---
+            // 2. 创建相机，并将其添加到支架中
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            cameraRig.add(camera); // 相机成为支架的子对象
+
+            // --- 镜头控制 ---
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            
-            // 1. 禁用 OrbitControls 的旋转和平移，只保留缩放(捏合)功能
-            controls.enableRotate = false;
-            controls.enablePan = false;
-            
-            // 2. 我们仍然需要一个目标点，用于缩放操作的中心
-            controls.target.set(0, 1, 0); 
-            
-            // 3. 限制缩放范围
-            controls.minDistance = 1;
+            controls.enableRotate = false; // 禁用 OrbitControls 的旋转
+            controls.enablePan = false;   // 禁用 OrbitControls 的平移
+            controls.minDistance = 1;     // 只用它来控制缩放
             controls.maxDistance = 20;
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
-
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
             loadAssetsInOrder();
             setupFullscreen();
-            setupMusicControls(); // 【新增】设置音乐按钮
-            setupFreeLookControls(); // 【新增】设置自由镜头触摸控制
+            setupMusicControls();
+            setupFreeLookControls();
             
             window.addEventListener('resize', onWindowResize);
         }
 
-        // --- 【新增】设置自由镜头触摸控制 ---
         function setupFreeLookControls() {
             renderer.domElement.addEventListener('touchstart', (event) => {
-                // 只处理单指触摸拖动
                 if (event.touches.length === 1) {
                     isDragging = true;
                     previousTouch.x = event.touches[0].clientX;
@@ -137,17 +144,16 @@
                 if (isDragging && event.touches.length === 1) {
                     const currentX = event.touches[0].clientX;
                     const currentY = event.touches[0].clientY;
-
                     const deltaX = currentX - previousTouch.x;
                     const deltaY = currentY - previousTouch.y;
 
-                    // 根据拖动距离旋转相机
-                    // 水平拖动 -> 围绕Y轴旋转 (左右看)
-                    camera.rotation.y -= deltaX * rotationSpeed;
-                    // 垂直拖动 -> 围绕X轴旋转 (上下看)
+                    // 【核心修改】分别旋转支架和相机
+                    // 左右拖动 -> 旋转整个支架 (摇头)
+                    cameraRig.rotation.y -= deltaX * rotationSpeed;
+                    // 上下拖动 -> 旋转相机本身 (点头)
                     camera.rotation.x -= deltaY * rotationSpeed;
 
-                    // 限制垂直方向的旋转，防止镜头翻转
+                    // 限制上下看的角度，防止镜头倒转
                     camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
                     
                     previousTouch.x = currentX;
@@ -160,18 +166,20 @@
             });
         }
         
-        // --- 【新增】设置音乐按钮 ---
         function setupMusicControls() {
             const audio = document.getElementById('bg-music');
             const toggleBtn = document.getElementById('music-toggle-btn');
+            
+            // 设置初始图标
+            toggleBtn.innerHTML = playIconSVG;
 
             toggleBtn.addEventListener('click', () => {
                 if (audio.paused) {
                     audio.play().catch(e => console.error("Audio play failed:", e));
-                    toggleBtn.textContent = 'Pause Music';
+                    toggleBtn.innerHTML = pauseIconSVG; // 切换到暂停图标
                 } else {
                     audio.pause();
-                    toggleBtn.textContent = 'Play Music';
+                    toggleBtn.innerHTML = playIconSVG; // 切换到播放图标
                 }
             });
         }
@@ -190,7 +198,6 @@
                         tankModel.position.set(0, 0.2, 0); 
                         tankModel.rotation.y = Math.PI;
                         scene.add(tankModel);
-                        controls.update();
                     });
                 });
             });
@@ -204,7 +211,11 @@
                 setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
                 setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
 
-                window.addEventListener('click', (event) => {
+                // 修改 click 为 touchend，避免与拖动冲突
+                window.addEventListener('touchend', (event) => {
+                    // 如果正在拖动，则不触发全屏
+                    if (isDragging) return;
+                    // 如果点击的是音乐按钮，则不触发全屏
                     if (document.getElementById('music-toggle-btn').contains(event.target)) {
                         return;
                     }
@@ -223,7 +234,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            // OrbitControls 仍然需要更新，以处理缩放和阻尼效果
+            // 即使只用于缩放，也需要更新以应用阻尼效果
             controls.update(); 
             renderer.render(scene, camera);
         }
