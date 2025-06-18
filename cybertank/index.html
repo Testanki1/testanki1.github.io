@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Synth Tank Showcase - Free Camera</title>
+    <title>Synth Tank Showcase - Sequential Load</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
+        #audio-control { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; background-color: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; z-index: 10; }
+        #audio-control svg { width: 20px; height: 20px; fill: white; }
+        .icon-unmuted { display: none; }
+        #audio-control.playing .icon-unmuted { display: block; }
+        #audio-control.playing .icon-muted { display: none; }
     </style>
     <script type="importmap">
         {
@@ -20,22 +25,23 @@
 </head>
 <body>
     <div id="fullscreen-prompt">Tap to enter fullscreen</div>
+    <div id="audio-control">
+        <svg class="icon-muted" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM21.17 3.83l-1.41-1.41L3.83 18.17l1.41 1.41L21.17 3.83z"/></svg>
+        <svg class="icon-unmuted" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    </div>
+    <audio id="background-music" src="assets/bounce tanki loop cut (no intro).opus" loop preload="auto"></audio>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-        // OrbitControls 不再是必须的，我们自己写控制逻辑
 
         let scene, camera, renderer;
-        const loader = new GLTFLoader();
 
-        init();
-        animate();
-
-        function init() {
+        // --- 核心改动 1: 将 init 函数声明为 async ---
+        async function init() {
+            // --- 同步设置部分 (不变) ---
             scene = new THREE.Scene();
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -46,123 +52,71 @@
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 5, 15);
 
-            // --- 核心改动 1: 设置自由相机控制器 ---
-            setupFreeCameraControls();
-
-            const exrLoader = new EXRLoader();
-            exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
-                texture.mapping = THREE.EquirectangularReflectionMapping;
-                scene.background = texture;
-                scene.environment = texture;
-            });
-
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
-
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
+            
+            console.log("Loading process started...");
 
-            loadModels();
+            // --- 核心改动 2: 使用 await 来强制加载顺序 ---
+            const exrLoader = new EXRLoader();
+            const gltfLoader = new GLTFLoader();
+
+            // 步骤 1: 等待背景图片加载完成
+            console.log("1. Loading background environment...");
+            const environmentTexture = await exrLoader.loadAsync('assets/Minigame_Synth_Environment_4096x2048.exr');
+            environmentTexture.mapping = THREE.EquirectangularReflectionMapping;
+            scene.background = environmentTexture;
+            scene.environment = environmentTexture;
+            console.log("   ...Background loaded.");
+
+            // 步骤 2: 背景加载后，再等待场景模型加载完成
+            console.log("2. Loading scene model...");
+            const sceneGltf = await gltfLoader.loadAsync('assets/Minigame_Synth_Scene.glb');
+            scene.add(sceneGltf.scene);
+            console.log("   ...Scene model loaded.");
+
+            // 步骤 3: 场景加载后，再等待坦克模型加载完成
+            console.log("3. Loading tank model...");
+            const tankGltf = await gltfLoader.loadAsync('assets/Minigame_Synth_Tank.glb');
+            const tankModel = tankGltf.scene;
+            tankModel.position.set(0, 0.2, 0);
+            tankModel.rotation.y = Math.PI;
+            scene.add(tankModel);
+            console.log("   ...Tank model loaded.");
+            console.log("All assets loaded successfully!");
+
+            // --- 所有异步加载完成后，再设置控制器 ---
+            setupFreeCameraControls();
             setupFullscreen();
+            setupAudioControls();
             window.addEventListener('resize', onWindowResize);
         }
 
-        function loadModels() {
-            loader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
-                scene.add(gltf.scene);
-            });
-
-            loader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                const tankModel = gltf.scene;
-                tankModel.position.set(0, 0.2, 0);
-                
-                // --- 核心改动 2: 旋转坦克模型 ---
-                // 围绕Y轴旋转180度 (PI 弧度)
-                tankModel.rotation.y = Math.PI; 
-                
-                scene.add(tankModel);
-            });
-        }
-
-        function setupFreeCameraControls() {
-            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-            const moveSpeed = 0.05;
-            let startX, startY, prevPinchDist = 0;
-            let isDragging = false;
-            let touchCount = 0;
-
-            function onPointerDown(event) {
-                isDragging = true;
-                touchCount = event.touches ? event.touches.length : 1;
-
-                if (touchCount === 1) {
-                    startX = event.touches ? event.touches[0].clientX : event.clientX;
-                    startY = event.touches ? event.touches[0].clientY : event.clientY;
-                } else if (touchCount === 2) {
-                    const dx = event.touches[0].clientX - event.touches[1].clientX;
-                    const dy = event.touches[0].clientY - event.touches[1].clientY;
-                    prevPinchDist = Math.sqrt(dx * dx + dy * dy);
-                }
-            }
-
-            function onPointerMove(event) {
-                if (!isDragging) return;
-
-                touchCount = event.touches ? event.touches.length : 1;
-
-                if (touchCount === 1) {
-                    // 单指滑动：旋转视角
-                    const currentX = event.touches ? event.touches[0].clientX : event.clientX;
-                    const currentY = event.touches ? event.touches[0].clientY : event.clientY;
-                    const deltaX = currentX - startX;
-                    const deltaY = currentY - startY;
-
-                    euler.setFromQuaternion(camera.quaternion);
-                    euler.y -= deltaX * 0.002;
-                    euler.x -= deltaY * 0.002;
-                    euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x)); // 限制上下看的角度
-
-                    camera.quaternion.setFromEuler(euler);
-                    
-                    startX = currentX;
-                    startY = currentY;
-                } else if (touchCount === 2) {
-                    // 双指捏合：前后移动
-                    const dx = event.touches[0].clientX - event.touches[1].clientX;
-                    const dy = event.touches[0].clientY - event.touches[1].clientY;
-                    const currentPinchDist = Math.sqrt(dx * dx + dy * dy);
-                    const deltaPinch = currentPinchDist - prevPinchDist;
-
-                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                    camera.position.addScaledVector(forward, deltaPinch * moveSpeed * 0.1);
-
-                    prevPinchDist = currentPinchDist;
-                }
-            }
-
-            function onPointerUp(event) {
-                isDragging = false;
-                prevPinchDist = 0;
-                touchCount = event.touches ? event.touches.length : 0;
-            }
-
-            const canvas = renderer.domElement;
-            canvas.addEventListener('pointerdown', onPointerDown);
-            canvas.addEventListener('pointermove', onPointerMove);
-            canvas.addEventListener('pointerup', onPointerUp);
-            canvas.addEventListener('pointerleave', onPointerUp); // 如果手指滑出屏幕也算结束
-        }
-
-        function setupFullscreen() { /* ... 此部分代码不变 ... */ }
-
-        function onWindowResize() { /* ... 此部分代码不变 ... */ }
-
+        // --- 其他函数 (不变) ---
+        function setupAudioControls() { /* ... 不变 ... */ }
+        function setupFreeCameraControls() { /* ... 不变 ... */ }
+        function setupFullscreen() { /* ... 不变 ... */ }
+        function onWindowResize() { /* ... 不变 ... */ }
+        
         function animate() {
             requestAnimationFrame(animate);
-            // 这里不再需要 controls.update()
-            renderer.render(scene, camera);
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
         }
+        
+        // --- 启动 ---
+        init(); // 调用 async 函数
+        animate();
+
+        // 粘贴不变的函数到这里
+        function setupAudioControls(){const a=document.getElementById("audio-control"),b=document.getElementById("background-music");a.addEventListener("click",()=>{b.paused?(b.play().catch(c=>console.error("Audio play failed:",c)),a.classList.add("playing")):(b.pause(),a.classList.remove("playing"))})}
+        function onWindowResize(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight)}
+        function setupFullscreen(){const a="ontouchstart" in window||navigator.maxTouchPoints>0,b=document.getElementById("fullscreen-prompt");a&&(setTimeout(()=>{b.style.opacity="1"},2e3),setTimeout(()=>{b.style.opacity="0"},7e3),window.addEventListener("click",()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(c=>{console.log(`Error attempting to enable full-screen mode: ${c.message} (${c.name})`)}))})}
+        function setupFreeCameraControls(){const a=new THREE.Euler(0,0,0,"YXZ"),b=.05;let c,d,e=0,f=!1,g=0;function h(i){f=!0;g=i.touches?i.touches.length:1;1===g?(c=i.touches?i.touches[0].clientX:i.clientX,d=i.touches?i.touches[0].clientY:i.clientY):2===g&&(i=i.touches[0].clientX-i.touches[1].clientX,i=Math.sqrt(i*i+(i=i.touches[0].clientY-i.touches[1].clientY)*i),e=i)}function j(i){if(f){if(g=i.touches?i.touches.length:1,1===g){const k=i.touches?i.touches[0].clientX:i.clientX,l=i.touches?i.touches[0].clientY:i.clientY,m=k-c,n=l-d;a.setFromQuaternion(camera.quaternion);a.y-=m*.002;a.x-=n*.002;a.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,a.x));camera.quaternion.setFromEuler(a);c=k;d=l}else 2===g&&(i=i.touches[0].clientX-i.touches[1].clientX,i=Math.sqrt(i*i+(i=i.touches[0].clientY-i.touches[1].clientY)*i),i-=e,camera.position.addScaledVector((new THREE.Vector3(0,0,-1)).applyQuaternion(camera.quaternion),i*b*.1),e=i)}}function k(i){f=!1;e=0;g=i.touches?i.touches.length:0}const l=renderer.domElement;l.addEventListener("pointerdown",h);l.addEventListener("pointermove",j);l.addEventListener("pointerup",k);l.addEventListener("pointerleave",k)}
 
     </script>
 </body>
