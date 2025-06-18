@@ -24,6 +24,7 @@ jobs:
           URL_RU_TEMPLATE="https://client-review-{i}-public.test-ru.tankionline.com/"
           STATE_FILE="server_status.json"
           notifications=()
+          available_servers=()
           new_status_json="{}"
           
           # --- 准备 URL 列表 ---
@@ -45,10 +46,14 @@ jobs:
           for url in "${urls[@]}"; do
             echo "正在检测: $url"
             
-            # 【重要修改】添加 --insecure 和 || true 来处理 SSL 和连接错误
             response=$(curl --insecure --silent --location --write-out "%{http_code}" --max-time 10 "$url" || true)
             http_code="${response: -3}"
             body="${response:0:${#response}-3}"
+            
+            # 【重要修正】检查服务器是否可用，同时排除 404 和 000 (连接失败) 状态
+            if [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]] && [[ -n "$http_code" ]]; then
+              available_servers+=("$url (状态: $http_code)")
+            fi
             
             # 从旧状态文件中获取此 URL 的记录
             old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
@@ -58,17 +63,16 @@ jobs:
             current_hash="null"
             message=""
 
+            # 这里处理通知的逻辑保持不变，因为它需要区分各种状态变化
+            # 例如从 200 变为 000 也是一种值得通知的变化 (服务器挂了)
             if [ "$http_code" -eq 404 ]; then
-              # 当前是 404
               if [ "$old_status" != "404" ] && [ "$old_status" != "null" ]; then
                 message="服务器已关闭 (404 Not Found)"
                 notifications+=("- $url: $message")
               fi
               current_status="404"
             else
-              # 当前不是 404 (包括连接失败导致 http_code 为空的情况)
-              # 只有在请求成功时才计算哈希值
-              if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then # 仅在状态码为 2xx 时计算哈希
+              if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
                 current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
               fi
               current_status="$http_code"
@@ -79,25 +83,38 @@ jobs:
               elif [ "$old_status" != "null" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
                 message="网页代码已更新 (状态: $http_code)"
                 notifications+=("- $url: $message")
-              elif [ "$old_status" == "null" ]; then
-                # 首次检测到，也算作一种通知
+              elif [ "$old_status" == "null" ] && [[ "$http_code" -ne 404 ]]; then # 首次发现，也应该排除 404
                 message="首次发现服务器 (状态: $http_code)"
+                notifications+=("- $url: $message")
+              # 【可选】你也可以在这里添加一个从正常状态变为 000 的通知
+              elif [ "$old_status" != "000" ] && [ "$http_code" == "000" ]; then
+                message="服务器连接失败 (状态: 000)"
                 notifications+=("- $url: $message")
               fi
             fi
 
-            # 构建新的状态条目
             new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$current_status\", \"hash\": \"$current_hash\"}}")
           done
 
           # --- 判断是否有变化并设置输出 ---
           if [ ${#notifications[@]} -gt 0 ]; then
             echo "发现服务器状态变化。"
-            notification_body=$(printf "%s\n" "${notifications[@]}")
+            
+            change_details=$(printf "%s\n" "${notifications[@]}")
+            
+            available_list_header="\n--------------------\n当前可用服务器列表 (${#available_servers[@]} 个):\n"
+            if [ ${#available_servers[@]} -gt 0 ]; then
+              available_list_body=$(printf "%s\n" "${available_servers[@]}")
+            else
+              available_list_body="目前没有检测到可用的服务器。"
+            fi
+            
+            full_notification_body="检测到以下服务器状态发生变化：\n$change_details$available_list_header$available_list_body"
+
             echo "has_changes=true" >> $GITHUB_OUTPUT
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "notification_body<<$EOF" >> $GITHUB_OUTPUT
-            echo "$notification_body" >> $GITHUB_OUTPUT
+            echo -e "$full_notification_body" >> $GITHUB_OUTPUT
             echo "$EOF" >> $GITHUB_OUTPUT
             
             echo "$new_status_json" | jq '.' > "$STATE_FILE"
@@ -116,13 +133,12 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          # 修改为发送至两个邮箱，从 secrets 中读取
           to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
           body: |
             你好，
             
-            检测到以下3D坦克测试服务器状态发生变化：
+            3D坦克测试服务器状态报告如下：
             
             ${{ steps.check_script.outputs.notification_body }}
             
