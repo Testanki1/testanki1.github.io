@@ -28,12 +28,20 @@
             opacity: 0;
             transition: opacity 0.5s;
         }
-        /* 音乐播放器样式 */
-        #audio-controls {
+        /* 【修改】音乐播放按钮样式 */
+        #music-toggle-btn {
             position: absolute;
             top: 20px;
             right: 20px;
             z-index: 100;
+            padding: 10px 15px;
+            font-family: sans-serif;
+            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            cursor: pointer;
         }
     </style>
     <script type="importmap">
@@ -48,8 +56,9 @@
 <body>
     <div id="fullscreen-prompt">Tap to enter fullscreen</div>
 
-    <!-- 添加背景音乐播放器，默认关闭，带控制条，可循环 -->
-    <audio id="audio-controls" src="assets/bounce tanki loop cut (no intro).opus" loop controls></audio>
+    <!-- 【修改】添加音频元素(无控制器)和自定义的播放按钮 -->
+    <audio id="bg-music" src="assets/bounce tanki loop cut (no intro).opus" loop></audio>
+    <button id="music-toggle-btn">Play Music</button>
 
     <script type="module">
         import * as THREE from 'three';
@@ -61,14 +70,17 @@
         const gltfLoader = new GLTFLoader();
         const exrLoader = new EXRLoader();
 
+        // 【新增】用于自由镜头控制的变量
+        let isDragging = false;
+        let previousTouch = { x: 0, y: 0 };
+        const rotationSpeed = 0.004; // 调整拖动灵敏度
+
         init();
         animate();
 
         function init() {
-            // 1. 场景
             scene = new THREE.Scene();
 
-            // 2. 渲染器
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -76,20 +88,25 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
 
-            // 3. 相机
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 15);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.5, 5); // 将相机放在一个类似人眼的高度
 
-            // 4. 镜头控制器
+            // --- 【核心修改】镜头控制 ---
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.screenSpacePanning = false;
-            controls.minDistance = 2;
-            controls.maxDistance = 50;
-            controls.maxPolarAngle = Math.PI / 2;
+            
+            // 1. 禁用 OrbitControls 的旋转和平移，只保留缩放(捏合)功能
+            controls.enableRotate = false;
+            controls.enablePan = false;
+            
+            // 2. 我们仍然需要一个目标点，用于缩放操作的中心
+            controls.target.set(0, 1, 0); 
+            
+            // 3. 限制缩放范围
+            controls.minDistance = 1;
+            controls.maxDistance = 20;
 
-            // 5. 光照
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
 
@@ -97,45 +114,83 @@
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
-            // 6. 按顺序加载资源
             loadAssetsInOrder();
-
-            // 7. 全屏处理
             setupFullscreen();
+            setupMusicControls(); // 【新增】设置音乐按钮
+            setupFreeLookControls(); // 【新增】设置自由镜头触摸控制
             
-            // 8. 窗口大小调整
             window.addEventListener('resize', onWindowResize);
         }
 
+        // --- 【新增】设置自由镜头触摸控制 ---
+        function setupFreeLookControls() {
+            renderer.domElement.addEventListener('touchstart', (event) => {
+                // 只处理单指触摸拖动
+                if (event.touches.length === 1) {
+                    isDragging = true;
+                    previousTouch.x = event.touches[0].clientX;
+                    previousTouch.y = event.touches[0].clientY;
+                }
+            });
+
+            renderer.domElement.addEventListener('touchmove', (event) => {
+                if (isDragging && event.touches.length === 1) {
+                    const currentX = event.touches[0].clientX;
+                    const currentY = event.touches[0].clientY;
+
+                    const deltaX = currentX - previousTouch.x;
+                    const deltaY = currentY - previousTouch.y;
+
+                    // 根据拖动距离旋转相机
+                    // 水平拖动 -> 围绕Y轴旋转 (左右看)
+                    camera.rotation.y -= deltaX * rotationSpeed;
+                    // 垂直拖动 -> 围绕X轴旋转 (上下看)
+                    camera.rotation.x -= deltaY * rotationSpeed;
+
+                    // 限制垂直方向的旋转，防止镜头翻转
+                    camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+                    
+                    previousTouch.x = currentX;
+                    previousTouch.y = currentY;
+                }
+            });
+
+            renderer.domElement.addEventListener('touchend', () => {
+                isDragging = false;
+            });
+        }
+        
+        // --- 【新增】设置音乐按钮 ---
+        function setupMusicControls() {
+            const audio = document.getElementById('bg-music');
+            const toggleBtn = document.getElementById('music-toggle-btn');
+
+            toggleBtn.addEventListener('click', () => {
+                if (audio.paused) {
+                    audio.play().catch(e => console.error("Audio play failed:", e));
+                    toggleBtn.textContent = 'Pause Music';
+                } else {
+                    audio.pause();
+                    toggleBtn.textContent = 'Play Music';
+                }
+            });
+        }
+
         function loadAssetsInOrder() {
-            // 1. 先加载背景环境
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                console.log("Environment loaded.");
-
-                // 2. 背景加载完成后，再加载场景
+                
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     scene.add(gltf.scene);
-                    console.log("Scene loaded.");
-
-                    // 3. 场景加载完成后，再加载坦克
+                    
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         const tankModel = gltf.scene;
-                        
-                        // 将坦克模型稍微抬高，确保它在赛道平面之上
                         tankModel.position.set(0, 0.2, 0); 
-                        
-                        // 【修改】将坦克沿 Y 轴旋转 180 度 (Math.PI 弧度)
                         tankModel.rotation.y = Math.PI;
-
                         scene.add(tankModel);
-                        console.log("Tank loaded.");
-
-                        // 将镜头控制器的目标设为坦克，这样镜头会围绕坦克旋转
-                        controls.target.set(0, 1, 0); 
-                        controls.update(); // 更新控制器以应用新的目标
+                        controls.update();
                     });
                 });
             });
@@ -150,18 +205,13 @@
                 setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
 
                 window.addEventListener('click', (event) => {
-                    // 检查点击事件是否发生在音频控制器上，如果是则不触发全屏
-                    if (document.getElementById('audio-controls').contains(event.target)) {
+                    if (document.getElementById('music-toggle-btn').contains(event.target)) {
                         return;
                     }
-
                     if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen().catch(err => {
-                            console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                        });
+                        document.documentElement.requestFullscreen().catch(err => {});
                     }
-                    // 注意：标准的全屏API没有退出全屏的click事件，通常由UI按钮或ESC键触发
-                }, true); // 使用捕获阶段确保在其他点击事件前执行
+                }, true);
             }
         }
         
@@ -173,7 +223,8 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            controls.update();
+            // OrbitControls 仍然需要更新，以处理缩放和阻尼效果
+            controls.update(); 
             renderer.render(scene, camera);
         }
     </script>
