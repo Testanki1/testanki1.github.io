@@ -12,6 +12,8 @@
         }
         canvas {
             display: block;
+            /* 禁用默认的触摸行为，如长按选中文本或弹出菜单 */
+            touch-action: none; 
         }
         #fullscreen-prompt {
             position: absolute;
@@ -28,7 +30,6 @@
             opacity: 0;
             transition: opacity 0.5s;
         }
-        /* 【修改】SVG 音乐播放按钮样式 */
         #music-toggle-btn {
             position: absolute;
             top: 20px;
@@ -39,7 +40,7 @@
             padding: 10px;
             background-color: rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.5);
-            border-radius: 50%; /* 圆形按钮 */
+            border-radius: 50%;
             cursor: pointer;
             box-sizing: border-box;
         }
@@ -49,6 +50,7 @@
             fill: white;
         }
     </style>
+    <!-- 【修改】不再需要 OrbitControls，所以 importmap 可以简化 -->
     <script type="importmap">
         {
             "imports": {
@@ -61,27 +63,29 @@
 <body>
     <div id="fullscreen-prompt">Tap to enter fullscreen</div>
 
-    <!-- 【修改】添加音频元素和带 SVG 图标的按钮 -->
     <audio id="bg-music" src="assets/bounce tanki loop cut (no intro).opus" loop></audio>
-    <button id="music-toggle-btn">
-        <!-- 初始状态为播放图标 -->
-    </button>
+    <button id="music-toggle-btn"></button>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        // 【修改】不再导入 OrbitControls
 
-        let scene, camera, renderer, controls, cameraRig;
+        let scene, camera, renderer, cameraRig;
         const gltfLoader = new GLTFLoader();
         const exrLoader = new EXRLoader();
 
-        let isDragging = false;
-        let previousTouch = { x: 0, y: 0 };
-        const rotationSpeed = 0.003;
+        // --- 【新增】手动控制所需变量 ---
+        let isPointerDown = false;
+        let isRotating = false;
+        let isZooming = false;
+        let previousPointer = { x: 0, y: 0 };
+        let initialPinchDistance = 0;
+        
+        const rotationSpeed = 0.004;
+        const zoomSpeed = 0.01;
 
-        // 【新增】SVG 图标内容
         const playIconSVG = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>`;
         const pauseIconSVG = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>`;
 
@@ -98,24 +102,13 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
 
-            // --- 【核心修改】设置 Camera Rig ---
-            // 1. 创建相机支架 (cameraRig)，它是一个普通的3D对象
+            // 使用 Camera Rig 结构
             cameraRig = new THREE.Object3D();
-            cameraRig.position.set(0, 1.5, 5); // 将支架放在观察点
+            cameraRig.position.set(0, 1.5, 5);
             scene.add(cameraRig);
 
-            // 2. 创建相机，并将其添加到支架中
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            cameraRig.add(camera); // 相机成为支架的子对象
-
-            // --- 镜头控制 ---
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.enableRotate = false; // 禁用 OrbitControls 的旋转
-            controls.enablePan = false;   // 禁用 OrbitControls 的平移
-            controls.minDistance = 1;     // 只用它来控制缩放
-            controls.maxDistance = 20;
+            cameraRig.add(camera);
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
@@ -126,60 +119,112 @@
             loadAssetsInOrder();
             setupFullscreen();
             setupMusicControls();
-            setupFreeLookControls();
+            setupManualControls(); // 【修改】调用新的手动控制设置函数
             
             window.addEventListener('resize', onWindowResize);
         }
 
-        function setupFreeLookControls() {
-            renderer.domElement.addEventListener('touchstart', (event) => {
-                if (event.touches.length === 1) {
-                    isDragging = true;
-                    previousTouch.x = event.touches[0].clientX;
-                    previousTouch.y = event.touches[0].clientY;
-                }
-            });
+        // --- 【核心修改】手动实现触摸控制 ---
+        function setupManualControls() {
+            const domElement = renderer.domElement;
 
-            renderer.domElement.addEventListener('touchmove', (event) => {
-                if (isDragging && event.touches.length === 1) {
-                    const currentX = event.touches[0].clientX;
-                    const currentY = event.touches[0].clientY;
-                    const deltaX = currentX - previousTouch.x;
-                    const deltaY = currentY - previousTouch.y;
-
-                    // 【核心修改】分别旋转支架和相机
-                    // 左右拖动 -> 旋转整个支架 (摇头)
-                    cameraRig.rotation.y -= deltaX * rotationSpeed;
-                    // 上下拖动 -> 旋转相机本身 (点头)
-                    camera.rotation.x -= deltaY * rotationSpeed;
-
-                    // 限制上下看的角度，防止镜头倒转
-                    camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-                    
-                    previousTouch.x = currentX;
-                    previousTouch.y = currentY;
-                }
-            });
-
-            renderer.domElement.addEventListener('touchend', () => {
-                isDragging = false;
-            });
+            domElement.addEventListener('pointerdown', onPointerDown);
+            domElement.addEventListener('pointermove', onPointerMove);
+            domElement.addEventListener('pointerup', onPointerUp);
         }
-        
+
+        function onPointerDown(event) {
+            isPointerDown = true;
+            if (event.pointerType === 'touch') {
+                // 如果是触摸事件，我们需要处理多点触控
+                const touches = event.touches;
+                if (touches.length === 1) {
+                    isRotating = true;
+                    previousPointer.x = touches[0].clientX;
+                    previousPointer.y = touches[0].clientY;
+                } else if (touches.length === 2) {
+                    isRotating = false; // 两个手指时停止旋转，开始缩放
+                    isZooming = true;
+                    initialPinchDistance = getPinchDistance(touches);
+                }
+            } else { // 鼠标事件
+                isRotating = true;
+                previousPointer.x = event.clientX;
+                previousPointer.y = event.clientY;
+            }
+        }
+
+        function onPointerMove(event) {
+            if (!isPointerDown) return;
+
+            if (event.pointerType === 'touch') {
+                const touches = event.touches;
+                if (isRotating && touches.length === 1) {
+                    handleRotation(touches[0].clientX, touches[0].clientY);
+                } else if (isZooming && touches.length === 2) {
+                    handleZoom(touches);
+                }
+            } else { // 鼠标事件
+                if (isRotating) {
+                    handleRotation(event.clientX, event.clientY);
+                }
+            }
+        }
+
+        function onPointerUp(event) {
+            isPointerDown = false;
+            isRotating = false;
+            isZooming = false;
+        }
+
+        function getPinchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+
+        function handleRotation(currentX, currentY) {
+            const deltaX = currentX - previousPointer.x;
+            const deltaY = currentY - previousPointer.y;
+            
+            // 左右拖动 -> 旋转整个支架 (摇头)
+            cameraRig.rotation.y -= deltaX * rotationSpeed;
+            // 上下拖动 -> 旋转相机本身 (点头)
+            camera.rotation.x -= deltaY * rotationSpeed;
+            
+            // 限制上下角度
+            camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+
+            previousPointer.x = currentX;
+            previousPointer.y = currentY;
+        }
+
+        function handleZoom(touches) {
+            const currentPinchDistance = getPinchDistance(touches);
+            const deltaDistance = currentPinchDistance - initialPinchDistance;
+            
+            // 根据捏合距离变化，沿相机本地Z轴移动（实现前进后退）
+            camera.position.z -= deltaDistance * zoomSpeed;
+            
+            // 限制缩放范围
+            camera.position.z = Math.max(-15, Math.min(4, camera.position.z));
+
+            initialPinchDistance = currentPinchDistance;
+        }
+
+
         function setupMusicControls() {
             const audio = document.getElementById('bg-music');
             const toggleBtn = document.getElementById('music-toggle-btn');
-            
-            // 设置初始图标
             toggleBtn.innerHTML = playIconSVG;
-
             toggleBtn.addEventListener('click', () => {
                 if (audio.paused) {
                     audio.play().catch(e => console.error("Audio play failed:", e));
-                    toggleBtn.innerHTML = pauseIconSVG; // 切换到暂停图标
+                    toggleBtn.innerHTML = pauseIconSVG;
                 } else {
                     audio.pause();
-                    toggleBtn.innerHTML = playIconSVG; // 切换到播放图标
+                    toggleBtn.innerHTML = playIconSVG;
                 }
             });
         }
@@ -189,10 +234,8 @@
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     scene.add(gltf.scene);
-                    
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         const tankModel = gltf.scene;
                         tankModel.position.set(0, 0.2, 0); 
@@ -204,21 +247,18 @@
         }
 
         function setupFullscreen() {
-            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+             const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             const prompt = document.getElementById('fullscreen-prompt');
 
             if (isTouchDevice) {
                 setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
                 setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
-
-                // 修改 click 为 touchend，避免与拖动冲突
-                window.addEventListener('touchend', (event) => {
-                    // 如果正在拖动，则不触发全屏
-                    if (isDragging) return;
-                    // 如果点击的是音乐按钮，则不触发全屏
-                    if (document.getElementById('music-toggle-btn').contains(event.target)) {
-                        return;
-                    }
+                
+                // 为了避免与拖动旋转冲突，在 touchend 事件上触发全屏
+                window.addEventListener('pointerup', (event) => {
+                    // 如果是正在旋转或缩放后的抬起，则不触发全屏
+                    if (isRotating || isZooming) return;
+                    if (document.getElementById('music-toggle-btn').contains(event.target)) return;
                     if (!document.fullscreenElement) {
                         document.documentElement.requestFullscreen().catch(err => {});
                     }
@@ -234,8 +274,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            // 即使只用于缩放，也需要更新以应用阻尼效果
-            controls.update(); 
+            // 不再需要更新 controls
             renderer.render(scene, camera);
         }
     </script>
