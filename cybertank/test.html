@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank with Physics and Controls (V2)</title>
+    <title>Tank with Physics and Controls (V3 - Chase Cam)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -30,12 +30,8 @@
 
 <body>
     <button id="music-toggle-btn" aria-label="Toggle Music">
-        <span id="music-icon-on" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
-        </span>
-        <span id="music-icon-off">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" /></svg>
-        </span>
+        <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg></span>
+        <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" /></svg></span>
     </button>
     
     <div id="controls-container">
@@ -52,26 +48,19 @@
 
         let scene, camera, renderer, clock;
         let world; 
-        
-        let tankModel, tankBody, tankCollider; // ADDED tankCollider
-        let isGrounded = false; // ADDED: For checking if tank is on the ground
-        
+        let tankModel, tankBody, tankCollider; 
+        let isGrounded = false;
         const controls = { forward: 0, turn: 0 };
-
-        // CHANGED: Adjusted parameters for better feel
         const TANK_MOVE_FORCE = 800.0;
         const TANK_TURN_SPEED = 3.5;
         const JUMP_FORCE = 50.0;
-
         let audioContext, audioBuffer, sourceNode, isPlaying = false;
 
         init();
 
         async function init() {
             await RAPIER.init();
-            const gravity = { x: 0.0, y: -9.81, z: 0.0 };
-            world = new RAPIER.World(gravity);
-
+            world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -80,21 +69,16 @@
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
-
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
             setupControls(); 
-
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
-
             loadAssets();
             setupMusicControls();
             window.addEventListener('resize', onWindowResize);
-            
             animate();
         }
         
@@ -106,73 +90,53 @@
                 color: '#76FF33',
                 size: 150
             });
-
             joystickManager.on('move', (evt, data) => {
                 if (data.vector) {
                     controls.forward = -data.vector.y; 
                     controls.turn = -data.vector.x;   
                 }
             });
-
-            joystickManager.on('end', () => {
-                controls.forward = 0;
-                controls.turn = 0;
-            });
-
+            joystickManager.on('end', () => { controls.forward = 0; controls.turn = 0; });
             const jumpBtn = document.getElementById('jump-btn');
             const handleJump = () => {
-                 // ADDED: Check if tank exists and is grounded
                  if (tankBody && isGrounded) {
                     tankBody.applyImpulse({ x: 0, y: JUMP_FORCE, z: 0 }, true);
                 }
             };
             jumpBtn.addEventListener('click', handleJump);
-            jumpBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault(); 
-                handleJump();
-            }, { passive: false });
+            jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); handleJump(); }, { passive: false });
         }
-
 
         function loadAssets() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
-
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     scene.add(gltf.scene);
-                    
                     gltf.scene.traverse(child => {
                         if (child.isMesh) {
                             const vertices = child.geometry.attributes.position.array;
                             const indices = child.geometry.index ? child.geometry.index.array : Array.from(Array(vertices.length / 3).keys());
-                            
                             const trimesh = RAPIER.ColliderDesc.trimesh(vertices, indices);
                             world.createCollider(trimesh);
                         }
                     });
-
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         tankModel = gltf.scene;
                         scene.add(tankModel);
-
-                        // CHANGED: Significantly updated RigidBody description
                         const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
                             .setTranslation(0, 5, 0)
                             .setLinearDamping(0.8)
                             .setAngularDamping(2.5)
-                            .lockRotations(); // ADDED: Lock X and Z axis rotation to prevent flipping!
-
+                            .lockRotations();
                         tankBody = world.createRigidBody(rigidBodyDesc);
-
                         const aabb = new THREE.Box3().setFromObject(tankModel);
                         const size = aabb.getSize(new THREE.Vector3());
                         const colliderDesc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2);
-                        tankCollider = world.createCollider(colliderDesc, tankBody); // ADDED: store collider reference
+                        tankCollider = world.createCollider(colliderDesc, tankBody);
                     });
                 });
             });
@@ -188,36 +152,10 @@
                 const arrayBuffer = await response.arrayBuffer();
                 audioContext = THREE.AudioContext.getContext();
                 audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            } catch (error) {
-                console.error('Failed to load or decode audio file:', error);
-                musicButton.disabled = true;
-                return;
-            }
-            function playMusic() {
-                if (isPlaying || !audioBuffer) return;
-                if (audioContext.state === 'suspended') { audioContext.resume(); }
-                sourceNode = audioContext.createBufferSource();
-                sourceNode.buffer = audioBuffer;
-                sourceNode.loop = true;
-                sourceNode.connect(audioContext.destination);
-                sourceNode.start();
-                isPlaying = true;
-                iconOn.style.display = 'inline';
-                iconOff.style.display = 'none';
-            }
-            function stopMusic() {
-                if (!isPlaying || !sourceNode) return;
-                sourceNode.stop();
-                sourceNode.disconnect();
-                sourceNode = null;
-                isPlaying = false;
-                iconOn.style.display = 'none';
-                iconOff.style.display = 'inline';
-            }
-            musicButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isPlaying) stopMusic(); else playMusic();
-            });
+            } catch (error) { console.error('Failed to load or decode audio file:', error); musicButton.disabled = true; return; }
+            function playMusic() { if (isPlaying || !audioBuffer) return; if (audioContext.state === 'suspended') { audioContext.resume(); } sourceNode = audioContext.createBufferSource(); sourceNode.buffer = audioBuffer; sourceNode.loop = true; sourceNode.connect(audioContext.destination); sourceNode.start(); isPlaying = true; iconOn.style.display = 'inline'; iconOff.style.display = 'none'; }
+            function stopMusic() { if (!isPlaying || !sourceNode) return; sourceNode.stop(); sourceNode.disconnect(); sourceNode = null; isPlaying = false; iconOn.style.display = 'none'; iconOff.style.display = 'inline'; }
+            musicButton.addEventListener('click', (e) => { e.stopPropagation(); if (isPlaying) stopMusic(); else playMusic(); });
         }
 
         function onWindowResize() {
@@ -226,90 +164,62 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         };
         
-        // ADDED: Function to check if the tank is on the ground
         function updateGroundedState() {
             if (!tankBody || !tankCollider) return;
-
             const tankHeight = tankCollider.shape.halfExtents.y * 2;
             const rayOrigin = tankBody.translation();
             const rayDir = { x: 0, y: -1, z: 0 };
-            const maxDistance = tankHeight * 0.55; // Ray slightly longer than half height
+            const maxDistance = tankHeight * 0.55;
             const ray = new RAPIER.Ray(rayOrigin, rayDir);
-            
             const hit = world.castRay(ray, maxDistance, true, null, null, tankCollider);
             isGrounded = hit !== null;
         }
 
-        // CHANGED: Completely new control logic
         function updateTankControls(deltaTime) {
             if (!tankBody) return;
-
-            // --- TURNING ---
-            // Use setAngvel for responsive turning, which directly sets angular velocity.
             const targetAngvel = { x: 0, y: controls.turn * -TANK_TURN_SPEED, z: 0 };
             tankBody.setAngvel(targetAngvel, true);
-
-            // --- MOVEMENT ---
             if (Math.abs(controls.forward) > 0.1 && isGrounded) {
-                // Get the tank's forward vector in world space
-                const forwardDir = new THREE.Vector3(0, 0, -1)
-                    .applyQuaternion(tankBody.rotation())
-                    .normalize();
-                
-                // Calculate the force to apply
+                const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(tankBody.rotation()).normalize();
                 const force = forwardDir.multiplyScalar(controls.forward * TANK_MOVE_FORCE * deltaTime);
                 tankBody.addForce({ x: force.x, y: 0, z: force.z }, true);
             }
         }
         
+        // --- ONLY THIS FUNCTION IS MODIFIED ---
         function updateCamera() {
             if (!tankModel) return;
 
-            // Camera offset (behind and above the tank)
-            const cameraOffset = new THREE.Vector3(0, 4, 10);
+            // 1. 定义相机在坦克局部坐标系中的偏移量 (后方、上方)
+            const cameraOffset = new THREE.Vector3(0, 4, 10); 
             
-            // Make the offset relative to the tank's rotation
+            // 2. 将这个局部偏移量转换到世界坐标系中，得到相机应该在的位置
             const desiredCamPos = tankModel.position.clone()
                 .add(cameraOffset.applyQuaternion(tankModel.quaternion));
             
-            // Smoothly interpolate camera position
-            camera.position.lerp(desiredCamPos, 0.08); // CHANGED: slightly increased lerp for snappier feel
+            // 3. 使用lerp平滑地移动相机到目标位置
+            camera.position.lerp(desiredCamPos, 0.1);
 
-            // Camera always looks at the tank's center
-            const lookAtTarget = tankModel.position.clone().add(new THREE.Vector3(0, 1, 0));
-            camera.lookAt(lookAtTarget);
+            // 4. 不再使用 lookAt！而是让相机的旋转也平滑地跟随坦克的旋转
+            // slerp (球面线性插值) 用于平滑地过渡旋转
+            camera.quaternion.slerp(tankModel.quaternion, 0.1);
         }
 
         function animate() {
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
-
             if (world) {
-                // 1. Update tank controls based on user input
                 updateTankControls(deltaTime);
-                
-                // 2. Step the physics world
                 world.step();
-                
-                // 3. ADDED: Check if the tank is grounded for jumping
                 updateGroundedState();
             }
-
-            // 4. Sync physics body with three.js model
             if (tankBody && tankModel) {
-                const pos = tankBody.translation();
-                const rot = tankBody.rotation();
-                tankModel.position.copy(pos);
-                tankModel.quaternion.copy(rot);
+                tankModel.position.copy(tankBody.translation());
+                tankModel.quaternion.copy(tankBody.rotation());
             }
-            
-            // 5. Update camera to follow the tank
             updateCamera();
-
-            // 6. Render the scene
             renderer.render(scene, camera);
         };
     </script>
 </body>
-
 </html>
