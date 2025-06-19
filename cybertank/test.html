@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Jump and Reset</title>
+    <title>Tank Physics Demo - Final Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -269,43 +269,64 @@
         const _matrix = new THREE.Matrix4();
         const upVector = new THREE.Vector3(0, 1, 0);
 
+        // --- RESTRUCTURED `animate` FUNCTION FOR CORRECT SYNCHRONIZATION ---
         function animate() {
             requestAnimationFrame(animate);
+            // 1. First, advance the physics simulation
             world.step();
 
             if (tankBody && tankModel) {
+                // 2. Handle user input and apply forces/velocities to the physics body
                 const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
-                camera.getWorldDirection(cameraForward);
-                cameraForward.y = 0;
-                cameraForward.normalize();
-                cameraRight.crossVectors(cameraForward, upVector);
-                moveDirection.set(0, 0, 0);
-                moveDirection.addScaledVector(cameraForward, moveInput.y);
-                moveDirection.addScaledVector(cameraRight, moveInput.x);
                 
-                if (moveDirection.lengthSq() > 0.01) {
-                    const currentVel = tankBody.linvel();
+                if (moveInput.lengthSq() > 0.01) {
+                    camera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0;
+                    cameraForward.normalize();
+                    cameraRight.crossVectors(cameraForward, upVector);
+
+                    moveDirection.set(0, 0, 0);
+                    moveDirection.addScaledVector(cameraForward, moveInput.y);
+                    moveDirection.addScaledVector(cameraRight, moveInput.x);
                     moveDirection.normalize();
+
+                    // Apply velocity to physics body
+                    const currentVel = tankBody.linvel();
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
-                    _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(moveDirection), upVector);
+                    
+                    // Also apply rotation to the physics body
+                    _matrix.lookAt(THREE.Vector3.ZERO, moveDirection.clone().negate(), upVector);
                     targetQuaternion.setFromRotationMatrix(_matrix);
-                    if (!tankModel.quaternion.equals(targetQuaternion)) {
-                        tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
-                        tankBody.setRotation(tankModel.quaternion, true);
-                    }
+                    
+                    // Smoothly rotate the physics body itself towards the target
+                    const currentRotation = tankBody.rotation();
+                    const currentQuat = new THREE.Quaternion(currentRotation.x, currentRotation.y, currentRotation.z, currentRotation.w);
+                    currentQuat.slerp(targetQuaternion, turnSpeed);
+                    tankBody.setRotation(currentQuat, true);
                 }
-                // THE PROBLEMATIC "ELSE" BLOCK HAS BEEN REMOVED
-                
+
+                // 3. ALWAYS sync the visual model to the physics body's state
+                // This is the crucial fix: It ensures the visual model is always
+                // a perfect reflection of the physics world, providing a stable
+                // target for the camera.
                 const position = tankBody.translation();
+                const rotation = tankBody.rotation();
+                
                 tankModel.position.set(position.x, position.y, position.z);
+                tankModel.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+
+                // 4. Update the camera based on the now-synced visual model
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
+                
                 const cameraTargetPosition = tankModel.position.clone().add(rotatedOffset);
                 camera.position.lerp(cameraTargetPosition, 0.1);
                 camera.lookAt(tankModel.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
             }
+            
+            // 5. Finally, render the scene
             renderer.render(scene, camera);
         };
         
