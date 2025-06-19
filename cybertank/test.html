@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo</title>
+    <title>Tank Physics Demo - Camera-Relative Controls</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -14,8 +14,6 @@
         #music-toggle-btn svg { display: block; }
         #joystick-container { position: absolute; bottom: 30px; left: 50px; width: 120px; height: 120px; z-index: 10; }
     </style>
-    <!-- ========================================================= -->
-    <!-- === FINAL CORRECTED IMPORT MAP USING ESM.SH CDN === -->
     <script type="importmap">
         {
             "imports": {
@@ -25,7 +23,6 @@
             }
         }
     </script>
-    <!-- ========================================================= -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 </head>
 
@@ -49,23 +46,19 @@
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         let audioContext, audioBuffer, sourceNode, isPlaying = false;
 
-        const moveDirection = { forward: 0, turn: 0 };
+        // --- Control State ---
+        const joystickVector = new THREE.Vector2(); // Store joystick x, y
+        const keyboard = { forward: 0, turn: 0 }; // For keyboard controls
         const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
         const cameraOffset = new THREE.Vector3(0, 4, 12);
-        const moveForce = 250;
-        const turnTorque = 150;
+        const moveForce = 40; // Adjusted force for new logic
+        const turnSpeed = 0.15; // How fast the tank turns to face the move direction
 
         init();
 
         async function init() {
-            // --- Physics Initialization ---
-            // =========================================================
-            // === RAPIER.init() no longer needs an explicit path ===
             await RAPIER.init();
-            // =========================================================
-            
-            const gravity = { x: 0.0, y: -9.81, z: 0.0 };
-            world = new RAPIER.World(gravity);
+            world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
 
             scene = new THREE.Scene();
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -118,7 +111,7 @@
 
                         const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
                             .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                            .setLinearDamping(0.5)
+                            .setLinearDamping(0.8) // Increased damping for better control
                             .setAngularDamping(0.8);
                         tankBody = world.createRigidBody(bodyDesc);
                         
@@ -136,15 +129,9 @@
         function createTrimeshCollider(mesh, bodyDesc, parentBody = null) {
             const geometry = mesh.geometry;
             const vertices = geometry.attributes.position.array;
-            // =========================================================
-            // === IMPORTANT BUG FIX: Handle meshes without an index ===
             const indices = geometry.index ? geometry.index.array : null;
 
-            if (!indices) {
-                console.warn("Skipping mesh for physics: It has no indices.", mesh);
-                return;
-            }
-            // =========================================================
+            if (!indices) { return; }
             
             const trimeshDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
             
@@ -157,6 +144,7 @@
         }
 
         function setupControls() {
+            // --- Joystick Controls (Simplified and Corrected) ---
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({
                     zone: document.getElementById('joystick-container'),
@@ -165,42 +153,36 @@
                     color: 'rgba(255,255,255,0.5)'
                 });
                 joystickManager.on('move', (evt, data) => {
-                    if (data.direction) {
-                       if (data.direction.y === 'up') moveDirection.forward = data.force;
-                       else if(data.direction.y === 'down') moveDirection.forward = -data.force * 0.7;
-                       else moveDirection.forward = 0;
-
-                       if (data.direction.x === 'left') moveDirection.turn = data.force;
-                       else if (data.direction.x === 'right') moveDirection.turn = -data.force;
-                       else moveDirection.turn = 0;
-                    }
+                    // Use the vector directly for precise control
+                    joystickVector.set(data.vector.x, data.vector.y);
                 }).on('end', () => {
-                    moveDirection.forward = 0;
-                    moveDirection.turn = 0;
+                    // Reset vector when joystick is released
+                    joystickVector.set(0, 0);
                 });
             }
 
+            // --- Keyboard Controls ---
             document.addEventListener('keydown', (e) => {
                 switch (e.key.toLowerCase()) {
-                    case 'w': case 'arrowup':    moveDirection.forward = 1; break;
-                    case 's': case 'arrowdown':  moveDirection.forward = -0.7; break;
-                    case 'a': case 'arrowleft':  moveDirection.turn = 1; break;
-                    case 'd': case 'arrowright': moveDirection.turn = -1; break;
+                    case 'w': case 'arrowup':    keyboard.forward = 1; break;
+                    case 's': case 'arrowdown':  keyboard.forward = -1; break;
+                    case 'a': case 'arrowleft':  keyboard.turn = 1; break;
+                    case 'd': case 'arrowright': keyboard.turn = -1; break;
                 }
             });
              document.addEventListener('keyup', (e) => {
                 switch (e.key.toLowerCase()) {
-                    case 'w': case 'arrowup':    if(moveDirection.forward > 0) moveDirection.forward = 0; break;
-                    case 's': case 'arrowdown':  if(moveDirection.forward < 0) moveDirection.forward = 0; break;
-                    case 'a': case 'arrowleft':  if(moveDirection.turn > 0) moveDirection.turn = 0; break;
-                    case 'd': case 'arrowright': if(moveDirection.turn < 0) moveDirection.turn = 0; break;
+                    case 'w': case 'arrowup':
+                    case 's': case 'arrowdown':  keyboard.forward = 0; break;
+                    case 'a': case 'arrowleft':
+                    case 'd': case 'arrowright': keyboard.turn = 0; break;
                 }
             });
 
+            // --- Camera Orbit Controls ---
             let isDragging = false;
             let prevMousePos = { x: 0, y: 0 };
             const rotationSpeed = 0.005;
-
             const onPointerDown = (e) => {
                 if (e.target.id === 'music-toggle-btn' || e.target.closest('#joystick-container')) return;
                 isDragging = true;
@@ -220,7 +202,6 @@
                 prevMousePos.y = clientY;
             };
             const onPointerUp = () => { isDragging = false; };
-
             renderer.domElement.addEventListener('mousedown', onPointerDown);
             renderer.domElement.addEventListener('mousemove', onPointerMove);
             renderer.domElement.addEventListener('mouseup', onPointerUp);
@@ -230,24 +211,63 @@
             renderer.domElement.addEventListener('touchend', onPointerUp);
         }
 
+        // --- Define helper vectors outside the loop to avoid reallocation ---
+        const cameraForward = new THREE.Vector3();
+        const cameraRight = new THREE.Vector3();
+        const moveVec = new THREE.Vector3();
+        const targetQuaternion = new THREE.Quaternion();
+        const _matrix = new THREE.Matrix4();
+        const upVector = new THREE.Vector3(0, 1, 0);
+
         function animate() {
             requestAnimationFrame(animate);
             world.step();
 
             if (tankBody && tankModel) {
-                const tankRotation = tankBody.rotation();
-                const tankQuaternion = new THREE.Quaternion(tankRotation.x, tankRotation.y, tankRotation.z, tankRotation.w);
-                const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(tankQuaternion);
-                tankBody.applyImpulse(forwardDir.multiplyScalar(moveDirection.forward * moveForce * 0.1), true);
-                const upVec = new THREE.Vector3(0, 1, 0);
-                tankBody.applyTorqueImpulse(upVec.multiplyScalar(moveDirection.turn * turnTorque * 0.1), true);
+                // --- Determine input from either joystick or keyboard ---
+                const moveInput = new THREE.Vector2(
+                    isTouchDevice ? joystickVector.x : keyboard.turn * -1,
+                    isTouchDevice ? joystickVector.y : keyboard.forward
+                );
 
+                // --- Calculate Camera-Relative Movement Vector ---
+                camera.getWorldDirection(cameraForward);
+                cameraForward.y = 0; // Project onto XZ plane
+                cameraForward.normalize();
+                cameraRight.crossVectors(upVector, cameraForward).normalize();
+                
+                // Invert joystick Y because it's usually +1 for up, but camera forward is -Z
+                moveVec.addVectors(
+                    cameraForward.multiplyScalar(-moveInput.y), 
+                    cameraRight.multiplyScalar(-moveInput.x)
+                );
+                
+                // --- Apply Movement Force ---
+                if (moveVec.length() > 0.01) {
+                    tankBody.applyImpulse(moveVec.multiplyScalar(moveForce), true);
+                }
+
+                // --- Smoothly Rotate Tank to Face Movement Direction ---
+                if (moveInput.length() > 0.1) {
+                    // Calculate the target rotation
+                    _matrix.lookAt(tankModel.position, tankModel.position.clone().add(moveVec), upVector);
+                    targetQuaternion.setFromRotationMatrix(_matrix);
+
+                    // Interpolate current rotation towards the target
+                    if (!tankModel.quaternion.equals(targetQuaternion)) {
+                        tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
+                        tankBody.setRotation(tankModel.quaternion, true);
+                    }
+                }
+                
+                // --- Update the Three.js model from the physics body ---
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
-                tankModel.quaternion.set(tankRotation.x, tankRotation.y, tankRotation.z, tankRotation.w);
+                // The visual rotation is already set, we just read the physics position
 
-                const rotatedOffset = cameraOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraAngle.horizontal);
-                const horizontalAxis = new THREE.Vector3(0, 1, 0).cross(rotatedOffset).normalize();
+                // --- Update Camera to follow and orbit ---
+                const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
+                const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
 
                 const cameraTargetPosition = tankModel.position.clone().add(rotatedOffset);
@@ -264,71 +284,24 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         };
         
-        function handleFullscreenRequest() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen()
-                    .then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } })
-                    .catch(() => {});
-            }
-        }
-
+        function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
         function setupFullscreen() {
             const prompt = document.getElementById('fullscreen-prompt');
-            if (isTouchDevice) {
-                setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
-                setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
-                renderer.domElement.addEventListener('click', (e) => {
-                     if (e.target.closest('#joystick-container')) return;
-                     handleFullscreenRequest();
-                });
-            } else {
-                 renderer.domElement.addEventListener('click', handleFullscreenRequest);
-            }
-             document.addEventListener('fullscreenchange', () => {
-                if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } }
-            });
+            if (isTouchDevice) { setTimeout(() => { prompt.style.opacity = '1'; }, 2000); setTimeout(() => { prompt.style.opacity = '0'; }, 7000); renderer.domElement.addEventListener('click', (e) => { if (e.target.closest('#joystick-container')) return; handleFullscreenRequest(); });
+            } else { renderer.domElement.addEventListener('click', handleFullscreenRequest); }
+            document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } });
         };
-
         async function setupMusicControls() {
             const musicButton = document.getElementById('music-toggle-btn');
             const iconOn = document.getElementById('music-icon-on');
             const iconOff = document.getElementById('music-icon-off');
-            try {
-                const response = await fetch('assets/bounce tanki loop cut (no intro).opus');
-                const arrayBuffer = await response.arrayBuffer();
-                audioContext = THREE.AudioContext.getContext();
-                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            } catch (error) {
-                console.error('Failed to load or decode audio file:', error);
-                musicButton.disabled = true;
-                return;
-            }
-            function playMusic() {
-                if (isPlaying || !audioBuffer) return;
-                sourceNode = audioContext.createBufferSource();
-                sourceNode.buffer = audioBuffer;
-                sourceNode.loop = true;
-                sourceNode.connect(audioContext.destination);
-                sourceNode.start();
-                isPlaying = true;
-                iconOn.style.display = 'inline';
-                iconOff.style.display = 'none';
-            }
-            function stopMusic() {
-                if (!isPlaying || !sourceNode) return;
-                sourceNode.stop();
-                sourceNode.disconnect();
-                sourceNode = null;
-                isPlaying = false;
-                iconOn.style.display = 'none';
-                iconOff.style.display = 'inline';
-            }
-            musicButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (audioContext.state === 'suspended') { audioContext.resume(); }
-                if (isPlaying) { stopMusic(); } else { playMusic(); }
-            });
+            try { const response = await fetch('assets/bounce tanki loop cut (no intro).opus'); const arrayBuffer = await response.arrayBuffer(); audioContext = THREE.AudioContext.getContext(); audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            } catch (error) { console.error('Failed to load or decode audio file:', error); musicButton.disabled = true; return; }
+            function playMusic() { if (isPlaying || !audioBuffer) return; sourceNode = audioContext.createBufferSource(); sourceNode.buffer = audioBuffer; sourceNode.loop = true; sourceNode.connect(audioContext.destination); sourceNode.start(); isPlaying = true; iconOn.style.display = 'inline'; iconOff.style.display = 'none'; }
+            function stopMusic() { if (!isPlaying || !sourceNode) return; sourceNode.stop(); sourceNode.disconnect(); sourceNode = null; isPlaying = false; iconOn.style.display = 'none'; iconOff.style.display = 'inline'; }
+            musicButton.addEventListener('click', (e) => { e.stopPropagation(); if (audioContext.state === 'suspended') { audioContext.resume(); } if (isPlaying) { stopMusic(); } else { playMusic(); } });
         }
     </script>
 </body>
+
 </html>
