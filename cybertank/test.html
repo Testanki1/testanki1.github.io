@@ -10,7 +10,6 @@
         canvas { display: block; }
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
         
-        /* UI Button Styles */
         .ui-button {
             position: absolute;
             background: rgba(0, 0, 0, 0.3);
@@ -109,7 +108,6 @@
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
             
-            // Start the asset loading process
             loadAssetsAndPhysics();
 
             setupControls();
@@ -119,26 +117,19 @@
             animate();
         }
 
-        // --- REWRITTEN loadAssetsAndPhysics to be sequential using async/await ---
         async function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
 
-            // Helper function to turn callback-based loaders into Promise-based ones
             const loadGltfAsync = (url) => new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
             const loadExrAsync = (url) => new Promise((resolve, reject) => exrLoader.load(url, resolve, undefined, reject));
 
             try {
-                // 1. AWAIT the background texture loading
-                console.log("Loading background...");
                 const texture = await loadExrAsync('assets/Minigame_Synth_Environment_4096x2048.exr');
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                console.log("Background loaded.");
 
-                // 2. AWAIT the scene model loading
-                console.log("Loading scene...");
                 const sceneGltf = await loadGltfAsync('assets/Minigame_Synth_Scene.glb');
                 const sceneModel = sceneGltf.scene;
                 scene.add(sceneModel);
@@ -163,10 +154,7 @@
                         world.createCollider(trimeshDesc, sceneBody);
                     }
                 });
-                console.log("Scene loaded and physics body created.");
 
-                // 3. AWAIT the tank model loading (only starts after scene is done)
-                console.log("Loading tank...");
                 const tankGltf = await loadGltfAsync('assets/Minigame_Synth_Tank.glb');
                 tankModel = tankGltf.scene;
                 tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
@@ -188,14 +176,12 @@
                 });
                 const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
                 world.createCollider(colliderDesc, tankBody);
-                console.log("Tank loaded and physics body created. All assets ready!");
 
             } catch (error) {
                 console.error("An error occurred during asset loading:", error);
             }
         }
 
-        // --- FIXED setupControls to correctly handle Pointer Events ---
         function setupControls() {
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
@@ -217,39 +203,27 @@
                 }
             });
             
-            const cameraPointers = {}; // Tracks active pointers for camera control
+            const cameraPointers = {};
             const rotationSpeed = 0.005;
 
             const onPointerDown = (e) => {
-                // Ignore clicks on UI elements for camera control
-                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) {
-                    return;
-                }
-                // Capture the pointer and its starting position
+                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return;
                 cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-                // Prevent default actions like text selection on drag
                 e.preventDefault();
             };
-
             const onPointerMove = (e) => {
-                // Find if the moving pointer is one we are tracking for the camera
                 const pointer = cameraPointers[e.pointerId];
                 if (pointer) {
                     const deltaX = e.clientX - pointer.x;
                     const deltaY = e.clientY - pointer.y;
-
                     cameraAngle.horizontal -= deltaX * rotationSpeed;
                     cameraAngle.vertical -= deltaY * rotationSpeed;
                     cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical));
-                    
-                    // Update the pointer's last position
                     pointer.x = e.clientX;
                     pointer.y = e.clientY;
                 }
             };
-
             const onPointerUpOrCancel = (e) => {
-                // Stop tracking the pointer when it's lifted or cancelled
                 delete cameraPointers[e.pointerId];
             };
             
@@ -259,7 +233,6 @@
             renderer.domElement.addEventListener('pointercancel', onPointerUpOrCancel);
             renderer.domElement.addEventListener('pointerleave', onPointerUpOrCancel);
 
-            // UI Buttons
             const jumpButton = document.getElementById('jump-btn');
             const resetButton = document.getElementById('reset-btn');
             
@@ -309,8 +282,9 @@
                 moveDirection.set(0, 0, 0);
                 moveDirection.addScaledVector(cameraForward, moveInput.y);
                 moveDirection.addScaledVector(cameraRight, moveInput.x);
-                const currentVel = tankBody.linvel();
+                
                 if (moveDirection.lengthSq() > 0.01) {
+                    const currentVel = tankBody.linvel();
                     moveDirection.normalize();
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
@@ -320,9 +294,9 @@
                         tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
                         tankBody.setRotation(tankModel.quaternion, true);
                     }
-                } else {
-                    tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
+                // THE PROBLEMATIC "ELSE" BLOCK HAS BEEN REMOVED
+                
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
