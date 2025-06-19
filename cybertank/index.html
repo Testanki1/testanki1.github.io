@@ -31,8 +31,6 @@
 
         let scene, camera, renderer;
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        
-        // --- 新增：用于确保音频上下文只初始化一次的标志 ---
         let isAudioContextInitialized = false;
 
         init();
@@ -65,19 +63,17 @@
             window.addEventListener('resize', onWindowResize);
         }
 
-        // --- 新增：用于解锁音频的函数 ---
         function initAudioContext() {
             if (isAudioContextInitialized) return;
             isAudioContextInitialized = true;
             
             const bgMusic = document.getElementById('background-music');
-            // 尝试播放然后立即暂停，这是解锁音频上下文的“技巧”
             const promise = bgMusic.play();
             if (promise !== undefined) {
                 promise.then(() => {
-                    bgMusic.pause(); // 成功播放后立即暂停，用户不会听到声音
+                    bgMusic.pause();
                 }).catch(error => {
-                    // 即使这里出错也无妨，因为点击音乐按钮时会再次尝试
+                    // Ignore errors, user can still click the button to try again.
                 });
             }
         }
@@ -95,11 +91,44 @@
             const tapTimeThreshold = 200;
             const tapMoveThreshold = 10;
 
-            const onTouchStart = (e) => {
-                // --- 核心修正：在首次触摸时解锁音频 ---
-                initAudioContext();
+            function handleCameraRotate(touch, state) {
+                const deltaX = touch.clientX - state.prevX;
+                const deltaY = touch.clientY - state.prevY;
+                camera.rotation.y -= deltaX * rotationSpeed;
+                camera.rotation.x -= deltaY * rotationSpeed;
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+                state.prevX = touch.clientX;
+                state.prevY = touch.clientY;
+            };
+            
+            function getTwoFingerState(touches) {
+                if (touches.length < 2) return null;
+                const t0 = touches[0];
+                const t1 = touches[1];
+                return {
+                    distance: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY),
+                    midpoint: { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 }
+                };
+            };
+            
+            function handleTwoFingerGesture(touches) {
+                const currentState = getTwoFingerState(touches);
+                if (previousTwoFingerState) {
+                    const deltaPanX = currentState.midpoint.x - previousTwoFingerState.midpoint.x;
+                    const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y;
+                    const deltaPinch = currentState.distance - previousTwoFingerState.distance;
+                    camera.translateX(-deltaPanX * panSpeed);
+                    camera.translateY(deltaPanY * panSpeed);
+                    camera.translateZ(-deltaPinch * pinchSpeed);
+                }
+                previousTwoFingerState = currentState;
+            };
 
-                if (musicButton.contains(e.target)) return;
+            const onTouchStart = (e) => {
+                initAudioContext();
+                if (musicButton.contains(e.target)) {
+                    return;
+                }
                 e.preventDefault();
                 isDragging = false;
                 if (e.touches.length === 1) {
@@ -113,21 +142,71 @@
                     previousTwoFingerState = getTwoFingerState(e.touches);
                 }
             };
-            
-            // ... 其他触摸函数 onTouchMove, onTouchEnd 保持不变 ...
+
             const onTouchMove = (e) => {
-                if (musicButton.contains(e.target)) return;
+                if (musicButton.contains(e.target)) {
+                    return;
+                }
                 e.preventDefault();
-                if(isDragging) { /* ... */ } else if (e.touches.length === 1) { const touch = e.touches[0]; const state = activeTouches[touch.identifier]; if (state) { const moveX = Math.abs(touch.clientX - state.startX); const moveY = Math.abs(touch.clientY - state.startY); if (moveX > tapMoveThreshold || moveY > tapMoveThreshold) { isDragging = true; } } } else { isDragging = true; }
-                const touchCount = Object.keys(activeTouches).length; if (touchCount === 1 && isDragging) { const touchId = Object.keys(activeTouches)[0]; const touch = Array.from(e.touches).find(t => t.identifier == touchId); if (touch) { handleCameraRotate(touch, activeTouches[touchId]); } } else if (touchCount === 2) { handleTwoFingerGesture(e.touches); }
+                
+                if (isDragging) {
+                    // Already dragging, continue
+                } else if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const state = activeTouches[touch.identifier];
+                    if (state) {
+                        const moveX = Math.abs(touch.clientX - state.startX);
+                        const moveY = Math.abs(touch.clientY - state.startY);
+                        if (moveX > tapMoveThreshold || moveY > tapMoveThreshold) {
+                            isDragging = true;
+                        }
+                    }
+                } else {
+                    isDragging = true;
+                }
+
+                const touchCount = Object.keys(activeTouches).length;
+                if (touchCount === 1 && isDragging) {
+                    const touchId = Object.keys(activeTouches)[0];
+                    const touch = Array.from(e.touches).find(t => t.identifier == touchId);
+                    if (touch) {
+                        handleCameraRotate(touch, activeTouches[touchId]);
+                    }
+                } else if (touchCount === 2) {
+                    handleTwoFingerGesture(e.touches);
+                }
             };
+
             const onTouchEnd = (e) => {
-                if (musicButton.contains(e.target)) return;
+                if (musicButton.contains(e.target)) {
+                    return;
+                }
                 e.preventDefault();
-                const touchDuration = Date.now() - touchStartTime; if (!isDragging && e.changedTouches.length === 1 && Object.keys(activeTouches).length === 1 && touchDuration < tapTimeThreshold) { handleFullscreenRequest(); }
-                const wasTwoFingers = Object.keys(activeTouches).length === 2; for (const touch of e.changedTouches) { delete activeTouches[touch.identifier]; }
-                const isNowOneFinger = Object.keys(activeTouches).length === 1; if (wasTwoFingers && isNowOneFinger) { const remainingTouchId = Object.keys(activeTouches)[0]; const remainingTouch = Array.from(e.touches).find(t => t.identifier == remainingTouchId); if(remainingTouch){ activeTouches[remainingTouchId].prevX = remainingTouch.clientX; activeTouches[remainingTouchId].prevY = remainingTouch.clientY; activeTouches[remainingTouchId].startX = remainingTouch.clientX; activeTouches[remainingTouchId].startY = remainingTouch.clientY; } }
-                if (!isNowOneFinger) { previousTwoFingerState = null; }
+
+                const touchDuration = Date.now() - touchStartTime;
+                if (!isDragging && e.changedTouches.length === 1 && Object.keys(activeTouches).length === 1 && touchDuration < tapTimeThreshold) {
+                    handleFullscreenRequest();
+                }
+
+                const wasTwoFingers = Object.keys(activeTouches).length === 2;
+                for (const touch of e.changedTouches) {
+                    delete activeTouches[touch.identifier];
+                }
+                const isNowOneFinger = Object.keys(activeTouches).length === 1;
+
+                if (wasTwoFingers && isNowOneFinger) {
+                    const remainingTouchId = Object.keys(activeTouches)[0];
+                    const remainingTouch = Array.from(e.touches).find(t => t.identifier == remainingTouchId);
+                    if (remainingTouch) {
+                        activeTouches[remainingTouchId].prevX = remainingTouch.clientX;
+                        activeTouches[remainingTouchId].prevY = remainingTouch.clientY;
+                        activeTouches[remainingTouchId].startX = remainingTouch.clientX;
+                        activeTouches[remainingTouchId].startY = remainingTouch.clientY;
+                    }
+                }
+                if (!isNowOneFinger) {
+                    previousTwoFingerState = null;
+                }
             };
             
             const targetElement = renderer.domElement;
@@ -138,24 +217,90 @@
                 targetElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
             } else {
                 targetElement.addEventListener('click', () => {
-                    // --- 核心修正：在桌面端首次点击时也解锁音频 ---
                     initAudioContext();
                     handleFullscreenRequest();
                 });
             }
-
-            // --- 辅助函数，保持不变 ---
-            function handleCameraRotate(touch, state) { const deltaX = touch.clientX - state.prevX; const deltaY = touch.clientY - state.prevY; camera.rotation.y -= deltaX * rotationSpeed; camera.rotation.x -= deltaY * rotationSpeed; camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x)); state.prevX = touch.clientX; state.prevY = touch.clientY; };
-            function getTwoFingerState(touches) { if (touches.length < 2) return null; const t0 = touches[0]; const t1 = touches[1]; return { distance: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), midpoint: { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 } }; };
-            function handleTwoFingerGesture(touches) { const currentState = getTwoFingerState(touches); if (previousTwoFingerState) { const deltaPanX = currentState.midpoint.x - previousTwoFingerState.midpoint.x; const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y; const deltaPinch = currentState.distance - previousTwoFingerState.distance; camera.translateX(-deltaPanX * panSpeed); camera.translateY(deltaPanY * panSpeed); camera.translateZ(-deltaPinch * pinchSpeed); } previousTwoFingerState = currentState; };
         }
         
-        function handleFullscreenRequest() { /* 保持不变 */ if (!document.fullscreenElement) { document.documentElement.requestFullscreen() .then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(err => console.warn("Could not lock orientation:", err)); } }) .catch(err => console.warn("Fullscreen request failed:", err)); } }
-        function loadAssetsInOrder() { /* 保持不变 */ const exrLoader = new EXRLoader(); const gltfLoader = new GLTFLoader(); exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => { texture.mapping = THREE.EquirectangularReflectionMapping; scene.background = texture; scene.environment = texture; gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => { scene.add(gltf.scene); gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => { const tankModel = gltf.scene; tankModel.rotation.y = Math.PI; tankModel.position.set(0, 0.2, 0); scene.add(tankModel); }); }); }); }
-        function setupMusicControls() { /* 保持不变 */ const musicButton = document.getElementById('music-toggle-btn'); const bgMusic = document.getElementById('background-music'); const iconOn = document.getElementById('music-icon-on'); const iconOff = document.getElementById('music-icon-off'); musicButton.addEventListener('click', (e) => { e.stopPropagation(); initAudioContext(); if (bgMusic.paused) { bgMusic.play().catch(err => console.error("Audio play failed:", err)); iconOn.style.display = 'inline'; iconOff.style.display = 'none'; } else { bgMusic.pause(); iconOn.style.display = 'none'; iconOff.style.display = 'inline'; } }); }
-        function setupFullscreen() { /* 保持不变 */ const prompt = document.getElementById('fullscreen-prompt'); if (isTouchDevice) { setTimeout(() => { prompt.style.opacity = '1'; }, 2000); setTimeout(() => { prompt.style.opacity = '0'; }, 7000); } document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); }
-        function onWindowResize() { /* 保持不变 */ camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
-        function animate() { /* 保持不变 */ requestAnimationFrame(animate); renderer.render(scene, camera); }
+        function handleFullscreenRequest() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen()
+                .then(() => {
+                    if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') {
+                        screen.orientation.lock('landscape').catch(err => console.warn("Could not lock orientation:", err));
+                    }
+                })
+                .catch(err => console.warn("Fullscreen request failed:", err));
+            }
+        }
+
+        function loadAssetsInOrder() {
+            const exrLoader = new EXRLoader();
+            const gltfLoader = new GLTFLoader();
+            exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;
+                scene.environment = texture;
+                gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
+                    scene.add(gltf.scene);
+                    gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
+                        const tankModel = gltf.scene;
+                        tankModel.rotation.y = Math.PI;
+                        tankModel.position.set(0, 0.2, 0); 
+                        scene.add(tankModel);
+                    });
+                });
+            });
+        }
+        
+        function setupMusicControls() {
+            const musicButton = document.getElementById('music-toggle-btn');
+            const bgMusic = document.getElementById('background-music');
+            const iconOn = document.getElementById('music-icon-on');
+            const iconOff = document.getElementById('music-icon-off');
+
+            musicButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudioContext();
+                if (bgMusic.paused) {
+                    bgMusic.play().catch(err => console.error("Audio play failed:", err));
+                    iconOn.style.display = 'inline';
+                    iconOff.style.display = 'none';
+                } else {
+                    bgMusic.pause();
+                    iconOn.style.display = 'none';
+                    iconOff.style.display = 'inline';
+                }
+            });
+        }
+
+        function setupFullscreen() {
+            const prompt = document.getElementById('fullscreen-prompt');
+            if (isTouchDevice) {
+                setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
+                setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
+            }
+
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+                        screen.orientation.unlock();
+                    }
+                }
+            });
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
     </script>
 </body>
 </html>
