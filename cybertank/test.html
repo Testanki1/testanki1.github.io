@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Corrected Controls</title>
+    <title>Tank Physics Demo - Velocity Control</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -50,15 +50,18 @@
         const keyboard = { forward: 0, turn: 0 };
         const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
         const cameraOffset = new THREE.Vector3(0, 4, 12);
-        const moveForce = 800;
-        const turnSpeed = 0.15;
+        
+        // =========================================================
+        // === NEW PHYSICS PARAMETERS: DIRECT VELOCITY CONTROL ===
+        const maxSpeed = 5.0; // This is the tank's maximum speed in meters/second. Adjust as needed!
+        const turnSpeed = 0.1; // How fast the tank turns.
+        // =========================================================
 
         init();
 
         async function init() {
             await RAPIER.init();
             world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
-
             scene = new THREE.Scene();
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -66,20 +69,16 @@
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
-
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
-
             loadAssetsAndPhysics();
             setupControls();
             setupMusicControls();
             setupFullscreen();
-
             window.addEventListener('resize', onWindowResize);
             animate();
         }
@@ -87,28 +86,24 @@
         function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
-
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     const sceneModel = gltf.scene;
                     scene.add(sceneModel);
                     sceneModel.traverse(child => { if (child.isMesh) { child.receiveShadow = true; createTrimeshCollider(child, RAPIER.RigidBodyDesc.fixed()); } });
-
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         tankModel = gltf.scene;
                         tankModel.position.set(0, 2, 0);
                         scene.add(tankModel);
-
                         const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
                             .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                            .setLinearDamping(0.8)
+                            // We don't need high damping with direct velocity control
+                            .setLinearDamping(0.5) 
                             .setAngularDamping(0.8);
                         tankBody = world.createRigidBody(bodyDesc);
-                        
                         tankModel.traverse(child => { if (child.isMesh) { child.castShadow = true; createTrimeshCollider(child, null, tankBody); } });
                     });
                 });
@@ -119,7 +114,6 @@
             const geometry = mesh.geometry;
             const vertices = geometry.attributes.position.array;
             const indices = geometry.index ? geometry.index.array : null;
-
             if (!indices) { return; }
             const trimeshDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
             if (bodyDesc) { world.createCollider(trimeshDesc, world.createRigidBody(bodyDesc));
@@ -128,36 +122,24 @@
 
         function setupControls() {
             if (isTouchDevice) {
-                const joystickManager = nipplejs.create({
-                    zone: document.getElementById('joystick-container'),
-                    mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)'
-                });
+                const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
                 joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
             }
-
-            // =========================================================
-            // === CORRECTED KEYBOARD LOGIC ===
             document.addEventListener('keydown', (e) => {
                 switch (e.key.toLowerCase()) {
                     case 'w': case 'arrowup':    keyboard.forward = 1; break;
                     case 's': case 'arrowdown':  keyboard.forward = -1; break;
-                    case 'a': case 'arrowleft':  keyboard.turn = -1; break; // Left is negative
-                    case 'd': case 'arrowright': keyboard.turn = 1; break;  // Right is positive
+                    case 'a': case 'arrowleft':  keyboard.turn = -1; break;
+                    case 'd': case 'arrowright': keyboard.turn = 1; break;
                 }
             });
              document.addEventListener('keyup', (e) => {
                 switch (e.key.toLowerCase()) {
-                    case 'w': case 'arrowup':
-                    case 's': case 'arrowdown':  keyboard.forward = 0; break;
-                    case 'a': case 'arrowleft':
-                    case 'd': case 'arrowright': keyboard.turn = 0; break;
+                    case 'w': case 'arrowup': case 's': case 'arrowdown':  keyboard.forward = 0; break;
+                    case 'a': case 'arrowleft': case 'd': case 'arrowright': keyboard.turn = 0; break;
                 }
             });
-            // =========================================================
-
-            let isDragging = false;
-            let prevMousePos = { x: 0, y: 0 };
-            const rotationSpeed = 0.005;
+            let isDragging = false; let prevMousePos = { x: 0, y: 0 }; const rotationSpeed = 0.005;
             const onPointerDown = (e) => { if (e.target.id === 'music-toggle-btn' || e.target.closest('#joystick-container')) return; isDragging = true; prevMousePos.x = e.clientX || e.touches[0].clientX; prevMousePos.y = e.clientY || e.touches[0].clientY; };
             const onPointerMove = (e) => { if (!isDragging) return; const clientX = e.clientX || e.touches[0].clientX; const clientY = e.clientY || e.touches[0].clientY; const deltaX = clientX - prevMousePos.x; const deltaY = clientY - prevMousePos.y; cameraAngle.horizontal -= deltaX * rotationSpeed; cameraAngle.vertical -= deltaY * rotationSpeed; cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical)); prevMousePos.x = clientX; prevMousePos.y = clientY; };
             const onPointerUp = () => { isDragging = false; };
@@ -166,7 +148,8 @@
 
         const cameraForward = new THREE.Vector3();
         const cameraRight = new THREE.Vector3();
-        const moveVec = new THREE.Vector3();
+        const moveDirection = new THREE.Vector3();
+        const targetVelocity = new THREE.Vector3();
         const targetQuaternion = new THREE.Quaternion();
         const _matrix = new THREE.Matrix4();
         const upVector = new THREE.Vector3(0, 1, 0);
@@ -176,40 +159,45 @@
             world.step();
 
             if (tankBody && tankModel) {
-                const moveInput = new THREE.Vector2(
-                    isTouchDevice ? joystickVector.x : keyboard.turn,
-                    isTouchDevice ? joystickVector.y : keyboard.forward
-                );
+                const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
 
+                // 1. Calculate the direction vector based on camera and input
                 camera.getWorldDirection(cameraForward);
                 cameraForward.y = 0;
                 cameraForward.normalize();
-                cameraRight.crossVectors(upVector, cameraForward).normalize();
-                
-                // =========================================================
-                // === CORRECTED MOVEMENT VECTOR CALCULATION ===
-                moveVec.addVectors(
-                    cameraForward.multiplyScalar(-moveInput.y), 
-                    cameraRight.multiplyScalar(moveInput.x) // Removed the extra negative sign here
-                );
-                // =========================================================
-                
-                if (moveVec.lengthSq() > 0.01) { // Use lengthSq for performance
-                    tankBody.applyImpulse(moveVec.clone().multiplyScalar(moveForce), true);
-                }
+                cameraRight.copy(cameraForward).cross(upVector);
 
+                moveDirection.set(0, 0, 0);
+                moveDirection.addScaledVector(cameraForward, -moveInput.y);
+                moveDirection.addScaledVector(cameraRight, moveInput.x);
+                moveDirection.normalize(); // Ensure it's just a direction
+
+                const currentVel = tankBody.linvel();
+                
                 if (moveInput.lengthSq() > 0.01) {
-                    _matrix.lookAt(tankModel.position, tankModel.position.clone().add(moveVec), upVector);
+                    // --- APPLY MOVEMENT BY SETTING VELOCITY ---
+                    targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
+                    // Preserve vertical velocity for gravity
+                    tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
+
+                    // --- SMOOTHLY ROTATE TANK ---
+                    _matrix.lookAt(tankModel.position, tankModel.position.clone().add(moveDirection), upVector);
                     targetQuaternion.setFromRotationMatrix(_matrix);
                     if (!tankModel.quaternion.equals(targetQuaternion)) {
                         tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
                         tankBody.setRotation(tankModel.quaternion, true);
                     }
+                } else {
+                    // --- STOP MOVEMENT WHEN NO INPUT ---
+                    // Preserve vertical velocity for gravity
+                    tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
                 
+                // Update visual model from physics
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
 
+                // Update Camera
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
