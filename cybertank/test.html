@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Correct Collision Shape</title>
+    <title>Tank Physics Demo - Corrected Orientation</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -41,7 +41,7 @@
         import RAPIER from '@dimforge/rapier3d-compat';
 
         let scene, camera, renderer, world;
-        let tankModel, tankBody;
+        let tankRoot, tankBody; // Renamed tankModel to tankRoot for clarity
         
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         let audioContext, audioBuffer, sourceNode, isPlaying = false;
@@ -80,9 +80,6 @@
             animate();
         }
 
-        // =========================================================
-        // === CRITICAL FIX: USING CONVEX HULL FOR DYNAMIC TANK ===
-        // =========================================================
         function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
@@ -90,8 +87,6 @@
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-
-                // Load Scene (Static Trimesh - This is CORRECT)
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     const sceneModel = gltf.scene;
                     scene.add(sceneModel);
@@ -106,24 +101,34 @@
                         }
                     });
                 });
-
-                // Load Tank (Dynamic Convex Hull - This is the FIX)
+                // =========================================================
+                // === FINAL FIX: PARENT PIVOT FOR MODEL ORIENTATION ===
+                // =========================================================
                 gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                    tankModel = gltf.scene;
-                    tankModel.position.set(0, 2, 0); // Start above ground
-                    scene.add(tankModel);
+                    // 1. Create the parent pivot object. This represents the physics body.
+                    tankRoot = new THREE.Object3D();
+                    tankRoot.position.set(0, 2, 0);
+                    scene.add(tankRoot);
 
-                    // Create the dynamic body for the tank
+                    // 2. The loaded GLTF scene is the visual part.
+                    const tankVisuals = gltf.scene;
+                    
+                    // 3. IMPORTANT: Rotate the visual part 180 degrees to face forward.
+                    tankVisuals.rotation.y = Math.PI;
+
+                    // 4. Add the visuals as a child of the physics pivot.
+                    tankRoot.add(tankVisuals);
+
                     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                        .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
+                        .setTranslation(tankRoot.position.x, tankRoot.position.y, tankRoot.position.z)
                         .setLinearDamping(0.5)
                         .setAngularDamping(0.8)
-                        .setCanSleep(false); // Important for player-controlled objects
+                        .setCanSleep(false);
                     tankBody = world.createRigidBody(bodyDesc);
 
-                    // Collect all vertices from all meshes in the tank model
                     const allVertices = [];
-                    tankModel.traverse(child => {
+                    // We traverse the visuals to get the geometry for the collider
+                    tankVisuals.traverse(child => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             const positions = child.geometry.attributes.position.array;
@@ -132,8 +137,6 @@
                             }
                         }
                     });
-                    
-                    // Create a single Convex Hull collider from all the vertices
                     const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
                     world.createCollider(colliderDesc, tankBody);
                 });
@@ -178,13 +181,14 @@
             requestAnimationFrame(animate);
             world.step();
 
-            if (tankBody && tankModel) {
+            if (tankBody && tankRoot) {
                 const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
 
                 camera.getWorldDirection(cameraForward);
                 cameraForward.y = 0;
                 cameraForward.normalize();
-                cameraRight.copy(cameraForward).cross(upVector);
+                
+                cameraRight.crossVectors(cameraForward, upVector).negate();
 
                 moveDirection.set(0, 0, 0);
                 moveDirection.addScaledVector(cameraForward, moveInput.y);
@@ -196,26 +200,29 @@
                     moveDirection.normalize();
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
-
-                    _matrix.lookAt(tankModel.position, tankModel.position.clone().add(moveDirection), upVector);
+                    
+                    // The rotation logic remains the same, but it now targets the parent pivot's orientation
+                    _matrix.lookAt(tankRoot.position, tankRoot.position.clone().add(moveDirection), upVector);
                     targetQuaternion.setFromRotationMatrix(_matrix);
-                    if (!tankModel.quaternion.equals(targetQuaternion)) {
-                        tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
-                        tankBody.setRotation(tankModel.quaternion, true);
+                    if (!tankRoot.quaternion.equals(targetQuaternion)) {
+                        tankRoot.quaternion.slerp(targetQuaternion, turnSpeed);
+                        tankBody.setRotation(tankRoot.quaternion, true);
                     }
                 } else {
                     tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
                 
+                // Update the parent pivot's position from the physics engine
                 const position = tankBody.translation();
-                tankModel.position.set(position.x, position.y, position.z);
+                tankRoot.position.set(position.x, position.y, position.z);
 
+                // Update Camera to follow the parent pivot
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
-                const cameraTargetPosition = tankModel.position.clone().add(rotatedOffset);
+                const cameraTargetPosition = tankRoot.position.clone().add(rotatedOffset);
                 camera.position.lerp(cameraTargetPosition, 0.1);
-                camera.lookAt(tankModel.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+                camera.lookAt(tankRoot.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
             }
             renderer.render(scene, camera);
         };
