@@ -86,8 +86,8 @@
         
         const maxSpeed = 25.0;
         const turnSpeed = 0.1;
-        const jumpForce = 2500; // Adjust this value for jump height
-        const groundRaycastDist = 1.5; // How far to check for the ground
+        const jumpForce = 2500;
+        const groundRaycastDist = 1.5;
         const initialTankPosition = { x: 0, y: 2, z: 0 };
 
         init();
@@ -119,24 +119,52 @@
         function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
+
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
+
+                // Load the Scene model
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     const sceneModel = gltf.scene;
                     scene.add(sceneModel);
+
+                    // Create ONE single static rigid body for the entire scene.
+                    const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+
                     sceneModel.traverse(child => {
                         if (child.isMesh) {
                             child.receiveShadow = true;
+
+                            // Update matrix to get correct world transform for the mesh.
+                            child.updateWorldMatrix(true, true);
                             const geometry = child.geometry;
-                            const vertices = geometry.attributes.position.array;
-                            const indices = geometry.index.array;
-                            const trimeshDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
-                            world.createCollider(trimeshDesc, world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
+                            
+                            if (!geometry.attributes.position || !geometry.index) {
+                                return; // Skip if mesh has no geometry data
+                            }
+
+                            // Get vertices and indices, and transform vertices to world space.
+                            const vertices = geometry.attributes.position.array.slice();
+                            const indices = geometry.index.array.slice();
+                            
+                            for (let i = 0; i < vertices.length; i += 3) {
+                                const vertex = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                                vertex.applyMatrix4(child.matrixWorld);
+                                vertices[i] = vertex.x;
+                                vertices[i + 1] = vertex.y;
+                                vertices[i + 2] = vertex.z;
+                            }
+
+                            // Create collider with world-space vertices and add to the single scene body.
+                            const trimeshDesc = RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices);
+                            world.createCollider(trimeshDesc, sceneBody);
                         }
                     });
                 });
+
+                // Load the Tank model
                 gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                     tankModel = gltf.scene;
                     tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
@@ -162,19 +190,19 @@
         }
 
         function setupControls() {
-            // Joystick
+            // Joystick for mobile
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
                 joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
             }
-            // Keyboard
+            // Keyboard for PC
             document.addEventListener('keydown', (e) => {
                 switch (e.key.toLowerCase()) {
                     case 'w': case 'arrowup':    keyboard.forward = 1; break;
                     case 's': case 'arrowdown':  keyboard.forward = -1; break;
                     case 'a': case 'arrowleft':  keyboard.turn = -1; break;
                     case 'd': case 'arrowright': keyboard.turn = 1; break;
-                    case ' ':                    handleJump(); break; // Spacebar to jump
+                    case ' ':                    handleJump(); break;
                 }
             });
             document.addEventListener('keyup', (e) => {
@@ -183,20 +211,42 @@
                     case 'a': case 'arrowleft': case 'd': case 'arrowright': keyboard.turn = 0; break;
                 }
             });
-            // Camera Orbit
+            
+            // Camera Orbit - supporting both mouse and multi-touch
             let isDragging = false; let prevMousePos = { x: 0, y: 0 }; const rotationSpeed = 0.005;
-            const onPointerDown = (e) => { if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return; isDragging = true; prevMousePos.x = e.clientX || e.touches[0].clientX; prevMousePos.y = e.clientY || e.touches[0].clientY; };
-            const onPointerMove = (e) => { if (!isDragging) return; const clientX = e.clientX || e.touches[0].clientX; const clientY = e.clientY || e.touches[0].clientY; const deltaX = clientX - prevMousePos.x; const deltaY = clientY - prevMousePos.y; cameraAngle.horizontal -= deltaX * rotationSpeed; cameraAngle.vertical -= deltaY * rotationSpeed; cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical)); prevMousePos.x = clientX; prevMousePos.y = clientY; };
+            const onPointerDown = (e) => { 
+                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return; 
+                isDragging = true; 
+                prevMousePos.x = e.clientX || e.touches[0].clientX; 
+                prevMousePos.y = e.clientY || e.touches[0].clientY; 
+            };
+            const onPointerMove = (e) => { 
+                if (!isDragging) return; 
+                const clientX = e.clientX || e.touches[0].clientX; 
+                const clientY = e.clientY || e.touches[0].clientY; 
+                const deltaX = clientX - prevMousePos.x; 
+                const deltaY = clientY - prevMousePos.y; 
+                cameraAngle.horizontal -= deltaX * rotationSpeed; 
+                cameraAngle.vertical -= deltaY * rotationSpeed; 
+                cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical)); 
+                prevMousePos.x = clientX; 
+                prevMousePos.y = clientY; 
+            };
             const onPointerUp = () => { isDragging = false; };
-            renderer.domElement.addEventListener('mousedown', onPointerDown); renderer.domElement.addEventListener('mousemove', onPointerMove); renderer.domElement.addEventListener('mouseup', onPointerUp); renderer.domElement.addEventListener('mouseleave', onPointerUp); renderer.domElement.addEventListener('touchstart', onPointerDown, { passive: true }); renderer.domElement.addEventListener('touchmove', onPointerMove, { passive: true }); renderer.domElement.addEventListener('touchend', onPointerUp);
+            renderer.domElement.addEventListener('mousedown', onPointerDown); 
+            renderer.domElement.addEventListener('mousemove', onPointerMove); 
+            renderer.domElement.addEventListener('mouseup', onPointerUp); 
+            renderer.domElement.addEventListener('mouseleave', onPointerUp); 
+            renderer.domElement.addEventListener('touchstart', onPointerDown, { passive: true }); 
+            renderer.domElement.addEventListener('touchmove', onPointerMove, { passive: true }); 
+            renderer.domElement.addEventListener('touchend', onPointerUp);
 
-            // --- JUMP & RESET BUTTONS ---
+            // UI Buttons with improved touch response
             const jumpButton = document.getElementById('jump-btn');
             const resetButton = document.getElementById('reset-btn');
             
-            // FIX: Replaced single 'click' listener with 'touchstart' and 'click'.
-            // 'touchstart' provides immediate response on mobile and supports multi-touch (e.g., moving and jumping).
-            // 'preventDefault()' stops the browser from also firing a delayed 'click' event for the same touch.
+            // Using 'touchstart' provides immediate response on mobile.
+            // preventDefault() stops the browser from also firing a delayed 'click' event.
             // The 'click' listener is kept for PC/mouse users.
             jumpButton.addEventListener('touchstart', (e) => {
                 e.preventDefault();
@@ -204,7 +254,6 @@
             });
             jumpButton.addEventListener('click', handleJump);
 
-            // Applying the same fix to the reset button for consistency.
             const resetTank = () => {
                 if (!tankBody) return;
                 tankBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -272,6 +321,9 @@
                         tankBody.setRotation(tankModel.quaternion, true);
                     }
                 } else {
+                    // This was a bug in original code, setting x and z to 0 caused drift.
+                    // Instead, we just stop applying forward force, and let linearDamping handle the slowdown.
+                    // For a more immediate stop, we can set linvel x/z to 0.
                     tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
                 
