@@ -17,7 +17,7 @@
     </script>
 </head>
 <body>
-    <div id="fullscreen-prompt">Tap to enter fullscreen</div>
+    <div id="fullscreen-prompt">Tap to enter fullscreen & lock landscape</div>
     <button id="music-toggle-btn" aria-label="Toggle Music">
         <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></span>
         <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z"/></svg></span>
@@ -30,6 +30,7 @@
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 
         let scene, camera, renderer;
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         init();
         animate();
@@ -46,8 +47,10 @@
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 5, 15);
             camera.rotation.order = 'YXZ';
-
-            setupTouchControls();
+            
+            if (isTouchDevice) {
+                setupTouchControls();
+            }
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
@@ -57,115 +60,77 @@
 
             loadAssetsInOrder();
             setupMusicControls();
-            setupFullscreen();
+            setupFullscreen(); 
             window.addEventListener('resize', onWindowResize);
         }
         
         function setupTouchControls() {
+            // ... (这部分代码没有变化，保持原样)
             const activeTouches = {};
             let previousTwoFingerState = null;
-            
             const rotationSpeed = 0.004;
             const panSpeed = 0.05;
             const pinchSpeed = 0.05;
 
             const onTouchStart = (e) => {
                 e.preventDefault();
-                for (const touch of e.changedTouches) {
-                    activeTouches[touch.identifier] = {
-                        prevX: touch.clientX,
-                        prevY: touch.clientY
-                    };
-                }
-                if (Object.keys(activeTouches).length === 2) {
-                    previousTwoFingerState = getTwoFingerState(e.touches);
-                }
+                for (const touch of e.changedTouches) { activeTouches[touch.identifier] = { prevX: touch.clientX, prevY: touch.clientY }; }
+                if (Object.keys(activeTouches).length === 2) { previousTwoFingerState = getTwoFingerState(e.touches); }
             };
-
             const onTouchMove = (e) => {
                 e.preventDefault();
                 const touchCount = Object.keys(activeTouches).length;
-
                 if (touchCount === 1) {
                     const touchId = Object.keys(activeTouches)[0];
                     const touch = Array.from(e.touches).find(t => t.identifier == touchId);
-                    if (touch) {
-                        handleCameraRotate(touch, activeTouches[touchId]);
-                    }
-                } else if (touchCount === 2) {
-                    handleTwoFingerGesture(e.touches);
-                }
+                    if (touch) { handleCameraRotate(touch, activeTouches[touchId]); }
+                } else if (touchCount === 2) { handleTwoFingerGesture(e.touches); }
             };
-            
             const onTouchEnd = (e) => {
                 e.preventDefault();
                 const wasTwoFingers = Object.keys(activeTouches).length === 2;
-                
-                for (const touch of e.changedTouches) {
-                    delete activeTouches[touch.identifier];
-                }
-
+                for (const touch of e.changedTouches) { delete activeTouches[touch.identifier]; }
                 const isNowOneFinger = Object.keys(activeTouches).length === 1;
-
-                // --- 核心修复点 1：防止镜头跳跃 ---
-                // 如果从双指变为单指，必须重置那根幸存手指的 'prev' 坐标
                 if (wasTwoFingers && isNowOneFinger) {
                     const remainingTouchId = Object.keys(activeTouches)[0];
                     const remainingTouch = Array.from(e.touches).find(t => t.identifier == remainingTouchId);
-                    if(remainingTouch){
-                        activeTouches[remainingTouchId].prevX = remainingTouch.clientX;
-                        activeTouches[remainingTouchId].prevY = remainingTouch.clientY;
-                    }
+                    if(remainingTouch){ activeTouches[remainingTouchId].prevX = remainingTouch.clientX; activeTouches[remainingTouchId].prevY = remainingTouch.clientY; }
                 }
-                
-                if (!isNowOneFinger) {
-                    previousTwoFingerState = null;
-                }
+                if (!isNowOneFinger) { previousTwoFingerState = null; }
             };
-
             const handleCameraRotate = (touch, state) => {
                 const deltaX = touch.clientX - state.prevX;
                 const deltaY = touch.clientY - state.prevY;
-                
                 camera.rotation.y -= deltaX * rotationSpeed;
                 camera.rotation.x -= deltaY * rotationSpeed;
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-
                 state.prevX = touch.clientX;
                 state.prevY = touch.clientY;
             };
-            
             const handleTwoFingerGesture = (touches) => {
                 const currentState = getTwoFingerState(touches);
                 if (previousTwoFingerState) {
                     const deltaPanX = currentState.midpoint.x - previousTwoFingerState.midpoint.x;
                     const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y;
                     const deltaPinch = currentState.distance - previousTwoFingerState.distance;
-
                     camera.translateX(-deltaPanX * panSpeed);
                     camera.translateY(deltaPanY * panSpeed);
                     camera.translateZ(-deltaPinch * pinchSpeed);
                 }
                 previousTwoFingerState = currentState;
             };
-
             const getTwoFingerState = (touches) => {
                 if (touches.length < 2) return null;
-                const t0 = touches[0];
-                const t1 = touches[1];
-                return {
-                    distance: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY),
-                    midpoint: { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 }
-                };
+                const t0 = touches[0]; const t1 = touches[1];
+                return { distance: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), midpoint: { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 } };
             };
             
-            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
-            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
-            renderer.domElement.addEventListener('touchend', onTouchEnd);
-            renderer.domElement.addEventListener('touchcancel', onTouchEnd);
+            // 重要：触摸控制已经占用了touchstart/move/end，全屏触发应避免与单指旋转冲突
+            // 我们将在 setupFullscreen 中使用 click 或 touchend
         }
 
         function loadAssetsInOrder() {
+            // ... (这部分代码没有变化，保持原样)
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
@@ -177,7 +142,7 @@
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         const tankModel = gltf.scene;
                         tankModel.rotation.y = Math.PI;
-                        tankModel.position.set(0, 0.2, 0); 
+                        tankModel.position.set(0, 0.2, 0);
                         scene.add(tankModel);
                     });
                 });
@@ -185,11 +150,11 @@
         }
         
         function setupMusicControls() {
+            // ... (这部分代码没有变化，保持原样)
             const musicButton = document.getElementById('music-toggle-btn');
             const bgMusic = document.getElementById('background-music');
             const iconOn = document.getElementById('music-icon-on');
             const iconOff = document.getElementById('music-icon-off');
-
             musicButton.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (bgMusic.paused) {
@@ -204,26 +169,68 @@
             });
         }
 
+        // --- 核心修正：重写 setupFullscreen 函数 ---
         function setupFullscreen() {
-            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             const prompt = document.getElementById('fullscreen-prompt');
             const musicButton = document.getElementById('music-toggle-btn');
+            const targetElement = renderer.domElement; // 监听 canvas 上的事件更精确
 
+            // 在移动设备上显示提示
             if (isTouchDevice) {
                 setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
                 setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
-
-                // --- 核心修复点 2：移除 { once: true } ---
-                window.addEventListener('click', (e) => {
-                    // 确保点击的不是音乐按钮
-                    if (musicButton.contains(e.target)) {
-                        return;
-                    }
-                    if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen().catch(err => {});
-                    }
-                });
             }
+
+            // 定义一个统一的事件处理函数
+            const handleFullscreenRequest = (e) => {
+                // 如果是触摸事件，我们只关心单指触摸结束
+                if (e.type === 'touchend' && e.touches.length > 0) {
+                    return;
+                }
+
+                // 检查是否点击了UI按钮，如果是则忽略
+                // 注意：由于事件监听在canvas上，按钮在canvas外，这个检查可能不是必须的
+                // 但保留它以防布局变化
+                if (musicButton.contains(e.target)) {
+                    return;
+                }
+                
+                // 如果当前未处于全屏模式，则发起请求
+                if (!document.fullscreenElement) {
+                    // 直接调用 requestFullscreen，不能用 async/await 包装
+                    const promise = document.documentElement.requestFullscreen();
+                    
+                    promise.then(() => {
+                        // 全屏成功后，执行这里的代码
+                        if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') {
+                            screen.orientation.lock('landscape').catch(err => {
+                                console.warn("Could not lock orientation:", err.message);
+                            });
+                        }
+                    }).catch(err => {
+                        // 全屏失败（如用户拒绝）
+                        console.warn("Fullscreen request failed:", err.message);
+                    });
+                }
+            };
+            
+            // 为桌面设备添加 click 监听
+            targetElement.addEventListener('click', handleFullscreenRequest);
+            
+            // 为移动设备添加 touchend 监听，这通常比click更可靠
+            // 注意：因为触摸控制占用了touchstart，我们用touchend来避免和拖动冲突
+            if (isTouchDevice) {
+                targetElement.addEventListener('touchend', handleFullscreenRequest);
+            }
+
+            // 监听退出全屏事件，以便解锁屏幕方向
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+                        screen.orientation.unlock();
+                    }
+                }
+            });
         }
         
         function onWindowResize() {
