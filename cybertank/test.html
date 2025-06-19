@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Final - Camera-Relative Controls</title>
+    <title>Tank Final - Correct Movement & Orientation</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; touch-action: none; }
@@ -12,7 +12,6 @@
         #joystick-container { position: absolute; bottom: 30px; left: 30px; width: 150px; height: 150px; pointer-events: auto; }
         #jump-btn { position: absolute; bottom: 40px; right: 40px; width: 80px; height: 80px; border-radius: 50%; background-color: rgba(118, 255, 51, 0.5); border: 2px solid #76FF33; color: white; font-size: 18px; font-weight: bold; font-family: sans-serif; display: flex; justify-content: center; align-items: center; -webkit-tap-highlight-color: transparent; pointer-events: auto; user-select: none; }
         #jump-btn:active { background-color: rgba(118, 255, 51, 0.8); }
-        #music-toggle-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 100; opacity: 0.8; }
     </style>
     <script type="importmap">
         {
@@ -43,11 +42,9 @@
         let scene, camera, renderer, clock, world;
         let tankGroup, tankModel, tankBody; 
         
-        const tankControls = {
-            move: new THREE.Vector2() // Using a Vector2 for joystick input
-        };
+        const tankControls = { move: new THREE.Vector2() };
         const TANK_MAX_SPEED = 10.0;
-        const TANK_TURN_LERP_FACTOR = 10.0; // How fast the tank turns to face the move direction
+        const TANK_TURN_LERP_FACTOR = 10.0;
         const JUMP_FORCE = 70.0;
 
         const cameraControls = {
@@ -58,7 +55,6 @@
             distance: 12
         };
 
-        // Helper vectors to avoid creating new ones in the loop
         const cameraForward = new THREE.Vector3();
         const cameraRight = new THREE.Vector3();
         const moveDirection = new THREE.Vector3();
@@ -97,17 +93,13 @@
                 mode: 'static', position: { left: '50%', top: '50%' }, color: '#76FF33', size: 150
             }).on('move', (evt, data) => {
                 if (data.vector) {
-                    // Store joystick vector directly
                     tankControls.move.set(data.vector.x, data.vector.y);
                 }
             }).on('end', () => {
-                tankControls.move.set(0, 0); // Reset on release
+                tankControls.move.set(0, 0);
             });
-
-            // --- FIX 1: 无限跳跃 ---
             const jumpBtn = document.getElementById('jump-btn');
             const handleJump = () => {
-                 // The isGrounded check is removed.
                  if (tankBody) {
                     tankBody.applyImpulse({ x: 0, y: JUMP_FORCE, z: 0 }, true);
                 }
@@ -130,11 +122,9 @@
                 const clientY = e.clientY ?? e.touches[0].clientY;
                 const deltaX = clientX - cameraControls.previousPointerPosition.x;
                 const deltaY = clientY - cameraControls.previousPointerPosition.y;
-
                 cameraControls.azimuthAngle -= deltaX * 0.005;
                 cameraControls.polarAngle -= deltaY * 0.005;
                 cameraControls.polarAngle = Math.max(0.2, Math.min(Math.PI - 0.2, cameraControls.polarAngle));
-                
                 cameraControls.previousPointerPosition.x = clientX;
                 cameraControls.previousPointerPosition.y = clientY;
             };
@@ -166,11 +156,13 @@
                         tankGroup = new THREE.Group();
                         scene.add(tankGroup);
                         tankGroup.add(tankModel);
+                        
+                        // --- THE FINAL FIX IS HERE: Re-add the 180-degree rotation to the visual model ---
                         tankModel.rotation.y = Math.PI;
                         
                         const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
                             .setTranslation(0, 5, 0)
-                            .setLinearDamping(0.5) // Reduced damping for more responsive feel
+                            .setLinearDamping(0.5)
                             .setAngularDamping(1.0)
                             .lockRotations();
                         tankBody = world.createRigidBody(rigidBodyDesc);
@@ -183,22 +175,18 @@
             });
         }
         
-        // --- FIX 2: 全新的镜头相对控制逻辑 ---
         function updateTankControls(deltaTime) {
             if (!tankBody) return;
 
-            // 1. 获取相机在水平面上的前/右方向
             camera.getWorldDirection(cameraForward);
             cameraForward.y = 0;
             cameraForward.normalize();
             cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward).normalize();
             
-            // 2. 根据相机方向和摇杆输入，计算最终移动方向
             const moveForward = cameraForward.multiplyScalar(tankControls.move.y);
             const moveRight = cameraRight.multiplyScalar(tankControls.move.x);
             moveDirection.addVectors(moveForward, moveRight).normalize();
             
-            // 3. 计算目标速度 (保留Y轴速度，用于重力和跳跃)
             const currentVel = tankBody.linvel();
             const targetVel = {
                 x: moveDirection.x * TANK_MAX_SPEED,
@@ -206,20 +194,14 @@
                 z: moveDirection.z * TANK_MAX_SPEED
             };
             
-            // 如果摇杆有输入，则设置目标速度并转向
             if (tankControls.move.length() > 0.1) {
                 tankBody.setLinvel(targetVel, true);
-
-                // 4. 让坦克平滑地转向移动方向
                 const targetAngle = Math.atan2(moveDirection.x, moveDirection.z);
                 const targetRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle);
-                
                 const currentRotation = new THREE.Quaternion().copy(tankBody.rotation());
                 currentRotation.slerp(targetRotation, deltaTime * TANK_TURN_LERP_FACTOR);
-                
                 tankBody.setRotation(currentRotation, true);
             } else {
-                // 如果摇杆没有输入，让坦克在水平方向减速停止
                 tankBody.setLinvel({ x: currentVel.x * 0.2, y: currentVel.y, z: currentVel.z * 0.2 }, true);
             }
         }
@@ -235,13 +217,16 @@
             camera.lookAt(cameraLookAt);
         }
         
-        function onWindowResize() { /* ... */ }
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
         function animate() {
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
             
-            // 移除地面检测，直接更新控制
             updateTankControls(deltaTime);
             world.step();
 
