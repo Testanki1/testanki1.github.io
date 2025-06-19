@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank with Physics and Controls (V3 - Chase Cam)</title>
+    <title>Tank with Physics and Controls (V4 - Final Cam)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -186,23 +186,23 @@
             }
         }
         
-        // --- ONLY THIS FUNCTION IS MODIFIED ---
+        // --- THIS IS THE FINAL, CORRECTED CAMERA LOGIC ---
         function updateCamera() {
             if (!tankModel) return;
 
-            // 1. 定义相机在坦克局部坐标系中的偏移量 (后方、上方)
+            // 1. 定义相机在坦克后方、上方的偏移位置
             const cameraOffset = new THREE.Vector3(0, 4, 10); 
             
-            // 2. 将这个局部偏移量转换到世界坐标系中，得到相机应该在的位置
+            // 2. 计算出相机在世界坐标中的理想位置
             const desiredCamPos = tankModel.position.clone()
                 .add(cameraOffset.applyQuaternion(tankModel.quaternion));
             
-            // 3. 使用lerp平滑地移动相机到目标位置
+            // 3. 平滑移动相机到这个位置
             camera.position.lerp(desiredCamPos, 0.1);
 
-            // 4. 不再使用 lookAt！而是让相机的旋转也平滑地跟随坦克的旋转
-            // slerp (球面线性插值) 用于平滑地过渡旋转
-            camera.quaternion.slerp(tankModel.quaternion, 0.1);
+            // 4. 【关键】让相机始终朝向坦克中心点
+            const lookAtTarget = tankModel.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+            camera.lookAt(lookAtTarget);
         }
 
         function animate() {
