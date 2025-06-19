@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Corrected Orientation</title>
+    <title>Tank Physics Demo - Reversed Orientation</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -41,7 +41,7 @@
         import RAPIER from '@dimforge/rapier3d-compat';
 
         let scene, camera, renderer, world;
-        let tankRoot, tankBody; // Renamed tankModel to tankRoot for clarity
+        let tankModel, tankBody;
         
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         let audioContext, audioBuffer, sourceNode, isPlaying = false;
@@ -101,34 +101,18 @@
                         }
                     });
                 });
-                // =========================================================
-                // === FINAL FIX: PARENT PIVOT FOR MODEL ORIENTATION ===
-                // =========================================================
                 gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                    // 1. Create the parent pivot object. This represents the physics body.
-                    tankRoot = new THREE.Object3D();
-                    tankRoot.position.set(0, 2, 0);
-                    scene.add(tankRoot);
-
-                    // 2. The loaded GLTF scene is the visual part.
-                    const tankVisuals = gltf.scene;
-                    
-                    // 3. IMPORTANT: Rotate the visual part 180 degrees to face forward.
-                    tankVisuals.rotation.y = Math.PI;
-
-                    // 4. Add the visuals as a child of the physics pivot.
-                    tankRoot.add(tankVisuals);
-
+                    tankModel = gltf.scene;
+                    tankModel.position.set(0, 2, 0);
+                    scene.add(tankModel);
                     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                        .setTranslation(tankRoot.position.x, tankRoot.position.y, tankRoot.position.z)
+                        .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
                         .setLinearDamping(0.5)
                         .setAngularDamping(0.8)
                         .setCanSleep(false);
                     tankBody = world.createRigidBody(bodyDesc);
-
                     const allVertices = [];
-                    // We traverse the visuals to get the geometry for the collider
-                    tankVisuals.traverse(child => {
+                    tankModel.traverse(child => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             const positions = child.geometry.attributes.position.array;
@@ -181,7 +165,7 @@
             requestAnimationFrame(animate);
             world.step();
 
-            if (tankBody && tankRoot) {
+            if (tankBody && tankModel) {
                 const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
 
                 camera.getWorldDirection(cameraForward);
@@ -200,29 +184,29 @@
                     moveDirection.normalize();
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
-                    
-                    // The rotation logic remains the same, but it now targets the parent pivot's orientation
-                    _matrix.lookAt(tankRoot.position, tankRoot.position.clone().add(moveDirection), upVector);
+
+                    // =========================================================
+                    // === FINAL ROTATION FIX: Look AWAY from move direction ===
+                    // =========================================================
+                    _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(moveDirection), upVector);
                     targetQuaternion.setFromRotationMatrix(_matrix);
-                    if (!tankRoot.quaternion.equals(targetQuaternion)) {
-                        tankRoot.quaternion.slerp(targetQuaternion, turnSpeed);
-                        tankBody.setRotation(tankRoot.quaternion, true);
+                    if (!tankModel.quaternion.equals(targetQuaternion)) {
+                        tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
+                        tankBody.setRotation(tankModel.quaternion, true);
                     }
                 } else {
                     tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
                 
-                // Update the parent pivot's position from the physics engine
                 const position = tankBody.translation();
-                tankRoot.position.set(position.x, position.y, position.z);
+                tankModel.position.set(position.x, position.y, position.z);
 
-                // Update Camera to follow the parent pivot
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
-                const cameraTargetPosition = tankRoot.position.clone().add(rotatedOffset);
+                const cameraTargetPosition = tankModel.position.clone().add(rotatedOffset);
                 camera.position.lerp(cameraTargetPosition, 0.1);
-                camera.lookAt(tankRoot.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+                camera.lookAt(tankModel.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
             }
             renderer.render(scene, camera);
         };
