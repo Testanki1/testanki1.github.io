@@ -4,84 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank with Physics and Controls</title>
+    <title>Tank with Physics and Controls (V2)</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        canvas {
-            display: block;
-        }
-        
-        /* 操纵杆和跳跃按钮的容器 */
-        #controls-container {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* 容器本身不响应点击 */
-            z-index: 10;
-        }
-
-        /* 操纵杆区域 */
-        #joystick-container {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            width: 150px;
-            height: 150px;
-            pointer-events: auto; /* 操纵杆区域响应点击 */
-        }
-        
-        /* 跳跃按钮 */
-        #jump-btn {
-            position: absolute;
-            bottom: 40px;
-            right: 40px;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background-color: rgba(118, 255, 51, 0.5);
-            border: 2px solid #76FF33;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
-            pointer-events: auto; /* 按钮响应点击 */
-            user-select: none; /* 禁止文本选中 */
-        }
-        #jump-btn:active {
-            background-color: rgba(118, 255, 51, 0.8);
-        }
-
-        #music-toggle-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 5px;
-            z-index: 100;
-            opacity: 0.8;
-            transition: opacity 0.2s;
-        }
-
-        #music-toggle-btn:hover {
-            opacity: 1;
-        }
-
-        #music-toggle-btn svg {
-            display: block;
-        }
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+        #controls-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        #joystick-container { position: absolute; bottom: 30px; left: 30px; width: 150px; height: 150px; pointer-events: auto; }
+        #jump-btn { position: absolute; bottom: 40px; right: 40px; width: 80px; height: 80px; border-radius: 50%; background-color: rgba(118, 255, 51, 0.5); border: 2px solid #76FF33; color: white; font-size: 18px; font-weight: bold; font-family: sans-serif; display: flex; justify-content: center; align-items: center; -webkit-tap-highlight-color: transparent; pointer-events: auto; user-select: none; }
+        #jump-btn:active { background-color: rgba(118, 255, 51, 0.8); }
+        #music-toggle-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 100; opacity: 0.8; transition: opacity 0.2s; }
+        #music-toggle-btn:hover { opacity: 1; }
+        #music-toggle-btn svg { display: block; }
     </style>
     <script type="importmap">
         {
@@ -96,23 +29,15 @@
 </head>
 
 <body>
-    <!-- 音乐按钮保持不变 -->
     <button id="music-toggle-btn" aria-label="Toggle Music">
         <span id="music-icon-on" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33">
-                <path d="M0 0h24v24H0V0z" fill="none" />
-                <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
         </span>
         <span id="music-icon-off">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33">
-                <path d="M0 0h24v24H0V0z" fill="none" />
-                <path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" /></svg>
         </span>
     </button>
     
-    <!-- 添加控制UI的容器 -->
     <div id="controls-container">
         <div id="joystick-container"></div>
         <button id="jump-btn">JUMP</button>
@@ -126,36 +51,28 @@
         import nipplejs from 'nipplejs';
 
         let scene, camera, renderer, clock;
-        let world; // 物理世界
+        let world; 
         
-        let tankModel, tankBody; // 坦克的模型和物理刚体
+        let tankModel, tankBody, tankCollider; // ADDED tankCollider
+        let isGrounded = false; // ADDED: For checking if tank is on the ground
         
-        // 控制输入状态
-        const controls = {
-            forward: 0,
-            turn: 0
-        };
+        const controls = { forward: 0, turn: 0 };
 
-        // 坦克移动参数 (可调整)
-        const TANK_MOVE_SPEED = 25.0;
-        const TANK_TURN_SPEED = 2.0;
-        const JUMP_FORCE = 40.0;
+        // CHANGED: Adjusted parameters for better feel
+        const TANK_MOVE_FORCE = 800.0;
+        const TANK_TURN_SPEED = 3.5;
+        const JUMP_FORCE = 50.0;
 
-        let audioContext;
-        let audioBuffer;
-        let sourceNode;
-        let isPlaying = false;
+        let audioContext, audioBuffer, sourceNode, isPlaying = false;
 
         init();
 
         async function init() {
-            // 初始化物理引擎
             await RAPIER.init();
             const gravity = { x: 0.0, y: -9.81, z: 0.0 };
             world = new RAPIER.World(gravity);
 
             clock = new THREE.Clock();
-
             scene = new THREE.Scene();
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -165,12 +82,8 @@
             document.body.appendChild(renderer.domElement);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 15);
-
-            // --- 不再需要旧的触摸控制 ---
-            // setupTouchControls(); 
-
-            setupControls(); // 设置新的操纵杆和跳跃按钮
+            
+            setupControls(); 
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
@@ -182,12 +95,10 @@
             setupMusicControls();
             window.addEventListener('resize', onWindowResize);
             
-            // 启动动画循环
             animate();
         }
         
         function setupControls() {
-            // 设置操纵杆
             const joystickManager = nipplejs.create({
                 zone: document.getElementById('joystick-container'),
                 mode: 'static',
@@ -198,8 +109,8 @@
 
             joystickManager.on('move', (evt, data) => {
                 if (data.vector) {
-                    controls.forward = -data.vector.y; // Y轴控制前进后退
-                    controls.turn = -data.vector.x;   // X轴控制转向
+                    controls.forward = -data.vector.y; 
+                    controls.turn = -data.vector.x;   
                 }
             });
 
@@ -208,17 +119,16 @@
                 controls.turn = 0;
             });
 
-            // 设置跳跃按钮
             const jumpBtn = document.getElementById('jump-btn');
             const handleJump = () => {
-                 if (tankBody) {
-                    // 施加一个向上的冲量
+                 // ADDED: Check if tank exists and is grounded
+                 if (tankBody && isGrounded) {
                     tankBody.applyImpulse({ x: 0, y: JUMP_FORCE, z: 0 }, true);
                 }
             };
             jumpBtn.addEventListener('click', handleJump);
             jumpBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // 防止触发click事件和页面缩放
+                e.preventDefault(); 
                 handleJump();
             }, { passive: false });
         }
@@ -228,60 +138,54 @@
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
 
-            // 加载环境贴图
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
                 
-                // 加载场景模型
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     scene.add(gltf.scene);
                     
-                    // 为场景创建静态碰撞体
                     gltf.scene.traverse(child => {
                         if (child.isMesh) {
                             const vertices = child.geometry.attributes.position.array;
-                            const indices = child.geometry.index.array;
+                            const indices = child.geometry.index ? child.geometry.index.array : Array.from(Array(vertices.length / 3).keys());
                             
                             const trimesh = RAPIER.ColliderDesc.trimesh(vertices, indices);
                             world.createCollider(trimesh);
                         }
                     });
 
-                    // 加载坦克模型
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         tankModel = gltf.scene;
                         scene.add(tankModel);
 
-                        // 为坦克创建动态物理刚体
+                        // CHANGED: Significantly updated RigidBody description
                         const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                            .setTranslation(0, 5, 0) // 初始位置在空中，让它自然落下
-                            .setLinearDamping(0.8)   // 线性阻尼，防止无限滑动
-                            .setAngularDamping(1.5); // 角阻尼，防止无限旋转
+                            .setTranslation(0, 5, 0)
+                            .setLinearDamping(0.8)
+                            .setAngularDamping(2.5)
+                            .lockRotations(); // ADDED: Lock X and Z axis rotation to prevent flipping!
 
                         tankBody = world.createRigidBody(rigidBodyDesc);
 
-                        // 根据模型大小创建长方体碰撞体
                         const aabb = new THREE.Box3().setFromObject(tankModel);
                         const size = aabb.getSize(new THREE.Vector3());
                         const colliderDesc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2);
-                        world.createCollider(colliderDesc, tankBody);
+                        tankCollider = world.createCollider(colliderDesc, tankBody); // ADDED: store collider reference
                     });
                 });
             });
         };
 
         async function setupMusicControls() {
-            // ... (这部分代码与您原来的一样，保持不变)
+            // ... (No changes here)
             const musicButton = document.getElementById('music-toggle-btn');
             const iconOn = document.getElementById('music-icon-on');
             const iconOff = document.getElementById('music-icon-off');
-
             try {
                 const response = await fetch('assets/bounce tanki loop cut (no intro).opus');
                 const arrayBuffer = await response.arrayBuffer();
-
                 audioContext = THREE.AudioContext.getContext();
                 audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             } catch (error) {
@@ -289,12 +193,9 @@
                 musicButton.disabled = true;
                 return;
             }
-
             function playMusic() {
                 if (isPlaying || !audioBuffer) return;
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
+                if (audioContext.state === 'suspended') { audioContext.resume(); }
                 sourceNode = audioContext.createBufferSource();
                 sourceNode.buffer = audioBuffer;
                 sourceNode.loop = true;
@@ -304,7 +205,6 @@
                 iconOn.style.display = 'inline';
                 iconOff.style.display = 'none';
             }
-
             function stopMusic() {
                 if (!isPlaying || !sourceNode) return;
                 sourceNode.stop();
@@ -314,11 +214,9 @@
                 iconOn.style.display = 'none';
                 iconOff.style.display = 'inline';
             }
-
             musicButton.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (isPlaying) stopMusic();
-                else playMusic();
+                if (isPlaying) stopMusic(); else playMusic();
             });
         }
 
@@ -327,45 +225,57 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         };
+        
+        // ADDED: Function to check if the tank is on the ground
+        function updateGroundedState() {
+            if (!tankBody || !tankCollider) return;
 
+            const tankHeight = tankCollider.shape.halfExtents.y * 2;
+            const rayOrigin = tankBody.translation();
+            const rayDir = { x: 0, y: -1, z: 0 };
+            const maxDistance = tankHeight * 0.55; // Ray slightly longer than half height
+            const ray = new RAPIER.Ray(rayOrigin, rayDir);
+            
+            const hit = world.castRay(ray, maxDistance, true, null, null, tankCollider);
+            isGrounded = hit !== null;
+        }
+
+        // CHANGED: Completely new control logic
         function updateTankControls(deltaTime) {
             if (!tankBody) return;
 
-            // 获取当前速度
-            const currentLinvel = tankBody.linvel();
-            const currentAngvel = tankBody.angvel();
+            // --- TURNING ---
+            // Use setAngvel for responsive turning, which directly sets angular velocity.
+            const targetAngvel = { x: 0, y: controls.turn * -TANK_TURN_SPEED, z: 0 };
+            tankBody.setAngvel(targetAngvel, true);
 
-            // 移动
-            if (Math.abs(controls.forward) > 0.1) {
-                // 计算坦克的前方向量
-                const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(tankBody.rotation()).normalize();
+            // --- MOVEMENT ---
+            if (Math.abs(controls.forward) > 0.1 && isGrounded) {
+                // Get the tank's forward vector in world space
+                const forwardDir = new THREE.Vector3(0, 0, -1)
+                    .applyQuaternion(tankBody.rotation())
+                    .normalize();
                 
-                // 施加力来移动坦克
-                const force = forwardDir.multiplyScalar(controls.forward * TANK_MOVE_SPEED);
+                // Calculate the force to apply
+                const force = forwardDir.multiplyScalar(controls.forward * TANK_MOVE_FORCE * deltaTime);
                 tankBody.addForce({ x: force.x, y: 0, z: force.z }, true);
-            }
-            
-            // 转向
-            if (Math.abs(controls.turn) > 0.1) {
-                // 施加扭矩来旋转坦克
-                 tankBody.applyTorqueImpulse({ x: 0, y: controls.turn * TANK_TURN_SPEED, z: 0 }, true);
             }
         }
         
         function updateCamera() {
             if (!tankModel) return;
 
-            // 相机目标偏移量 (在坦克后上方)
+            // Camera offset (behind and above the tank)
             const cameraOffset = new THREE.Vector3(0, 4, 10);
-
-            // 计算理想的相机位置
+            
+            // Make the offset relative to the tank's rotation
             const desiredCamPos = tankModel.position.clone()
                 .add(cameraOffset.applyQuaternion(tankModel.quaternion));
             
-            // 平滑地移动相机到目标位置
-            camera.position.lerp(desiredCamPos, 0.05);
+            // Smoothly interpolate camera position
+            camera.position.lerp(desiredCamPos, 0.08); // CHANGED: slightly increased lerp for snappier feel
 
-            // 相机始终看向坦克中心稍高一点的位置
+            // Camera always looks at the tank's center
             const lookAtTarget = tankModel.position.clone().add(new THREE.Vector3(0, 1, 0));
             camera.lookAt(lookAtTarget);
         }
@@ -374,15 +284,18 @@
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
 
-            // 1. 根据输入更新坦克控制
-            updateTankControls(deltaTime);
-            
-            // 2. 步进物理世界
             if (world) {
+                // 1. Update tank controls based on user input
+                updateTankControls(deltaTime);
+                
+                // 2. Step the physics world
                 world.step();
+                
+                // 3. ADDED: Check if the tank is grounded for jumping
+                updateGroundedState();
             }
 
-            // 3. 将物理世界中的位置同步到Three.js模型
+            // 4. Sync physics body with three.js model
             if (tankBody && tankModel) {
                 const pos = tankBody.translation();
                 const rot = tankBody.rotation();
@@ -390,10 +303,10 @@
                 tankModel.quaternion.copy(rot);
             }
             
-            // 4. 更新相机位置
+            // 5. Update camera to follow the tank
             updateCamera();
 
-            // 5. 渲染场景
+            // 6. Render the scene
             renderer.render(scene, camera);
         };
     </script>
