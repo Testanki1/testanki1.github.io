@@ -84,7 +84,7 @@
         const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
         const cameraOffset = new THREE.Vector3(0, 4, 12);
         
-        const maxSpeed = 10.0;
+        const maxSpeed = 25.0;
         const turnSpeed = 0.1;
         const jumpForce = 2500; // Adjust this value for jump height
         const groundRaycastDist = 1.5; // How far to check for the ground
@@ -194,14 +194,29 @@
             const jumpButton = document.getElementById('jump-btn');
             const resetButton = document.getElementById('reset-btn');
             
+            // FIX: Replaced single 'click' listener with 'touchstart' and 'click'.
+            // 'touchstart' provides immediate response on mobile and supports multi-touch (e.g., moving and jumping).
+            // 'preventDefault()' stops the browser from also firing a delayed 'click' event for the same touch.
+            // The 'click' listener is kept for PC/mouse users.
+            jumpButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                handleJump();
+            });
             jumpButton.addEventListener('click', handleJump);
-            resetButton.addEventListener('click', () => {
+
+            // Applying the same fix to the reset button for consistency.
+            const resetTank = () => {
                 if (!tankBody) return;
                 tankBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
                 tankBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
                 tankBody.setTranslation(initialTankPosition, true);
                 tankBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+            };
+            resetButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                resetTank();
             });
+            resetButton.addEventListener('click', resetTank);
         }
         
         function handleJump() {
