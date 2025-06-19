@@ -28,7 +28,6 @@
             opacity: 0;
             transition: opacity 0.5s;
         }
-        /* 音乐控制按钮样式 */
         #music-toggle-btn {
             position: absolute;
             top: 15px;
@@ -37,7 +36,7 @@
             border: none;
             cursor: pointer;
             padding: 5px;
-            z-index: 100; /* 确保在最上层 */
+            z-index: 100;
             opacity: 0.8;
             transition: opacity 0.2s;
         }
@@ -45,7 +44,7 @@
             opacity: 1;
         }
         #music-toggle-btn svg {
-            display: block; /* 移除SVG下方的额外空间 */
+            display: block;
         }
     </style>
     <!-- three.js 模块 -->
@@ -61,14 +60,13 @@
 <body>
     <div id="fullscreen-prompt">Tap to enter fullscreen</div>
 
-    <!-- 音乐控制按钮和音频元素 -->
     <button id="music-toggle-btn" aria-label="Toggle Music">
         <span id="music-icon-on" style="display: none;">
-            <!-- Music ON 图标 (Material: music_note) -->
+            <!-- Music ON 图标 -->
             <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         </span>
         <span id="music-icon-off">
-            <!-- Music OFF 图标 (Material: music_off), 默认显示 -->
+            <!-- Music OFF 图标 -->
             <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z"/></svg>
         </span>
     </button>
@@ -108,12 +106,13 @@
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.screenSpacePanning = false;
+            // --- 核心修改 1: 设为 true 以便自由平移相机 ---
+            controls.screenSpacePanning = true; 
             controls.minDistance = 2;
             controls.maxDistance = 50;
             controls.maxPolarAngle = Math.PI / 2;
 
-            // 5. 光照 (环境光和方向光)
+            // 5. 光照
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
 
@@ -121,7 +120,7 @@
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
-            // 6. 按照指定顺序加载所有资源
+            // 6. 加载资源
             loadAssetsInOrder();
 
             // 7. 设置音乐控制
@@ -138,7 +137,6 @@
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
 
-            // 步骤 1: 首先加载背景/环境贴图
             console.log("Loading background...");
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -146,27 +144,22 @@
                 scene.environment = texture;
                 console.log("Background loaded.");
 
-                // 步骤 2: 背景加载完成后，加载场景模型
                 console.log("Loading scene...");
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     scene.add(gltf.scene);
                     console.log("Scene loaded.");
 
-                    // 步骤 3: 场景加载完成后，加载坦克模型
                     console.log("Loading tank...");
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         const tankModel = gltf.scene;
                         
-                        // --- 核心修改：将坦克旋转180度 (Math.PI弧度) ---
                         tankModel.rotation.y = Math.PI;
-
-                        // 将坦克模型稍微抬高一点，确保它在赛道平面之上
                         tankModel.position.set(0, 0.2, 0); 
                         scene.add(tankModel);
                         console.log("Tank loaded.");
 
-                        // 将镜头控制器的目标设为坦克，这样镜头会围绕坦克旋转
-                        controls.target.set(0, 1, 0);
+                        // --- 核心修改 2: 移除此行，不再将镜头目标锁定到坦克 ---
+                        // controls.target.set(0, 1, 0);
                     });
                 });
             });
@@ -179,8 +172,7 @@
             const iconOff = document.getElementById('music-icon-off');
 
             musicButton.addEventListener('click', (e) => {
-                e.stopPropagation(); // 防止点击按钮时触发全屏事件
-                // 浏览器通常要求用户交互后才能播放音频
+                e.stopPropagation();
                 if (bgMusic.paused) {
                     bgMusic.play().catch(err => console.error("Audio play failed:", err));
                     iconOn.style.display = 'inline';
@@ -207,7 +199,7 @@
                             console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
                         });
                     }
-                }, { once: true }); // 使用 once: true 让全屏请求只在第一次点击时触发
+                }, { once: true });
             }
         }
         
