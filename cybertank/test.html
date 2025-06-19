@@ -14,11 +14,9 @@
 
         canvas {
             display: block;
-            /* 阻止在移动设备上拖动时的默认行为，如页面刷新 */
             touch-action: none;
         }
         
-        /* 摇杆容器的样式 */
         #joystick-zone {
             position: absolute;
             bottom: 30px;
@@ -29,6 +27,29 @@
             border-radius: 50%;
             z-index: 10;
         }
+
+        /* --- 新增：跳跃按钮样式 --- */
+        #jump-button-zone {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            z-index: 10;
+        }
+
+        #jump-button {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid white;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+        }
+        /* --- 样式结束 --- */
 
         #music-toggle-btn {
             position: absolute;
@@ -51,7 +72,6 @@
             display: block;
         }
     </style>
-    <!-- 更新 importmap 以包含 Rapier 物理引擎 -->
     <script type="importmap">
         {
             "imports": {
@@ -64,19 +84,17 @@
 </head>
 
 <body>
-    <!-- 添加一个用于摇杆的 div -->
     <div id="joystick-zone"></div>
+    <!-- 新增：跳跃按钮 -->
+    <div id="jump-button-zone">
+        <button id="jump-button">JUMP</button>
+    </div>
     
     <button id="music-toggle-btn" aria-label="Toggle Music">
-        <span id="music-icon-on" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
-        </span>
-        <span id="music-icon-off">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" /></svg>
-        </span>
+        <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg></span>
+        <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" /></svg></span>
     </button>
     
-    <!-- 引入 nipplejs 摇杆库 -->
     <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
 
     <script type="module">
@@ -88,30 +106,29 @@
         let scene, camera, renderer, clock;
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
-        // --- 物理世界相关变量 ---
         let world;
         let tankModel;
         let tankRigidBody;
+        let tankSize = new THREE.Vector3(); // 用于存储坦克的尺寸
 
-        // --- 控制相关变量 ---
         const joystick = { active: false, force: 0, angle: 0 };
         const tankControl = {
-            moveSpeed: 2.5,
-            turnSpeed: 3.0
+            moveSpeed: 5.0, // 增加移动速度
+            turnSpeed: 4.0, // 增加转向速度
+            jumpForce: 70.0, // 定义跳跃力量
         };
+        let isGrounded = false; // 坦克是否在地面上的标志
 
-        // --- 相机相关变量 ---
-        const cameraOffset = new THREE.Vector3(0, 4, 8); // 相机在坦克后上方的偏移量
+        // --- 已修正：相机偏移量，Z为负值，使其在坦克后方 ---
+        const cameraOffset = new THREE.Vector3(0, 5, -12);
         
         let audioContext, audioBuffer, sourceNode, isPlaying = false;
 
-        // --- 初始化物理世界和游戏 ---
         RAPIER.init().then(init);
 
         function init() {
             clock = new THREE.Clock();
             
-            // --- 场景、渲染器、相机基础设置 ---
             scene = new THREE.Scene();
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -121,38 +138,30 @@
             document.body.appendChild(renderer.domElement);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.copy(cameraOffset); // 初始相机位置
+            camera.position.copy(cameraOffset);
 
-            // --- 物理世界设置 ---
-            const gravity = { x: 0.0, y: -9.81, z: 0.0 };
+            const gravity = { x: 0.0, y: -9.81 * 2, z: 0.0 }; // 加大重力，让跳跃手感更好
             world = new RAPIER.World(gravity);
             
-            // --- 光照设置 ---
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
-            // --- 加载资源 ---
             loadAssets();
             
-            // --- 设置控制器 ---
             if (isTouchDevice) {
                 setupJoystick();
-            } else {
-                // 为PC端添加键盘控制（可选，此处未实现，但可扩展）
-                console.log("PC device detected. Use a mobile device or simulator for joystick controls.");
+                setupJumpButton(); // --- 新增：初始化跳跃按钮
             }
 
-            // --- 其他设置 ---
             setupMusicControls();
             window.addEventListener('resize', onWindowResize);
             
             animate();
         }
 
-        // --- 加载所有模型和环境贴图 ---
         function loadAssets() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
@@ -161,38 +170,28 @@
                 scene.background = texture;
                 scene.environment = texture;
                 
-                // 加载场景模型并创建物理碰撞体
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     scene.add(gltf.scene);
                     createPhysicsForScene(gltf.scene);
                 });
 
-                // 加载坦克模型并创建物理刚体
                 gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                     tankModel = gltf.scene;
-                    tankModel.position.set(0, 1, 0); // 初始位置稍高，让它自然落下
+                    tankModel.position.set(0, 1, 0);
                     scene.add(tankModel);
                     createPhysicsForTank(tankModel);
                 });
             });
         }
         
-        // --- 为场景模型创建静态三角网格碰撞体 ---
         function createPhysicsForScene(object) {
             object.traverse((child) => {
                 if (child.isMesh) {
-                    // 对于有纹理（即有面）的部分创建碰撞
-                    const geometry = child.geometry;
-                    const vertices = geometry.attributes.position.array;
-                    const indices = geometry.index ? geometry.index.array : undefined;
-
+                    const vertices = child.geometry.attributes.position.array;
+                    const indices = child.geometry.index ? child.geometry.index.array : undefined;
                     if (vertices && indices) {
-                        // 创建静态刚体描述
                         let rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
-                        // 创建三角网格碰撞体描述
                         let colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
-                        
-                        // 创建刚体和碰撞体
                         let body = world.createRigidBody(rigidBodyDesc);
                         world.createCollider(colliderDesc, body);
                     }
@@ -200,28 +199,22 @@
             });
         }
         
-        // --- 为坦克模型创建动态立方体碰撞体 ---
         function createPhysicsForTank(object) {
             const boundingBox = new THREE.Box3().setFromObject(object);
-            const size = new THREE.Vector3();
-            boundingBox.getSize(size);
+            boundingBox.getSize(tankSize); // 保存坦克尺寸以备后用
             
-            // 动态刚体描述
             let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
                 .setTranslation(object.position.x, object.position.y, object.position.z)
-                .setLinearDamping(0.5) // 增加线性阻尼，让坦克不会滑行太远
-                .setAngularDamping(0.5); // 增加角阻尼，让坦克旋转更稳定
+                .setLinearDamping(0.5)
+                .setAngularDamping(0.8) // 增加角阻尼，防止过度旋转
+                .lockRotations(); // 锁定物理旋转，我们将通过代码控制
 
-            // 创建刚体
             tankRigidBody = world.createRigidBody(rigidBodyDesc);
 
-            // 立方体碰撞体描述
-            let colliderDesc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2);
-            // 创建碰撞体并附加到刚体上
+            let colliderDesc = RAPIER.ColliderDesc.cuboid(tankSize.x / 2, tankSize.y / 2, tankSize.z / 2);
             world.createCollider(colliderDesc, tankRigidBody);
         }
 
-        // --- 设置虚拟摇杆 ---
         function setupJoystick() {
             const options = {
                 zone: document.getElementById('joystick-zone'),
@@ -235,8 +228,7 @@
             manager.on('move', (evt, data) => {
                 joystick.active = true;
                 joystick.force = data.force;
-                // nipplejs的角度是度数，0度向右，顺时针增加。需转换为弧度，并调整为_three.js_坐标系（0弧度向+Z）
-                joystick.angle = data.angle.radian - Math.PI / 2;
+                joystick.angle = data.angle.radian;
             });
             
             manager.on('end', () => {
@@ -245,15 +237,28 @@
             });
         }
 
-        // --- 核心动画/游戏循环 ---
+        // --- 新增：设置跳跃按钮的事件监听 ---
+        function setupJumpButton() {
+            const jumpButton = document.getElementById('jump-button');
+            const jumpAction = () => {
+                if (tankRigidBody && isGrounded) {
+                    // 施加一个向上的巨大冲力来实现跳跃
+                    tankRigidBody.applyImpulse({ x: 0, y: tankControl.jumpForce, z: 0 }, true);
+                }
+            };
+            jumpButton.addEventListener('click', jumpAction);
+            jumpButton.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // 防止触发click事件和页面缩放
+                jumpAction();
+            });
+        }
+        
         function animate() {
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
 
-            // 更新物理世界
             world.step();
 
-            // 如果坦克物理体存在，则更新坦克
             if (tankRigidBody && tankModel) {
                 updateTank(deltaTime);
                 updateCamera();
@@ -262,56 +267,77 @@
             renderer.render(scene, camera);
         }
 
-        // --- 更新坦克状态（物理和渲染） ---
+        // --- 已重写：更新坦克状态，使用新的控制逻辑和地面检测 ---
         function updateTank(deltaTime) {
-            // 1. 处理摇杆输入，施加力
-            if (joystick.active) {
-                const impulse = new THREE.Vector3(0, 0, -joystick.force * tankControl.moveSpeed);
-                
-                // 让坦克朝向目标方向
-                const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), joystick.angle);
-                tankModel.quaternion.slerp(targetQuaternion, deltaTime * tankControl.turnSpeed * 5); // 平滑转向
-                
-                // 将力从模型本地坐标转换到世界坐标并施加
-                impulse.applyQuaternion(tankModel.quaternion);
-                tankRigidBody.applyImpulse(impulse, true);
-            }
+            // 1. 地面检测 (Raycasting)
+            const rayOrigin = tankRigidBody.translation();
+            const rayDirection = { x: 0, y: -1, z: 0 };
+            const ray = new RAPIER.Ray(rayOrigin, rayDirection);
+            const maxToi = tankSize.y / 2 + 0.1; // 射线长度 = 坦克一半高度 + 一点点缓冲
+            const hit = world.castRay(ray, maxToi, true);
+            isGrounded = hit !== null;
 
-            // 2. 同步渲染模型到物理体的位置和旋转
+            // 2. 处理摇杆输入来移动坦克
+            const currentVelocity = tankRigidBody.linvel();
+            let targetVelocity = new THREE.Vector3(0, currentVelocity.y, 0);
+
+            if (joystick.active) {
+                // 将摇杆的角度和力度转换为一个速度向量
+                // NippleJS 0度向右，90度向上。我们需要向上为-Z，向右为+X
+                const moveX = Math.cos(joystick.angle) * joystick.force * tankControl.moveSpeed;
+                const moveZ = -Math.sin(joystick.angle) * joystick.force * tankControl.moveSpeed;
+                targetVelocity.x = moveX;
+                targetVelocity.z = moveZ;
+
+                // 3. 让坦克模型平滑地朝向移动方向
+                if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
+                    const targetQuaternion = new THREE.Quaternion();
+                    const forward = new THREE.Vector3(moveX, 0, moveZ).normalize();
+                    targetQuaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), forward); // 注意：这里假设模型初始朝向+Z，如果不是，需要调整
+                    tankModel.quaternion.slerp(targetQuaternion, deltaTime * tankControl.turnSpeed * 5);
+                }
+            }
+            
+            // 4. 设置刚体的线速度
+            tankRigidBody.setLinvel(targetVelocity, true);
+            
+            // 5. 同步渲染模型到物理体的位置
             const position = tankRigidBody.translation();
-            tankModel.position.set(position.x, position.y, position.z);
-            // 注意：我们使用模型的旋转来控制方向，所以这里不从物理引擎同步旋转回来
-            // 物理引擎只负责位置移动和碰撞，视觉旋转由我们控制
-            tankRigidBody.setRotation(tankModel.quaternion, true);
+            tankModel.position.copy(position);
         }
 
-        // --- 更新相机位置和朝向 ---
+        // --- 已重写：更新相机以适应新的模型朝向和位置 ---
         function updateCamera() {
             if (!tankModel) return;
 
             // 1. 计算目标相机位置
             const targetPosition = new THREE.Vector3();
             targetPosition.copy(cameraOffset); // 获取基础偏移
-            targetPosition.applyQuaternion(tankModel.quaternion); // 让偏移量跟随坦克旋转
+            
+            // 让相机朝向和坦克模型朝向保持一致，但我们不希望相机也跟着上下翻转
+            const tankQuaternion = new THREE.Quaternion();
+            // 只取坦克在Y轴上的旋转，忽略X和Z轴的翻滚
+            const tankEuler = new THREE.Euler().setFromQuaternion(tankModel.quaternion, 'YXZ');
+            tankQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), tankEuler.y);
+            
+            targetPosition.applyQuaternion(tankQuaternion); // 让偏移量跟随坦克Y轴旋转
             targetPosition.add(tankModel.position); // 将偏移量加到坦克当前位置上
 
             // 2. 平滑移动相机到目标位置
-            camera.position.lerp(targetPosition, 0.05);
+            camera.position.lerp(targetPosition, 0.08); // 稍微加快跟随速度
 
             // 3. 让相机始终朝向坦克中心
             const lookAtTarget = new THREE.Vector3().copy(tankModel.position);
-            lookAtTarget.y += 1.0; // 稍微抬高视点，看向坦克的中心而不是底部
+            lookAtTarget.y += 1.0; 
             camera.lookAt(lookAtTarget);
         }
 
-        // --- 窗口大小调整 ---
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
         
-        // --- 音乐控制（保持不变） ---
         async function setupMusicControls() {
             const musicButton = document.getElementById('music-toggle-btn');
             const iconOn = document.getElementById('music-icon-on');
