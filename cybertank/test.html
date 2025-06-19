@@ -108,7 +108,10 @@
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
+            
+            // Start the asset loading process
             loadAssetsAndPhysics();
+
             setupControls();
             setupMusicControls();
             setupFullscreen();
@@ -116,74 +119,88 @@
             animate();
         }
 
-        function loadAssetsAndPhysics() {
+        // --- REWRITTEN loadAssetsAndPhysics to be sequential using async/await ---
+        async function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
 
-            exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
+            // Helper function to turn callback-based loaders into Promise-based ones
+            const loadGltfAsync = (url) => new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
+            const loadExrAsync = (url) => new Promise((resolve, reject) => exrLoader.load(url, resolve, undefined, reject));
+
+            try {
+                // 1. AWAIT the background texture loading
+                console.log("Loading background...");
+                const texture = await loadExrAsync('assets/Minigame_Synth_Environment_4096x2048.exr');
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
+                console.log("Background loaded.");
 
-                // Load the Scene model
-                gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
-                    const sceneModel = gltf.scene;
-                    scene.add(sceneModel);
+                // 2. AWAIT the scene model loading
+                console.log("Loading scene...");
+                const sceneGltf = await loadGltfAsync('assets/Minigame_Synth_Scene.glb');
+                const sceneModel = sceneGltf.scene;
+                scene.add(sceneModel);
 
-                    const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-                    sceneModel.traverse(child => {
-                        if (child.isMesh) {
-                            child.receiveShadow = true;
-                            child.updateWorldMatrix(true, true);
-                            const geometry = child.geometry;
-                            if (!geometry.attributes.position || !geometry.index) return;
-                            const vertices = geometry.attributes.position.array.slice();
-                            const indices = geometry.index.array.slice();
-                            for (let i = 0; i < vertices.length; i += 3) {
-                                const vertex = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-                                vertex.applyMatrix4(child.matrixWorld);
-                                vertices[i] = vertex.x;
-                                vertices[i + 1] = vertex.y;
-                                vertices[i + 2] = vertex.z;
-                            }
-                            const trimeshDesc = RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices);
-                            world.createCollider(trimeshDesc, sceneBody);
+                const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+                sceneModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.receiveShadow = true;
+                        child.updateWorldMatrix(true, true);
+                        const geometry = child.geometry;
+                        if (!geometry.attributes.position || !geometry.index) return;
+                        const vertices = geometry.attributes.position.array.slice();
+                        const indices = geometry.index.array.slice();
+                        for (let i = 0; i < vertices.length; i += 3) {
+                            const vertex = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                            vertex.applyMatrix4(child.matrixWorld);
+                            vertices[i] = vertex.x;
+                            vertices[i + 1] = vertex.y;
+                            vertices[i + 2] = vertex.z;
                         }
-                    });
+                        const trimeshDesc = RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices);
+                        world.createCollider(trimeshDesc, sceneBody);
+                    }
                 });
+                console.log("Scene loaded and physics body created.");
 
-                // Load the Tank model
-                gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                    tankModel = gltf.scene;
-                    tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
-                    scene.add(tankModel);
-                    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                        .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                        .setLinearDamping(0.5)
-                        .setAngularDamping(0.8)
-                        .setCanSleep(false);
-                    tankBody = world.createRigidBody(bodyDesc);
-                    const allVertices = [];
-                    tankModel.traverse(child => {
-                        if (child.isMesh) {
-                            child.castShadow = true;
-                            const positions = child.geometry.attributes.position.array;
-                            for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
-                        }
-                    });
-                    const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
-                    world.createCollider(colliderDesc, tankBody);
+                // 3. AWAIT the tank model loading (only starts after scene is done)
+                console.log("Loading tank...");
+                const tankGltf = await loadGltfAsync('assets/Minigame_Synth_Tank.glb');
+                tankModel = tankGltf.scene;
+                tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
+                scene.add(tankModel);
+
+                const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+                    .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
+                    .setLinearDamping(0.5)
+                    .setAngularDamping(0.8)
+                    .setCanSleep(false);
+                tankBody = world.createRigidBody(bodyDesc);
+                const allVertices = [];
+                tankModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        const positions = child.geometry.attributes.position.array;
+                        for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
+                    }
                 });
-            });
+                const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
+                world.createCollider(colliderDesc, tankBody);
+                console.log("Tank loaded and physics body created. All assets ready!");
+
+            } catch (error) {
+                console.error("An error occurred during asset loading:", error);
+            }
         }
 
+        // --- FIXED setupControls to correctly handle Pointer Events ---
         function setupControls() {
-            // Joystick for mobile
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
                 joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
             }
-            // Keyboard for PC
             document.addEventListener('keydown', (e) => {
                 switch (e.key.toLowerCase()) {
                     case 'w': case 'arrowup':    keyboard.forward = 1; break;
@@ -200,92 +217,53 @@
                 }
             });
             
-            // --- REFACTORED CAMERA ORBIT CONTROLS FOR MULTI-TOUCH ---
-            const cameraTouches = {}; // Use an object to track individual touches for the camera
-            let isMouseDown = false; // Keep track of mouse state for PC
-            let prevMousePos = { x: 0, y: 0 };
+            const cameraPointers = {}; // Tracks active pointers for camera control
             const rotationSpeed = 0.005;
 
             const onPointerDown = (e) => {
-                // For mouse events (PC)
-                if (e.pointerType === 'mouse' || !isTouchDevice) {
-                    if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return;
-                    isMouseDown = true;
-                    prevMousePos.x = e.clientX;
-                    prevMousePos.y = e.clientY;
+                // Ignore clicks on UI elements for camera control
+                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) {
                     return;
                 }
-
-                // For touch events (Mobile)
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touch = e.changedTouches[i];
-                    if (touch.target.closest('.ui-button') || touch.target.closest('#joystick-container')) {
-                        continue;
-                    }
-                    cameraTouches[touch.identifier] = {
-                        lastX: touch.clientX,
-                        lastY: touch.clientY
-                    };
-                }
+                // Capture the pointer and its starting position
+                cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+                // Prevent default actions like text selection on drag
+                e.preventDefault();
             };
 
             const onPointerMove = (e) => {
-                // For mouse events (PC)
-                if (e.pointerType === 'mouse' || !isTouchDevice) {
-                    if (!isMouseDown) return;
-                    const deltaX = e.clientX - prevMousePos.x;
-                    const deltaY = e.clientY - prevMousePos.y;
+                // Find if the moving pointer is one we are tracking for the camera
+                const pointer = cameraPointers[e.pointerId];
+                if (pointer) {
+                    const deltaX = e.clientX - pointer.x;
+                    const deltaY = e.clientY - pointer.y;
+
                     cameraAngle.horizontal -= deltaX * rotationSpeed;
                     cameraAngle.vertical -= deltaY * rotationSpeed;
                     cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical));
-                    prevMousePos.x = e.clientX;
-                    prevMousePos.y = e.clientY;
-                    return;
-                }
-
-                // For touch events (Mobile)
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touch = e.changedTouches[i];
-                    const trackedTouch = cameraTouches[touch.identifier];
-                    if (trackedTouch) {
-                        const deltaX = touch.clientX - trackedTouch.lastX;
-                        const deltaY = touch.clientY - trackedTouch.lastY;
-                        cameraAngle.horizontal -= deltaX * rotationSpeed;
-                        cameraAngle.vertical -= deltaY * rotationSpeed;
-                        cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical));
-                        trackedTouch.lastX = touch.clientX;
-                        trackedTouch.lastY = touch.clientY;
-                    }
+                    
+                    // Update the pointer's last position
+                    pointer.x = e.clientX;
+                    pointer.y = e.clientY;
                 }
             };
 
-            const onPointerUp = (e) => {
-                // For mouse events (PC)
-                if (e.pointerType === 'mouse' || !isTouchDevice) {
-                    isMouseDown = false;
-                    return;
-                }
-
-                // For touch events (Mobile)
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touch = e.changedTouches[i];
-                    if (cameraTouches[touch.identifier]) {
-                        delete cameraTouches[touch.identifier];
-                    }
-                }
+            const onPointerUpOrCancel = (e) => {
+                // Stop tracking the pointer when it's lifted or cancelled
+                delete cameraPointers[e.pointerId];
             };
             
             renderer.domElement.addEventListener('pointerdown', onPointerDown);
             renderer.domElement.addEventListener('pointermove', onPointerMove);
-            renderer.domElement.addEventListener('pointerup', onPointerUp);
-            renderer.domElement.addEventListener('pointerleave', onPointerUp);
-            renderer.domElement.addEventListener('pointercancel', onPointerUp);
+            renderer.domElement.addEventListener('pointerup', onPointerUpOrCancel);
+            renderer.domElement.addEventListener('pointercancel', onPointerUpOrCancel);
+            renderer.domElement.addEventListener('pointerleave', onPointerUpOrCancel);
 
             // UI Buttons
             const jumpButton = document.getElementById('jump-btn');
             const resetButton = document.getElementById('reset-btn');
             
-            jumpButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleJump(); });
+            jumpButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleJump(); }, { passive: false });
             jumpButton.addEventListener('click', handleJump);
 
             const resetTank = () => {
@@ -295,7 +273,7 @@
                 tankBody.setTranslation(initialTankPosition, true);
                 tankBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
             };
-            resetButton.addEventListener('touchstart', (e) => { e.preventDefault(); resetTank(); });
+            resetButton.addEventListener('touchstart', (e) => { e.preventDefault(); resetTank(); }, { passive: false });
             resetButton.addEventListener('click', resetTank);
         }
         
