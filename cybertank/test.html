@@ -15,13 +15,13 @@
         #joystick-container { position: absolute; bottom: 30px; left: 50px; width: 120px; height: 120px; z-index: 10; }
     </style>
     <!-- ========================================================= -->
-    <!-- === CORRECTED IMPORT MAP === -->
+    <!-- === FINAL CORRECTED IMPORT MAP USING ESM.SH CDN === -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/",
-                "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.13.1/pkg/rapier_wasm3d_compat.js"
+                "three": "https://esm.sh/three@0.149.0",
+                "three/addons/": "https://esm.sh/three@0.149.0/examples/jsm/",
+                "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.13.1"
             }
         }
     </script>
@@ -60,9 +60,8 @@
         async function init() {
             // --- Physics Initialization ---
             // =========================================================
-            // === CORRECTED RAPIER INIT WITH EXPLICIT WASM PATH ===
-            const wasmPath = 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.13.1/pkg/rapier_wasm3d_compat_bg.wasm';
-            await RAPIER.init(wasmPath);
+            // === RAPIER.init() no longer needs an explicit path ===
+            await RAPIER.init();
             // =========================================================
             
             const gravity = { x: 0.0, y: -9.81, z: 0.0 };
@@ -137,12 +136,15 @@
         function createTrimeshCollider(mesh, bodyDesc, parentBody = null) {
             const geometry = mesh.geometry;
             const vertices = geometry.attributes.position.array;
-            const indices = geometry.index ? geometry.index.array : undefined;
+            // =========================================================
+            // === IMPORTANT BUG FIX: Handle meshes without an index ===
+            const indices = geometry.index ? geometry.index.array : null;
 
             if (!indices) {
-                console.warn("Skipping mesh for physics: No indices found.", mesh);
+                console.warn("Skipping mesh for physics: It has no indices.", mesh);
                 return;
             }
+            // =========================================================
             
             const trimeshDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
             
@@ -163,13 +165,14 @@
                     color: 'rgba(255,255,255,0.5)'
                 });
                 joystickManager.on('move', (evt, data) => {
-                    const angle = data.angle.radian;
-                    const force = data.force;
                     if (data.direction) {
-                       if (data.direction.y === 'up') moveDirection.forward = force;
-                       else if(data.direction.y === 'down') moveDirection.forward = -force * 0.7;
-                       if (data.direction.x === 'left') moveDirection.turn = force;
-                       else if (data.direction.x === 'right') moveDirection.turn = -force;
+                       if (data.direction.y === 'up') moveDirection.forward = data.force;
+                       else if(data.direction.y === 'down') moveDirection.forward = -data.force * 0.7;
+                       else moveDirection.forward = 0;
+
+                       if (data.direction.x === 'left') moveDirection.turn = data.force;
+                       else if (data.direction.x === 'right') moveDirection.turn = -data.force;
+                       else moveDirection.turn = 0;
                     }
                 }).on('end', () => {
                     moveDirection.forward = 0;
