@@ -14,42 +14,24 @@
 
         canvas {
             display: block;
-            touch-action: none;
-        }
-        
-        #joystick-zone {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            width: 150px;
-            height: 150px;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            z-index: 10;
         }
 
-        /* --- 新增：跳跃按钮样式 --- */
-        #jump-button-zone {
+        #fullscreen-prompt {
             position: absolute;
-            bottom: 40px;
-            right: 40px;
-            width: 80px;
-            height: 80px;
-            z-index: 10;
-        }
-
-        #jump-button {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid white;
-            background-color: rgba(255, 255, 255, 0.2);
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             color: white;
-            font-size: 18px;
-            font-weight: bold;
-            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 10;
         }
-        /* --- 样式结束 --- */
 
         #music-toggle-btn {
             position: absolute;
@@ -71,65 +53,90 @@
         #music-toggle-btn svg {
             display: block;
         }
+        
+        /* Joystick container */
+        #joystick-zone {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(128, 128, 128, 0.2);
+            border-radius: 50%;
+            z-index: 50;
+        }
+        
+        /* Hide joystick on non-touch devices */
+        .no-touch #joystick-zone {
+            display: none;
+        }
     </style>
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/",
-                "@dimforge/rapier3d-compat": "https://cdn.skypack.dev/@dimforge/rapier3d-compat@0.11.2"
-            }
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/",
+            "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.mjs",
+            "nipplejs": "https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.mjs"
         }
+    }
     </script>
+
 </head>
 
 <body>
-    <div id="joystick-zone"></div>
-    <!-- 新增：跳跃按钮 -->
-    <div id="jump-button-zone">
-        <button id="jump-button">JUMP</button>
-    </div>
-    
+    <div id="fullscreen-prompt">Tap to enter fullscreen & lock landscape</div>
     <button id="music-toggle-btn" aria-label="Toggle Music">
-        <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg></span>
-        <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none" /><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" /></svg></span>
+        <span id="music-icon-on" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33">
+                <path d="M0 0h24v24H0V0z" fill="none" />
+                <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+            </svg>
+        </span>
+        <span id="music-icon-off">
+            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33">
+                <path d="M0 0h24v24H0V0z" fill="none" />
+                <path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" />
+            </svg>
+        </span>
     </button>
     
-    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
+    <div id="joystick-zone"></div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-        import RAPIER from '@dimforge/rapier3d-compat';
+        import * as CANNON from 'cannon-es';
+        import nipplejs from 'nipplejs';
 
-        let scene, camera, renderer, clock;
+        let scene, camera, renderer, world, clock;
+        let tankModel, tankBody, cameraPivot;
+        
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        
-        let world;
-        let tankModel;
-        let tankRigidBody;
-        let tankSize = new THREE.Vector3(); // 用于存储坦克的尺寸
+        if (!isTouchDevice) {
+            document.body.classList.add('no-touch');
+        }
 
-        const joystick = { active: false, force: 0, angle: 0 };
-        const tankControl = {
-            moveSpeed: 5.0, // 增加移动速度
-            turnSpeed: 4.0, // 增加转向速度
-            jumpForce: 70.0, // 定义跳跃力量
-        };
-        let isGrounded = false; // 坦克是否在地面上的标志
+        // Tank control state
+        const tankControls = { forward: 0, turn: 0 };
+        const TANK_SPEED = 6;
+        const TANK_TURN_SPEED = 1.5;
 
-        // --- 已修正：相机偏移量，Z为负值，使其在坦克后方 ---
-        const cameraOffset = new THREE.Vector3(0, 5, -12);
-        
-        let audioContext, audioBuffer, sourceNode, isPlaying = false;
+        // Music
+        let audioContext;
+        let audioBuffer;
+        let sourceNode;
+        let isPlaying = false;
 
-        RAPIER.init().then(init);
+        init();
+        animate();
 
         function init() {
-            clock = new THREE.Clock();
-            
+            // === THREE.js Setup ===
             scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -138,86 +145,112 @@
             document.body.appendChild(renderer.domElement);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.copy(cameraOffset);
-
-            const gravity = { x: 0.0, y: -9.81 * 2, z: 0.0 }; // 加大重力，让跳跃手感更好
-            world = new RAPIER.World(gravity);
             
+            // Camera Pivot for orbit controls
+            cameraPivot = new THREE.Object3D();
+            cameraPivot.add(camera);
+            scene.add(cameraPivot);
+            camera.position.set(0, 5, 10); // Offset from pivot
+            camera.lookAt(cameraPivot.position);
+
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
-            loadAssets();
-            
-            if (isTouchDevice) {
-                setupJoystick();
-                setupJumpButton(); // --- 新增：初始化跳跃按钮
-            }
+            // === CANNON.js Physics Setup ===
+            world = new CANNON.World({
+                gravity: new CANNON.Vec3(0, -9.82, 0)
+            });
+            world.broadphase = new CANNON.SAPBroadphase(world);
+            world.allowSleep = true; // Performance improvement
 
+            loadAssetsAndCreatePhysics();
+            setupControls();
             setupMusicControls();
+            setupFullscreen();
             window.addEventListener('resize', onWindowResize);
-            
-            animate();
         }
 
-        function loadAssets() {
+        // Helper to create Cannon.js Trimesh from Three.js BufferGeometry
+        function createTrimesh(geometry) {
+            const vertices = geometry.attributes.position.array;
+            const indices = geometry.index ? geometry.index.array : Array.from(Array(vertices.length / 3).keys());
+            return new CANNON.Trimesh(vertices, indices);
+        }
+
+        function loadAssetsAndCreatePhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
+
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                
+
+                // Load Scene and create static collision meshes
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
-                    scene.add(gltf.scene);
-                    createPhysicsForScene(gltf.scene);
+                    const sceneModel = gltf.scene;
+                    scene.add(sceneModel);
+
+                    // Create static physics body from the scene's geometry
+                    sceneModel.traverse(child => {
+                        if (child.isMesh && child.geometry) {
+                            const trimeshShape = createTrimesh(child.geometry);
+                            const trimeshBody = new CANNON.Body({ mass: 0 }); // mass 0 makes it static
+                            
+                            // Apply world transform from Three.js mesh to Cannon.js body
+                            const worldPosition = new THREE.Vector3();
+                            const worldQuaternion = new THREE.Quaternion();
+                            child.getWorldPosition(worldPosition);
+                            child.getWorldQuaternion(worldQuaternion);
+                            trimeshBody.position.copy(worldPosition);
+                            trimeshBody.quaternion.copy(worldQuaternion);
+                            
+                            trimeshBody.addShape(trimeshShape);
+                            world.addBody(trimeshBody);
+                        }
+                    });
                 });
 
+                // Load Tank and create dynamic collision body
                 gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                     tankModel = gltf.scene;
-                    tankModel.position.set(0, 1, 0);
                     scene.add(tankModel);
-                    createPhysicsForTank(tankModel);
+
+                    // Create a simplified dynamic physics body for the tank (a box)
+                    const boundingBox = new THREE.Box3().setFromObject(tankModel);
+                    const size = new THREE.Vector3();
+                    boundingBox.getSize(size);
+                    const tankShape = new CANNON.Box(new CANNON.Vec3(size.x / 2 * 0.9, size.y / 2 * 0.8, size.z / 2 * 0.95));
+                    
+                    tankBody = new CANNON.Body({
+                        mass: 700,
+                        shape: tankShape,
+                        position: new CANNON.Vec3(0, 5, 0), // Start above the ground
+                        material: new CANNON.Material({ friction: 0.1, restitution: 0.1 })
+                    });
+                    tankBody.angularDamping = 0.8; // Prevents infinite spinning
+                    world.addBody(tankBody);
                 });
             });
         }
         
-        function createPhysicsForScene(object) {
-            object.traverse((child) => {
-                if (child.isMesh) {
-                    const vertices = child.geometry.attributes.position.array;
-                    const indices = child.geometry.index ? child.geometry.index.array : undefined;
-                    if (vertices && indices) {
-                        let rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
-                        let colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
-                        let body = world.createRigidBody(rigidBodyDesc);
-                        world.createCollider(colliderDesc, body);
-                    }
-                }
-            });
-        }
-        
-        function createPhysicsForTank(object) {
-            const boundingBox = new THREE.Box3().setFromObject(object);
-            boundingBox.getSize(tankSize); // 保存坦克尺寸以备后用
-            
-            let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                .setTranslation(object.position.x, object.position.y, object.position.z)
-                .setLinearDamping(0.5)
-                .setAngularDamping(0.8) // 增加角阻尼，防止过度旋转
-                .lockRotations(); // 锁定物理旋转，我们将通过代码控制
-
-            tankRigidBody = world.createRigidBody(rigidBodyDesc);
-
-            let colliderDesc = RAPIER.ColliderDesc.cuboid(tankSize.x / 2, tankSize.y / 2, tankSize.z / 2);
-            world.createCollider(colliderDesc, tankRigidBody);
+        function setupControls() {
+            if (isTouchDevice) {
+                setupJoystick();
+                setupCameraTouchControls();
+            } else {
+                setupCameraMouseControls();
+                setupKeyboardControls(); // Add keyboard controls for desktop
+            }
         }
 
         function setupJoystick() {
+            const joystickZone = document.getElementById('joystick-zone');
             const options = {
-                zone: document.getElementById('joystick-zone'),
+                zone: joystickZone,
                 mode: 'static',
                 position: { left: '50%', top: '50%' },
                 color: 'white',
@@ -226,119 +259,160 @@
             const manager = nipplejs.create(options);
             
             manager.on('move', (evt, data) => {
-                joystick.active = true;
-                joystick.force = data.force;
-                joystick.angle = data.angle.radian;
+                const angle = data.angle.radian;
+                const force = data.force;
+                // Convert joystick angle to tank forward/turn controls
+                tankControls.forward = force * Math.sin(angle);
+                tankControls.turn = -force * Math.cos(angle);
             });
-            
+
             manager.on('end', () => {
-                joystick.active = false;
-                joystick.force = 0;
+                tankControls.forward = 0;
+                tankControls.turn = 0;
             });
         }
 
-        // --- 新增：设置跳跃按钮的事件监听 ---
-        function setupJumpButton() {
-            const jumpButton = document.getElementById('jump-button');
-            const jumpAction = () => {
-                if (tankRigidBody && isGrounded) {
-                    // 施加一个向上的巨大冲力来实现跳跃
-                    tankRigidBody.applyImpulse({ x: 0, y: tankControl.jumpForce, z: 0 }, true);
+        function setupKeyboardControls() {
+            window.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case 'w': case 'ArrowUp':    tankControls.forward = 1; break;
+                    case 's': case 'ArrowDown':  tankControls.forward = -1; break;
+                    case 'a': case 'ArrowLeft':  tankControls.turn = 1; break;
+                    case 'd': case 'ArrowRight': tankControls.turn = -1; break;
                 }
-            };
-            jumpButton.addEventListener('click', jumpAction);
-            jumpButton.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // 防止触发click事件和页面缩放
-                jumpAction();
+            });
+            window.addEventListener('keyup', (e) => {
+                switch(e.key) {
+                    case 'w': case 'ArrowUp':
+                    case 's': case 'ArrowDown':  tankControls.forward = 0; break;
+                    case 'a': case 'ArrowLeft':
+                    case 'd': case 'ArrowRight': tankControls.turn = 0; break;
+                }
             });
         }
         
-        function animate() {
-            requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
+        function updateTankMovement() {
+            if (!tankBody) return;
 
-            world.step();
+            // Calculate forward vector based on tank's rotation
+            const forwardVector = new CANNON.Vec3(0, 0, 1);
+            const rotatedForward = tankBody.quaternion.vmult(forwardVector);
+            
+            // Apply velocity for forward/backward movement
+            const targetVelocity = rotatedForward.scale(tankControls.forward * TANK_SPEED);
+            // Preserve vertical velocity (gravity)
+            targetVelocity.y = tankBody.velocity.y;
+            tankBody.velocity.lerp(targetVelocity, 0.2, tankBody.velocity);
 
-            if (tankRigidBody && tankModel) {
-                updateTank(deltaTime);
-                updateCamera();
-            }
-
-            renderer.render(scene, camera);
+            // Apply angular velocity for turning
+            const targetAngularVelocity = new CANNON.Vec3(0, tankControls.turn * TANK_TURN_SPEED, 0);
+            tankBody.angularVelocity.lerp(targetAngularVelocity, 0.5, tankBody.angularVelocity);
         }
 
-        // --- 已重写：更新坦克状态，使用新的控制逻辑和地面检测 ---
-        function updateTank(deltaTime) {
-            // 1. 地面检测 (Raycasting)
-            const rayOrigin = tankRigidBody.translation();
-            const rayDirection = { x: 0, y: -1, z: 0 };
-            const ray = new RAPIER.Ray(rayOrigin, rayDirection);
-            const maxToi = tankSize.y / 2 + 0.1; // 射线长度 = 坦克一半高度 + 一点点缓冲
-            const hit = world.castRay(ray, maxToi, true);
-            isGrounded = hit !== null;
+        function setupCameraTouchControls() {
+            const musicButton = document.getElementById('music-toggle-btn');
+            const joystickZone = document.getElementById('joystick-zone');
+            const activeTouches = {};
+            let previousPinchDistance = null;
+            const rotationSpeed = 0.005;
+            const pinchSpeed = 0.02;
 
-            // 2. 处理摇杆输入来移动坦克
-            const currentVelocity = tankRigidBody.linvel();
-            let targetVelocity = new THREE.Vector3(0, currentVelocity.y, 0);
-
-            if (joystick.active) {
-                // 将摇杆的角度和力度转换为一个速度向量
-                // NippleJS 0度向右，90度向上。我们需要向上为-Z，向右为+X
-                const moveX = Math.cos(joystick.angle) * joystick.force * tankControl.moveSpeed;
-                const moveZ = -Math.sin(joystick.angle) * joystick.force * tankControl.moveSpeed;
-                targetVelocity.x = moveX;
-                targetVelocity.z = moveZ;
-
-                // 3. 让坦克模型平滑地朝向移动方向
-                if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
-                    const targetQuaternion = new THREE.Quaternion();
-                    const forward = new THREE.Vector3(moveX, 0, moveZ).normalize();
-                    targetQuaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), forward); // 注意：这里假设模型初始朝向+Z，如果不是，需要调整
-                    tankModel.quaternion.slerp(targetQuaternion, deltaTime * tankControl.turnSpeed * 5);
+            const onTouchStart = (e) => {
+                // Ignore touches starting on UI elements
+                if (musicButton.contains(e.target) || joystickZone.contains(e.target)) return;
+                
+                for (const touch of e.changedTouches) {
+                    activeTouches[touch.identifier] = { prevX: touch.clientX, prevY: touch.clientY };
                 }
-            }
-            
-            // 4. 设置刚体的线速度
-            tankRigidBody.setLinvel(targetVelocity, true);
-            
-            // 5. 同步渲染模型到物理体的位置
-            const position = tankRigidBody.translation();
-            tankModel.position.copy(position);
+                if (Object.keys(activeTouches).length === 2) {
+                     const t0 = e.touches[0];
+                     const t1 = e.touches[1];
+                     previousPinchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+                }
+            };
+
+            const onTouchMove = (e) => {
+                if (musicButton.contains(e.target) || joystickZone.contains(e.target)) return;
+                e.preventDefault();
+
+                const touchCount = Object.keys(activeTouches).length;
+                if (touchCount === 1) { // Single finger drag for rotation
+                    const touchId = Object.keys(activeTouches)[0];
+                    const touch = Array.from(e.touches).find(t => t.identifier == touchId);
+                    if (touch) {
+                        const state = activeTouches[touchId];
+                        const deltaX = touch.clientX - state.prevX;
+                        const deltaY = touch.clientY - state.prevY;
+                        cameraPivot.rotation.y -= deltaX * rotationSpeed;
+                        cameraPivot.rotation.x -= deltaY * rotationSpeed;
+                        cameraPivot.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraPivot.rotation.x));
+                        state.prevX = touch.clientX;
+                        state.prevY = touch.clientY;
+                    }
+                } else if (touchCount === 2) { // Two finger pinch for zoom
+                    const t0 = e.touches[0];
+                    const t1 = e.touches[1];
+                    const currentPinchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+                    if (previousPinchDistance) {
+                        const deltaPinch = currentPinchDistance - previousPinchDistance;
+                        camera.position.z -= deltaPinch * pinchSpeed;
+                        camera.position.z = Math.max(2, Math.min(30, camera.position.z)); // Clamp zoom
+                    }
+                    previousPinchDistance = currentPinchDistance;
+                }
+            };
+
+            const onTouchEnd = (e) => {
+                for (const touch of e.changedTouches) {
+                    delete activeTouches[touch.identifier];
+                }
+                if (Object.keys(activeTouches).length < 2) {
+                    previousPinchDistance = null;
+                }
+            };
+
+            const targetElement = renderer.domElement;
+            targetElement.addEventListener('touchstart', onTouchStart, { passive: true });
+            targetElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            targetElement.addEventListener('touchend', onTouchEnd, { passive: true });
         }
+        
+        function setupCameraMouseControls() {
+            let isDragging = false;
+            let prevMouse = {x: 0, y: 0};
+            const rotationSpeed = 0.005;
 
-        // --- 已重写：更新相机以适应新的模型朝向和位置 ---
-        function updateCamera() {
-            if (!tankModel) return;
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                if (e.button === 0) { // Left mouse button
+                    isDragging = true;
+                    prevMouse.x = e.clientX;
+                    prevMouse.y = e.clientY;
+                }
+            });
 
-            // 1. 计算目标相机位置
-            const targetPosition = new THREE.Vector3();
-            targetPosition.copy(cameraOffset); // 获取基础偏移
-            
-            // 让相机朝向和坦克模型朝向保持一致，但我们不希望相机也跟着上下翻转
-            const tankQuaternion = new THREE.Quaternion();
-            // 只取坦克在Y轴上的旋转，忽略X和Z轴的翻滚
-            const tankEuler = new THREE.Euler().setFromQuaternion(tankModel.quaternion, 'YXZ');
-            tankQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), tankEuler.y);
-            
-            targetPosition.applyQuaternion(tankQuaternion); // 让偏移量跟随坦克Y轴旋转
-            targetPosition.add(tankModel.position); // 将偏移量加到坦克当前位置上
+             renderer.domElement.addEventListener('mousemove', (e) => {
+                if(isDragging) {
+                    const deltaX = e.clientX - prevMouse.x;
+                    const deltaY = e.clientY - prevMouse.y;
+                    cameraPivot.rotation.y -= deltaX * rotationSpeed;
+                    cameraPivot.rotation.x -= deltaY * rotationSpeed;
+                    cameraPivot.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraPivot.rotation.x));
+                    prevMouse.x = e.clientX;
+                    prevMouse.y = e.clientY;
+                }
+            });
 
-            // 2. 平滑移动相机到目标位置
-            camera.position.lerp(targetPosition, 0.08); // 稍微加快跟随速度
+            renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+            renderer.domElement.addEventListener('mouseleave', () => isDragging = false);
 
-            // 3. 让相机始终朝向坦克中心
-            const lookAtTarget = new THREE.Vector3().copy(tankModel.position);
-            lookAtTarget.y += 1.0; 
-            camera.lookAt(lookAtTarget);
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.addEventListener('wheel', (e) => {
+                camera.position.z += e.deltaY * 0.01;
+                camera.position.z = Math.max(2, Math.min(30, camera.position.z));
+            });
         }
         
         async function setupMusicControls() {
+            // This function remains the same as provided
             const musicButton = document.getElementById('music-toggle-btn');
             const iconOn = document.getElementById('music-icon-on');
             const iconOff = document.getElementById('music-icon-off');
@@ -383,6 +457,56 @@
                     playMusic();
                 }
             });
+        }
+
+        function setupFullscreen() {
+            // This function remains the same as provided
+            const prompt = document.getElementById('fullscreen-prompt');
+            if (isTouchDevice) {
+                setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
+                setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
+            }
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+                        screen.orientation.unlock();
+                    }
+                }
+            });
+            renderer.domElement.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+
+            updateTankMovement();
+            
+            // Step the physics world
+            world.step(1 / 60, deltaTime, 3);
+
+            // Sync visual tank with physics body
+            if(tankModel && tankBody) {
+                tankModel.position.copy(tankBody.position);
+                // Adjust position slightly if pivot point is not at the base
+                tankModel.position.y -= 0.2; 
+                tankModel.quaternion.copy(tankBody.quaternion);
+
+                // Update camera pivot to follow the tank
+                cameraPivot.position.copy(tankBody.position);
+            }
+            
+            renderer.render(scene, camera);
         }
     </script>
 </body>
