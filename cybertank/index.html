@@ -11,9 +11,7 @@
         #music-toggle-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 100; opacity: 0.8; transition: opacity 0.2s; }
         #music-toggle-btn:hover { opacity: 1; }
         #music-toggle-btn svg { display: block; }
-        #joystick-container { position: absolute; bottom: 20px; left: 20px; width: 120px; height: 120px; z-index: 100; user-select: none; -webkit-user-select: none; }
-        #joystick-base { position: absolute; width: 100%; height: 100%; background-color: rgba(128, 128, 128, 0.3); border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); }
-        #joystick-handle { position: absolute; top: 30px; left: 30px; width: 60px; height: 60px; background-color: rgba(200, 200, 200, 0.5); border-radius: 50%; transition: transform 0.1s; }
+        /* 移除了所有摇杆相关的CSS */
     </style>
     <script type="importmap">
         { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/" } }
@@ -26,7 +24,7 @@
         <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z"/></svg></span>
     </button>
     <audio id="background-music" loop><source src="assets/bounce tanki loop cut (no intro).opus" type="audio/opus"></audio>
-    <div id="joystick-container"><div id="joystick-base"></div><div id="joystick-handle"></div></div>
+    <!-- 移除了摇杆的HTML元素 -->
 
     <script type="module">
         import * as THREE from 'three';
@@ -34,9 +32,7 @@
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 
         let scene, camera, renderer;
-        const clock = new THREE.Clock();
-        let joystickVector = new THREE.Vector2();
-        let moveSpeed = 5;
+        const clock = new THREE.Clock(); // 保留clock以备将来使用，当前平移不依赖它
 
         init();
         animate();
@@ -54,7 +50,7 @@
             camera.position.set(0, 5, 15);
             camera.rotation.order = 'YXZ';
 
-            setupMultiTouchControls();
+            setupTouchControls(); // 使用新的、简化的触摸控制器
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
@@ -64,112 +60,55 @@
 
             loadAssetsInOrder();
             setupMusicControls();
-            setupFullscreen();
+            setupFullscreen(); // 恢复调用
             window.addEventListener('resize', onWindowResize);
         }
         
-        // --- 完全重构和修复的统一多点触控控制器 ---
-        function setupMultiTouchControls() {
-            const activeTouches = new Map();
-            const joystickContainer = document.getElementById('joystick-container');
-            const joystickHandle = document.getElementById('joystick-handle');
-            const joystickBaseRadius = joystickContainer.offsetWidth / 2;
-            const joystickHandleRadius = joystickHandle.offsetWidth / 2;
-            const joystickMaxRadius = joystickBaseRadius - joystickHandleRadius;
+        function setupTouchControls() {
+            let activeTouches = {};
+            let previousPanPoint = null;
             
-            let previousPinchDistance = 0;
             const rotationSpeed = 0.004;
-            const pinchSpeed = 0.02;
+            const panSpeed = 0.01;
 
             const onTouchStart = (e) => {
                 e.preventDefault();
                 for (const touch of e.changedTouches) {
-                    const isJoystickTouch = joystickContainer.contains(touch.target);
-                    activeTouches.set(touch.identifier, {
-                        type: isJoystickTouch ? 'joystick' : 'camera',
+                    activeTouches[touch.identifier] = {
                         prevX: touch.clientX,
-                        prevY: touch.clientY,
-                    });
+                        prevY: touch.clientY
+                    };
+                }
+                // 如果变为双指操作，记录中心点
+                if (Object.keys(activeTouches).length === 2) {
+                    previousPanPoint = getPanPoint(e.touches);
                 }
             };
 
             const onTouchMove = (e) => {
                 e.preventDefault();
-                
-                const cameraTouches = [];
-                let joystickTouch = null;
+                const touchCount = Object.keys(activeTouches).length;
 
-                // --- 核心修复点 1: 遍历 e.touches 而不是 e.changedTouches ---
-                // 这可以让我们每一帧都获得所有手指的最新状态
-                for (const touch of e.touches) {
-                    const state = activeTouches.get(touch.identifier);
-                    if (!state) continue;
-
-                    if (state.type === 'joystick') {
-                        joystickTouch = touch;
-                    } else if (state.type === 'camera') {
-                        cameraTouches.push(touch);
+                if (touchCount === 1) { // 单指旋转
+                    const touchId = Object.keys(activeTouches)[0];
+                    const touch = Array.from(e.touches).find(t => t.identifier == touchId);
+                    if (touch) {
+                        handleCameraRotate(touch, activeTouches[touchId]);
                     }
-                }
-
-                // --- 处理摇杆 ---
-                if (joystickTouch) {
-                    handleJoystickMove(joystickTouch);
-                } else {
-                    resetJoystick(); // 如果没有摇杆手指，确保摇杆复位
-                }
-
-                // --- 处理相机：旋转和缩放 ---
-                if (cameraTouches.length === 1) {
-                    const touch = cameraTouches[0];
-                    const state = activeTouches.get(touch.identifier);
-                    handleCameraRotate(touch, state);
-                    previousPinchDistance = 0; // 从多指变为单指时，重置捏合距离
-                } else if (cameraTouches.length === 2) {
-                    handlePinchZoom(cameraTouches);
-                } else {
-                    previousPinchDistance = 0; // 手指数量不为2时，重置
-                }
-                
-                // 更新所有触摸点的旧位置
-                for (const touch of e.touches) {
-                    const state = activeTouches.get(touch.identifier);
-                    if (state) {
-                         state.prevX = touch.clientX;
-                         state.prevY = touch.clientY;
-                    }
+                } else if (touchCount === 2) { // 双指平移
+                    handleCameraPan(e.touches);
                 }
             };
             
             const onTouchEnd = (e) => {
                 e.preventDefault();
                 for (const touch of e.changedTouches) {
-                    // 检查抬起的手指是否是摇杆手指
-                    const state = activeTouches.get(touch.identifier);
-                    if (state && state.type === 'joystick') {
-                        resetJoystick();
-                    }
-                    activeTouches.delete(touch.identifier);
+                    delete activeTouches[touch.identifier];
                 }
-                 // 如果只剩下一个手指，重置捏合状态以防万一
-                if (activeTouches.size < 2) {
-                    previousPinchDistance = 0;
+                // 从双指变为单指时，重置平移点
+                if (Object.keys(activeTouches).length < 2) {
+                    previousPanPoint = null;
                 }
-            };
-
-            const handleJoystickMove = (touch) => {
-                const rect = joystickContainer.getBoundingClientRect();
-                let x = touch.clientX - (rect.left + joystickBaseRadius);
-                let y = touch.clientY - (rect.top + joystickBaseRadius);
-                const distance = Math.hypot(x, y);
-
-                if (distance > joystickMaxRadius) {
-                    x = (x / distance) * joystickMaxRadius;
-                    y = (y / distance) * joystickMaxRadius;
-                }
-                
-                joystickHandle.style.transform = `translate(${x}px, ${y}px)`;
-                joystickVector.set(x / joystickMaxRadius, -y / joystickMaxRadius);
             };
 
             const handleCameraRotate = (touch, state) => {
@@ -179,28 +118,30 @@
                 camera.rotation.y -= deltaX * rotationSpeed;
                 camera.rotation.x -= deltaY * rotationSpeed;
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+
+                state.prevX = touch.clientX;
+                state.prevY = touch.clientY;
             };
             
-            // --- 核心修复点 2: 修复捏合逻辑 ---
-            const handlePinchZoom = (touches) => {
-                const t0 = touches[0];
-                const t1 = touches[1];
-                const currentDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-                
-                // 只有在已经有上一次距离记录时才计算移动
-                if (previousPinchDistance > 0) {
-                    const deltaDistance = currentDist - previousPinchDistance;
-                    camera.translateZ(-deltaDistance * pinchSpeed);
+            const handleCameraPan = (touches) => {
+                const currentPanPoint = getPanPoint(touches);
+                if (previousPanPoint) {
+                    const deltaX = currentPanPoint.x - previousPanPoint.x;
+                    const deltaY = currentPanPoint.y - previousPanPoint.y;
+                    
+                    // 根据相机的朝向进行平移
+                    camera.translateX(-deltaX * panSpeed);
+                    camera.translateY(deltaY * panSpeed); // 注意：屏幕Y轴向上是负，相机Y轴向上是正，所以这里是正
                 }
-                // 更新上一次的距离，为下一帧做准备
-                previousPinchDistance = currentDist;
+                previousPanPoint = currentPanPoint;
             };
-            
-            const resetJoystick = () => {
-                if (joystickVector.x !== 0 || joystickVector.y !== 0) {
-                    joystickHandle.style.transform = `translate(0px, 0px)`;
-                    joystickVector.set(0, 0);
-                }
+
+            const getPanPoint = (touches) => {
+                if (touches.length < 2) return null;
+                return {
+                    x: (touches[0].clientX + touches[1].clientX) / 2,
+                    y: (touches[0].clientY + touches[1].clientY) / 2
+                };
             };
             
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -210,6 +151,7 @@
         }
 
         function loadAssetsInOrder() {
+            // ... (此函数无需修改)
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
             exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
@@ -229,6 +171,7 @@
         }
         
         function setupMusicControls() {
+            // ... (此函数无需修改)
             const musicButton = document.getElementById('music-toggle-btn');
             const bgMusic = document.getElementById('background-music');
             const iconOn = document.getElementById('music-icon-on');
@@ -248,12 +191,15 @@
             });
         }
 
+        // --- 全屏功能已恢复 ---
         function setupFullscreen() {
             const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             const prompt = document.getElementById('fullscreen-prompt');
             if (isTouchDevice) {
                 setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
                 setTimeout(() => { prompt.style.opacity = '0'; }, 7000);
+
+                // 这个监听器确保首次点击时触发全屏
                 window.addEventListener('click', () => {
                     if (!document.fullscreenElement) {
                         document.documentElement.requestFullscreen().catch(err => {});
@@ -270,11 +216,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
-            if (joystickVector.length() > 0) {
-                camera.translateZ(-joystickVector.y * moveSpeed * deltaTime);
-                camera.translateX(joystickVector.x * moveSpeed * deltaTime);
-            }
+            // 现在移动逻辑在touch事件中直接处理，animate循环无需再做移动计算
             renderer.render(scene, camera);
         }
     </script>
