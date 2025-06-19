@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Jump and Reset</title>
+    <title>Tank Physics Demo - Final Version</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -109,9 +109,7 @@
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
             
-            // Start the asset loading process
             loadAssetsAndPhysics();
-
             setupControls();
             setupMusicControls();
             setupFullscreen();
@@ -119,30 +117,19 @@
             animate();
         }
 
-        // --- REWRITTEN loadAssetsAndPhysics to be sequential using async/await ---
         async function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
-
-            // Helper function to turn callback-based loaders into Promise-based ones
             const loadGltfAsync = (url) => new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
             const loadExrAsync = (url) => new Promise((resolve, reject) => exrLoader.load(url, resolve, undefined, reject));
-
             try {
-                // 1. AWAIT the background texture loading
-                console.log("Loading background...");
                 const texture = await loadExrAsync('assets/Minigame_Synth_Environment_4096x2048.exr');
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                console.log("Background loaded.");
-
-                // 2. AWAIT the scene model loading
-                console.log("Loading scene...");
                 const sceneGltf = await loadGltfAsync('assets/Minigame_Synth_Scene.glb');
                 const sceneModel = sceneGltf.scene;
                 scene.add(sceneModel);
-
                 const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
                 sceneModel.traverse(child => {
                     if (child.isMesh) {
@@ -163,20 +150,11 @@
                         world.createCollider(trimeshDesc, sceneBody);
                     }
                 });
-                console.log("Scene loaded and physics body created.");
-
-                // 3. AWAIT the tank model loading (only starts after scene is done)
-                console.log("Loading tank...");
                 const tankGltf = await loadGltfAsync('assets/Minigame_Synth_Tank.glb');
                 tankModel = tankGltf.scene;
                 tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
                 scene.add(tankModel);
-
-                const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                    .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                    .setLinearDamping(0.5)
-                    .setAngularDamping(0.8)
-                    .setCanSleep(false);
+                const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z).setLinearDamping(0.5).setAngularDamping(0.8).setCanSleep(false);
                 tankBody = world.createRigidBody(bodyDesc);
                 const allVertices = [];
                 tankModel.traverse(child => {
@@ -188,14 +166,11 @@
                 });
                 const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
                 world.createCollider(colliderDesc, tankBody);
-                console.log("Tank loaded and physics body created. All assets ready!");
-
             } catch (error) {
                 console.error("An error occurred during asset loading:", error);
             }
         }
 
-        // --- FIXED setupControls to correctly handle Pointer Events ---
         function setupControls() {
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
@@ -217,39 +192,40 @@
                 }
             });
             
-            const cameraPointers = {}; // Tracks active pointers for camera control
+            const cameraPointers = {};
             const rotationSpeed = 0.005;
+            const tapThreshold = 10;
+            const pointerDownPos = new THREE.Vector2();
 
             const onPointerDown = (e) => {
-                // Ignore clicks on UI elements for camera control
                 if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) {
                     return;
                 }
-                // Capture the pointer and its starting position
                 cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-                // Prevent default actions like text selection on drag
+                pointerDownPos.set(e.clientX, e.clientY);
                 e.preventDefault();
             };
 
             const onPointerMove = (e) => {
-                // Find if the moving pointer is one we are tracking for the camera
                 const pointer = cameraPointers[e.pointerId];
                 if (pointer) {
                     const deltaX = e.clientX - pointer.x;
                     const deltaY = e.clientY - pointer.y;
-
                     cameraAngle.horizontal -= deltaX * rotationSpeed;
                     cameraAngle.vertical -= deltaY * rotationSpeed;
                     cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical));
-                    
-                    // Update the pointer's last position
                     pointer.x = e.clientX;
                     pointer.y = e.clientY;
                 }
             };
 
             const onPointerUpOrCancel = (e) => {
-                // Stop tracking the pointer when it's lifted or cancelled
+                if (cameraPointers[e.pointerId]) {
+                    const dragDistance = pointerDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
+                    if (dragDistance < tapThreshold) {
+                        handleFullscreenRequest();
+                    }
+                }
                 delete cameraPointers[e.pointerId];
             };
             
@@ -259,13 +235,10 @@
             renderer.domElement.addEventListener('pointercancel', onPointerUpOrCancel);
             renderer.domElement.addEventListener('pointerleave', onPointerUpOrCancel);
 
-            // UI Buttons
             const jumpButton = document.getElementById('jump-btn');
             const resetButton = document.getElementById('reset-btn');
-            
             jumpButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleJump(); }, { passive: false });
             jumpButton.addEventListener('click', handleJump);
-
             const resetTank = () => {
                 if (!tankBody) return;
                 tankBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -309,20 +282,24 @@
                 moveDirection.set(0, 0, 0);
                 moveDirection.addScaledVector(cameraForward, moveInput.y);
                 moveDirection.addScaledVector(cameraRight, moveInput.x);
+
                 const currentVel = tankBody.linvel();
                 if (moveDirection.lengthSq() > 0.01) {
                     moveDirection.normalize();
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
-                    _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(moveDirection), upVector);
-                    targetQuaternion.setFromRotationMatrix(_matrix);
-                    if (!tankModel.quaternion.equals(targetQuaternion)) {
-                        tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
-                        tankBody.setRotation(tankModel.quaternion, true);
-                    }
                 } else {
                     tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
+
+                const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
+                _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), upVector);
+                targetQuaternion.setFromRotationMatrix(_matrix);
+                if (!tankModel.quaternion.equals(targetQuaternion)) {
+                    tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
+                    tankBody.setRotation(tankModel.quaternion, true);
+                }
+
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
@@ -336,9 +313,67 @@
         };
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+        
         function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
-        function setupFullscreen() { const prompt = document.getElementById('fullscreen-prompt'); if (isTouchDevice) { setTimeout(() => { prompt.style.opacity = '1'; }, 2000); setTimeout(() => { prompt.style.opacity = '0'; }, 7000); renderer.domElement.addEventListener('click', (e) => { if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return; handleFullscreenRequest(); }); } else { renderer.domElement.addEventListener('click', (e) => { if(e.target.closest('.ui-button')) return; handleFullscreenRequest()}); } document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); };
-        async function setupMusicControls() { const musicButton = document.getElementById('music-toggle-btn'); const iconOn = document.getElementById('music-icon-on'); const iconOff = document.getElementById('music-icon-off'); try { const response = await fetch('assets/bounce tanki loop cut (no intro).opus'); const arrayBuffer = await response.arrayBuffer(); audioContext = THREE.AudioContext.getContext(); audioBuffer = await audioContext.decodeAudioData(arrayBuffer); } catch (error) { console.error('Failed to load or decode audio file:', error); musicButton.disabled = true; return; } function playMusic() { if (isPlaying || !audioBuffer) return; sourceNode = audioContext.createBufferSource(); sourceNode.buffer = audioBuffer; sourceNode.loop = true; sourceNode.connect(audioContext.destination); sourceNode.start(); isPlaying = true; iconOn.style.display = 'inline'; iconOff.style.display = 'none'; } function stopMusic() { if (!isPlaying || !sourceNode) return; sourceNode.stop(); sourceNode.disconnect(); sourceNode = null; isPlaying = false; iconOn.style.display = 'none'; iconOff.style.display = 'inline'; } musicButton.addEventListener('click', (e) => { e.stopPropagation(); if (audioContext.state === 'suspended') { audioContext.resume(); } if (isPlaying) { stopMusic(); } else { playMusic(); } }); }
+        
+        function setupFullscreen() { 
+            const prompt = document.getElementById('fullscreen-prompt'); 
+            if (isTouchDevice) { 
+                setTimeout(() => { prompt.style.opacity = '1'; }, 2000); 
+                setTimeout(() => { prompt.style.opacity = '0'; }, 7000); 
+            } else { 
+                renderer.domElement.addEventListener('click', (e) => { 
+                    if(e.target.closest('.ui-button')) return; 
+                    handleFullscreenRequest()
+                }); 
+            } 
+            document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); 
+        };
+
+        async function setupMusicControls() { 
+            const musicButton = document.getElementById('music-toggle-btn'); 
+            const iconOn = document.getElementById('music-icon-on'); 
+            const iconOff = document.getElementById('music-icon-off'); 
+            try { 
+                const response = await fetch('assets/bounce tanki loop cut (no intro).opus'); 
+                const arrayBuffer = await response.arrayBuffer(); 
+                audioContext = THREE.AudioContext.getContext(); 
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer); 
+            } catch (error) { 
+                console.error('Failed to load or decode audio file:', error); 
+                musicButton.disabled = true; 
+                return; 
+            } 
+            function playMusic() { 
+                if (isPlaying || !audioBuffer) return; 
+                sourceNode = audioContext.createBufferSource(); 
+                sourceNode.buffer = audioBuffer; 
+                sourceNode.loop = true; 
+                sourceNode.connect(audioContext.destination); 
+                sourceNode.start(); 
+                isPlaying = true; 
+                iconOn.style.display = 'inline'; 
+                iconOff.style.display = 'none'; 
+            } 
+            function stopMusic() { 
+                if (!isPlaying || !sourceNode) return; 
+                sourceNode.stop(); 
+                sourceNode.disconnect(); 
+                sourceNode = null; 
+                isPlaying = false; 
+                iconOn.style.display = 'none'; 
+                iconOff.style.display = 'inline'; 
+            } 
+            musicButton.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                if (audioContext.state === 'suspended') { audioContext.resume(); } 
+                if (isPlaying) { 
+                    stopMusic(); 
+                } else { 
+                    playMusic(); 
+                } 
+            }); 
+        }
     </script>
 </body>
 
