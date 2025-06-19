@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Velocity Control</title>
+    <title>Tank Physics Demo - Correct Collision Shape</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
@@ -51,11 +51,8 @@
         const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
         const cameraOffset = new THREE.Vector3(0, 4, 12);
         
-        // =========================================================
-        // === NEW PHYSICS PARAMETERS: DIRECT VELOCITY CONTROL ===
-        const maxSpeed = 5.0; // This is the tank's maximum speed in meters/second. Adjust as needed!
-        const turnSpeed = 0.1; // How fast the tank turns.
-        // =========================================================
+        const maxSpeed = 5.0;
+        const turnSpeed = 0.1;
 
         init();
 
@@ -83,6 +80,9 @@
             animate();
         }
 
+        // =========================================================
+        // === CRITICAL FIX: USING CONVEX HULL FOR DYNAMIC TANK ===
+        // =========================================================
         function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
@@ -90,34 +90,54 @@
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
+
+                // Load Scene (Static Trimesh - This is CORRECT)
                 gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
                     const sceneModel = gltf.scene;
                     scene.add(sceneModel);
-                    sceneModel.traverse(child => { if (child.isMesh) { child.receiveShadow = true; createTrimeshCollider(child, RAPIER.RigidBodyDesc.fixed()); } });
-                    gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                        tankModel = gltf.scene;
-                        tankModel.position.set(0, 2, 0);
-                        scene.add(tankModel);
-                        const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                            .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                            // We don't need high damping with direct velocity control
-                            .setLinearDamping(0.5) 
-                            .setAngularDamping(0.8);
-                        tankBody = world.createRigidBody(bodyDesc);
-                        tankModel.traverse(child => { if (child.isMesh) { child.castShadow = true; createTrimeshCollider(child, null, tankBody); } });
+                    sceneModel.traverse(child => {
+                        if (child.isMesh) {
+                            child.receiveShadow = true;
+                            const geometry = child.geometry;
+                            const vertices = geometry.attributes.position.array;
+                            const indices = geometry.index.array;
+                            const trimeshDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
+                            world.createCollider(trimeshDesc, world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
+                        }
                     });
                 });
-            });
-        }
 
-        function createTrimeshCollider(mesh, bodyDesc, parentBody = null) {
-            const geometry = mesh.geometry;
-            const vertices = geometry.attributes.position.array;
-            const indices = geometry.index ? geometry.index.array : null;
-            if (!indices) { return; }
-            const trimeshDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
-            if (bodyDesc) { world.createCollider(trimeshDesc, world.createRigidBody(bodyDesc));
-            } else if (parentBody) { world.createCollider(trimeshDesc, parentBody); }
+                // Load Tank (Dynamic Convex Hull - This is the FIX)
+                gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
+                    tankModel = gltf.scene;
+                    tankModel.position.set(0, 2, 0); // Start above ground
+                    scene.add(tankModel);
+
+                    // Create the dynamic body for the tank
+                    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+                        .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
+                        .setLinearDamping(0.5)
+                        .setAngularDamping(0.8)
+                        .setCanSleep(false); // Important for player-controlled objects
+                    tankBody = world.createRigidBody(bodyDesc);
+
+                    // Collect all vertices from all meshes in the tank model
+                    const allVertices = [];
+                    tankModel.traverse(child => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            const positions = child.geometry.attributes.position.array;
+                            for (let i = 0; i < positions.length; i += 3) {
+                                allVertices.push(positions[i], positions[i+1], positions[i+2]);
+                            }
+                        }
+                    });
+                    
+                    // Create a single Convex Hull collider from all the vertices
+                    const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
+                    world.createCollider(colliderDesc, tankBody);
+                });
+            });
         }
 
         function setupControls() {
@@ -161,7 +181,6 @@
             if (tankBody && tankModel) {
                 const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
 
-                // 1. Calculate the direction vector based on camera and input
                 camera.getWorldDirection(cameraForward);
                 cameraForward.y = 0;
                 cameraForward.normalize();
@@ -170,17 +189,14 @@
                 moveDirection.set(0, 0, 0);
                 moveDirection.addScaledVector(cameraForward, -moveInput.y);
                 moveDirection.addScaledVector(cameraRight, moveInput.x);
-                moveDirection.normalize(); // Ensure it's just a direction
-
+                
                 const currentVel = tankBody.linvel();
                 
-                if (moveInput.lengthSq() > 0.01) {
-                    // --- APPLY MOVEMENT BY SETTING VELOCITY ---
+                if (moveDirection.lengthSq() > 0.01) {
+                    moveDirection.normalize();
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
-                    // Preserve vertical velocity for gravity
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
 
-                    // --- SMOOTHLY ROTATE TANK ---
                     _matrix.lookAt(tankModel.position, tankModel.position.clone().add(moveDirection), upVector);
                     targetQuaternion.setFromRotationMatrix(_matrix);
                     if (!tankModel.quaternion.equals(targetQuaternion)) {
@@ -188,16 +204,12 @@
                         tankBody.setRotation(tankModel.quaternion, true);
                     }
                 } else {
-                    // --- STOP MOVEMENT WHEN NO INPUT ---
-                    // Preserve vertical velocity for gravity
                     tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
                 
-                // Update visual model from physics
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
 
-                // Update Camera
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
