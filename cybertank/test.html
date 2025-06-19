@@ -4,14 +4,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Reversed Orientation</title>
+    <title>Tank Physics Demo - Jump and Reset</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
-        #music-toggle-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 100; opacity: 0.8; transition: opacity 0.2s; }
-        #music-toggle-btn:hover { opacity: 1; }
-        #music-toggle-btn svg { display: block; }
+        
+        /* UI Button Styles */
+        .ui-button {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            padding: 10px;
+            z-index: 100;
+            opacity: 0.8;
+            transition: opacity 0.2s, background-color 0.2s;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ui-button:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        .ui-button svg {
+            display: block;
+            width: 32px;
+            height: 32px;
+        }
+
+        #music-toggle-btn { top: 15px; right: 15px; border-radius: 8px; }
+        #reset-btn { top: 15px; right: 85px; border-radius: 8px; }
+        #jump-btn { position: absolute; bottom: 30px; right: 50px; width: 80px; height: 80px; }
         #joystick-container { position: absolute; bottom: 30px; left: 50px; width: 120px; height: 120px; z-index: 10; }
     </style>
     <script type="importmap">
@@ -27,12 +53,19 @@
 </head>
 
 <body>
+    <!-- UI Elements -->
     <div id="joystick-container"></div>
-    <div id="fullscreen-prompt">Tap to enter fullscreen & lock landscape</div>
-    <button id="music-toggle-btn" aria-label="Toggle Music">
-        <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></span>
-        <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5 2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z"/></svg></span>
+    <button id="jump-btn" class="ui-button" aria-label="Jump">
+        <svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 0 24 24" width="48px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
     </button>
+    <button id="reset-btn" class="ui-button" aria-label="Reset Tank">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-8v4h2v-4h3l-4-4-4 4h3z" fill-rule="evenodd"/></svg>
+    </button>
+    <button id="music-toggle-btn" class="ui-button" aria-label="Toggle Music">
+        <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg></span>
+        <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M14.77 10.27 3 4.23l1.27-1.27 18 18L21 22.23 12.28 13.5c.47-.17.97-.28 1.5-.28 2.49 0 4.5 2.01 4.5 4.5s-2.01 4.5-4.5 4.5-4.5-2.01-4.5-4.5v-1.73L8.27 10H15V6h4V3h-7v7.27z"/></svg></span>
+    </button>
+    <div id="fullscreen-prompt">Tap to enter fullscreen & lock landscape</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -53,6 +86,9 @@
         
         const maxSpeed = 5.0;
         const turnSpeed = 0.1;
+        const jumpForce = 250; // Adjust this value for jump height
+        const groundRaycastDist = 1.5; // How far to check for the ground
+        const initialTankPosition = { x: 0, y: 2, z: 0 };
 
         init();
 
@@ -103,7 +139,7 @@
                 });
                 gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                     tankModel = gltf.scene;
-                    tankModel.position.set(0, 2, 0);
+                    tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
                     scene.add(tankModel);
                     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
                         .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
@@ -116,9 +152,7 @@
                         if (child.isMesh) {
                             child.castShadow = true;
                             const positions = child.geometry.attributes.position.array;
-                            for (let i = 0; i < positions.length; i += 3) {
-                                allVertices.push(positions[i], positions[i+1], positions[i+2]);
-                            }
+                            for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
                         }
                     });
                     const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
@@ -128,29 +162,60 @@
         }
 
         function setupControls() {
+            // Joystick
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
                 joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
             }
+            // Keyboard
             document.addEventListener('keydown', (e) => {
                 switch (e.key.toLowerCase()) {
                     case 'w': case 'arrowup':    keyboard.forward = 1; break;
                     case 's': case 'arrowdown':  keyboard.forward = -1; break;
                     case 'a': case 'arrowleft':  keyboard.turn = -1; break;
                     case 'd': case 'arrowright': keyboard.turn = 1; break;
+                    case ' ':                    handleJump(); break; // Spacebar to jump
                 }
             });
-             document.addEventListener('keyup', (e) => {
+            document.addEventListener('keyup', (e) => {
                 switch (e.key.toLowerCase()) {
                     case 'w': case 'arrowup': case 's': case 'arrowdown':  keyboard.forward = 0; break;
                     case 'a': case 'arrowleft': case 'd': case 'arrowright': keyboard.turn = 0; break;
                 }
             });
+            // Camera Orbit
             let isDragging = false; let prevMousePos = { x: 0, y: 0 }; const rotationSpeed = 0.005;
-            const onPointerDown = (e) => { if (e.target.id === 'music-toggle-btn' || e.target.closest('#joystick-container')) return; isDragging = true; prevMousePos.x = e.clientX || e.touches[0].clientX; prevMousePos.y = e.clientY || e.touches[0].clientY; };
+            const onPointerDown = (e) => { if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return; isDragging = true; prevMousePos.x = e.clientX || e.touches[0].clientX; prevMousePos.y = e.clientY || e.touches[0].clientY; };
             const onPointerMove = (e) => { if (!isDragging) return; const clientX = e.clientX || e.touches[0].clientX; const clientY = e.clientY || e.touches[0].clientY; const deltaX = clientX - prevMousePos.x; const deltaY = clientY - prevMousePos.y; cameraAngle.horizontal -= deltaX * rotationSpeed; cameraAngle.vertical -= deltaY * rotationSpeed; cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical)); prevMousePos.x = clientX; prevMousePos.y = clientY; };
             const onPointerUp = () => { isDragging = false; };
             renderer.domElement.addEventListener('mousedown', onPointerDown); renderer.domElement.addEventListener('mousemove', onPointerMove); renderer.domElement.addEventListener('mouseup', onPointerUp); renderer.domElement.addEventListener('mouseleave', onPointerUp); renderer.domElement.addEventListener('touchstart', onPointerDown, { passive: true }); renderer.domElement.addEventListener('touchmove', onPointerMove, { passive: true }); renderer.domElement.addEventListener('touchend', onPointerUp);
+
+            // --- JUMP & RESET BUTTONS ---
+            const jumpButton = document.getElementById('jump-btn');
+            const resetButton = document.getElementById('reset-btn');
+            
+            jumpButton.addEventListener('click', handleJump);
+            resetButton.addEventListener('click', () => {
+                if (!tankBody) return;
+                tankBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                tankBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                tankBody.setTranslation(initialTankPosition, true);
+                tankBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+            });
+        }
+        
+        function handleJump() {
+            if (!tankBody) return;
+            // Raycasting to check if grounded
+            const rayOrigin = tankBody.translation();
+            const rayDir = { x: 0, y: -1, z: 0 };
+            const ray = new RAPIER.Ray(rayOrigin, rayDir);
+            const hit = world.castRay(ray, groundRaycastDist, true, null, null, tankBody.collider(0));
+            
+            if (hit) {
+                // Apply a strong upward impulse for the jump
+                tankBody.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
+            }
         }
 
         const cameraForward = new THREE.Vector3();
@@ -172,7 +237,7 @@
                 cameraForward.y = 0;
                 cameraForward.normalize();
                 
-                cameraRight.crossVectors(cameraForward, upVector);
+                cameraRight.crossVectors(cameraForward, upVector).negate();
 
                 moveDirection.set(0, 0, 0);
                 moveDirection.addScaledVector(cameraForward, moveInput.y);
@@ -185,9 +250,6 @@
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
 
-                    // =========================================================
-                    // === FINAL ROTATION FIX: Look AWAY from move direction ===
-                    // =========================================================
                     _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(moveDirection), upVector);
                     targetQuaternion.setFromRotationMatrix(_matrix);
                     if (!tankModel.quaternion.equals(targetQuaternion)) {
@@ -213,7 +275,7 @@
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
         function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
-        function setupFullscreen() { const prompt = document.getElementById('fullscreen-prompt'); if (isTouchDevice) { setTimeout(() => { prompt.style.opacity = '1'; }, 2000); setTimeout(() => { prompt.style.opacity = '0'; }, 7000); renderer.domElement.addEventListener('click', (e) => { if (e.target.closest('#joystick-container')) return; handleFullscreenRequest(); }); } else { renderer.domElement.addEventListener('click', handleFullscreenRequest); } document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); };
+        function setupFullscreen() { const prompt = document.getElementById('fullscreen-prompt'); if (isTouchDevice) { setTimeout(() => { prompt.style.opacity = '1'; }, 2000); setTimeout(() => { prompt.style.opacity = '0'; }, 7000); renderer.domElement.addEventListener('click', (e) => { if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return; handleFullscreenRequest(); }); } else { renderer.domElement.addEventListener('click', (e) => { if(e.target.closest('.ui-button')) return; handleFullscreenRequest()}); } document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); };
         async function setupMusicControls() { const musicButton = document.getElementById('music-toggle-btn'); const iconOn = document.getElementById('music-icon-on'); const iconOff = document.getElementById('music-icon-off'); try { const response = await fetch('assets/bounce tanki loop cut (no intro).opus'); const arrayBuffer = await response.arrayBuffer(); audioContext = THREE.AudioContext.getContext(); audioBuffer = await audioContext.decodeAudioData(arrayBuffer); } catch (error) { console.error('Failed to load or decode audio file:', error); musicButton.disabled = true; return; } function playMusic() { if (isPlaying || !audioBuffer) return; sourceNode = audioContext.createBufferSource(); sourceNode.buffer = audioBuffer; sourceNode.loop = true; sourceNode.connect(audioContext.destination); sourceNode.start(); isPlaying = true; iconOn.style.display = 'inline'; iconOff.style.display = 'none'; } function stopMusic() { if (!isPlaying || !sourceNode) return; sourceNode.stop(); sourceNode.disconnect(); sourceNode = null; isPlaying = false; iconOn.style.display = 'none'; iconOff.style.display = 'inline'; } musicButton.addEventListener('click', (e) => { e.stopPropagation(); if (audioContext.state === 'suspended') { audioContext.resume(); } if (isPlaying) { stopMusic(); } else { playMusic(); } }); }
     </script>
 </body>
