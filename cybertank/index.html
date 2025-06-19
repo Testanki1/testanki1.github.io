@@ -54,7 +54,6 @@
             camera.position.set(0, 5, 15);
             camera.rotation.order = 'YXZ';
 
-            // --- 核心修改：使用统一的多点触控控制器 ---
             setupMultiTouchControls();
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -69,7 +68,7 @@
             window.addEventListener('resize', onWindowResize);
         }
         
-        // --- 全新的统一多点触控控制器 ---
+        // --- 完全重构和修复的统一多点触控控制器 ---
         function setupMultiTouchControls() {
             const activeTouches = new Map();
             const joystickContainer = document.getElementById('joystick-container');
@@ -88,51 +87,74 @@
                     const isJoystickTouch = joystickContainer.contains(touch.target);
                     activeTouches.set(touch.identifier, {
                         type: isJoystickTouch ? 'joystick' : 'camera',
-                        startX: touch.clientX,
-                        startY: touch.clientY,
                         prevX: touch.clientX,
                         prevY: touch.clientY,
                     });
                 }
-                updatePinchState();
             };
 
             const onTouchMove = (e) => {
                 e.preventDefault();
+                
                 const cameraTouches = [];
+                let joystickTouch = null;
 
-                for (const touch of e.changedTouches) {
+                // --- 核心修复点 1: 遍历 e.touches 而不是 e.changedTouches ---
+                // 这可以让我们每一帧都获得所有手指的最新状态
+                for (const touch of e.touches) {
                     const state = activeTouches.get(touch.identifier);
                     if (!state) continue;
 
                     if (state.type === 'joystick') {
-                        handleJoystickMove(touch);
+                        joystickTouch = touch;
                     } else if (state.type === 'camera') {
-                        handleCameraRotate(touch, state);
-                        cameraTouches.push(touch); // 收集用于捏合判断
+                        cameraTouches.push(touch);
                     }
-                    
-                    state.prevX = touch.clientX;
-                    state.prevY = touch.clientY;
                 }
 
-                // 在处理完单指旋转后，再检查是否需要捏合缩放
-                const allCameraTouches = Array.from(activeTouches.values()).filter(t => t.type === 'camera');
-                if (allCameraTouches.length === 2) {
-                    handlePinchZoom();
+                // --- 处理摇杆 ---
+                if (joystickTouch) {
+                    handleJoystickMove(joystickTouch);
+                } else {
+                    resetJoystick(); // 如果没有摇杆手指，确保摇杆复位
+                }
+
+                // --- 处理相机：旋转和缩放 ---
+                if (cameraTouches.length === 1) {
+                    const touch = cameraTouches[0];
+                    const state = activeTouches.get(touch.identifier);
+                    handleCameraRotate(touch, state);
+                    previousPinchDistance = 0; // 从多指变为单指时，重置捏合距离
+                } else if (cameraTouches.length === 2) {
+                    handlePinchZoom(cameraTouches);
+                } else {
+                    previousPinchDistance = 0; // 手指数量不为2时，重置
+                }
+                
+                // 更新所有触摸点的旧位置
+                for (const touch of e.touches) {
+                    const state = activeTouches.get(touch.identifier);
+                    if (state) {
+                         state.prevX = touch.clientX;
+                         state.prevY = touch.clientY;
+                    }
                 }
             };
             
             const onTouchEnd = (e) => {
                 e.preventDefault();
                 for (const touch of e.changedTouches) {
+                    // 检查抬起的手指是否是摇杆手指
                     const state = activeTouches.get(touch.identifier);
                     if (state && state.type === 'joystick') {
                         resetJoystick();
                     }
                     activeTouches.delete(touch.identifier);
                 }
-                updatePinchState();
+                 // 如果只剩下一个手指，重置捏合状态以防万一
+                if (activeTouches.size < 2) {
+                    previousPinchDistance = 0;
+                }
             };
 
             const handleJoystickMove = (touch) => {
@@ -151,10 +173,6 @@
             };
 
             const handleCameraRotate = (touch, state) => {
-                // 如果当前有2个或更多相机触摸点，则禁用单指旋转，优先处理捏合
-                const cameraTouchCount = Array.from(activeTouches.values()).filter(t => t.type === 'camera').length;
-                if (cameraTouchCount > 1) return;
-
                 const deltaX = touch.clientX - state.prevX;
                 const deltaY = touch.clientY - state.prevY;
                 
@@ -163,42 +181,30 @@
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
             };
             
-            const handlePinchZoom = () => {
-                const cameraTouches = Array.from(activeTouches.values()).filter(t => t.type === 'camera').map(state => {
-                    // 需要找到原始的 touch 对象来获取最新的 clientX/Y
-                    for(const t of renderer.domElement.getTouches()){
-                        if(t.identifier === state.identifier) return t;
-                    }
-                }).filter(Boolean); // 过滤掉可能未找到的
-                
-                if (cameraTouches.length !== 2) return;
-
-                const t0 = cameraTouches[0];
-                const t1 = cameraTouches[1];
+            // --- 核心修复点 2: 修复捏合逻辑 ---
+            const handlePinchZoom = (touches) => {
+                const t0 = touches[0];
+                const t1 = touches[1];
                 const currentDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
                 
+                // 只有在已经有上一次距离记录时才计算移动
                 if (previousPinchDistance > 0) {
                     const deltaDistance = currentDist - previousPinchDistance;
                     camera.translateZ(-deltaDistance * pinchSpeed);
                 }
+                // 更新上一次的距离，为下一帧做准备
                 previousPinchDistance = currentDist;
             };
             
-            const updatePinchState = () => {
-                 const cameraTouchCount = Array.from(activeTouches.values()).filter(t => t.type === 'camera').length;
-                 if (cameraTouchCount !== 2) {
-                     previousPinchDistance = 0;
-                 }
-            };
-            
             const resetJoystick = () => {
-                joystickHandle.style.transform = `translate(0px, 0px)`;
-                joystickVector.set(0, 0);
+                if (joystickVector.x !== 0 || joystickVector.y !== 0) {
+                    joystickHandle.style.transform = `translate(0px, 0px)`;
+                    joystickVector.set(0, 0);
+                }
             };
             
-            // 绑定事件到 canvas
-            renderer.domElement.addEventListener('touchstart', onTouchStart);
-            renderer.domElement.addEventListener('touchmove', onTouchMove);
+            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
             renderer.domElement.addEventListener('touchend', onTouchEnd);
             renderer.domElement.addEventListener('touchcancel', onTouchEnd);
         }
