@@ -4,15 +4,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank with Orbit Camera & Fixed Jump</title>
+    <title>Tank Final - Orbit Cam & Working Jump</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
-        canvas { display: block; }
+        canvas { 
+            display: block;
+            /* --- FIX 1: 解决触摸屏只能“一点一点”旋转的问题 --- */
+            touch-action: none; 
+        }
         #controls-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         #joystick-container { position: absolute; bottom: 30px; left: 30px; width: 150px; height: 150px; pointer-events: auto; }
         #jump-btn { position: absolute; bottom: 40px; right: 40px; width: 80px; height: 80px; border-radius: 50%; background-color: rgba(118, 255, 51, 0.5); border: 2px solid #76FF33; color: white; font-size: 18px; font-weight: bold; font-family: sans-serif; display: flex; justify-content: center; align-items: center; -webkit-tap-highlight-color: transparent; pointer-events: auto; user-select: none; }
         #jump-btn:active { background-color: rgba(118, 255, 51, 0.8); }
-        #music-toggle-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 100; opacity: 0.8; transition: opacity 0.2s; }
+        #music-toggle-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 100; opacity: 0.8; }
     </style>
     <script type="importmap">
         {
@@ -27,8 +31,8 @@
 </head>
 
 <body>
-    <!-- UI Elements remain the same -->
-    <button id="music-toggle-btn" aria-label="Toggle Music"><!-- SVG icons --></button>
+    <!-- UI Elements -->
+    <button id="music-toggle-btn"><!-- SVG icons --></button>
     <div id="controls-container">
         <div id="joystick-container"></div>
         <button id="jump-btn">JUMP</button>
@@ -42,31 +46,25 @@
         import nipplejs from 'nipplejs';
 
         let scene, camera, renderer, clock, world;
-        
-        // --- TANK & PHYSICS VARIABLES ---
         let tankGroup, tankModel, tankBody, tankCollider; 
         let isGrounded = false;
         const tankControls = { forward: 0, turn: 0 };
         const TANK_MOVE_FORCE = 800.0;
         const TANK_TURN_SPEED = 3.5;
-        const JUMP_FORCE = 60.0; // Slightly increased force
+        const JUMP_FORCE = 70.0; // Increased jump force
 
-        // --- NEW ORBIT CAMERA VARIABLES ---
         const cameraControls = {
             isDragging: false,
-            previousMousePosition: { x: 0, y: 0 },
-            azimuthAngle: Math.PI, // Start from behind the tank
-            polarAngle: Math.PI / 3, // Angle from the top
-            distance: 12 // Camera distance from tank
+            previousPointerPosition: { x: 0, y: 0 },
+             // --- FIX 2: 修正初始镜头方向 ---
+            azimuthAngle: 0, // 0 = 背后, Math.PI = 前方
+            polarAngle: Math.PI / 3,
+            distance: 12
         };
-
-        // --- Audio Variables ---
-        let audioContext, audioBuffer, sourceNode, isPlaying = false;
 
         init();
 
         async function init() {
-            // --- Basic Setup ---
             await RAPIER.init();
             world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
             clock = new THREE.Clock();
@@ -79,25 +77,20 @@
             document.body.appendChild(renderer.domElement);
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-            // --- Setup Controls ---
             setupJoystickAndJump(); 
-            setupOrbitCameraControls(); // New camera controls
+            setupOrbitCameraControls();
 
-            // --- Scene Lighting ---
             scene.add(new THREE.AmbientLight(0xffffff, 0.5));
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
 
-            // --- Load Assets ---
             loadAssets();
-            // setupMusicControls();
             window.addEventListener('resize', onWindowResize);
             animate();
         }
         
         function setupJoystickAndJump() {
-            // Joystick for movement
             nipplejs.create({
                 zone: document.getElementById('joystick-container'),
                 mode: 'static', position: { left: '50%', top: '50%' }, color: '#76FF33', size: 150
@@ -110,11 +103,10 @@
                 tankControls.forward = 0; tankControls.turn = 0;
             });
 
-            // Jump button
             const jumpBtn = document.getElementById('jump-btn');
             const handleJump = () => {
-                 console.log(`Jump button pressed. isGrounded: ${isGrounded}`); // DEBUG
                  if (tankBody && isGrounded) {
+                    // Apply a strong upward force
                     tankBody.applyImpulse({ x: 0, y: JUMP_FORCE, z: 0 }, true);
                 }
             };
@@ -122,44 +114,33 @@
             jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); handleJump(); }, { passive: false });
         }
 
-        // --- NEW: SETUP ORBIT CAMERA CONTROLS ---
         function setupOrbitCameraControls() {
             const domElement = renderer.domElement;
-            
             const onPointerDown = (e) => {
-                // Ignore clicks on UI elements
                 if (e.target.closest('#joystick-container') || e.target.closest('#jump-btn')) return;
                 cameraControls.isDragging = true;
-                cameraControls.previousMousePosition.x = e.clientX || e.touches[0].clientX;
-                cameraControls.previousMousePosition.y = e.clientY || e.touches[0].clientY;
+                cameraControls.previousPointerPosition.x = e.clientX ?? e.touches[0].clientX;
+                cameraControls.previousPointerPosition.y = e.clientY ?? e.touches[0].clientY;
             };
-
             const onPointerMove = (e) => {
                 if (!cameraControls.isDragging) return;
-                const clientX = e.clientX || e.touches[0].clientX;
-                const clientY = e.clientY || e.touches[0].clientY;
-                
-                const deltaX = clientX - cameraControls.previousMousePosition.x;
-                const deltaY = clientY - cameraControls.previousMousePosition.y;
+                const clientX = e.clientX ?? e.touches[0].clientX;
+                const clientY = e.clientY ?? e.touches[0].clientY;
+                const deltaX = clientX - cameraControls.previousPointerPosition.x;
+                const deltaY = clientY - cameraControls.previousPointerPosition.y;
 
                 cameraControls.azimuthAngle -= deltaX * 0.005;
                 cameraControls.polarAngle -= deltaY * 0.005;
-
-                // Clamp polar angle to prevent camera flipping
-                cameraControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, cameraControls.polarAngle));
-
-                cameraControls.previousMousePosition.x = clientX;
-                cameraControls.previousMousePosition.y = clientY;
+                cameraControls.polarAngle = Math.max(0.2, Math.min(Math.PI - 0.2, cameraControls.polarAngle));
+                
+                cameraControls.previousPointerPosition.x = clientX;
+                cameraControls.previousPointerPosition.y = clientY;
             };
-
-            const onPointerUp = () => {
-                cameraControls.isDragging = false;
-            };
-
+            const onPointerUp = () => { cameraControls.isDragging = false; };
             domElement.addEventListener('pointerdown', onPointerDown);
             domElement.addEventListener('pointermove', onPointerMove);
             domElement.addEventListener('pointerup', onPointerUp);
-            domElement.addEventListener('pointerleave', onPointerUp);
+            domElement.addEventListener('pointerleave', onPointerUp); // Also stop on leaving canvas
         }
 
         function loadAssets() {
@@ -180,21 +161,11 @@
                     });
                     gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
                         tankModel = gltf.scene;
-
-                        // --- TANK ORIENTATION FIX ---
-                        // The GLB model is facing the wrong way. We'll fix it here.
-                        // 1. Create a parent Group. This group will be controlled by physics.
                         tankGroup = new THREE.Group();
                         scene.add(tankGroup);
-
-                        // 2. Add the visible model as a child of the group.
                         tankGroup.add(tankModel);
-
-                        // 3. Rotate the VISIBLE MODEL 180 degrees to face the correct direction.
-                        // The parent `tankGroup` remains un-rotated.
                         tankModel.rotation.y = Math.PI; 
                         
-                        // --- PHYSICS BODY SETUP ---
                         const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
                             .setTranslation(0, 5, 0)
                             .setLinearDamping(0.8)
@@ -211,80 +182,75 @@
             });
         }
         
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        
-        // --- IMPROVED GROUND CHECK ---
+        // --- FIX 3: 全新的、可靠的地面检测逻辑 ---
         function updateGroundedState() {
             if (!tankBody || !tankCollider) { isGrounded = false; return; }
-            const tankHeight = tankCollider.shape.halfExtents.y * 2;
-            const rayOrigin = tankBody.translation();
-            // Make ray slightly longer to ensure contact
-            const maxDistance = tankHeight * 0.5 + 0.1; 
-            const ray = new RAPIER.Ray(rayOrigin, { x: 0, y: -1, z: 0 });
-            // The last parameter makes the ray ignore the tank's own collider
-            const hit = world.castRay(ray, maxDistance, true, null, null, tankCollider);
+
+            const shape = tankCollider.shape;
+            const position = tankBody.translation();
+            const rotation = tankBody.rotation();
+            
+            // The direction we want to cast the shape in (straight down)
+            const castDirection = { x: 0, y: -1, z: 0 };
+            
+            // The maximum distance the shape can travel. A small value is enough.
+            const maxCastDistance = 0.2;
+
+            // Perform the shape-cast
+            const hit = world.castShape(
+                position,
+                rotation,
+                castDirection,
+                shape,
+                maxCastDistance,
+                true, // Stop at first penetration
+                null, null, // No query filter groups
+                tankCollider // Collider to ignore (the tank itself)
+            );
+
             isGrounded = hit !== null;
         }
 
         function updateTank(deltaTime) {
             if (!tankBody) return;
-
-            // --- TANK MOVEMENT LOGIC (UNCHANGED) ---
             const targetAngvel = { x: 0, y: tankControls.turn * -TANK_TURN_SPEED, z: 0 };
             tankBody.setAngvel(targetAngvel, true);
-
             if (Math.abs(tankControls.forward) > 0.1 && isGrounded) {
-                // Get the tank's forward vector (from the physics body, not the visual model)
                 const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(tankBody.rotation());
                 const force = forwardDir.multiplyScalar(tankControls.forward * TANK_MOVE_FORCE * deltaTime);
                 tankBody.addForce({ x: force.x, y: 0, z: force.z }, true);
             }
         }
         
-        // --- NEW: ORBIT CAMERA UPDATE LOGIC ---
         function updateCamera() {
             if (!tankGroup) return;
-
-            // Calculate camera position based on angles and distance
             const offset = new THREE.Vector3();
             offset.x = cameraControls.distance * Math.sin(cameraControls.polarAngle) * Math.sin(cameraControls.azimuthAngle);
             offset.y = cameraControls.distance * Math.cos(cameraControls.polarAngle);
             offset.z = cameraControls.distance * Math.sin(cameraControls.polarAngle) * Math.cos(cameraControls.azimuthAngle);
-
-            const cameraLookAt = tankGroup.position.clone().add(new THREE.Vector3(0,1,0)); // Look slightly above the tank's center
+            const cameraLookAt = tankGroup.position.clone().add(new THREE.Vector3(0, 1, 0));
             camera.position.copy(cameraLookAt).add(offset);
             camera.lookAt(cameraLookAt);
         }
+        
+        function onWindowResize() { /* ... */ }
 
         function animate() {
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
-
-            // 1. Update Tank Controls & Physics
+            
             updateTank(deltaTime);
             world.step();
-
-            // 2. Update Grounded State AFTER physics step
             updateGroundedState();
 
-            // 3. Sync Visuals with Physics
             if (tankBody && tankGroup) {
                 tankGroup.position.copy(tankBody.translation());
                 tankGroup.quaternion.copy(tankBody.rotation());
             }
             
-            // 4. Update the new orbit camera
             updateCamera();
-
-            // 5. Render
             renderer.render(scene, camera);
         };
-
-        // music setup can be added here if needed
     </script>
 </body>
 </html>
