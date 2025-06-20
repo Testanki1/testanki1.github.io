@@ -13,52 +13,46 @@
             touch-action: none; /* Prevents default browser actions like scroll/zoom on the canvas */
         }
 
-        /* --- Loading Overlay Styles --- */
-        #loading-overlay {
+        /* --- 加载屏幕样式 --- */
+        #loading-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: #001926;
-            z-index: 9999;
+            background-color: #111;
+            z-index: 200;
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+            flex-direction: column;
             color: white;
             font-family: sans-serif;
             transition: opacity 0.5s ease-out;
+            opacity: 1; /* 默认可见 */
         }
-        #loading-container {
+        .loading-content {
             text-align: center;
-            width: 80%;
-            max-width: 400px;
         }
-        .loading-text {
-            font-size: 1.2em;
+        #loading-text {
             margin-bottom: 15px;
+            font-size: 16px;
             color: #eee;
         }
-        #progress-bar-container {
-            width: 100%;
-            height: 20px;
+        #loading-bar-container {
+            width: 300px;
+            height: 15px;
             background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
-            margin-bottom: 10px;
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
-        #progress-bar {
+        #loading-bar {
             width: 0%;
             height: 100%;
             background-color: #76FF33;
-            transition: width 0.1s linear;
+            transition: width 0.2s linear;
         }
-        #progress-text {
-            font-size: 0.9em;
-            color: #ccc;
-        }
-
 
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
         
@@ -89,7 +83,7 @@
 
         #music-toggle-btn { top: 15px; right: 15px; }
         #reset-btn { top: 15px; right: 85px; }
-        #camera-toggle-btn { top: 15px; right: 155px; }
+        #camera-toggle-btn { top: 15px; right: 155px; } /* New Button */
 
         #jump-btn { position: absolute; bottom: 30px; right: 50px; width: 80px; height: 80px; border-radius: 50%; }
         #joystick-container { position: absolute; bottom: 30px; left: 50px; width: 120px; height: 120px; z-index: 10; }
@@ -107,17 +101,16 @@
 </head>
 
 <body>
-    <!-- Loading Overlay -->
-    <div id="loading-overlay">
-        <div id="loading-container">
-            <div class="loading-text">正在初始化...</div>
-            <div id="progress-bar-container">
-                <div id="progress-bar"></div>
+    <!-- 新增：加载屏幕 -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <div id="loading-text">Loading...</div>
+            <div id="loading-bar-container">
+                <div id="loading-bar"></div>
             </div>
-            <div id="progress-text">0.00 MB / 0.00 MB</div>
         </div>
     </div>
-
+    
     <!-- UI Elements -->
     <div id="joystick-container"></div>
     <button id="jump-btn" class="ui-button" aria-label="Jump">
@@ -148,11 +141,12 @@
 
         let scene, camera, renderer, world;
         let tankModel, tankBody;
-        let audioContext, audioBuffer, sourceNode, isPlaying = false;
         
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        
-        let cameraMode = 'tank';
+        let audioContext, audioBuffer, sourceNode, isPlaying = false;
+
+        // --- MERGED STATE ---
+        let cameraMode = 'tank'; // 'tank' or 'spectator'
         const cameraPointers = {};
         let previousTwoFingerState = null;
 
@@ -167,18 +161,6 @@
         const groundRaycastDist = 1.5;
         const initialTankPosition = { x: 0, y: 2, z: 0 };
 
-        // --- ASSET LOADING CONFIG ---
-        const ASSETS_TO_LOAD = [
-            { name: 'envMap',     url: 'assets/Minigame_Synth_Environment_4096x2048.exr',   size: 8903428, type: 'exr',   displayName: '环境贴图' },
-            { name: 'sceneModel', url: 'assets/Minigame_Synth_Scene.glb',                  size: 1489120, type: 'gltf',  displayName: '场景模型' },
-            { name: 'tankModel',  url: 'assets/Minigame_Synth_Tank.glb',                   size: 199492,  type: 'gltf',  displayName: '坦克模型' },
-            { name: 'music',      url: 'assets/bounce tanki loop cut (no intro).opus',     size: 326717,  type: 'audio', displayName: '背景音乐' }
-        ];
-        const TOTAL_BYTES = ASSETS_TO_LOAD.reduce((acc, asset) => acc + asset.size, 0);
-        const progressByAsset = {};
-        ASSETS_TO_LOAD.forEach(asset => progressByAsset[asset.name] = { loaded: 0, total: asset.size });
-
-
         init();
 
         async function init() {
@@ -192,211 +174,139 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.rotation.order = 'YXZ'; 
+            camera.rotation.order = 'YXZ'; // Important for spectator controls
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
             
-            startLoading();
+            await loadAssetsAndPhysics(); // 等待资源加载完成
             
+            // 资源加载完成后再初始化控制和UI
             setupControls();
+            setupMusicControls();
             setupFullscreen();
             window.addEventListener('resize', onWindowResize);
             animate();
         }
-        
-        // --- Loading Orchestrator with Parallel Download and Sequential Display ---
-        async function startLoading() {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-            const loadingText = document.querySelector('#loading-container .loading-text');
 
-            function updateTotalProgress() {
-                let totalLoaded = 0;
-                for (const assetName in progressByAsset) {
-                    totalLoaded += progressByAsset[assetName].loaded;
-                }
-                const percentage = TOTAL_BYTES > 0 ? (totalLoaded / TOTAL_BYTES) * 100 : 0;
-                progressBar.style.width = `${percentage}%`;
-                progressText.textContent = `${(totalLoaded / 1024 / 1024).toFixed(2)} MB / ${(TOTAL_BYTES / 1024 / 1024).toFixed(2)} MB`;
-            }
+        async function loadAssetsAndPhysics() {
+            // --- 设置加载管理器 ---
+            const loadingManager = new THREE.LoadingManager();
+            const loadingScreen = document.getElementById('loading-screen');
+            const loadingBar = document.getElementById('loading-bar');
+            const loadingText = document.getElementById('loading-text');
 
-            async function fetchWithProgress(url, onProgress) {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                if (!response.body) throw new Error('Response body is null');
-                const contentLength = +response.headers.get('Content-Length') || 0;
+            const assets = {
+                envMap: { loaded: 0, total: 0 },
+                scene: { loaded: 0, total: 0 },
+                tank: { loaded: 0, total: 0 }
+            };
+
+            const formatBytes = (bytes) => {
+                if (bytes === 0) return '0 B';
+                const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${['B', 'KB', 'MB'][i]}`;
+            };
+
+            const updateTotalProgress = () => {
+                const totalLoaded = assets.envMap.loaded + assets.scene.loaded + assets.tank.loaded;
+                const grandTotal = assets.envMap.total + assets.scene.total + assets.tank.total;
                 
-                const reader = response.body.getReader();
-                let receivedLength = 0;
-                const chunks = [];
-                while(true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    receivedLength += value.length;
-                    if (onProgress) onProgress({ loaded: receivedLength, total: contentLength });
-                }
-                const allChunks = new Uint8Array(receivedLength);
-                let position = 0;
-                for(let chunk of chunks) {
-                    allChunks.set(chunk, position);
-                    position += chunk.length;
-                }
-                return allChunks.buffer;
-            }
+                if (grandTotal === 0) return;
+                
+                const progress = totalLoaded / grandTotal;
+                loadingBar.style.width = `${progress * 100}%`;
+                loadingText.textContent = `Loading: ${formatBytes(totalLoaded)} / ${formatBytes(grandTotal)}`;
+            };
             
-            updateTotalProgress();
+            loadingManager.onLoad = () => {
+                // 加载完成后，淡出加载屏幕
+                loadingScreen.style.opacity = '0';
+                loadingScreen.addEventListener('transitionend', () => {
+                    loadingScreen.style.display = 'none';
+                }, { once: true });
+            };
 
-            const gltfLoader = new GLTFLoader();
-            const exrLoader = new EXRLoader();
-            const promises = {};
-            const loadedData = {};
+            loadingManager.onError = (url) => {
+                console.error('Error loading asset:', url);
+                loadingText.textContent = 'Error loading assets. Please refresh.';
+            };
+            
+            const exrLoader = new EXRLoader(loadingManager);
+            const gltfLoader = new GLTFLoader(loadingManager);
 
-            // 1. Start ALL downloads in parallel
-            ASSETS_TO_LOAD.forEach(asset => {
-                const onProgress = (progress) => {
-                    progressByAsset[asset.name].loaded = progress.loaded;
-                    updateTotalProgress();
-                };
+            // --- 创建一个带进度追踪的加载 Promise ---
+            const loadWithProgress = (loader, url, assetTracker) => {
+                return new Promise((resolve, reject) => {
+                    loader.load(url, resolve, (progress) => {
+                        if (progress.lengthComputable) {
+                            assetTracker.loaded = progress.loaded;
+                            assetTracker.total = progress.total;
+                            updateTotalProgress();
+                        }
+                    }, reject);
+                });
+            };
+
+            try {
+                // 并行加载所有资源
+                const [texture, sceneGltf, tankGltf] = await Promise.all([
+                    loadWithProgress(exrLoader, 'assets/Minigame_Synth_Environment_4096x2048.exr', assets.envMap),
+                    loadWithProgress(gltfLoader, 'assets/Minigame_Synth_Scene.glb', assets.scene),
+                    loadWithProgress(gltfLoader, 'assets/Minigame_Synth_Tank.glb', assets.tank)
+                ]);
+
+                // --- 所有资源加载完成，开始处理它们 ---
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;
+                scene.environment = texture;
                 
-                const promise = new Promise((resolve, reject) => {
-                    const onLoad = (result) => {
-                        progressByAsset[asset.name].loaded = progressByAsset[asset.name].total;
-                        updateTotalProgress();
-                        loadedData[asset.name] = result;
-                        resolve(result);
-                    };
-
-                    if (asset.type === 'gltf') gltfLoader.load(asset.url, onLoad, onProgress, reject);
-                    else if (asset.type === 'exr') exrLoader.load(asset.url, onLoad, onProgress, reject);
-                    else if (asset.type === 'audio') fetchWithProgress(asset.url, onProgress).then(onLoad).catch(reject);
+                const sceneModel = sceneGltf.scene;
+                scene.add(sceneModel);
+                const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+                sceneModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.receiveShadow = true;
+                        child.updateWorldMatrix(true, true);
+                        const geometry = child.geometry;
+                        if (!geometry.attributes.position || !geometry.index) return;
+                        const vertices = geometry.attributes.position.array.slice();
+                        const indices = geometry.index.array.slice();
+                        for (let i = 0; i < vertices.length; i += 3) {
+                            const vertex = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                            vertex.applyMatrix4(child.matrixWorld);
+                            vertices[i] = vertex.x;
+                            vertices[i + 1] = vertex.y;
+                            vertices[i + 2] = vertex.z;
+                        }
+                        const trimeshDesc = RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices);
+                        world.createCollider(trimeshDesc, sceneBody);
+                    }
                 });
                 
-                promises[asset.name] = promise;
-            });
-            
-            // 2. Create an async function to update UI text sequentially
-            async function manageLoadingUI() {
-                for (const asset of ASSETS_TO_LOAD) {
-                    loadingText.textContent = `正在加载 ${asset.displayName}...`;
-                    await promises[asset.name];
-                }
-                loadingText.textContent = '准备进入场景...';
-            }
+                tankModel = tankGltf.scene;
+                tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
+                scene.add(tankModel);
+                const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z).setLinearDamping(0.5).setAngularDamping(0.8).setCanSleep(false);
+                tankBody = world.createRigidBody(bodyDesc);
+                const allVertices = [];
+                tankModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        const positions = child.geometry.attributes.position.array;
+                        for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
+                    }
+                });
+                const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
+                world.createCollider(colliderDesc, tankBody);
 
-            // 3. Run UI management and final setup logic
-            try {
-                manageLoadingUI(); 
-                
-                await Promise.all(Object.values(promises));
-
-                setTimeout(() => {
-                    loadingOverlay.style.opacity = '0';
-                    loadingOverlay.addEventListener('transitionend', () => loadingOverlay.remove(), { once: true });
-
-                    setupPhysics(loadedData.sceneModel, loadedData.tankModel);
-                    initializeMusicPlayer(loadedData.music);
-
-                }, 500);
             } catch (error) {
                 console.error("An error occurred during asset loading:", error);
-                loadingText.textContent = '资源加载失败，请刷新页面。';
-                progressBar.style.backgroundColor = 'red';
+                // 在加载屏幕上显示错误
+                loadingText.textContent = 'Error loading assets. Please refresh.';
             }
-        }
-
-        function setupPhysics(sceneGltf, tankGltf) {
-            const sceneModel = sceneGltf.scene;
-            scene.add(sceneModel);
-            const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-            sceneModel.traverse(child => {
-                if (child.isMesh) {
-                    child.receiveShadow = true;
-                    child.updateWorldMatrix(true, true);
-                    const geometry = child.geometry;
-                    if (!geometry.attributes.position || !geometry.index) return;
-                    const vertices = geometry.attributes.position.array.slice();
-                    const indices = geometry.index.array.slice();
-                    for (let i = 0; i < vertices.length; i += 3) {
-                        const vertex = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-                        vertex.applyMatrix4(child.matrixWorld);
-                        vertices[i] = vertex.x;
-                        vertices[i + 1] = vertex.y;
-                        vertices[i + 2] = vertex.z;
-                    }
-                    const trimeshDesc = RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices);
-                    world.createCollider(trimeshDesc, sceneBody);
-                }
-            });
-            tankModel = tankGltf.scene;
-            tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
-            scene.add(tankModel);
-            const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z).setLinearDamping(0.5).setAngularDamping(0.8).setCanSleep(false);
-            tankBody = world.createRigidBody(bodyDesc);
-            const allVertices = [];
-            tankModel.traverse(child => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    const positions = child.geometry.attributes.position.array;
-                    for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
-                }
-            });
-            const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
-            world.createCollider(colliderDesc, tankBody);
-        }
-
-        function initializeMusicPlayer(arrayBuffer) {
-            const musicButton = document.getElementById('music-toggle-btn');
-            const iconOn = document.getElementById('music-icon-on');
-            const iconOff = document.getElementById('music-icon-off');
-
-            try {
-                audioContext = THREE.AudioContext.getContext();
-                audioContext.decodeAudioData(arrayBuffer)
-                    .then(buffer => {
-                        audioBuffer = buffer;
-                    })
-                    .catch(e => {
-                        console.error('Failed to decode audio data:', e);
-                        musicButton.disabled = true;
-                    });
-            } catch (error) {
-                console.error('Failed to initialize AudioContext:', error);
-                musicButton.disabled = true;
-                return;
-            }
-
-            function playMusic() {
-                if (isPlaying || !audioBuffer) return;
-                if (audioContext.state === 'suspended') { audioContext.resume(); } 
-                sourceNode = audioContext.createBufferSource();
-                sourceNode.buffer = audioBuffer;
-                sourceNode.loop = true;
-                sourceNode.connect(audioContext.destination);
-                sourceNode.start();
-                isPlaying = true;
-                iconOn.style.display = 'inline';
-                iconOff.style.display = 'none';
-            }
-
-            function stopMusic() {
-                if (!isPlaying || !sourceNode) return;
-                sourceNode.stop();
-                sourceNode.disconnect();
-                sourceNode = null;
-                isPlaying = false;
-                iconOn.style.display = 'none';
-                iconOff.style.display = 'inline';
-            }
-
-            musicButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isPlaying) { stopMusic(); } else { playMusic(); }
-            });
         }
 
         function updateUiForCameraMode() {
@@ -419,6 +329,7 @@
         }
 
         function setupControls() {
+            // Tank Movement
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
                 joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
@@ -439,6 +350,7 @@
                 }
             });
 
+            // --- UNIFIED CAMERA CONTROLS ---
             const tapThreshold = 10;
             const pointerDownPos = new THREE.Vector2();
 
@@ -454,10 +366,8 @@
             const onPointerMove = (e) => {
                 const pointer = cameraPointers[e.pointerId];
                 if (!pointer) return;
-
                 const deltaX = e.clientX - pointer.x;
                 const deltaY = e.clientY - pointer.y;
-
                 if (Object.keys(cameraPointers).length === 1) {
                     if (cameraMode === 'tank') {
                         cameraAngle.horizontal -= deltaX * 0.005;
@@ -473,7 +383,6 @@
                     pointer.y = e.clientY;
                     handleSpectatorPanAndZoom(Object.values(cameraPointers));
                 }
-                
                 pointer.x = e.clientX;
                 pointer.y = e.clientY;
             };
@@ -485,20 +394,17 @@
                         handleFullscreenRequest();
                     }
                 }
-
                 const wasTwoFingers = Object.keys(cameraPointers).length === 2;
                 delete cameraPointers[e.pointerId];
                 if (wasTwoFingers && Object.keys(cameraPointers).length === 1) {
                     const remainingPointerId = Object.keys(cameraPointers)[0];
                     const remainingPointer = cameraPointers[remainingPointerId];
-                    const touches = e.touches || [];
-                    const remainingTouch = Array.from(touches).find(t => t.identifier == remainingPointerId);
+                    const remainingTouch = Array.from(e.touches).find(t => t.identifier == remainingPointerId);
                     if (remainingTouch) {
                         remainingPointer.x = remainingTouch.clientX;
                         remainingPointer.y = remainingTouch.clientY;
                     }
                 }
-
                 if (Object.keys(cameraPointers).length < 2) {
                     previousTwoFingerState = null;
                 }
@@ -513,7 +419,6 @@
             const jumpButton = document.getElementById('jump-btn');
             const resetButton = document.getElementById('reset-btn');
             const cameraToggleButton = document.getElementById('camera-toggle-btn');
-
             jumpButton.addEventListener('pointerdown', (e) => { e.preventDefault(); handleJump(); });
             resetButton.addEventListener('pointerdown', (e) => { e.preventDefault(); resetTank(); });
             cameraToggleButton.addEventListener('click', (e) => {
@@ -628,15 +533,62 @@
         };
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+        
         function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
+        
         function setupFullscreen() { 
             const prompt = document.getElementById('fullscreen-prompt'); 
             if (isTouchDevice) { 
-                setTimeout(() => { if(prompt) prompt.style.opacity = '1'; }, 2000); 
-                setTimeout(() => { if(prompt) prompt.style.opacity = '0'; }, 7000); 
+                setTimeout(() => { prompt.style.opacity = '1'; }, 2000); 
+                setTimeout(() => { prompt.style.opacity = '0'; }, 7000); 
             }
             document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); 
         };
+
+        async function setupMusicControls() { 
+            const musicButton = document.getElementById('music-toggle-btn'); 
+            const iconOn = document.getElementById('music-icon-on'); 
+            const iconOff = document.getElementById('music-icon-off'); 
+            try { 
+                const response = await fetch('assets/bounce tanki loop cut (no intro).opus'); 
+                const arrayBuffer = await response.arrayBuffer(); 
+                audioContext = THREE.AudioContext.getContext(); 
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer); 
+            } catch (error) { 
+                console.error('Failed to load or decode audio file:', error); 
+                musicButton.disabled = true; 
+                return; 
+            } 
+            function playMusic() { 
+                if (isPlaying || !audioBuffer) return; 
+                sourceNode = audioContext.createBufferSource(); 
+                sourceNode.buffer = audioBuffer; 
+                sourceNode.loop = true; 
+                sourceNode.connect(audioContext.destination); 
+                sourceNode.start(); 
+                isPlaying = true; 
+                iconOn.style.display = 'inline'; 
+                iconOff.style.display = 'none'; 
+            } 
+            function stopMusic() { 
+                if (!isPlaying || !sourceNode) return; 
+                sourceNode.stop(); 
+                sourceNode.disconnect(); 
+                sourceNode = null; 
+                isPlaying = false; 
+                iconOn.style.display = 'none'; 
+                iconOff.style.display = 'inline'; 
+            } 
+            musicButton.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                if (audioContext.state === 'suspended') { audioContext.resume(); } 
+                if (isPlaying) { 
+                    stopMusic(); 
+                } else { 
+                    playMusic(); 
+                } 
+            }); 
+        }
     </script>
 </body>
 </html>
