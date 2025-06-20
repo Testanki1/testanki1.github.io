@@ -4,19 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - With Terrain Tilt</title>
+    <title>Tank Physics Demo - Simulation Air Tumble</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         
-        /* THE CRUCIAL FIX IS HERE */
         canvas { 
             display: block; 
-            touch-action: none; /* Prevents default browser actions like scroll/zoom/context-menu on the canvas */
+            touch-action: none; 
         }
 
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
         
-        /* UI Button Styles */
         .ui-button {
             position: absolute;
             background: rgba(0, 0, 0, 0.3);
@@ -160,7 +158,12 @@
                 tankModel = tankGltf.scene;
                 tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
                 scene.add(tankModel);
-                const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z).setLinearDamping(0.5).setAngularDamping(0.8).setCanSleep(false);
+                // Increased angular damping slightly to prevent endless spinning, but still allows tumbling.
+                const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+                    .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
+                    .setLinearDamping(0.5)
+                    .setAngularDamping(0.5) // Original was 0.8, a lower value allows for more tumbling
+                    .setCanSleep(false);
                 tankBody = world.createRigidBody(bodyDesc);
                 const allVertices = [];
                 tankModel.traverse(child => {
@@ -204,13 +207,10 @@
             const pointerDownPos = new THREE.Vector2();
 
             const onPointerDown = (e) => {
-                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) {
-                    return;
-                }
+                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return;
                 cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
                 pointerDownPos.set(e.clientX, e.clientY);
             };
-
             const onPointerMove = (e) => {
                 const pointer = cameraPointers[e.pointerId];
                 if (pointer) {
@@ -223,13 +223,10 @@
                     pointer.y = e.clientY;
                 }
             };
-
             const onPointerUpOrCancel = (e) => {
                 if (cameraPointers[e.pointerId]) {
                     const dragDistance = pointerDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
-                    if (dragDistance < tapThreshold) {
-                        handleFullscreenRequest();
-                    }
+                    if (dragDistance < tapThreshold) handleFullscreenRequest();
                 }
                 delete cameraPointers[e.pointerId];
             };
@@ -274,7 +271,6 @@
         const _matrix = new THREE.Matrix4();
         const upVector = new THREE.Vector3(0, 1, 0);
 
-        // NEW CODE: Variables for terrain adaptation
         const groundNormal = new THREE.Vector3(0, 1, 0);
         const currentUpVector = new THREE.Vector3(0, 1, 0);
 
@@ -283,7 +279,6 @@
             world.step();
 
             if (tankBody && tankModel) {
-                // --- MOVEMENT LOGIC (Largely unchanged) ---
                 const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
                 camera.getWorldDirection(cameraForward);
                 cameraForward.y = 0;
@@ -302,44 +297,46 @@
                     tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
                 }
                 
-                // --- NEW CODE: TANK ORIENTATION LOGIC ---
-                // 1. Raycast down to find the ground normal
+                // --- TANK ORIENTATION LOGIC ---
                 const rayOrigin = tankBody.translation();
-                rayOrigin.y += 0.5; // Start ray slightly above tank center to avoid starting inside geometry
+                rayOrigin.y += 0.5;
                 const rayDir = { x: 0, y: -1, z: 0 };
                 const ray = new RAPIER.Ray(rayOrigin, rayDir);
                 const hit = world.castRayAndGetNormal(ray, 2.0, true, null, null, tankBody.collider(0));
 
+                let isOnGround = false; // A flag to know if we are on ground
                 if (hit) {
-                    // Ground detected: Set the target 'up' vector to the ground's normal
+                    isOnGround = true;
                     groundNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
                 } else {
-                    // In the air: Default to world up vector (0, 1, 0)
-                    groundNormal.set(0, 1, 0);
+                    // MODIFIED: In-air behavior
+                    // Do nothing here. This lets the physics engine control the tumble.
+                    // We let 'groundNormal' keep its last value from when it was on the ground.
                 }
                 
-                // 2. Smoothly interpolate the current 'up' vector towards the target ground normal
-                // The '0.1' value controls how quickly the tank adapts to the terrain slope.
-                currentUpVector.lerp(groundNormal, 0.1);
-
-                // --- MODIFIED CODE: TANK ROTATION LOGIC ---
-                // Use the calculated 'lookDirection' and the new 'currentUpVector' to orient the tank
-                const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
-                
-                // 3. Update the lookAt matrix using the smoothed up vector
-                _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), currentUpVector);
-                targetQuaternion.setFromRotationMatrix(_matrix);
-
-                // Slerp to the new target rotation and update the physics body
-                if (!tankModel.quaternion.equals(targetQuaternion)) {
-                    // We use the existing slerp for smooth turning AND tilting
-                    tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
-                    tankBody.setRotation(tankModel.quaternion, true);
+                // We only force the tank's orientation when it's on the ground.
+                if (isOnGround) {
+                    currentUpVector.lerp(groundNormal, 0.1);
+                    const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
+                    _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), currentUpVector);
+                    targetQuaternion.setFromRotationMatrix(_matrix);
+                    
+                    // Slerp to the new target rotation.
+                    // Since this only runs on the ground, it won't interfere with air tumbling.
+                    const currentRotation = new THREE.Quaternion().copy(tankBody.rotation());
+                    currentRotation.slerp(targetQuaternion, turnSpeed);
+                    tankBody.setRotation(currentRotation, true);
                 }
-
-                // --- POSITION AND CAMERA LOGIC (Unchanged) ---
+                
+                // Always sync model position and rotation with the physics body.
+                // This is crucial for displaying the in-air tumble correctly.
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
+                const rotation = tankBody.rotation();
+                tankModel.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+
+
+                // --- CAMERA LOGIC (Unchanged) ---
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
