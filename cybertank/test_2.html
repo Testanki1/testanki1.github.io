@@ -3,22 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics - Final Debug</title>
+    <title>Tank Physics - Stable Load</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; touch-action: none; }
-        /* 调试面板样式 */
-        #debug-panel { position: absolute; top: 10px; left: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; z-index: 9999; max-width: 90%; }
-        .debug-item { margin-bottom: 5px; }
-        .debug-success { color: #76ff33; }
-        .debug-error { color: #ff5555; }
-        .debug-loading { color: #ffff88; }
-        /* 其他UI样式... */
-        .ui-button { position: absolute; background: rgba(0, 0, 0, 0.3); border: 2px solid rgba(255, 255, 255, 0.4); cursor: pointer; padding: 10px; z-index: 100; opacity: 0.8; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        #music-toggle-btn { top: 15px; right: 15px; border-radius: 8px; }
-        #reset-btn { top: 15px; right: 85px; border-radius: 8px; }
-        #jump-btn { position: absolute; bottom: 30px; right: 50px; width: 80px; height: 80px; }
-        #joystick-container { position: absolute; bottom: 30px; left: 50px; width: 120px; height: 120px; z-index: 10; }
+        /* 隐藏所有UI，专注于模型加载 */
+        .ui-button, #joystick-container { display: none; }
     </style>
     <script type="importmap">
         { "imports": { "three": "https://esm.sh/three@0.149.0", "three/addons/": "https://esm.sh/three@0.149.0/examples/jsm/", "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.13.1" } }
@@ -26,176 +16,137 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 </head>
 <body>
-    <div id="debug-panel">
-        <div class="debug-item"><strong>Load Status</strong></div>
-        <div id="debug-log"></div>
-    </div>
-    <div id="joystick-container"></div>
-    <button id="jump-btn" class="ui-button" aria-label="Jump"><svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 0 24 24" width="48px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
-    <button id="reset-btn" class="ui-button" aria-label="Reset Tank"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-8v4h2v-4h3l-4-4-4 4h3z" fill-rule="evenodd"/></svg></button>
-    <!-- 其他UI元素... -->
-
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
         import RAPIER from '@dimforge/rapier3d-compat';
 
-        // --- 可视化日志 ---
-        const debugLogEl = document.getElementById('debug-log');
-        function logToScreen(id, message, type) {
-            let item = document.getElementById(id);
-            if (!item) {
-                item = document.createElement('div');
-                item.id = id;
-                debugLogEl.appendChild(item);
-            }
-            item.textContent = message;
-            item.className = `debug-item debug-${type}`;
-        }
-        
-        async function loadAndLog(id, name, promise) {
-            logToScreen(id, `⌛ Loading: ${name}...`, 'loading');
-            try {
-                const result = await promise;
-                logToScreen(id, `✔ Success: ${name}`, 'success');
-                return result;
-            } catch (error) {
-                logToScreen(id, `❌ FAILED: ${name}`, 'error');
-                throw error; // 必须再次抛出，以中断Promise链
-            }
-        }
-
         let scene, camera, renderer, world, clock, mixer;
-        let tankGroup, tankBody;
-        // ...其他变量声明保持不变...
-
-        init();
 
         async function init() {
-            logToScreen('init', '⌛ Initializing...', 'loading');
-            // ...init函数其他内容不变...
+            // 1. 基础场景设置
             await RAPIER.init();
             world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
             scene = new THREE.Scene();
             clock = new THREE.Clock();
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
-            directionalLight.position.set(-20, 30, 20);
-            scene.add(directionalLight);
-            
-            await loadAssetsAndPhysics();
-            logToScreen('init', '✔ Initialization Complete', 'success');
-            
-            // setupControls(); // 暂时注释，简化调试
-            // setupMusicControls();
-            // setupFullscreen();
-            window.addEventListener('resize', onWindowResize);
+            camera.position.set(15, 15, 25); // 设置一个能看全景的固定机位
+            camera.lookAt(0, 0, 0);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            dirLight.position.set(10, 20, 5);
+            scene.add(dirLight);
+
+            // 2. 依次加载所有资源
+            try {
+                await loadAssets();
+            } catch (error) {
+                // 如果任何一步失败，在屏幕上显示一个巨大的错误信息
+                const errorDiv = document.createElement('div');
+                errorDiv.style.position = 'absolute';
+                errorDiv.style.top = '0';
+                errorDiv.style.left = '0';
+                errorDiv.style.width = '100%';
+                errorDiv.style.height = '100%';
+                errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+                errorDiv.style.color = 'white';
+                errorDiv.style.fontSize = '24px';
+                errorDiv.style.display = 'flex';
+                errorDiv.style.justifyContent = 'center';
+                errorDiv.style.alignItems = 'center';
+                errorDiv.style.textAlign = 'center';
+                errorDiv.style.zIndex = '9999';
+                errorDiv.innerHTML = `LOADING FAILED!<br>Check file names and integrity.<br>Error: ${error.message || 'Unknown'}`;
+                document.body.appendChild(errorDiv);
+            }
+
+            // 3. 启动渲染循环
             animate();
         }
 
-        async function loadStaticModelAndCollider(gltfLoader, url, position, rotation, scale) {
-            const gltf = await gltfLoader.loadAsync(url);
-            const model = gltf.scene;
-            model.position.copy(position);
-            model.rotation.copy(rotation);
-            model.scale.copy(scale);
+        // 统一的模型处理函数
+        function processModel(model, scale, position, rotation) {
+            model.scale.set(scale.x, scale.y, scale.z);
+            model.position.set(position.x, position.y, position.z);
+            if (rotation) model.rotation.set(rotation.x, rotation.y, rotation.z);
             scene.add(model);
-            const rigidBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+            
+            // 为所有子网格创建物理碰撞体
             model.updateWorldMatrix(true, true);
+            const rigidBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
             model.traverse(child => {
-                if (child.isMesh && child.geometry.attributes.position && child.geometry.index) {
-                    child.receiveShadow = true;
+                if (child.isMesh && child.geometry) {
                     const vertices = child.geometry.attributes.position.array.slice();
                     const indices = child.geometry.index.array.slice();
                     const worldMatrix = child.matrixWorld;
                     for (let i = 0; i < vertices.length; i += 3) {
-                        const vertex = new THREE.Vector3(vertices[i], vertices[i+1], vertices[i+2]).applyMatrix4(worldMatrix);
-                        vertices[i] = vertex.x;
-                        vertices[i+1] = vertex.y;
-                        vertices[i+2] = vertex.z;
+                        const v = new THREE.Vector3(vertices[i], vertices[i+1], vertices[i+2]).applyMatrix4(worldMatrix);
+                        vertices[i] = v.x; vertices[i+1] = v.y; vertices[i+2] = v.z;
                     }
                     world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices), rigidBody);
                 }
             });
-            return gltf;
         }
 
-        async function loadAssetsAndPhysics() {
+        async function loadAssets() {
             const rgbeLoader = new RGBELoader();
             const gltfLoader = new GLTFLoader();
             const localAssetPath = 'assets/';
 
-            try {
-                const hdrTexture = await loadAndLog('hdr', 'venice_sunset_1k.hdr', rgbeLoader.loadAsync(`${localAssetPath}venice_sunset_1k.hdr`));
-                hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
-                scene.background = hdrTexture;
-                scene.environment = hdrTexture;
-                
-                const islandT4Gltf = await loadAndLog('island_t4', 'island_t4.glb', loadStaticModelAndCollider(gltfLoader, `${localAssetPath}island_t4.glb`, new THREE.Vector3(0, -0.5, 0), new THREE.Euler(0, Math.PI / 2, 0), new THREE.Vector3(0.002, 0.002, 0.002)));
-                mixer = new THREE.AnimationMixer(islandT4Gltf.scene);
-                if (islandT4Gltf.animations.length > 0) mixer.clipAction(islandT4Gltf.animations[0]).play();
+            // --- 按最直接的方式一步步加载 ---
 
-                await loadAndLog('start_glb', 'start.glb', loadStaticModelAndCollider(gltfLoader, `${localAssetPath}start.glb`, new THREE.Vector3(3.5, 0, 0), new THREE.Euler(0, Math.PI / 2, 0), new THREE.Vector3(0.2, 0.2, 0.2)));
-                
-                const smallIslandGltf = await loadAndLog('island_small', 'island_small.glb', gltfLoader.loadAsync(`${localAssetPath}island_small.glb`));
-                const radius = 19;
-                const numIslands = 17;
-                for (let i = 0; i < numIslands; i++) {
-                    const islandInstance = smallIslandGltf.scene.clone(true);
-                    const angle = (2 * -Math.PI * i) / numIslands;
-                    const x = radius * Math.cos(angle);
-                    const z = radius * Math.sin(angle);
-                    const yRotation = -Math.PI / 2 + (2 * Math.PI * i) / numIslands;
-                    islandInstance.position.set(x, 0, z);
-                    islandInstance.rotation.set(0, yRotation, 0);
-                    islandInstance.scale.set(0.2, 0.2, 0.2);
-                    scene.add(islandInstance);
-                    const rigidBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-                    islandInstance.updateWorldMatrix(true, true);
-                    islandInstance.traverse(child => {
-                        if (child.isMesh && child.geometry.attributes.position && child.geometry.index) {
-                            const vertices = child.geometry.attributes.position.array.slice();
-                            const indices = child.geometry.index.array.slice();
-                            const worldMatrix = child.matrixWorld;
-                            for (let j = 0; j < vertices.length; j += 3) {
-                                const v = new THREE.Vector3(vertices[j], vertices[j+1], vertices[j+2]).applyMatrix4(worldMatrix);
-                                vertices[j] = v.x; vertices[j+1] = v.y; vertices[j+2] = v.z;
-                            }
-                            world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices), rigidBody);
-                        }
-                    });
-                }
-                logToScreen('small_islands_loop', '✔ Success: Small islands loop', 'success');
-                
-                const tankGltf = await loadAndLog('tank_glb', 'tank.glb', gltfLoader.loadAsync(`${localAssetPath}tank.glb`));
-                // ... (坦克相关的物理和场景添加逻辑) ...
-                
-                logToScreen('all_assets', '🎉 All assets loaded!', 'success');
-            } catch (error) {
-                logToScreen('main_catch', '🛑 Loading stopped due to an error!', 'error');
+            // 步骤 1: 背景
+            const hdrTexture = await rgbeLoader.loadAsync(`${localAssetPath}venice_sunset_1k.hdr`);
+            hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+            scene.background = hdrTexture;
+            scene.environment = hdrTexture;
+
+            // 步骤 2: 中央岛屿
+            const islandT4Gltf = await gltfLoader.loadAsync(`${localAssetPath}island_t4.glb`);
+            processModel(islandT4Gltf.scene, {x:0.002, y:0.002, z:0.002}, {x:0, y:-0.5, z:0}, new THREE.Euler(0, Math.PI / 2, 0));
+            mixer = new THREE.AnimationMixer(islandT4Gltf.scene);
+            if (islandT4Gltf.animations.length > 0) mixer.clipAction(islandT4Gltf.animations[0]).play();
+
+            // 步骤 3: 起始岛屿
+            const startGltf = await gltfLoader.loadAsync(`${localAssetPath}start.glb`);
+            processModel(startGltf.scene, {x:0.2, y:0.2, z:0.2}, {x:3.5, y:0, z:0}, new THREE.Euler(0, Math.PI / 2, 0));
+
+            // 步骤 4: 小岛屿
+            const smallIslandGltf = await gltfLoader.loadAsync(`${localAssetPath}island_small.glb`);
+            const radius = 19;
+            const numIslands = 17;
+            for (let i = 0; i < numIslands; i++) {
+                const islandInstance = smallIslandGltf.scene.clone(true); // 克隆模型
+                const angle = (2 * -Math.PI * i) / numIslands;
+                const yRotation = -Math.PI / 2 + (2 * Math.PI * i) / numIslands;
+                processModel(islandInstance, {x:0.2, y:0.2, z:0.2}, {x: radius * Math.cos(angle), y:0, z: radius * Math.sin(angle)}, new THREE.Euler(0, yRotation, 0));
             }
-        }
 
-        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+            // 步骤 5: 坦克
+            const tankGltf = await gltfLoader.loadAsync(`${localAssetPath}tank.glb`);
+            const tankModel = tankGltf.scene;
+            tankModel.scale.set(0.004, 0.004, 0.004); // 放大一点，方便看到
+            tankModel.position.set(3.5, 1, 0); // 放在起始岛屿上
+            scene.add(tankModel);
+            // 坦克的物理暂时简化，我们只关心加载
+        }
         
         function animate() {
             requestAnimationFrame(animate);
             if (clock && mixer) {
-                const delta = clock.getDelta();
-                mixer.update(delta);
+                mixer.update(clock.getDelta());
             }
             renderer.render(scene, camera);
-        };
-        //... 省略了 setupControls, handleJump 等，因为目前不影响加载测试
+        }
+
+        init();
     </script>
 </body>
 </html>
