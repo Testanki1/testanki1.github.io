@@ -4,383 +4,504 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tanki Online CyberTank Model Showcase</title>
+    <title>Tanki Online CyberTank</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        
+        canvas { 
+            display: block; 
+            touch-action: none; /* Prevents default browser actions like scroll/zoom on the canvas */
         }
 
-        canvas {
-            display: block;
-        }
-
-        #fullscreen-prompt {
+        #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
+        
+        /* UI Button Styles */
+        .ui-button {
             position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-family: sans-serif;
-            font-size: 14px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s;
-            z-index: 10;
-        }
-
-        #music-toggle-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.4);
             cursor: pointer;
-            padding: 5px;
+            padding: 10px;
             z-index: 100;
             opacity: 0.8;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s, background-color 0.2s;
+            border-radius: 8px; /* Changed to square for consistency */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-
-        #music-toggle-btn:hover {
+        .ui-button:hover {
             opacity: 1;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        .ui-button svg {
+            display: block;
+            width: 32px;
+            height: 32px;
         }
 
-        #music-toggle-btn svg {
-            display: block;
-        }
+        #music-toggle-btn { top: 15px; right: 15px; }
+        #reset-btn { top: 15px; right: 85px; }
+        #camera-toggle-btn { top: 15px; right: 155px; } /* New Button */
+
+        #jump-btn { position: absolute; bottom: 30px; right: 50px; width: 80px; height: 80px; border-radius: 50%; }
+        #joystick-container { position: absolute; bottom: 30px; left: 50px; width: 120px; height: 120px; z-index: 10; }
     </style>
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/"
+                "three": "https://esm.sh/three@0.149.0",
+                "three/addons/": "https://esm.sh/three@0.149.0/examples/jsm/",
+                "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.13.1"
             }
         }
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 </head>
 
 <body>
-    <div id="fullscreen-prompt">Tap to enter fullscreen & lock landscape</div>
-    <button id="music-toggle-btn" aria-label="Toggle Music">
-        <span id="music-icon-on" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33">
-                <path d="M0 0h24v24H0V0z" fill="none" />
-                <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zM10.5 19c-1.38 0-2.5-1.12-2.5-2.5S9.12 14 10.5 14s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-            </svg>
+    <!-- UI Elements -->
+    <div id="joystick-container"></div>
+    <button id="jump-btn" class="ui-button" aria-label="Jump">
+        <svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 0 24 24" width="48px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+    </button>
+    <button id="reset-btn" class="ui-button" aria-label="Reset Tank">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-8v4h2v-4h3l-4-4-4 4h3z" fill-rule="evenodd"/></svg>
+    </button>
+    <!-- NEW CAMERA TOGGLE BUTTON -->
+    <button id="camera-toggle-btn" class="ui-button" aria-label="Toggle Camera Mode">
+        <span id="camera-icon-tank">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6-2c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm6 12H6V8h12v10z"/><path d="M9.5 12c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v2.25L15 13v4l-2.5-1.25V18c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5v-6z"/></svg>
         </span>
-        <span id="music-icon-off">
-            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 0 24 24" width="32px" fill="#76FF33">
-                <path d="M0 0h24v24H0V0z" fill="none" />
-                <path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28C8.01 13.5 6 15.51 6 18s2.01 4.5 4.5 4.5S15 20.49 15 18v-1.73L19.73 21 21 19.73 4.27 3zM10.5 19.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM12 10.15v-7.1h4V6h-4v2.87l2.13 2.13z" />
-            </svg>
+        <span id="camera-icon-spectator" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
         </span>
     </button>
+    <button id="music-toggle-btn" class="ui-button" aria-label="Toggle Music">
+        <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg></span>
+        <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28-2.49 0-4.5 2.01-4.5 4.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15v-1.73l5.73 5.73L22 19.73 4.27 3zM15 6h4V3h-7v4.18l2 2z"/></svg></span>
+    </button>
+    <div id="fullscreen-prompt">Tap to enter fullscreen & lock landscape</div>
 
     <script type="module">
         import * as THREE from 'three';
-        import {
-            GLTFLoader
-        } from 'three/addons/loaders/GLTFLoader.js';
-        import {
-            EXRLoader
-        } from 'three/addons/loaders/EXRLoader.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+        import RAPIER from '@dimforge/rapier3d-compat';
 
-        let scene, camera, renderer;
+        let scene, camera, renderer, world;
+        let tankModel, tankBody;
+        
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        let audioContext, audioBuffer, sourceNode, isPlaying = false;
 
-        let audioContext;
-        let audioBuffer;
-        let sourceNode;
-        let isPlaying = false;
+        // --- MERGED STATE ---
+        let cameraMode = 'tank'; // 'tank' or 'spectator'
+        const cameraPointers = {};
+        let previousTwoFingerState = null;
+
+        const joystickVector = new THREE.Vector2();
+        const keyboard = { forward: 0, turn: 0 };
+        const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
+        const cameraOffset = new THREE.Vector3(0, 4, 12);
+        
+        const maxSpeed = 25.0;
+        const turnSpeed = 0.1;
+        const jumpForce = 2500;
+        const groundRaycastDist = 1.5;
+        const initialTankPosition = { x: 0, y: 2, z: 0 };
 
         init();
-        animate();
 
-        function init() {
+        async function init() {
+            await RAPIER.init();
+            world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
             scene = new THREE.Scene();
-            renderer = new THREE.WebGLRenderer({
-                antialias: true
-            });
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.appendChild(renderer.domElement);
-
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 15);
-            camera.rotation.order = 'YXZ';
-
-            setupTouchControls();
-
+            camera.rotation.order = 'YXZ'; // Important for spectator controls
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffeeb1, 1);
             directionalLight.position.set(-20, 30, 20);
             scene.add(directionalLight);
-
-            loadAssetsInOrder();
+            
+            loadAssetsAndPhysics();
+            setupControls();
             setupMusicControls();
             setupFullscreen();
             window.addEventListener('resize', onWindowResize);
+            animate();
         }
 
-        function setupTouchControls() {
-            const musicButton = document.getElementById('music-toggle-btn');
-            const activeTouches = {};
-            let previousTwoFingerState = null;
-            const rotationSpeed = 0.004;
-            const panSpeed = 0.05;
-            const pinchSpeed = 0.05;
-
-            let isDragging = false;
-            let touchStartTime = 0;
-            const tapTimeThreshold = 200;
-            const tapMoveThreshold = 10;
-
-            function handleCameraRotate(touch, state) {
-                const deltaX = touch.clientX - state.prevX;
-                const deltaY = touch.clientY - state.prevY;
-                camera.rotation.y -= deltaX * rotationSpeed;
-                camera.rotation.x -= deltaY * rotationSpeed;
-                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-                state.prevX = touch.clientX;
-                state.prevY = touch.clientY;
-            };
-
-            function getTwoFingerState(touches) {
-                if (touches.length < 2) return null;
-                const t0 = touches[0];
-                const t1 = touches[1];
-                return {
-                    distance: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY),
-                    midpoint: {
-                        x: (t0.clientX + t1.clientX) / 2,
-                        y: (t0.clientY + t1.clientY) / 2
-                    }
-                };
-            };
-
-            function handleTwoFingerGesture(touches) {
-                const currentState = getTwoFingerState(touches);
-                if (previousTwoFingerState) {
-                    const deltaPanX = currentState.midpoint.x - previousTwoFingerState.midpoint.x;
-                    const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y;
-                    const deltaPinch = currentState.distance - previousTwoFingerState.distance;
-                    camera.translateX(-deltaPanX * panSpeed);
-                    camera.translateY(deltaPanY * panSpeed);
-                    camera.translateZ(-deltaPinch * pinchSpeed);
-                }
-                previousTwoFingerState = currentState;
-            };
-
-            const onTouchStart = (e) => {
-                if (musicButton.contains(e.target)) return;
-                e.preventDefault();
-                isDragging = false;
-                if (e.touches.length === 1) touchStartTime = Date.now();
-                for (const touch of e.changedTouches) {
-                    activeTouches[touch.identifier] = {
-                        startX: touch.clientX,
-                        startY: touch.clientY,
-                        prevX: touch.clientX,
-                        prevY: touch.clientY
-                    };
-                }
-                if (Object.keys(activeTouches).length === 2) previousTwoFingerState = getTwoFingerState(e.touches);
-            };
-
-            const onTouchMove = (e) => {
-                if (musicButton.contains(e.target)) return;
-                e.preventDefault();
-                if (!isDragging) {
-                    if (e.touches.length === 1) {
-                        const touch = e.touches[0];
-                        const state = activeTouches[touch.identifier];
-                        if (state && (Math.abs(touch.clientX - state.startX) > tapMoveThreshold || Math.abs(touch.clientY - state.startY) > tapMoveThreshold)) {
-                            isDragging = true;
-                        }
-                    } else {
-                        isDragging = true;
-                    }
-                }
-                const touchCount = Object.keys(activeTouches).length;
-                if (touchCount === 1 && isDragging) {
-                    const touchId = Object.keys(activeTouches)[0];
-                    const touch = Array.from(e.touches).find(t => t.identifier == touchId);
-                    if (touch) handleCameraRotate(touch, activeTouches[touchId]);
-                } else if (touchCount === 2) {
-                    handleTwoFingerGesture(e.touches);
-                }
-            };
-
-            const onTouchEnd = (e) => {
-                if (musicButton.contains(e.target)) return;
-                e.preventDefault();
-                const touchDuration = Date.now() - touchStartTime;
-                if (!isDragging && e.changedTouches.length === 1 && Object.keys(activeTouches).length === 1 && touchDuration < tapTimeThreshold) {
-                    handleFullscreenRequest();
-                }
-                const wasTwoFingers = Object.keys(activeTouches).length === 2;
-                for (const touch of e.changedTouches) {
-                    delete activeTouches[touch.identifier];
-                }
-                const isNowOneFinger = Object.keys(activeTouches).length === 1;
-                if (wasTwoFingers && isNowOneFinger) {
-                    const remainingTouchId = Object.keys(activeTouches)[0];
-                    const remainingTouch = Array.from(e.touches).find(t => t.identifier == remainingTouchId);
-                    if (remainingTouch) {
-                        activeTouches[remainingTouchId].prevX = remainingTouch.clientX;
-                        activeTouches[remainingTouchId].prevY = remainingTouch.clientY;
-                        activeTouches[remainingTouchId].startX = remainingTouch.clientX;
-                        activeTouches[remainingTouchId].startY = remainingTouch.clientY;
-                    }
-                }
-                if (!isNowOneFinger) previousTwoFingerState = null;
-            };
-
-            const targetElement = renderer.domElement;
-            if (isTouchDevice) {
-                targetElement.addEventListener('touchstart', onTouchStart, {
-                    passive: false
-                });
-                targetElement.addEventListener('touchmove', onTouchMove, {
-                    passive: false
-                });
-                targetElement.addEventListener('touchend', onTouchEnd, {
-                    passive: false
-                });
-                targetElement.addEventListener('touchcancel', onTouchEnd, {
-                    passive: false
-                });
-            } else {
-                targetElement.addEventListener('click', handleFullscreenRequest);
-            }
-        };
-
-        function handleFullscreenRequest() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen()
-                    .then(() => {
-                        if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') {
-                            screen.orientation.lock('landscape').catch(() => {});
-                        }
-                    })
-                    .catch(() => {});
-            }
-        }
-
-        function loadAssetsInOrder() {
+        async function loadAssetsAndPhysics() {
             const exrLoader = new EXRLoader();
             const gltfLoader = new GLTFLoader();
-            exrLoader.load('assets/Minigame_Synth_Environment_4096x2048.exr', (texture) => {
+            const loadGltfAsync = (url) => new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
+            const loadExrAsync = (url) => new Promise((resolve, reject) => exrLoader.load(url, resolve, undefined, reject));
+            try {
+                const texture = await loadExrAsync('assets/Minigame_Synth_Environment_4096x2048.exr');
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
-                gltfLoader.load('assets/Minigame_Synth_Scene.glb', (gltf) => {
-                    scene.add(gltf.scene);
-                    gltfLoader.load('assets/Minigame_Synth_Tank.glb', (gltf) => {
-                        const tankModel = gltf.scene;
-                        tankModel.position.set(0, 0.2, 0);
-                        scene.add(tankModel);
-                    });
+                const sceneGltf = await loadGltfAsync('assets/Minigame_Synth_Scene.glb');
+                const sceneModel = sceneGltf.scene;
+                scene.add(sceneModel);
+                const sceneBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+                sceneModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.receiveShadow = true;
+                        child.updateWorldMatrix(true, true);
+                        const geometry = child.geometry;
+                        if (!geometry.attributes.position || !geometry.index) return;
+                        const vertices = geometry.attributes.position.array.slice();
+                        const indices = geometry.index.array.slice();
+                        for (let i = 0; i < vertices.length; i += 3) {
+                            const vertex = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                            vertex.applyMatrix4(child.matrixWorld);
+                            vertices[i] = vertex.x;
+                            vertices[i + 1] = vertex.y;
+                            vertices[i + 2] = vertex.z;
+                        }
+                        const trimeshDesc = RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), indices);
+                        world.createCollider(trimeshDesc, sceneBody);
+                    }
                 });
-            });
-        };
-
-        async function setupMusicControls() {
-            const musicButton = document.getElementById('music-toggle-btn');
-            const iconOn = document.getElementById('music-icon-on');
-            const iconOff = document.getElementById('music-icon-off');
-
-            try {
-                const response = await fetch('assets/bounce tanki loop cut (no intro).opus');
-                const arrayBuffer = await response.arrayBuffer();
-
-                audioContext = THREE.AudioContext.getContext();
-                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                const tankGltf = await loadGltfAsync('assets/Minigame_Synth_Tank.glb');
+                tankModel = tankGltf.scene;
+                tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
+                scene.add(tankModel);
+                const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z).setLinearDamping(0.5).setAngularDamping(0.8).setCanSleep(false);
+                tankBody = world.createRigidBody(bodyDesc);
+                const allVertices = [];
+                tankModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        const positions = child.geometry.attributes.position.array;
+                        for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
+                    }
+                });
+                const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
+                world.createCollider(colliderDesc, tankBody);
             } catch (error) {
-                console.error('Failed to load or decode audio file:', error);
-                musicButton.disabled = true;
-                return;
+                console.error("An error occurred during asset loading:", error);
             }
-
-            function playMusic() {
-                if (isPlaying || !audioBuffer) return;
-
-                sourceNode = audioContext.createBufferSource();
-                sourceNode.buffer = audioBuffer;
-                sourceNode.loop = true;
-                sourceNode.connect(audioContext.destination);
-                sourceNode.start();
-
-                isPlaying = true;
-                iconOn.style.display = 'inline';
-                iconOff.style.display = 'none';
-            }
-
-            function stopMusic() {
-                if (!isPlaying || !sourceNode) return;
-
-                sourceNode.stop();
-                sourceNode.disconnect();
-                sourceNode = null;
-
-                isPlaying = false;
-                iconOn.style.display = 'none';
-                iconOff.style.display = 'inline';
-            }
-
-            musicButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-
-                if (isPlaying) {
-                    stopMusic();
-                } else {
-                    playMusic();
-                }
-            });
         }
 
-        function setupFullscreen() {
-            const prompt = document.getElementById('fullscreen-prompt');
-            if (isTouchDevice) {
-                setTimeout(() => {
-                    prompt.style.opacity = '1';
-                }, 2000);
-                setTimeout(() => {
-                    prompt.style.opacity = '0';
-                }, 7000);
+        function updateUiForCameraMode() {
+            const joystickEl = document.getElementById('joystick-container');
+            const jumpBtnEl = document.getElementById('jump-btn');
+            const cameraIconTank = document.getElementById('camera-icon-tank');
+            const cameraIconSpectator = document.getElementById('camera-icon-spectator');
+
+            if (cameraMode === 'tank') {
+                joystickEl.style.display = 'block';
+                jumpBtnEl.style.display = 'flex';
+                cameraIconTank.style.display = 'none';
+                cameraIconSpectator.style.display = 'inline';
+            } else { // 'spectator'
+                joystickEl.style.display = 'none';
+                jumpBtnEl.style.display = 'none';
+                cameraIconTank.style.display = 'inline';
+                cameraIconSpectator.style.display = 'none';
             }
-            document.addEventListener('fullscreenchange', () => {
-                if (!document.fullscreenElement) {
-                    if (screen.orientation && typeof screen.orientation.unlock === 'function') {
-                        screen.orientation.unlock();
-                    }
+        }
+
+        function setupControls() {
+            // Tank Movement
+            if (isTouchDevice) {
+                const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
+                joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
+            }
+            document.addEventListener('keydown', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': case 'arrowup':    keyboard.forward = 1; break;
+                    case 's': case 'arrowdown':  keyboard.forward = -1; break;
+                    case 'a': case 'arrowleft':  keyboard.turn = -1; break;
+                    case 'd': case 'arrowright': keyboard.turn = 1; break;
+                    case ' ':                    handleJump(); break;
                 }
             });
+            document.addEventListener('keyup', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': case 'arrowup': case 's': case 'arrowdown':  keyboard.forward = 0; break;
+                    case 'a': case 'arrowleft': case 'd': case 'arrowright': keyboard.turn = 0; break;
+                }
+            });
+
+            // --- UNIFIED CAMERA CONTROLS ---
+            const tapThreshold = 10;
+            const pointerDownPos = new THREE.Vector2();
+
+            const onPointerDown = (e) => {
+                // Ignore clicks on UI elements
+                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) return;
+                
+                // Record pointer info
+                pointerDownPos.set(e.clientX, e.clientY);
+                cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+                // If this is the second pointer, initialize two-finger gesture state
+                if (Object.keys(cameraPointers).length === 2) {
+                     previousTwoFingerState = getTwoFingerState(Object.values(cameraPointers));
+                }
+            };
+
+            const onPointerMove = (e) => {
+                const pointer = cameraPointers[e.pointerId];
+                if (!pointer) return; // Only process pointers we are tracking
+
+                const deltaX = e.clientX - pointer.x;
+                const deltaY = e.clientY - pointer.y;
+
+                if (Object.keys(cameraPointers).length === 1) {
+                    // Single pointer: Rotate camera
+                    if (cameraMode === 'tank') {
+                        cameraAngle.horizontal -= deltaX * 0.005;
+                        cameraAngle.vertical -= deltaY * 0.005;
+                        cameraAngle.vertical = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.5, cameraAngle.vertical));
+                    } else { // Spectator mode
+                        camera.rotation.y -= deltaX * 0.004;
+                        camera.rotation.x -= deltaY * 0.004;
+                        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+                    }
+                } else if (Object.keys(cameraPointers).length === 2 && cameraMode === 'spectator') {
+                    // Two pointers in spectator mode: Pan and Zoom
+                    pointer.x = e.clientX;
+                    pointer.y = e.clientY;
+                    handleSpectatorPanAndZoom(Object.values(cameraPointers));
+                }
+                
+                // Update pointer's last known position
+                pointer.x = e.clientX;
+                pointer.y = e.clientY;
+            };
+
+            const onPointerUpOrCancel = (e) => {
+                if (cameraPointers[e.pointerId]) {
+                    const dragDistance = pointerDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
+                    // Handle tap for fullscreen only if it wasn't a drag and was the only pointer
+                    if (dragDistance < tapThreshold && Object.keys(cameraPointers).length === 1) {
+                        handleFullscreenRequest();
+                    }
+                }
+
+                // --- KEY FIX FOR CAMERA JUMP ---
+                const wasTwoFingers = Object.keys(cameraPointers).length === 2;
+                delete cameraPointers[e.pointerId];
+                if (wasTwoFingers && Object.keys(cameraPointers).length === 1) {
+                    // If we just transitioned from 2 fingers to 1, we must reset the remaining pointer's
+                    // reference position to prevent a jump on the next move event.
+                    const remainingPointerId = Object.keys(cameraPointers)[0];
+                    const remainingPointer = cameraPointers[remainingPointerId];
+                    // Find the most up-to-date position from the browser's list of active touches.
+                    const remainingTouch = Array.from(e.touches).find(t => t.identifier == remainingPointerId);
+                    if (remainingTouch) {
+                        // Reset the reference position to the current position.
+                        remainingPointer.x = remainingTouch.clientX;
+                        remainingPointer.y = remainingTouch.clientY;
+                    }
+                }
+                // --- END OF FIX ---
+
+                if (Object.keys(cameraPointers).length < 2) {
+                    previousTwoFingerState = null;
+                }
+            };
+            
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerup', onPointerUpOrCancel);
+            renderer.domElement.addEventListener('pointercancel', onPointerUpOrCancel);
+            renderer.domElement.addEventListener('pointerleave', onPointerUpOrCancel); // Also handle leaving the canvas
+
+            // --- UI BUTTONS ---
+            const jumpButton = document.getElementById('jump-btn');
+            const resetButton = document.getElementById('reset-btn');
+            const cameraToggleButton = document.getElementById('camera-toggle-btn');
+            // Use pointerdown for buttons for faster response on touch devices
+            jumpButton.addEventListener('pointerdown', (e) => { e.preventDefault(); handleJump(); });
+            resetButton.addEventListener('pointerdown', (e) => { e.preventDefault(); resetTank(); });
+            cameraToggleButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                cameraMode = cameraMode === 'tank' ? 'spectator' : 'tank';
+                updateUiForCameraMode();
+            });
+
+            const resetTank = () => {
+                if (!tankBody) return;
+                tankBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                tankBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                tankBody.setTranslation(initialTankPosition, true);
+                tankBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+            };
+
+            updateUiForCameraMode();
+        }
+
+        function getTwoFingerState(pointers) {
+            if (pointers.length < 2) return null;
+            const t0 = pointers[0];
+            const t1 = pointers[1];
+            return {
+                distance: Math.hypot(t1.x - t0.x, t1.y - t0.y),
+                midpoint: { x: (t0.x + t1.x) / 2, y: (t0.y + t1.y) / 2 }
+            };
         };
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        function handleSpectatorPanAndZoom(pointers) {
+            const currentState = getTwoFingerState(pointers);
+            if (previousTwoFingerState && currentState) {
+                const deltaPanX = currentState.midpoint.x - previousTwoFingerState.midpoint.x;
+                const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y;
+                const deltaPinch = currentState.distance - previousTwoFingerState.distance;
+                camera.translateX(-deltaPanX * 0.05);
+                camera.translateY(deltaPanY * 0.05);
+                camera.translateZ(-deltaPinch * 0.05);
+            }
+            previousTwoFingerState = currentState;
         };
+
+        function handleJump() {
+            if (!tankBody || cameraMode !== 'tank') return;
+            const rayOrigin = tankBody.translation();
+            const rayDir = { x: 0, y: -1, z: 0 };
+            const ray = new RAPIER.Ray(rayOrigin, rayDir);
+            const hit = world.castRay(ray, groundRaycastDist, true, null, null, tankBody.collider(0));
+            if (hit) {
+                tankBody.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
+            }
+        }
+
+        // --- ANIMATE & RENDER ---
+        const cameraForward = new THREE.Vector3();
+        const cameraRight = new THREE.Vector3();
+        const moveDirection = new THREE.Vector3();
+        const targetVelocity = new THREE.Vector3();
+        const targetQuaternion = new THREE.Quaternion();
+        const _matrix = new THREE.Matrix4();
+        const upVector = new THREE.Vector3(0, 1, 0);
 
         function animate() {
             requestAnimationFrame(animate);
+            world.step();
+
+            if (tankBody && tankModel) {
+                // --- TANK PHYSICS (Always running) ---
+                const moveInput = new THREE.Vector2( 
+                    isTouchDevice ? joystickVector.x : keyboard.turn, 
+                    isTouchDevice ? joystickVector.y : keyboard.forward 
+                );
+                
+                // Use camera direction for movement input only in tank mode
+                if (cameraMode === 'tank') {
+                    camera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0;
+                    cameraForward.normalize();
+                    cameraRight.crossVectors(cameraForward, upVector);
+                    moveDirection.set(0, 0, 0);
+                    moveDirection.addScaledVector(cameraForward, moveInput.y);
+                    moveDirection.addScaledVector(cameraRight, moveInput.x);
+
+                    const currentVel = tankBody.linvel();
+                    if (moveDirection.lengthSq() > 0.01) {
+                        moveDirection.normalize();
+                        targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
+                        tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
+                    } else {
+                        // Gently bring to a stop on the XZ plane if no input
+                        tankBody.setLinvel({ x: currentVel.x * 0.9, y: currentVel.y, z: currentVel.z * 0.9 }, true);
+                    }
+
+                    const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
+                    _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), upVector);
+                    targetQuaternion.setFromRotationMatrix(_matrix);
+                    if (!tankModel.quaternion.equals(targetQuaternion)) {
+                        tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
+                        tankBody.setRotation(tankModel.quaternion, true);
+                    }
+                }
+
+                // --- TANK MODEL UPDATE (Always running) ---
+                const position = tankBody.translation();
+                tankModel.position.set(position.x, position.y, position.z);
+
+                // --- CAMERA LOGIC (Conditional) ---
+                if (cameraMode === 'tank') {
+                    const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
+                    const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
+                    rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
+                    const cameraTargetPosition = tankModel.position.clone().add(rotatedOffset);
+                    camera.position.lerp(cameraTargetPosition, 0.1);
+                    camera.lookAt(tankModel.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+                }
+            }
             renderer.render(scene, camera);
         };
+        
+        // --- UTILITY FUNCTIONS ---
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+        
+        function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
+        
+        function setupFullscreen() { 
+            const prompt = document.getElementById('fullscreen-prompt'); 
+            if (isTouchDevice) { 
+                setTimeout(() => { prompt.style.opacity = '1'; }, 2000); 
+                setTimeout(() => { prompt.style.opacity = '0'; }, 7000); 
+            }
+            document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); 
+        };
+
+        async function setupMusicControls() { 
+            const musicButton = document.getElementById('music-toggle-btn'); 
+            const iconOn = document.getElementById('music-icon-on'); 
+            const iconOff = document.getElementById('music-icon-off'); 
+            try { 
+                const response = await fetch('assets/bounce tanki loop cut (no intro).opus'); 
+                const arrayBuffer = await response.arrayBuffer(); 
+                audioContext = THREE.AudioContext.getContext(); 
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer); 
+            } catch (error) { 
+                console.error('Failed to load or decode audio file:', error); 
+                musicButton.disabled = true; 
+                return; 
+            } 
+            function playMusic() { 
+                if (isPlaying || !audioBuffer) return; 
+                sourceNode = audioContext.createBufferSource(); 
+                sourceNode.buffer = audioBuffer; 
+                sourceNode.loop = true; 
+                sourceNode.connect(audioContext.destination); 
+                sourceNode.start(); 
+                isPlaying = true; 
+                iconOn.style.display = 'inline'; 
+                iconOff.style.display = 'none'; 
+            } 
+            function stopMusic() { 
+                if (!isPlaying || !sourceNode) return; 
+                sourceNode.stop(); 
+                sourceNode.disconnect(); 
+                sourceNode = null; 
+                isPlaying = false; 
+                iconOn.style.display = 'none'; 
+                iconOff.style.display = 'inline'; 
+            } 
+            musicButton.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                if (audioContext.state === 'suspended') { audioContext.resume(); } 
+                if (isPlaying) { 
+                    stopMusic(); 
+                } else { 
+                    playMusic(); 
+                } 
+            }); 
+        }
     </script>
 </body>
-
 </html>
