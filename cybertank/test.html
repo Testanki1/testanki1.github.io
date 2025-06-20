@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Simulation Air Tumble</title>
+    <title>Tank Physics Demo - Improved Handling</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         
@@ -158,11 +158,10 @@
                 tankModel = tankGltf.scene;
                 tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
                 scene.add(tankModel);
-                // Increased angular damping slightly to prevent endless spinning, but still allows tumbling.
                 const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
                     .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
                     .setLinearDamping(0.5)
-                    .setAngularDamping(0.5) // Original was 0.8, a lower value allows for more tumbling
+                    .setAngularDamping(0.5) 
                     .setCanSleep(false);
                 tankBody = world.createRigidBody(bodyDesc);
                 const allVertices = [];
@@ -273,70 +272,83 @@
 
         const groundNormal = new THREE.Vector3(0, 1, 0);
         const currentUpVector = new THREE.Vector3(0, 1, 0);
+        const tankUpVector = new THREE.Vector3(); // NEW: 用于存储坦克自身的“向上”向量
 
         function animate() {
             requestAnimationFrame(animate);
             world.step();
 
             if (tankBody && tankModel) {
-                const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
-                camera.getWorldDirection(cameraForward);
-                cameraForward.y = 0;
-                cameraForward.normalize();
-                cameraRight.crossVectors(cameraForward, upVector);
-                moveDirection.set(0, 0, 0);
-                moveDirection.addScaledVector(cameraForward, moveInput.y);
-                moveDirection.addScaledVector(cameraRight, moveInput.x);
-
-                const currentVel = tankBody.linvel();
-                if (moveDirection.lengthSq() > 0.01) {
-                    moveDirection.normalize();
-                    targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
-                    tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
-                } else {
-                    tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
-                }
-                
-                // --- TANK ORIENTATION LOGIC ---
+                // --- 状态检测 ---
+                // 1. 向下发射射线，检测是否在地面上
                 const rayOrigin = tankBody.translation();
-                rayOrigin.y += 0.5;
+                rayOrigin.y += 0.2; // 从略高于中心点的位置发射，避免陷入地面
                 const rayDir = { x: 0, y: -1, z: 0 };
                 const ray = new RAPIER.Ray(rayOrigin, rayDir);
-                const hit = world.castRayAndGetNormal(ray, 2.0, true, null, null, tankBody.collider(0));
+                const hit = world.castRayAndGetNormal(ray, 0.7, true, null, null, tankBody.collider(0)); // 缩短射线距离，更精确
+                const isOnGround = !!hit;
 
-                let isOnGround = false; // A flag to know if we are on ground
-                if (hit) {
-                    isOnGround = true;
-                    groundNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
-                } else {
-                    // MODIFIED: In-air behavior
-                    // Do nothing here. This lets the physics engine control the tumble.
-                    // We let 'groundNormal' keep its last value from when it was on the ground.
-                }
-                
-                // We only force the tank's orientation when it's on the ground.
-                if (isOnGround) {
-                    currentUpVector.lerp(groundNormal, 0.1);
-                    const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
-                    _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), currentUpVector);
-                    targetQuaternion.setFromRotationMatrix(_matrix);
+                // 2. 检测坦克自身是否正向朝上
+                tankUpVector.set(0, 1, 0).applyQuaternion(tankModel.quaternion);
+                const isUpright = tankUpVector.dot(upVector) > 0.3; // 点积大于0.3才算正向
+
+                // 3. 最终判断是否可控
+                const canControl = isOnGround && isUpright;
+
+                // --- 移动逻辑 ---
+                if (canControl) {
+                    const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
+                    camera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0;
+                    cameraForward.normalize();
+                    cameraRight.crossVectors(cameraForward, upVector);
+                    moveDirection.set(0, 0, 0);
+                    moveDirection.addScaledVector(cameraForward, moveInput.y);
+                    moveDirection.addScaledVector(cameraRight, moveInput.x);
                     
-                    // Slerp to the new target rotation.
-                    // Since this only runs on the ground, it won't interfere with air tumbling.
-                    const currentRotation = new THREE.Quaternion().copy(tankBody.rotation());
-                    currentRotation.slerp(targetQuaternion, turnSpeed);
-                    tankBody.setRotation(currentRotation, true);
+                    const currentVel = tankBody.linvel();
+                    if (moveDirection.lengthSq() > 0.01) {
+                        moveDirection.normalize();
+                        targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
+                        tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
+                    } else {
+                        // 如果没有输入，也应该停止水平移动
+                        tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
+                    }
+                } else {
+                    // 如果不可控（在空中或翻车），则强制停止水平移动
+                    const currentVel = tankBody.linvel();
+                    tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
+                }
+
+                // --- 姿态（旋转）逻辑 ---
+                if (isOnGround) {
+                    // MODIFIED: 减小 lerp 值 (从 0.1 改为 0.05)，让坦克适应地形时更平滑、更“重”
+                    // 您可以调整这个值来改变“悬挂”的软硬度
+                    groundNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
+                    currentUpVector.lerp(groundNormal, 0.05);
+
+                    // 只有在可控时，才根据玩家输入调整朝向
+                    if (canControl) {
+                        const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
+                        _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), currentUpVector);
+                        targetQuaternion.setFromRotationMatrix(_matrix);
+                        
+                        const currentRotation = new THREE.Quaternion().copy(tankBody.rotation());
+                        currentRotation.slerp(targetQuaternion, turnSpeed);
+                        tankBody.setRotation(currentRotation, true);
+                    }
                 }
                 
-                // Always sync model position and rotation with the physics body.
-                // This is crucial for displaying the in-air tumble correctly.
+                // --- 模型与物理同步 ---
+                // 这一步必须无条件执行，以正确显示物理引擎驱动的翻滚效果
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
                 const rotation = tankBody.rotation();
                 tankModel.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
 
 
-                // --- CAMERA LOGIC (Unchanged) ---
+                // --- 镜头逻辑 ---
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
