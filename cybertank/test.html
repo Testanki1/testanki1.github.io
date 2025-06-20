@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Advanced Handling</title>
+    <title>Tank Physics Demo - True Contact Physics</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         
@@ -88,10 +88,9 @@
         const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
         const cameraOffset = new THREE.Vector3(0, 4, 12);
         
-        const maxSpeed = 25.0;
+        const maxSpeed = 15.0;
         const turnSpeed = 0.1;
         const jumpForce = 2500;
-        const groundRaycastDist = 1.0; // 射线检测距离，模拟悬挂行程
         const initialTankPosition = { x: 0, y: 2, z: 0 };
 
         init();
@@ -160,9 +159,8 @@
                 scene.add(tankModel);
                 const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
                     .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                    // **物理参数调节区**
-                    .setLinearDamping(0.3)   // 线性阻尼: 影响“空气/地面阻力”。值越小，滑行越远。
-                    .setAngularDamping(0.8)  // 角阻尼: 影响翻滚的衰减速度。值越小，翻滚越自由。
+                    .setLinearDamping(0.3)
+                    .setAngularDamping(0.8)
                     .setCanSleep(false);
                 tankBody = world.createRigidBody(bodyDesc);
                 const allVertices = [];
@@ -173,7 +171,8 @@
                         for (let i = 0; i < positions.length; i += 3) { allVertices.push(positions[i], positions[i+1], positions[i+2]); }
                     }
                 });
-                const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices));
+                const colliderDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(allVertices))
+                    .setSolverGroups(1); // Set solver group for contact detection
                 world.createCollider(colliderDesc, tankBody);
             } catch (error) {
                 console.error("An error occurred during asset loading:", error);
@@ -193,56 +192,14 @@
         const currentUpVector = new THREE.Vector3(0, 1, 0);
         const tankUpVector = new THREE.Vector3();
         
-        // 定义四个“车轮”相对于坦克模型中心的位置 (需要根据你的模型调整)
-        const wheelOffsets = [
-            new THREE.Vector3(1.2, -0.5, 2.0),  // 右前
-            new THREE.Vector3(-1.2, -0.5, 2.0), // 左前
-            new THREE.Vector3(1.2, -0.5, -2.0), // 右后
-            new THREE.Vector3(-1.2, -0.5, -2.0)  // 左后
-        ];
-        
-        // 封装好的多点地面检测函数
-        function checkGround(body, world) {
-            const bodyRotation = body.rotation();
-            const bodyPosition = body.translation();
-            const hits = [];
-
-            for(const offset of wheelOffsets) {
-                const rayOrigin = new THREE.Vector3().copy(offset)
-                    .applyQuaternion(bodyRotation)
-                    .add(bodyPosition);
-
-                const rayDir = new THREE.Vector3(0, -1, 0);
-                const ray = new RAPIER.Ray(rayOrigin, rayDir);
-                const hit = world.castRayAndGetNormal(ray, groundRaycastDist, true, null, null, body.collider(0));
-                
-                if (hit) {
-                    hits.push(hit);
-                }
-            }
-
-            if (hits.length === 0) {
-                return { isOnGround: false, averageNormal: null };
-            }
-
-            const averageNormal = new THREE.Vector3();
-            for(const hit of hits) {
-                averageNormal.add(hit.normal);
-            }
-            averageNormal.normalize();
-            
-            return { isOnGround: true, averageNormal };
-        }
+        let isOnGround = false; // We need this to be accessible by handleJump
 
         function handleJump() {
-            if (!tankBody) return;
-            const groundInfo = checkGround(tankBody, world);
-            if (groundInfo.isOnGround) {
-                tankBody.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
-            }
+            if (!tankBody || !isOnGround) return;
+            tankBody.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
         }
         
-        function setupControls() {
+        function setupControls() { /* ... 此处代码未改变 ... */ 
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
                 joystickManager.on('move', (evt, data) => { joystickVector.set(data.vector.x, data.vector.y); }).on('end', () => { joystickVector.set(0, 0); });
@@ -316,17 +273,42 @@
         
         function animate() {
             requestAnimationFrame(animate);
+            // 物理计算优先
             world.step();
 
             if (tankBody && tankModel) {
-                const groundInfo = checkGround(tankBody, world);
-                const isOnGround = groundInfo.isOnGround;
+                // --- 状态检测 (使用真实物理接触点) ---
+                const groundContacts = [];
+                // 遍历与坦克发生接触的每一个物体对
+                world.contactsWith(tankBody.collider(0), (otherCollider) => {
+                    // 获取这对物体之间的接触流形 (manifold)
+                    const manifold = world.contactPair(tankBody.collider(0), otherCollider)?.manifolds[0];
+                    if (manifold) {
+                        // 我们只关心那些发生在坦克“底部”的接触
+                        // 通过判断接触法线是否大致朝上 (dot product > 0.5)
+                        if (manifold.normal().y > 0.5) {
+                            groundContacts.push(manifold.normal());
+                        }
+                    }
+                });
 
+                isOnGround = groundContacts.length > 0;
+
+                if (isOnGround) {
+                    // 计算所有地面接触点法线的平均值，得到最稳定的“地面方向”
+                    groundNormal.set(0, 0, 0);
+                    for(const normal of groundContacts) {
+                        groundNormal.add(normal);
+                    }
+                    groundNormal.normalize();
+                }
+                
                 tankUpVector.set(0, 1, 0).applyQuaternion(tankModel.quaternion);
                 const isUpright = tankUpVector.dot(upVector) > 0.3;
 
                 const canControl = isOnGround && isUpright;
 
+                // --- 移动逻辑 ---
                 if (canControl) {
                     const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
                     camera.getWorldDirection(cameraForward);
@@ -348,9 +330,9 @@
                     }
                 }
                 
+                // --- 姿态逻辑 ---
                 if (isOnGround) {
-                    const suspensionHardness = 0.05; // 悬挂硬度: 值越小越软，越大越硬
-                    groundNormal.copy(groundInfo.averageNormal);
+                    const suspensionHardness = 0.1; // 这种方法的“悬挂”感觉会偏硬，因此可以适当提高插值
                     currentUpVector.lerp(groundNormal, suspensionHardness);
 
                     if (canControl) {
@@ -364,11 +346,13 @@
                     }
                 }
                 
+                // --- 同步模型与物理 ---
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
                 const rotation = tankBody.rotation();
                 tankModel.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
 
+                // --- 镜头逻辑 ---
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
@@ -379,13 +363,13 @@
             renderer.render(scene, camera);
         };
         
-        function onWindowResize() {
+        function onWindowResize() { /* ... 此处代码未改变 ... */
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight); 
         }
-        function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
-        function setupFullscreen() { 
+        function handleFullscreenRequest() { /* ... 此处代码未改变 ... */ if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
+        function setupFullscreen() { /* ... 此处代码未改变 ... */ 
             const prompt = document.getElementById('fullscreen-prompt'); 
             if (isTouchDevice) { 
                 setTimeout(() => { prompt.style.opacity = '1'; }, 2000); 
@@ -398,7 +382,7 @@
             } 
             document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); 
         }
-        async function setupMusicControls() { 
+        async function setupMusicControls() { /* ... 此处代码未改变 ... */ 
             const musicButton = document.getElementById('music-toggle-btn'); 
             const iconOn = document.getElementById('music-icon-on'); 
             const iconOff = document.getElementById('music-icon-off'); 
