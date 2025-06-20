@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple GLB Load Test</title>
+</head>
+<body>
+    <h1>Testing GLB File Loading</h1>
+    <p>Check the browser console (F12) for messages.</p>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://esm.sh/three@0.149.0",
+                "three/addons/": "https://esm.sh/three@0.149.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // 1. 创建一个加载器实例
+        const loader = new GLTFLoader();
+
+        // 2. 定义要加载的文件的路径
+        const filePath = 'assets/tank.glb'; // 我们只测试这一个文件
+
+        // 3. 开始加载
+        console.log(`Attempting to load: ${filePath}`);
+
+        loader.load(
+            // resource URL
+            filePath,
+
+            // onLoad callback (加载成功时调用)
+            function (gltf) {
+                console.log('SUCCESS! The file was loaded successfully.');
+                console.log('Here is the loaded data:', gltf);
+                document.body.innerHTML += '<h2 style="color: green;">SUCCESS: assets/tank.glb loaded!</h2>';
+            },
+
+            // onProgress callback (加载过程中调用，可以忽略)
+            undefined,
+
+            // onError callback (加载失败时调用)
+            function (error) {
+                console.error('ERROR! The file could not be loaded.');
+                console.error('Here is the error object:', error);
+                document.body.innerHTML += `<h2 style="color: red;">FAILURE: Could not load assets/tank.glb. Check console for details.</h2>`;
+            }
+        );
+    </script>
+</body>
+</html>
