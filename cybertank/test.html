@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Improved Handling</title>
+    <title>Tank Physics Demo - With Inertia</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         
@@ -160,7 +160,7 @@
                 scene.add(tankModel);
                 const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
                     .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
-                    .setLinearDamping(0.5)
+                    .setLinearDamping(0.5) // This value acts like air/ground friction.
                     .setAngularDamping(0.5) 
                     .setCanSleep(false);
                 tankBody = world.createRigidBody(bodyDesc);
@@ -258,7 +258,10 @@
             const ray = new RAPIER.Ray(rayOrigin, rayDir);
             const hit = world.castRay(ray, groundRaycastDist, true, null, null, tankBody.collider(0));
             if (hit) {
-                tankBody.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
+                // To make the jump feel more powerful with inertia,
+                // we add the impulse to the current velocity instead of just setting it.
+                const currentVel = tankBody.linvel();
+                tankBody.applyImpulse({ x: 0, y: jumpForce - currentVel.y, z: 0 }, true);
             }
         }
 
@@ -272,7 +275,7 @@
 
         const groundNormal = new THREE.Vector3(0, 1, 0);
         const currentUpVector = new THREE.Vector3(0, 1, 0);
-        const tankUpVector = new THREE.Vector3(); // NEW: 用于存储坦克自身的“向上”向量
+        const tankUpVector = new THREE.Vector3();
 
         function animate() {
             requestAnimationFrame(animate);
@@ -280,55 +283,55 @@
 
             if (tankBody && tankModel) {
                 // --- 状态检测 ---
-                // 1. 向下发射射线，检测是否在地面上
                 const rayOrigin = tankBody.translation();
-                rayOrigin.y += 0.2; // 从略高于中心点的位置发射，避免陷入地面
+                rayOrigin.y += 0.2;
                 const rayDir = { x: 0, y: -1, z: 0 };
                 const ray = new RAPIER.Ray(rayOrigin, rayDir);
-                const hit = world.castRayAndGetNormal(ray, 0.7, true, null, null, tankBody.collider(0)); // 缩短射线距离，更精确
+                const hit = world.castRayAndGetNormal(ray, 0.7, true, null, null, tankBody.collider(0));
                 const isOnGround = !!hit;
 
-                // 2. 检测坦克自身是否正向朝上
                 tankUpVector.set(0, 1, 0).applyQuaternion(tankModel.quaternion);
-                const isUpright = tankUpVector.dot(upVector) > 0.3; // 点积大于0.3才算正向
+                const isUpright = tankUpVector.dot(upVector) > 0.3;
 
-                // 3. 最终判断是否可控
                 const canControl = isOnGround && isUpright;
 
-                // --- 移动逻辑 ---
+                // --- 移动逻辑 (已重构以支持惯性) ---
+                const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
+                camera.getWorldDirection(cameraForward);
+                cameraForward.y = 0;
+                cameraForward.normalize();
+                cameraRight.crossVectors(cameraForward, upVector);
+                moveDirection.set(0, 0, 0);
+                moveDirection.addScaledVector(cameraForward, moveInput.y);
+                moveDirection.addScaledVector(cameraRight, moveInput.x);
+
                 if (canControl) {
-                    const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
-                    camera.getWorldDirection(cameraForward);
-                    cameraForward.y = 0;
-                    cameraForward.normalize();
-                    cameraRight.crossVectors(cameraForward, upVector);
-                    moveDirection.set(0, 0, 0);
-                    moveDirection.addScaledVector(cameraForward, moveInput.y);
-                    moveDirection.addScaledVector(cameraRight, moveInput.x);
-                    
+                    // 当在地面且姿态正确时，直接控制速度，提供灵敏的操控感。
                     const currentVel = tankBody.linvel();
                     if (moveDirection.lengthSq() > 0.01) {
                         moveDirection.normalize();
                         targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                         tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
                     } else {
-                        // 如果没有输入，也应该停止水平移动
-                        tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
+                        // 如果没有输入，线性阻尼(LinearDamping)会自动让坦克停下来。
+                        // 为了更快的刹车，我们可以主动减速。
+                        const brakingForce = 0.9;
+                        tankBody.setLinvel({ x: currentVel.x * brakingForce, y: currentVel.y, z: currentVel.z * brakingForce }, true);
                     }
-                } else {
-                    // 如果不可控（在空中或翻车），则强制停止水平移动
-                    const currentVel = tankBody.linvel();
-                    tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
-                }
-
+                } 
+                // **关键改动**: 当 `!canControl` (在空中或翻车)时，我们什么都不做。
+                // 这允许坦克保持其跳起时的水平速度，从而产生惯性。
+                // 物理引擎的 `linearDamping` 会像空气阻力一样，使其在空中自然减速。
+                
                 // --- 姿态（旋转）逻辑 ---
                 if (isOnGround) {
-                    // MODIFIED: 减小 lerp 值 (从 0.1 改为 0.05)，让坦克适应地形时更平滑、更“重”
-                    // 您可以调整这个值来改变“悬挂”的软硬度
+                    // **在这里调整悬挂软硬度**
+                    // 减小这个值 (e.g., 0.02) = 悬挂更软，更平滑
+                    // 增大这个值 (e.g., 0.1) = 悬挂更硬，反应更快
+                    const suspensionHardness = 0.01; 
                     groundNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
-                    currentUpVector.lerp(groundNormal, 0.05);
+                    currentUpVector.lerp(groundNormal, suspensionHardness);
 
-                    // 只有在可控时，才根据玩家输入调整朝向
                     if (canControl) {
                         const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
                         _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), currentUpVector);
@@ -341,7 +344,6 @@
                 }
                 
                 // --- 模型与物理同步 ---
-                // 这一步必须无条件执行，以正确显示物理引擎驱动的翻滚效果
                 const position = tankBody.translation();
                 tankModel.position.set(position.x, position.y, position.z);
                 const rotation = tankBody.rotation();
@@ -359,7 +361,7 @@
             renderer.render(scene, camera);
         };
         
-        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerHeight, window.innerHeight); };
         
         function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
         
