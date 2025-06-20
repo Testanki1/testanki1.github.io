@@ -7,38 +7,11 @@
     <title>Tank Physics Demo - Halloween Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
-        
-        canvas { 
-            display: block; 
-            touch-action: none; 
-        }
-
+        canvas { display: block; touch-action: none; }
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
-        
-        .ui-button {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            cursor: pointer;
-            padding: 10px;
-            z-index: 100;
-            opacity: 0.8;
-            transition: opacity 0.2s, background-color 0.2s;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .ui-button:hover {
-            opacity: 1;
-            background: rgba(0, 0, 0, 0.5);
-        }
-        .ui-button svg {
-            display: block;
-            width: 32px;
-            height: 32px;
-        }
-
+        .ui-button { position: absolute; background: rgba(0, 0, 0, 0.3); border: 2px solid rgba(255, 255, 255, 0.4); cursor: pointer; padding: 10px; z-index: 100; opacity: 0.8; transition: opacity 0.2s, background-color 0.2s; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .ui-button:hover { opacity: 1; background: rgba(0, 0, 0, 0.5); }
+        .ui-button svg { display: block; width: 32px; height: 32px; }
         #music-toggle-btn { top: 15px; right: 15px; border-radius: 8px; }
         #reset-btn { top: 15px; right: 85px; border-radius: 8px; }
         #jump-btn { position: absolute; bottom: 30px; right: 50px; width: 80px; height: 80px; }
@@ -57,14 +30,9 @@
 </head>
 
 <body>
-    <!-- UI Elements -->
     <div id="joystick-container"></div>
-    <button id="jump-btn" class="ui-button" aria-label="Jump">
-        <svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 0 24 24" width="48px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
-    </button>
-    <button id="reset-btn" class="ui-button" aria-label="Reset Tank">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-8v4h2v-4h3l-4-4-4 4h3z" fill-rule="evenodd"/></svg>
-    </button>
+    <button id="jump-btn" class="ui-button" aria-label="Jump"><svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 0 24 24" width="48px" fill="#76FF33"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
+    <button id="reset-btn" class="ui-button" aria-label="Reset Tank"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-8v4h2v-4h3l-4-4-4 4h3z" fill-rule="evenodd"/></svg></button>
     <button id="music-toggle-btn" class="ui-button" aria-label="Toggle Music">
         <span id="music-icon-on" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg></span>
         <span id="music-icon-off"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#76FF33"><path d="M4.27 3L3 4.27l9 9v.28c-.47-.17-.97-.28-1.5-.28-2.49 0-4.5 2.01-4.5 4.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15v-1.73l5.73 5.73L22 19.73 4.27 3zM15 6h4V3h-7v4.18l2 2z"/></svg></span>
@@ -78,7 +46,7 @@
         import RAPIER from '@dimforge/rapier3d-compat';
 
         let scene, camera, renderer, world, clock, mixer;
-        let tankGroup, tankBody; // tankGroup is the main physics object
+        let tankGroup, tankBody;
         
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         let audioContext, audioBuffer, sourceNode, isPlaying = false;
@@ -92,7 +60,7 @@
         const turnSpeed = 0.1;
         const jumpForce = 2500;
         const groundRaycastDist = 1.5;
-        const initialTankPosition = { x: 3.5, y: 2, z: 0 }; // Updated for new scene
+        const initialTankPosition = { x: 3.5, y: 2, z: 0 };
 
         init();
 
@@ -153,45 +121,39 @@
                     world.createCollider(trimeshDesc, rigidBody);
                 }
             });
-            return gltf; // Return for further processing (e.g., animations)
+            return gltf;
         }
 
         async function loadAssetsAndPhysics() {
             const rgbeLoader = new RGBELoader();
             const gltfLoader = new GLTFLoader();
-            const archiveUrlPrefix = 'https://web-cdn.tankionline.com/';
+            const localAssetPath = 'assets/';
 
             try {
-                // 1. Environment
-                const texture = await rgbeLoader.loadAsync(`${archiveUrlPrefix}darkmatter/venice_sunset_1k.hdr`);
+                const texture = await rgbeLoader.loadAsync(`${localAssetPath}venice_sunset_1k.hdr`);
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
                 scene.environment = texture;
                 
-                // 2. Scene Geometry
-                // Central animated island
                 const islandT4Gltf = await loadStaticModelAndCollider(
-                    `${archiveUrlPrefix}halloween/island_t4.glb`,
+                    `${localAssetPath}island_t4.glb`,
                     new THREE.Vector3(0, -0.5, 0),
                     new THREE.Euler(0, Math.PI / 2, 0),
                     new THREE.Vector3(0.002, 0.002, 0.002)
                 );
-                // Setup animation for the central island's tree
                 mixer = new THREE.AnimationMixer(islandT4Gltf.scene);
                 if (islandT4Gltf.animations.length > 0) {
                      mixer.clipAction(islandT4Gltf.animations[0]).play();
                 }
 
-                // Start island
                 await loadStaticModelAndCollider(
-                    `${archiveUrlPrefix}halloween/start.glb`,
+                    `${localAssetPath}start.glb`,
                     new THREE.Vector3(3.5, 0, 0),
                     new THREE.Euler(0, Math.PI / 2, 0),
                     new THREE.Vector3(0.2, 0.2, 0.2)
                 );
                 
-                // Ring of small islands
-                const smallIslandGltf = await gltfLoader.loadAsync(`${archiveUrlPrefix}halloween/island_small.glb`);
+                const smallIslandGltf = await gltfLoader.loadAsync(`${localAssetPath}island_small.glb`);
                 const radius = 19;
                 const numIslands = 17;
                 for (let i = 0; i < numIslands; i++) {
@@ -227,8 +189,7 @@
                     });
                 }
                 
-                // 3. Tank Model
-                const tankGltf = await gltfLoader.loadAsync(`${archiveUrlPrefix}halloween/tank.glb`);
+                const tankGltf = await gltfLoader.loadAsync(`${localAssetPath}tank.glb`);
                 tankGroup = new THREE.Group();
                 tankGroup.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
                 scene.add(tankGroup);
@@ -260,6 +221,8 @@
             }
         }
 
+        // ... (The rest of the JS code is identical to the previous answer)
+
         function setupControls() {
             if (isTouchDevice) {
                 const joystickManager = nipplejs.create({ zone: document.getElementById('joystick-container'), mode: 'static', position: { left: '80px', bottom: '80px' }, color: 'rgba(255,255,255,0.5)' });
@@ -287,9 +250,7 @@
             const pointerDownPos = new THREE.Vector2();
 
             const onPointerDown = (e) => {
-                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) {
-                    return;
-                }
+                if (e.target.closest('.ui-button') || e.target.closest('#joystick-container')) { return; }
                 cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
                 pointerDownPos.set(e.clientX, e.clientY);
             };
@@ -310,9 +271,7 @@
             const onPointerUpOrCancel = (e) => {
                 if (cameraPointers[e.pointerId]) {
                     const dragDistance = pointerDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
-                    if (dragDistance < tapThreshold) {
-                        handleFullscreenRequest();
-                    }
+                    if (dragDistance < tapThreshold) { handleFullscreenRequest(); }
                 }
                 delete cameraPointers[e.pointerId];
             };
@@ -379,7 +338,6 @@
                     targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
                     tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
                 } else {
-                    // This creates a braking effect
                     const brakingVel = { x: currentVel.x * 0.9, y: currentVel.y, z: currentVel.z * 0.9 };
                     tankBody.setLinvel(brakingVel, true);
                 }
@@ -395,7 +353,6 @@
                         tankBody.setRotation(tankGroup.quaternion, true);
                     }
                 } else {
-                    // Sync body rotation from the group if not moving
                      tankBody.setRotation(tankGroup.quaternion, true);
                 }
 
