@@ -4,43 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Tank Physics Demo - Final Corrected Version</title>
+    <title>Tank Physics Demo - Corrected with Terrain Following</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
-        
-        /* THE CRUCIAL FIX IS HERE */
-        canvas { 
-            display: block; 
-            touch-action: none; /* Prevents default browser actions like scroll/zoom/context-menu on the canvas */
-        }
-
+        canvas { display: block; touch-action: none; }
         #fullscreen-prompt { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background-color: rgba(0, 0, 0, 0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10; }
-        
-        /* UI Button Styles */
-        .ui-button {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            cursor: pointer;
-            padding: 10px;
-            z-index: 100;
-            opacity: 0.8;
-            transition: opacity 0.2s, background-color 0.2s;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .ui-button:hover {
-            opacity: 1;
-            background: rgba(0, 0, 0, 0.5);
-        }
-        .ui-button svg {
-            display: block;
-            width: 32px;
-            height: 32px;
-        }
-
+        .ui-button { position: absolute; background: rgba(0, 0, 0, 0.3); border: 2px solid rgba(255, 255, 255, 0.4); cursor: pointer; padding: 10px; z-index: 100; opacity: 0.8; transition: opacity 0.2s, background-color 0.2s; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .ui-button:hover { opacity: 1; background: rgba(0, 0, 0, 0.5); }
+        .ui-button svg { display: block; width: 32px; height: 32px; }
         #music-toggle-btn { top: 15px; right: 15px; border-radius: 8px; }
         #reset-btn { top: 15px; right: 85px; border-radius: 8px; }
         #jump-btn { position: absolute; bottom: 30px; right: 50px; width: 80px; height: 80px; }
@@ -90,9 +61,11 @@
         const cameraAngle = { horizontal: Math.PI, vertical: 0.4 };
         const cameraOffset = new THREE.Vector3(0, 4, 12);
         
-        const maxSpeed = 25.0;
-        const turnSpeed = 0.1;
-        const jumpForce = 2500;
+        // --- MODIFICATION: Use forces and torques for more realistic physics ---
+        const forwardForce = 15000.0; // Increased force for impulse-based movement. (Tune this value)
+        const turnTorque = 4000.0;   // Torque for turning. (Tune this value)
+        const jumpForce = 4000;       // Impulse for jumping. (Tune this value)
+
         const groundRaycastDist = 1.5;
         const initialTankPosition = { x: 0, y: 2, z: 0 };
 
@@ -160,7 +133,12 @@
                 tankModel = tankGltf.scene;
                 tankModel.position.set(initialTankPosition.x, initialTankPosition.y, initialTankPosition.z);
                 scene.add(tankModel);
-                const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z).setLinearDamping(0.5).setAngularDamping(0.8).setCanSleep(false);
+                // --- MODIFICATION: Increased damping for better control with forces ---
+                const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+                    .setTranslation(tankModel.position.x, tankModel.position.y, tankModel.position.z)
+                    .setLinearDamping(0.8) // Increased linear damping
+                    .setAngularDamping(1.5) // Increased angular damping
+                    .setCanSleep(false);
                 tankBody = world.createRigidBody(bodyDesc);
                 const allVertices = [];
                 tankModel.traverse(child => {
@@ -186,8 +164,8 @@
                 switch (e.key.toLowerCase()) {
                     case 'w': case 'arrowup':    keyboard.forward = 1; break;
                     case 's': case 'arrowdown':  keyboard.forward = -1; break;
-                    case 'a': case 'arrowleft':  keyboard.turn = -1; break;
-                    case 'd': case 'arrowright': keyboard.turn = 1; break;
+                    case 'a': case 'arrowleft':  keyboard.turn = 1; break; // Note: turn direction is now positive for left
+                    case 'd': case 'arrowright': keyboard.turn = -1; break; // and negative for right
                     case ' ':                    handleJump(); break;
                 }
             });
@@ -210,7 +188,6 @@
                 cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
                 pointerDownPos.set(e.clientX, e.clientY);
             };
-
             const onPointerMove = (e) => {
                 const pointer = cameraPointers[e.pointerId];
                 if (pointer) {
@@ -223,13 +200,10 @@
                     pointer.y = e.clientY;
                 }
             };
-
             const onPointerUpOrCancel = (e) => {
                 if (cameraPointers[e.pointerId]) {
                     const dragDistance = pointerDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
-                    if (dragDistance < tapThreshold) {
-                        handleFullscreenRequest();
-                    }
+                    if (dragDistance < tapThreshold) { handleFullscreenRequest(); }
                 }
                 delete cameraPointers[e.pointerId];
             };
@@ -262,79 +236,84 @@
             const ray = new RAPIER.Ray(rayOrigin, rayDir);
             const hit = world.castRay(ray, groundRaycastDist, true, null, null, tankBody.collider(0));
             if (hit) {
+                // Use applyImpulse for a sudden burst of force
                 tankBody.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
             }
         }
 
-        const cameraForward = new THREE.Vector3();
-        const cameraRight = new THREE.Vector3();
-        const moveDirection = new THREE.Vector3();
-        const targetVelocity = new THREE.Vector3();
-        const targetQuaternion = new THREE.Quaternion();
-        const _matrix = new THREE.Matrix4();
         const upVector = new THREE.Vector3(0, 1, 0);
 
+        // ======================================================================================
+        // === CORE LOGIC CHANGE: Animate function is completely rewritten for physics control ===
+        // ======================================================================================
         function animate() {
             requestAnimationFrame(animate);
+            // First, step the physics world forward
             world.step();
 
             if (tankBody && tankModel) {
-                const moveInput = new THREE.Vector2( isTouchDevice ? joystickVector.x : keyboard.turn, isTouchDevice ? joystickVector.y : keyboard.forward );
-                camera.getWorldDirection(cameraForward);
-                cameraForward.y = 0;
-                cameraForward.normalize();
-                cameraRight.crossVectors(cameraForward, upVector);
-                moveDirection.set(0, 0, 0);
-                moveDirection.addScaledVector(cameraForward, moveInput.y);
-                moveDirection.addScaledVector(cameraRight, moveInput.x);
+                // --- 1. SYNCHRONIZE VISUALS WITH PHYSICS ---
+                // Get the tank's new position and rotation FROM the physics world
+                const bodyPosition = tankBody.translation();
+                const bodyRotation = tankBody.rotation();
 
-                const currentVel = tankBody.linvel();
-                if (moveDirection.lengthSq() > 0.01) {
-                    moveDirection.normalize();
-                    targetVelocity.copy(moveDirection).multiplyScalar(maxSpeed);
-                    tankBody.setLinvel({ x: targetVelocity.x, y: currentVel.y, z: targetVelocity.z }, true);
-                } else {
-                    tankBody.setLinvel({ x: 0, y: currentVel.y, z: 0 }, true);
+                // Apply this position and rotation TO the Three.js model
+                tankModel.position.copy(bodyPosition);
+                tankModel.quaternion.copy(bodyRotation);
+
+                // --- 2. APPLY FORCES BASED ON PLAYER INPUT ---
+                // Get combined input from joystick or keyboard
+                const turnInput = isTouchDevice ? joystickVector.x : keyboard.turn;
+                const forwardInput = isTouchDevice ? joystickVector.y : keyboard.forward;
+                
+                // --- APPLY TORQUE for Turning ---
+                // We apply a rotational force (torque) around the tank's local Y-axis
+                if (Math.abs(turnInput) > 0.01) {
+                    // Note: Joystick 'x' and keyboard 'turn' have opposite signs, so we combine them.
+                    const effectiveTurn = isTouchDevice ? -turnInput : turnInput;
+                    const torqueVector = { x: 0, y: effectiveTurn * turnTorque, z: 0 };
+                    tankBody.applyTorqueImpulse(torqueVector, true);
                 }
 
-                const lookDirection = moveDirection.lengthSq() > 0.01 ? moveDirection : cameraForward;
-                _matrix.lookAt(tankModel.position, tankModel.position.clone().sub(lookDirection), upVector);
-                targetQuaternion.setFromRotationMatrix(_matrix);
-                if (!tankModel.quaternion.equals(targetQuaternion)) {
-                    tankModel.quaternion.slerp(targetQuaternion, turnSpeed);
-                    tankBody.setRotation(tankModel.quaternion, true);
+                // --- APPLY FORCE for Forward/Backward Movement ---
+                // We apply a linear force along the tank's current forward direction
+                if (Math.abs(forwardInput) > 0.01) {
+                    // Create a vector representing the tank's local "forward" direction (negative Z)
+                    const forwardDir = new THREE.Vector3(0, 0, -1);
+                    // Rotate this vector by the tank's current rotation to get the world-space direction
+                    forwardDir.applyQuaternion(bodyRotation);
+                    
+                    const forceVector = {
+                        x: forwardDir.x * forwardInput * forwardForce,
+                        y: 0, // We don't apply upward force for movement, only for jumping
+                        z: forwardDir.z * forwardInput * forwardForce,
+                    }
+                    tankBody.applyImpulse(forceVector, true);
                 }
 
-                const position = tankBody.translation();
-                tankModel.position.set(position.x, position.y, position.z);
+                // --- 3. UPDATE THE CAMERA ---
+                // The camera logic remains largely the same, following the now physics-driven tank model
                 const rotatedOffset = cameraOffset.clone().applyAxisAngle(upVector, cameraAngle.horizontal);
                 const horizontalAxis = new THREE.Vector3().crossVectors(upVector, rotatedOffset).normalize();
                 rotatedOffset.applyAxisAngle(horizontalAxis, cameraAngle.vertical);
+                
                 const cameraTargetPosition = tankModel.position.clone().add(rotatedOffset);
                 camera.position.lerp(cameraTargetPosition, 0.1);
                 camera.lookAt(tankModel.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
             }
+            
+            // Finally, render the scene
             renderer.render(scene, camera);
         };
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
-        
         function handleFullscreenRequest() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().then(() => { if (isTouchDevice && screen.orientation && typeof screen.orientation.lock === 'function') { screen.orientation.lock('landscape').catch(() => {}); } }).catch(() => {}); } }
-        
         function setupFullscreen() { 
             const prompt = document.getElementById('fullscreen-prompt'); 
-            if (isTouchDevice) { 
-                setTimeout(() => { prompt.style.opacity = '1'; }, 2000); 
-                setTimeout(() => { prompt.style.opacity = '0'; }, 7000); 
-            } else { 
-                renderer.domElement.addEventListener('click', (e) => { 
-                    if(e.target.closest('.ui-button')) return; 
-                    handleFullscreenRequest()
-                }); 
-            } 
+            if (isTouchDevice) { setTimeout(() => { prompt.style.opacity = '1'; }, 2000); setTimeout(() => { prompt.style.opacity = '0'; }, 7000); } 
+            else { renderer.domElement.addEventListener('click', (e) => { if(e.target.closest('.ui-button')) return; handleFullscreenRequest()}); } 
             document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) { if (screen.orientation && typeof screen.orientation.unlock === 'function') { screen.orientation.unlock(); } } }); 
         };
-
         async function setupMusicControls() { 
             const musicButton = document.getElementById('music-toggle-btn'); 
             const iconOn = document.getElementById('music-icon-on'); 
@@ -344,40 +323,10 @@
                 const arrayBuffer = await response.arrayBuffer(); 
                 audioContext = THREE.AudioContext.getContext(); 
                 audioBuffer = await audioContext.decodeAudioData(arrayBuffer); 
-            } catch (error) { 
-                console.error('Failed to load or decode audio file:', error); 
-                musicButton.disabled = true; 
-                return; 
-            } 
-            function playMusic() { 
-                if (isPlaying || !audioBuffer) return; 
-                sourceNode = audioContext.createBufferSource(); 
-                sourceNode.buffer = audioBuffer; 
-                sourceNode.loop = true; 
-                sourceNode.connect(audioContext.destination); 
-                sourceNode.start(); 
-                isPlaying = true; 
-                iconOn.style.display = 'inline'; 
-                iconOff.style.display = 'none'; 
-            } 
-            function stopMusic() { 
-                if (!isPlaying || !sourceNode) return; 
-                sourceNode.stop(); 
-                sourceNode.disconnect(); 
-                sourceNode = null; 
-                isPlaying = false; 
-                iconOn.style.display = 'none'; 
-                iconOff.style.display = 'inline'; 
-            } 
-            musicButton.addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                if (audioContext.state === 'suspended') { audioContext.resume(); } 
-                if (isPlaying) { 
-                    stopMusic(); 
-                } else { 
-                    playMusic(); 
-                } 
-            }); 
+            } catch (error) { console.error('Failed to load or decode audio file:', error); musicButton.disabled = true; return; } 
+            function playMusic() { if (isPlaying || !audioBuffer) return; sourceNode = audioContext.createBufferSource(); sourceNode.buffer = audioBuffer; sourceNode.loop = true; sourceNode.connect(audioContext.destination); sourceNode.start(); isPlaying = true; iconOn.style.display = 'inline'; iconOff.style.display = 'none'; } 
+            function stopMusic() { if (!isPlaying || !sourceNode) return; sourceNode.stop(); sourceNode.disconnect(); sourceNode = null; isPlaying = false; iconOn.style.display = 'none'; iconOff.style.display = 'inline'; } 
+            musicButton.addEventListener('click', (e) => { e.stopPropagation(); if (audioContext.state === 'suspended') { audioContext.resume(); } if (isPlaying) { stopMusic(); } else { playMusic(); } }); 
         }
     </script>
 </body>
