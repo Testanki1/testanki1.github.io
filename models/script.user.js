@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      1.3.4
+// @version      1.3.5
 // @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果等资源
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -14,8 +14,8 @@
 (function() {
 	'use strict';
 	// --- START VERSION CHECK ---
-        const currentVersion = "1.3.4"
-	const currentVersionCode = 23
+        const currentVersion = "1.3.5"
+	const currentVersionCode = 24
 	const versionUrl = 'https://testanki1.github.io/models/version.json';
 
 	fetch(versionUrl)
@@ -119,9 +119,9 @@
 			"GT": "607/133661/133/27/31033605036471"
 		},
 		"striker": {
-			"default": "0/16723/37/11/31167700275767",
+			"default": "626/176167/41/146/31345773511404",
 			"XT": "551/70756/233/273/31033605117137",
-			"UT": "570/164502/316/245/31033605234224",
+			"UT": "626/176167/41/146/31345773511404",
             "XT_HD": "626/144201/263/252/31342006372645"
 		},
 		"thunder": {
