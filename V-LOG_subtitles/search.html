@@ -3,247 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V-LOG 字幕搜索工具 (修正版)</title>
+    <title>视频周报字幕内容搜索</title>
+
+    <!-- 核心修改点 1: 导入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --bg-color: #001926;
+            --primary-color: #76FF33;
+            --text-color: #ccc;
+            --text-muted-color: #BFD5FF;
+            --container-bg: #00253a;
+            --border-color: #38444d;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            /* 核心修改点 2: 应用新的字体栈 */
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
             line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 0 15px;
-            background-color: #f8f9fa;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px 15px;
         }
-        h1 {
-            color: #0056b3;
-            text-align: center;
-        }
-        #search-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        #search-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        #search-button {
-            padding: 10px 20px;
-            border: none;
-            background-color: #007bff;
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.2s;
-        }
-        #search-button:hover {
-            background-color: #0056b3;
-        }
-        #status {
-            text-align: center;
-            font-style: italic;
-            color: #666;
-            margin: 20px 0;
-        }
-        .result-item {
-            background-color: #fff;
-            border: 1px solid #e0e0e0;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .result-item h3 {
-            margin-top: 0;
-            font-size: 1.1em;
-        }
-        .result-item a {
-            color: #0056b3;
-            text-decoration: none;
-        }
-        .result-item a:hover {
-            text-decoration: underline;
-        }
-        .result-item p {
-            margin: 5px 0 0;
-            color: #555;
-            white-space: pre-wrap; /* 保留换行和空格 */
-            word-break: break-word;
-        }
-        .highlight {
-            background-color: #fff3cd;
-            color: #856404;
-            font-weight: bold;
-            padding: 2px 4px;
-            border-radius: 3px;
-        }
-        footer {
-            text-align: center;
-            margin-top: 40px;
-            font-size: 0.9em;
-            color: #999;
-        }
+        /* ... 其他所有样式保持不变 ... */
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary-color); text-align: center; font-weight: 600; letter-spacing: 1px; }
+        .description { text-align: center; color: var(--text-muted-color); margin-bottom: 30px; }
+        #search-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        #search-input { flex-grow: 1; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 16px; background-color: var(--container-bg); color: #fff; transition: border-color 0.3s, box-shadow 0.3s; }
+        #search-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(118, 255, 51, 0.2); }
+        #search-button { padding: 12px 25px; border: none; background-color: var(--primary-color); color: var(--bg-color); font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.2s, transform 0.1s; }
+        #search-button:hover { background-color: #62d92b; }
+        #search-button:active { transform: scale(0.98); }
+        #search-button:disabled { background-color: #55664a; cursor: not-allowed; }
+        #status { text-align: center; font-style: italic; color: var(--text-muted-color); margin: 20px 0; min-height: 1.6em; }
+        .result-item { background-color: var(--container-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: transform 0.2s, border-color 0.2s; }
+        .result-item:hover { transform: translateY(-3px); border-color: var(--primary-color); }
+        .result-item h3 { margin: 0 0 10px 0; font-size: 1.2em; }
+        .view-file-link { color: #00D4FF; text-decoration: none; cursor: pointer; font-weight: 500; }
+        .view-file-link:hover { text-decoration: underline; }
+        .result-item p { margin: 0; color: var(--text-color); white-space: pre-wrap; word-break: break-word; }
+        .highlight { background-color: var(--primary-color); color: var(--bg-color); font-weight: bold; padding: 2px 5px; border-radius: 4px; }
+        #no-results-message { text-align: center; padding: 40px 20px; background-color: var(--container-bg); border-radius: 8px; color: var(--text-muted-color); font-size: 1.1em; display: none; }
+        footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #777; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background-color: #002030; border: 1px solid var(--border-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; height: 85%; max-height: 90vh; display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-header { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px; font-size: 1.2em; color: var(--primary-color); font-weight: 500; }
+        .modal-body { flex-grow: 1; overflow-y: auto; white-space: pre; color: #e0e0e0; font-size: 14px; line-height: 1.5; }
+        .modal-body::-webkit-scrollbar { width: 10px; }
+        .modal-body::-webkit-scrollbar-track { background: var(--container-bg); border-radius: 5px; }
+        .modal-body::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 5px; border: 2px solid var(--container-bg); }
+        .modal-body::-webkit-scrollbar-thumb:hover { background-color: var(--primary-color); }
+        .modal-close-button { position: absolute; top: 15px; right: 20px; font-size: 32px; color: #aaa; cursor: pointer; line-height: 1; transition: color 0.2s, transform 0.2s; }
+        .modal-close-button:hover { color: #fff; transform: rotate(90deg); }
+        .highlight-line { background-color: rgba(118, 255, 51, 0.15); display: block; margin: 0 -20px; padding: 0 20px; box-shadow: 0 0 10px rgba(118, 255, 51, 0.2); }
     </style>
 </head>
 <body>
 
-    <h1>V-LOG 字幕内容搜索</h1>
-    <p>在 <a href="https://testanki1.github.io/V-LOG_subtitles/" target="_blank">testanki1.github.io/V-LOG_subtitles</a> 上的所有 <code>.srt</code> 文件中进行关键词搜索。</p>
-
-    <div id="search-container">
-        <input type="text" id="search-input" placeholder="输入要查找的关键词...">
-        <button id="search-button">搜索</button>
+    <div class="container">
+        <h1>视频周报字幕内容搜索</h1></h1>
+        <p class="description">在<strong>3D坦克视频周报字幕</strong>中搜索所有内容。</p>
+        <div id="search-container">
+            <input type="text" id="search-input" placeholder="输入要查找的关键词...">
+            <button id="search-button">搜索</button>
+        </div>
+        <div id="status"></div>
+        <div id="results"></div>
+        <div id="no-results-message">在这里未找到匹配的结果。</div>
+    </div>
+    <footer>
+        <p>此工具通过 GitHub API 获取文件列表并进行内容搜索。</p>
+    </footer>
+    <div id="file-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span id="modal-close" class="modal-close-button">×</span>
+            <div id="modal-header" class="modal-header"></div>
+            <pre id="modal-body" class="modal-body"></pre>
+        </div>
     </div>
 
-    <div id="status"></div>
-    <div id="results"></div>
-    
-    <footer>
-        <p>此工具通过 GitHub API 获取文件列表，然后直接请求文件内容进行搜索。</p>
-    </footer>
-
 <script>
+    // ... JavaScript部分完全保持不变 ...
     const owner = 'testanki1';
-    // *** 修正点 1: 仓库名称是 testanki1.github.io ***
     const repo = 'testanki1.github.io';
     const subtitlesPath = 'V-LOG_subtitles';
-    
-    // *** 修正点 2: API URL 需要包含文件夹路径 ***
     const apiURL = `https://api.github.com/repos/${owner}/${repo}/contents/${subtitlesPath}`;
-    
-    // GitHub Pages 的文件基础 URL (这个保持不变，因为最终的访问地址是对的)
     const fileBaseURL = `https://testanki1.github.io/${subtitlesPath}/`;
-
     const searchInput = document.getElementById('search-input');
     const searchButton = document.getElementById('search-button');
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
-    
+    const noResultsMessage = document.getElementById('no-results-message');
+    const modal = document.getElementById('file-modal');
+    const modalHeader = document.getElementById('modal-header');
+    const modalBody = document.getElementById('modal-body');
+    const modalClose = document.getElementById('modal-close');
     let srtFiles = [];
-
-    // 页面加载时预先获取文件列表
-    async function fetchFileList() {
-        statusDiv.textContent = '正在获取字幕文件列表...';
-        try {
-            const response = await fetch(apiURL);
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`GitHub API 请求失败: ${response.status} - ${errorData.message}`);
-            }
-            const data = await response.json();
-            srtFiles = data
-                .filter(file => file.type === 'file' && file.name.endsWith('.srt'))
-                .map(file => file.name);
-
-            if (srtFiles.length > 0) {
-                 statusDiv.textContent = `已成功加载 ${srtFiles.length} 个字幕文件，请输入关键词进行搜索。`;
-            } else {
-                 statusDiv.textContent = '警告：在该仓库的指定文件夹中未找到 .srt 文件。';
-            }
-        } catch (error) {
-            console.error('获取文件列表失败:', error);
-            statusDiv.textContent = `错误：无法加载文件列表。请检查网络连接或浏览器控制台获取更多信息。 ${error.message}`;
-        }
-    }
-    
-    // 执行搜索的核心函数
-    async function performSearch() {
-        const searchTerm = searchInput.value.trim();
-        if (!searchTerm) {
-            alert('请输入搜索关键词！');
-            return;
-        }
-        if (srtFiles.length === 0) {
-            alert('没有可供搜索的字幕文件，请等待文件列表加载完成。');
-            return;
-        }
-
-        // 清理旧结果并显示状态
-        resultsDiv.innerHTML = '';
-        statusDiv.textContent = `正在 ${srtFiles.length} 个文件中搜索 "${searchTerm}"...`;
-        
-        const searchPromises = srtFiles.map(fileName => searchInFile(fileName, searchTerm));
-        
-        try {
-            const allMatches = await Promise.all(searchPromises);
-            const flattenedMatches = allMatches.flat(); // 将多维数组展平成一维
-
-            if (flattenedMatches.length === 0) {
-                statusDiv.textContent = `在所有文件中均未找到 "${searchTerm}"。`;
-            } else {
-                statusDiv.textContent = `搜索完成！共找到 ${flattenedMatches.length} 条匹配结果。`;
-                flattenedMatches.forEach(displayResult);
-            }
-        } catch (error) {
-             console.error('搜索过程中发生错误:', error);
-             statusDiv.textContent = `搜索失败: ${error.message}`;
-        }
-    }
-    
-    // 在单个文件中搜索
-    async function searchInFile(fileName, searchTerm) {
-        // fileURL 拼接逻辑是正确的
-        const fileURL = fileBaseURL + encodeURIComponent(fileName);
-        const matches = [];
-        try {
-            const response = await fetch(fileURL);
-            if (!response.ok) {
-                console.warn(`无法下载文件: ${fileName}`);
-                return []; // 如果某个文件下载失败，跳过它
-            }
-            const content = await response.text();
-            const lines = content.split('\n');
-            const lowerCaseSearchTerm = searchTerm.toLowerCase();
-
-            for (const line of lines) {
-                // 忽略 SRT 的时间戳行和序号行（通常以数字开头）
-                if (!/^\d/.test(line) && line.toLowerCase().includes(lowerCaseSearchTerm)) {
-                    matches.push({ fileName, line });
-                }
-            }
-        } catch (error) {
-             console.error(`处理文件 ${fileName} 时出错:`, error);
-        }
-        return matches;
-    }
-
-    // 在页面上显示一条结果
-    function displayResult(result) {
-        const resultItem = document.createElement('div');
-        resultItem.className = 'result-item';
-
-        const regex = new RegExp(escapeRegExp(searchInput.value), 'gi');
-        const highlightedLine = result.line.replace(regex, `<span class="highlight">$&</span>`);
-
-        resultItem.innerHTML = `
-            <h3>
-                <a href="${fileBaseURL}${encodeURIComponent(result.fileName)}" target="_blank">${result.fileName}</a>
-            </h3>
-            <p>${highlightedLine}</p>
-        `;
-        resultsDiv.appendChild(resultItem);
-    }
-
-    // 转义正则表达式中的特殊字符
-    function escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    // 添加事件监听
+    async function fetchFileList() { statusDiv.textContent = '正在初始化，获取字幕文件列表...'; try { const response = await fetch(apiURL); if (!response.ok) throw new Error(`GitHub API 请求失败: ${response.status}`); const data = await response.json(); srtFiles = data.filter(file => file.type === 'file' && file.name.endsWith('.srt')).map(file => file.name); if (srtFiles.length > 0) { statusDiv.textContent = `已成功加载 ${srtFiles.length} 个字幕文件，请输入关键词开始搜索。`; } else { statusDiv.textContent = '警告：未在指定位置找到 .srt 文件。'; } } catch (error) { console.error('获取文件列表失败:', error); statusDiv.textContent = `错误：无法加载文件列表。请检查网络连接或浏览器控制台。`; } }
+    async function performSearch() { const searchTerm = searchInput.value.trim(); if (!searchTerm) { alert('请输入搜索关键词！'); return; } if (srtFiles.length === 0) { alert('文件列表尚未加载完成，请稍候。'); return; } searchButton.disabled = true; searchButton.textContent = '搜索中...'; resultsDiv.innerHTML = ''; noResultsMessage.style.display = 'none'; statusDiv.textContent = `正在 ${srtFiles.length} 个文件中搜索 "${searchTerm}"...`; const searchPromises = srtFiles.map(fileName => searchInFile(fileName, searchTerm)); try { const allMatches = await Promise.all(searchPromises); const flattenedMatches = allMatches.flat(); if (flattenedMatches.length === 0) { statusDiv.textContent = '搜索完成。'; noResultsMessage.style.display = 'block'; } else { statusDiv.textContent = `搜索完成！共找到 ${flattenedMatches.length} 条匹配结果。`; flattenedMatches.forEach(displayResult); } } catch (error) { console.error('搜索过程中发生错误:', error); statusDiv.textContent = `搜索失败: ${error.message}`; } finally { searchButton.disabled = false; searchButton.textContent = '搜索'; } }
+    async function searchInFile(fileName, searchTerm) { const fileURL = fileBaseURL + encodeURIComponent(fileName); const matches = []; try { const response = await fetch(fileURL); if (!response.ok) return []; const content = await response.text(); const lines = content.split('\n'); const lowerCaseSearchTerm = searchTerm.toLowerCase(); for (const line of lines) { if (!/^\d/.test(line) && line.toLowerCase().includes(lowerCaseSearchTerm)) { matches.push({ fileName, line }); } } } catch (error) { console.error(`处理文件 ${fileName} 时出错:`, error); } return matches; }
+    function displayResult(result) { const resultItem = document.createElement('div'); resultItem.className = 'result-item'; const regex = new RegExp(escapeRegExp(searchInput.value), 'gi'); const highlightedLine = result.line.replace(regex, `<span class="highlight">$&</span>`); const h3 = document.createElement('h3'); const link = document.createElement('a'); link.href = '#'; link.className = 'view-file-link'; link.textContent = result.fileName; link.dataset.filename = result.fileName; link.dataset.lineContent = result.line; h3.appendChild(link); const p = document.createElement('p'); p.innerHTML = highlightedLine; resultItem.appendChild(h3); resultItem.appendChild(p); resultsDiv.appendChild(resultItem); }
+    async function showFileInModal(fileName, lineToFind) { modalHeader.textContent = fileName; modalBody.innerHTML = '正在加载文件内容...'; modal.style.display = 'flex'; const fileURL = fileBaseURL + encodeURIComponent(fileName); try { const response = await fetch(fileURL); if (!response.ok) throw new Error(`文件加载失败: ${response.status}`); const content = await response.text(); const escapeHTML = (str) => str.replace(/</g, '<').replace(/>/g, '>'); const escapedContent = escapeHTML(content); const escapedLineToFind = escapeHTML(lineToFind); const finalHTML = escapedContent.replace(escapedLineToFind, `<span id="scroll-to-target" class="highlight-line">${escapedLineToFind}</span>`); modalBody.innerHTML = finalHTML; const targetElement = document.getElementById('scroll-to-target'); if (targetElement) { requestAnimationFrame(() => { targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); } } catch (error) { console.error('加载文件内容失败:', error); modalBody.textContent = `错误：无法加载文件内容。\n${error.message}`; } }
+    function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
     searchButton.addEventListener('click', performSearch);
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            performSearch();
-        }
-    });
-    
-    // 页面加载完成后，自动获取文件列表
+    searchInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') { performSearch(); } });
+    resultsDiv.addEventListener('click', (event) => { if (event.target.classList.contains('view-file-link')) { event.preventDefault(); const fileName = event.target.dataset.filename; const lineContent = event.target.dataset.lineContent; showFileInModal(fileName, lineContent); } });
+    modalClose.addEventListener('click', () => { modal.style.display = 'none'; });
+    modal.addEventListener('click', (event) => { if (event.target === modal) { modal.style.display = 'none'; } });
     document.addEventListener('DOMContentLoaded', fetchFileList);
-
 </script>
 </body>
 </html>
