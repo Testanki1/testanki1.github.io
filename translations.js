@@ -801,6 +801,7 @@ const replacementDict = {
 "Spear": "矛",
 "Scout": "侦察机",
 "Shotgun": "滑膛炮",
+"Stellarator": "仿星器",
 "Elite": "精英",
 "Bomb": "炸弹",
 "Pumpkin": "南瓜",
