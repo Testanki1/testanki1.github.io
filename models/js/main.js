@@ -4,10 +4,11 @@ import { OrbitControls } from 'OrbitControls';
 import { A3D, A3D_VERTEXTYPE_COORDINATE, A3D_VERTEXTYPE_UV1, A3D_VERTEXTYPE_NORMAL1 } from './A3DParser.js';
 
 let scene, camera, renderer, controls;
-let modelGroup; // A group to hold all parts of the loaded A3D model
-let loadedObjects = []; // To keep track of THREE.Mesh objects for selection/deletion
+let modelGroup; 
+let loadedObjects = []; 
 let selectedObject = null;
-let loadedTextures = {}; // { 'textureName.webp': THREE.Texture }
+let loadedTextures = {}; // 全局纹理缓存
+let lastA3DData = null; // 缓存最后一次解析的A3D数据
 
 const objectListUI = document.getElementById('objectList');
 const deleteButton = document.getElementById('deleteSelectedObject');
@@ -38,18 +39,15 @@ function initThreeJS() {
     directionalLight.position.set(1, 1, 1).normalize();
     scene.add(directionalLight);
 
-    // Grid Helper
     const gridHelper = new THREE.GridHelper( 200, 20, 0x000000, 0x000000 );
     gridHelper.material.opacity = 0.2;
     gridHelper.material.transparent = true;
     scene.add( gridHelper );
 
-
     window.addEventListener('resize', onWindowResize, false);
     renderer.domElement.addEventListener('click', onMouseClick, false);
     renderer.domElement.addEventListener('touchstart', onTouchStart, false);
     rotateModelCheckbox.addEventListener('change', applyModelRotation);
-
 
     animate();
 }
@@ -74,6 +72,7 @@ function animate() {
 function clearScene() {
     if (modelGroup) {
         scene.remove(modelGroup);
+        // 只处理 Three.js 对象的清理，不清除 a3dData 或 textures
         modelGroup.traverse(object => {
             if (object.isMesh) {
                 if (object.geometry) object.geometry.dispose();
@@ -93,16 +92,11 @@ function clearScene() {
     selectedObject = null;
     objectListUI.innerHTML = '';
     deleteButton.disabled = true;
-    // Textures are kept
 }
 
 function applyModelRotation() {
     if (modelGroup) {
-        if (rotateModelCheckbox.checked) {
-            modelGroup.rotation.x = -Math.PI / 2;
-        } else {
-            modelGroup.rotation.x = 0;
-        }
+        modelGroup.rotation.x = rotateModelCheckbox.checked ? -Math.PI / 2 : 0;
     }
 }
 
@@ -110,118 +104,78 @@ function handleA3DFile(file) {
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
-            clearScene();
-            const a3dData = new A3D().parse(event.target.result);
-            console.log("Parsed A3D Data:", a3dData);
-            buildThreeJSModel(a3dData);
+            // 解析A3D数据并缓存
+            lastA3DData = new A3D().parse(event.target.result);
+            console.log("Parsed and cached A3D Data:", lastA3DData);
+            // 基于当前缓存的A3D数据和已加载的纹理，重建整个模型
+            rebuildModel();
         } catch (error) {
             console.error("Error parsing A3D file:", error);
             alert(`Error parsing A3D: ${error.message}`);
+            lastA3DData = null; // 解析失败，清空缓存
         }
     };
     reader.readAsArrayBuffer(file);
 }
 
-/**
- * NEW: This function now updates all materials in the scene based on currently loaded textures.
- * It's called every time a new texture is successfully loaded.
- */
-function updateAllMaterials() {
-    if (!modelGroup || modelGroup.children.length === 0) {
-        return; // No model to update
-    }
-
-    console.log("Updating all materials with currently loaded textures...");
-
-    modelGroup.traverse(child => {
-        if (child.isMesh) {
-            const a3dObj = child.userData.a3dObjectData;
-            const a3dMatData = child.userData.a3dMaterialData;
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            const a3dMats = Array.isArray(a3dMatData) ? a3dMatData : [a3dMatData];
-
-            let textureApplied = false;
-
-            // --- Strategy 1: Heuristic based on object name (overrides other methods) ---
-            let heuristicTexture = null;
-            if (a3dObj && a3dObj.name) {
-                const objectNameLower = a3dObj.name.toLowerCase();
-                if (objectNameLower.includes("hull") || objectNameLower.includes("turret")) {
-                    heuristicTexture = loadedTextures['lightmap.webp'];
-                } else if (objectNameLower.includes("track")) {
-                    heuristicTexture = loadedTextures['tracks.webp'];
-                } else if (objectNameLower.includes("wheel")) {
-                    heuristicTexture = loadedTextures['wheels.webp'];
-                }
-            }
-
-            if (heuristicTexture) {
-                materials.forEach(mat => {
-                    if (mat.map !== heuristicTexture) {
-                        mat.map = heuristicTexture;
-                        mat.needsUpdate = true;
-                        textureApplied = true;
-                    }
-                });
-            }
-
-            // If no texture was applied by heuristics, try data-driven method
-            if (!textureApplied && a3dMatData) {
-                materials.forEach((mat, index) => {
-                    const currentA3DMat = a3dMats[index] || (a3dMats.length === 1 ? a3dMats[0] : null);
-                    if (currentA3DMat && currentA3DMat.diffuseMap) {
-                        const diffuseMapName = currentA3DMat.diffuseMap.toLowerCase().split(/[\\/]/).pop();
-                        const texture = loadedTextures[diffuseMapName];
-                        if (texture && mat.map !== texture) {
-                            mat.map = texture;
-                            mat.needsUpdate = true;
-                        }
-                    }
-                });
-            }
-        }
-    });
-}
-
-
 function handleTextureFiles(files) {
     const textureLoader = new THREE.TextureLoader();
+    let filesToLoad = files.length;
+    if (filesToLoad === 0) return;
+
+    const onTextureLoaded = () => {
+        filesToLoad--;
+        // 当所有新上传的纹理都处理完毕（无论成功或失败）
+        if (filesToLoad === 0) {
+            console.log("Texture batch processed. Rebuilding model...");
+            // 如果已经有模型数据，就重建模型
+            if (lastA3DData) {
+                rebuildModel();
+            }
+        }
+    };
 
     for (const file of files) {
         const textureKey = file.name.toLowerCase();
-        
-        // If a texture with the same name exists, dispose of the old one first
         if (loadedTextures[textureKey]) {
             loadedTextures[textureKey].dispose();
         }
-
         const objectURL = URL.createObjectURL(file);
         textureLoader.load(
             objectURL,
             (texture) => {
                 texture.name = file.name;
-                // IMPORTANT: Since we flip UVs manually (1.0 - v), we must tell the loader not to flip the image.
-                texture.flipY = false;
-                
+                texture.flipY = false; // UVs in parser are already flipped (v = 1.0 - v)
                 loadedTextures[textureKey] = texture;
                 console.log(`Loaded texture: ${file.name}`);
                 URL.revokeObjectURL(objectURL);
-
-                // On every successful load, trigger a full material update
-                updateAllMaterials();
+                onTextureLoaded();
             },
-            undefined, // onProgress callback
+            undefined,
             (error) => {
                 console.error(`Error loading texture ${file.name}:`, error);
                 URL.revokeObjectURL(objectURL);
+                onTextureLoaded();
             }
         );
     }
 }
 
+/**
+ * 核心函数：使用缓存的 A3D 数据和当前所有已加载的纹理，从头开始构建或重建整个 Three.js 场景。
+ */
+function rebuildModel() {
+    if (!lastA3DData) {
+        console.warn("rebuildModel called but no A3D data is available.");
+        return;
+    }
 
-function buildThreeJSModel(a3dData) {
-    const originalA3dMaterials = [];
+    const a3dData = lastA3DData;
+
+    // 1. 清理旧的 Three.js 场景对象
+    clearScene();
+
+    // 2. 创建材质 (每次都重新创建)
     const threeMaterials = a3dData.materials.map(matData => {
         const params = {
             name: matData.name,
@@ -229,139 +183,116 @@ function buildThreeJSModel(a3dData) {
             roughness: 0.8,
             metalness: 0.1,
         };
-        // At creation time, try to find an already-loaded texture
+        // 尝试从全局纹理缓存中查找纹理
         if (matData.diffuseMap) {
             const diffuseMapName = matData.diffuseMap.toLowerCase().split(/[\\/]/).pop();
             if (loadedTextures[diffuseMapName]) {
                 params.map = loadedTextures[diffuseMapName];
             }
         }
-        const material = new THREE.MeshStandardMaterial(params);
-        originalA3dMaterials.push(matData);
-        return material;
+        return new THREE.MeshStandardMaterial(params);
     });
 
-    const threeMeshesData = a3dData.meshes.map(meshData => {
+    // 3. 创建几何体和网格 (这部分可以优化，但为保证可靠性，暂时也重新创建)
+    // 注意：理想情况下，几何体可以被缓存，但材质必须重新创建和分配。
+    // 为简单起见，我们这里全部重建。
+    const objectMap = {};
+    a3dData.objects.forEach((objData, index) => {
+        const meshData = a3dData.meshes[objData.meshID];
+        if (!meshData) return;
+
+        // 创建几何体
         const geometry = new THREE.BufferGeometry();
         let positions = [], uvs = [], normals = [];
-
         meshData.vertexBuffers.forEach(vb => {
-            if (vb.bufferType === A3D_VERTEXTYPE_COORDINATE) {
-                vb.data.forEach(v => positions.push(...v));
-            } else if (vb.bufferType === A3D_VERTEXTYPE_UV1) {
-                vb.data.forEach(uv => uvs.push(uv[0], 1.0 - uv[1])); // Flip V-coordinate
-            } else if (vb.bufferType === A3D_VERTEXTYPE_NORMAL1) {
-                vb.data.forEach(n => normals.push(...n));
-            }
+            if (vb.bufferType === A3D_VERTEXTYPE_COORDINATE) vb.data.forEach(v => positions.push(...v));
+            else if (vb.bufferType === A3D_VERTEXTYPE_UV1) vb.data.forEach(uv => uvs.push(uv[0], 1.0 - uv[1]));
+            else if (vb.bufferType === A3D_VERTEXTYPE_NORMAL1) vb.data.forEach(n => normals.push(...n));
         });
-
         if (positions.length > 0) geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         if (uvs.length > 0) geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-
-        if (normals.length > 0) {
-            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-        } else if (positions.length > 0) {
-            geometry.computeVertexNormals();
-        }
+        if (normals.length > 0) geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+        else geometry.computeVertexNormals();
 
         let allIndices = [];
-        if (meshData.submeshes.length > 0) {
-            if (a3dData.version === 2) {
-                meshData.submeshes.forEach((sm) => {
-                    geometry.addGroup(allIndices.length, sm.indices.length, sm.materialID !== null ? sm.materialID : 0);
-                    allIndices.push(...sm.indices);
-                });
-            } else {
-                 meshData.submeshes.forEach(sm => allIndices.push(...sm.indices));
-            }
+        if (a3dData.version === 2) {
+             meshData.submeshes.forEach(sm => {
+                geometry.addGroup(allIndices.length, sm.indices.length, sm.materialID !== null ? sm.materialID : 0);
+                allIndices.push(...sm.indices);
+            });
+        } else {
+             meshData.submeshes.forEach(sm => allIndices.push(...sm.indices));
         }
         if (allIndices.length > 0) geometry.setIndex(allIndices);
 
-        return { geometry, a3dMeshData: meshData };
-    });
-
-    const objectMap = {};
-
-    a3dData.objects.forEach((objData, index) => {
-        const meshInfo = threeMeshesData[objData.meshID];
-        if (!meshInfo) return;
-
+        // 分配材质
         let currentObjectMaterials = [];
-        let currentObjectA3dMaterialData = [];
-
         if (a3dData.version === 2) {
-            const usedMaterialIndexes = new Set(meshInfo.a3dMeshData.submeshes.map(sm => sm.materialID).filter(id => id !== null));
-            if (usedMaterialIndexes.size > 0) {
-                 usedMaterialIndexes.forEach(idx => {
-                    currentObjectMaterials.push(threeMaterials[idx]);
-                    currentObjectA3dMaterialData.push(originalA3dMaterials[idx]);
-                 });
-            } else if (threeMaterials.length > 0) {
-                 currentObjectMaterials.push(threeMaterials[0]);
-                 currentObjectA3dMaterialData.push(originalA3dMaterials[0]);
-            } else {
-                currentObjectMaterials.push(new THREE.MeshStandardMaterial({color: 0xdddddd}));
-            }
+            const matIndices = new Set(meshData.submeshes.map(sm => sm.materialID).filter(id => id !== null));
+            if (matIndices.size > 0) matIndices.forEach(idx => currentObjectMaterials.push(threeMaterials[idx]));
+            else if (threeMaterials.length > 0) currentObjectMaterials.push(threeMaterials[0]);
         } else { // V3
             objData.materialIDs.forEach(matID => {
-                if (matID >= 0 && matID < threeMaterials.length) {
-                    currentObjectMaterials.push(threeMaterials[matID]);
-                    currentObjectA3dMaterialData.push(originalA3dMaterials[matID]);
-                }
+                if (matID >= 0 && matID < threeMaterials.length) currentObjectMaterials.push(threeMaterials[matID]);
             });
-            if (currentObjectMaterials.length === 0) {
-                 const fallbackMat = threeMaterials.length > 0 ? threeMaterials[0] : new THREE.MeshStandardMaterial({color: 0xcccccc});
-                 const fallbackA3dData = threeMaterials.length > 0 ? originalA3dMaterials[0] : null;
-                 currentObjectMaterials.push(fallbackMat);
-                 if(fallbackA3dData) currentObjectA3dMaterialData.push(fallbackA3dData);
-            }
+            if (currentObjectMaterials.length === 0 && threeMaterials.length > 0) currentObjectMaterials.push(threeMaterials[0]);
+        }
+        if (currentObjectMaterials.length === 0) {
+            currentObjectMaterials.push(new THREE.MeshStandardMaterial({ color: 0xcccccc }));
         }
 
-        const threeMesh = new THREE.Mesh(meshInfo.geometry, currentObjectMaterials.length > 1 ? currentObjectMaterials : currentObjectMaterials[0]);
-        threeMesh.name = objData.name || meshInfo.a3dMeshData.name || `Object_${index}`;
+        const meshMaterial = currentObjectMaterials.length > 1 ? currentObjectMaterials : currentObjectMaterials[0];
+        const threeMesh = new THREE.Mesh(geometry, meshMaterial);
 
+        // 应用启发式纹理（如果名称匹配）
+        const objName = objData.name || meshData.name || `Object_${index}`;
+        threeMesh.name = objName;
+        const objectNameLower = objName.toLowerCase();
+        let heuristicTexture = null;
+        if (objectNameLower.includes("hull") || objectNameLower.includes("turret")) heuristicTexture = loadedTextures['lightmap.webp'];
+        else if (objectNameLower.includes("track")) heuristicTexture = loadedTextures['tracks.webp'];
+        else if (objectNameLower.includes("wheel")) heuristicTexture = loadedTextures['wheels.webp'];
+        
+        if (heuristicTexture) {
+            (Array.isArray(threeMesh.material) ? threeMesh.material : [threeMesh.material]).forEach(mat => {
+                mat.map = heuristicTexture;
+                // 注意：由于是全新创建的材质，这里不需要 needsUpdate = true
+            });
+        }
+
+        // 设置变换
         const transformData = a3dData.transforms[objData.transformID];
         if (transformData) {
             threeMesh.position.fromArray(transformData.position);
             threeMesh.quaternion.fromArray(transformData.rotation);
             threeMesh.scale.fromArray(transformData.scale);
-            if (transformData.scale.every(s => s === 0)) {
-                threeMesh.scale.set(1, 1, 1);
-            }
+            if (transformData.scale.every(s => s === 0)) threeMesh.scale.set(1, 1, 1);
         }
-
-        threeMesh.userData.a3dObjectData = objData;
-        threeMesh.userData.a3dMaterialData = currentObjectA3dMaterialData.length > 1 ? currentObjectA3dMaterialData : currentObjectA3dMaterialData[0];
 
         loadedObjects.push(threeMesh);
         objectMap[index] = threeMesh;
         addToListUI(threeMesh, index);
     });
 
-    // Setup parenting
+    // 4. 设置父子关系
     loadedObjects.forEach((obj, originalIndex) => {
         const parentID = a3dData.transformParentIDs[a3dData.objects[originalIndex].transformID];
-        let actualParentId = -1;
         if (parentID !== -1) {
-             // Find object that uses this transform
             for (let i = 0; i < a3dData.objects.length; i++) {
                 if (a3dData.objects[i].transformID === parentID) {
                     if (objectMap[i] && objectMap[i] !== obj) {
                         objectMap[i].add(obj);
+                        return;
                     }
-                    return; // Parent found and assigned, exit forEach loop for this obj
                 }
             }
         }
-        // If no parent found or parentID is -1, add to model group
         modelGroup.add(obj);
     });
 
-    // Final material update pass after building the whole hierarchy
-    updateAllMaterials();
+    // 5. 应用旋转并重置相机
     applyModelRotation();
-    
-    // Fit camera to model
+
     if (loadedObjects.length > 0) {
         const box = new THREE.Box3().setFromObject(modelGroup);
         const size = box.getSize(new THREE.Vector3());
@@ -378,38 +309,28 @@ function buildThreeJSModel(a3dData) {
     }
 }
 
-// --- UI and Interaction Functions (Unchanged) ---
+// --- UI and Interaction Functions (Unchanged from previous versions) ---
 
 function addToListUI(object, id) {
     const listItem = document.createElement('li');
     listItem.textContent = object.name || `Unnamed Object ${id}`;
     listItem.dataset.objectId = object.uuid;
-    listItem.addEventListener('click', () => {
-        selectObjectUI(object);
-    });
+    listItem.addEventListener('click', () => selectObjectUI(object));
     objectListUI.appendChild(listItem);
 }
 
 function selectObjectUI(object) {
     if (selectedObject) {
         selectedObject.traverse(child => {
-            if (child.isMesh) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                materials.forEach(m => m.emissive.setHex(0x000000));
-            }
+            if (child.isMesh) (Array.isArray(child.material) ? child.material : [child.material]).forEach(m => m.emissive.setHex(0x000000));
         });
         const oldLi = objectListUI.querySelector(`[data-object-id="${selectedObject.uuid}"]`);
         if (oldLi) oldLi.classList.remove('selected');
     }
-
     selectedObject = object;
-
     if (selectedObject) {
         selectedObject.traverse(child => {
-             if (child.isMesh) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                materials.forEach(m => m.emissive.setHex(0x555500));
-            }
+             if (child.isMesh) (Array.isArray(child.material) ? child.material : [child.material]).forEach(m => m.emissive.setHex(0x555500));
         });
         const newLi = objectListUI.querySelector(`[data-object-id="${selectedObject.uuid}"]`);
         if (newLi) newLi.classList.add('selected');
@@ -425,12 +346,10 @@ function deleteSelected() {
     selectedObject.traverse(child => {
         if (child.isMesh) {
             if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-                (Array.isArray(child.material) ? child.material : [child.material]).forEach(mat => {
-                    if (mat.map) mat.map.dispose();
-                    mat.dispose();
-                });
-            }
+            if (child.material) (Array.isArray(child.material) ? child.material : [child.material]).forEach(mat => {
+                if (mat.map) mat.map.dispose();
+                mat.dispose();
+            });
         }
     });
     const index = loadedObjects.indexOf(selectedObject);
@@ -446,10 +365,7 @@ const mouse = new THREE.Vector2();
 let touchHandled = false;
 
 function onMouseClick(event) {
-    if (touchHandled) {
-        touchHandled = false;
-        return;
-    }
+    if (touchHandled) { touchHandled = false; return; }
     handleInteraction(event.clientX, event.clientY);
 }
 
@@ -464,25 +380,20 @@ function handleInteraction(x, y) {
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(loadedObjects, true);
-
     if (intersects.length > 0) {
         let intersectedObject = intersects[0].object;
-        while(intersectedObject.parent && intersectedObject.parent !== modelGroup && !intersectedObject.userData.a3dObjectData) {
+        while(intersectedObject.parent && intersectedObject.parent !== modelGroup && !loadedObjects.includes(intersectedObject)) {
             intersectedObject = intersectedObject.parent;
         }
-        if (loadedObjects.includes(intersectedObject)) {
-             selectObjectUI(intersectedObject);
-        } else {
-            selectObjectUI(null);
-        }
+        selectObjectUI(loadedObjects.includes(intersectedObject) ? intersectedObject : null);
     } else {
         selectObjectUI(null);
     }
 }
 
+// Event Listeners
 document.getElementById('a3dFile').addEventListener('change', (event) => {
     if (event.target.files.length > 0) handleA3DFile(event.target.files[0]);
 });
