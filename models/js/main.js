@@ -136,63 +136,59 @@ function handleTextureFiles(files) {
         texturesToLoad--;
         if (texturesToLoad === 0) {
             console.log("All new textures processed. Re-applying materials.");
-            // This implies you might need to rebuild/update materials on existing objects
-            // For simplicity, if a model is already loaded, you might need to re-process its materials
-            // Or, if textures are loaded BEFORE the model, buildThreeJSModel will pick them up.
+            // If a model is already loaded, update its materials.
              if (modelGroup && modelGroup.children.length > 0) {
                 modelGroup.traverse(child => {
                     if (child.isMesh) {
-                        const a3dObj = child.userData.a3dObjectData; // We need to store this
-                        const a3dMatDataFromMesh = child.userData.a3dMaterialData; // And this (can be single or array)
+                        const a3dObj = child.userData.a3dObjectData;
+                        const a3dMatDataFromMesh = child.userData.a3dMaterialData;
 
-                        let textureToApply = null;
-                        let diffuseMapNameFromMaterial = null;
-
+                        // --- Heuristic-based update (by object name) ---
+                        let textureToApplyByName = null;
                         if (a3dObj && a3dObj.name) {
                             const objectNameLower = a3dObj.name.toLowerCase();
                             if (objectNameLower.includes("hull") || objectNameLower.includes("turret")) {
-                                textureToApply = loadedTextures['lightmap.webp'];
+                                textureToApplyByName = loadedTextures['lightmap.webp'];
                             } else if (objectNameLower.includes("track")) {
-                                textureToApply = loadedTextures['tracks.webp'];
+                                textureToApplyByName = loadedTextures['tracks.webp'];
                             } else if (objectNameLower.includes("wheel")) {
-                                textureToApply = loadedTextures['wheels.webp'];
+                                textureToApplyByName = loadedTextures['wheels.webp'];
+                            }
+                        }
+                        
+                        if (textureToApplyByName) {
+                             if (Array.isArray(child.material)) {
+                                child.material.forEach(mat => {
+                                    if (mat.map !== textureToApplyByName) {
+                                        mat.map = textureToApplyByName;
+                                        mat.needsUpdate = true; // MODIFICATION: Added needsUpdate
+                                    }
+                                });
+                            } else {
+                                if (child.material.map !== textureToApplyByName) {
+                                    child.material.map = textureToApplyByName;
+                                    child.material.needsUpdate = true; // MODIFICATION: Added needsUpdate
+                                }
                             }
                         }
 
-                        // If not found by object name, try by stored A3D material diffuseMap
-                        // This part is a bit tricky because a mesh can have multiple materials.
-                        // We'll iterate through materials if it's an array.
-                        if (!textureToApply && a3dMatDataFromMesh) {
+                        // --- Data-driven update (by material's diffuseMap property) ---
+                        if (a3dMatDataFromMesh) {
                             const materialsToUpdate = Array.isArray(child.material) ? child.material : [child.material];
                             const originalA3DMaterials = Array.isArray(a3dMatDataFromMesh) ? a3dMatDataFromMesh : [a3dMatDataFromMesh];
 
                             materialsToUpdate.forEach((threeMat, index) => {
+                                // Find the corresponding original A3D material data
                                 const currentA3DMat = originalA3DMaterials[index] || (originalA3DMaterials.length === 1 ? originalA3DMaterials[0] : null);
                                 if (currentA3DMat && currentA3DMat.diffuseMap) {
                                     const diffuseMapName = currentA3DMat.diffuseMap.toLowerCase().split(/[\\/]/).pop();
+                                    // Check if a newly loaded texture matches the material's defined map
                                     if (loadedTextures[diffuseMapName] && threeMat.map !== loadedTextures[diffuseMapName]) {
                                         threeMat.map = loadedTextures[diffuseMapName];
-                                        threeMat.needsUpdate = true;
+                                        threeMat.needsUpdate = true; // MODIFICATION: Added needsUpdate
                                     }
                                 }
                             });
-                        }
-
-
-                        if (textureToApply) { // This textureToApply is from object name heuristic
-                             if (Array.isArray(child.material)) {
-                                child.material.forEach(mat => {
-                                    if (mat.map !== textureToApply) {
-                                        mat.map = textureToApply;
-                                        mat.needsUpdate = true;
-                                    }
-                                });
-                            } else {
-                                if (child.material.map !== textureToApply) {
-                                    child.material.map = textureToApply;
-                                    child.material.needsUpdate = true;
-                                }
-                            }
                         }
                     }
                 });
@@ -201,12 +197,20 @@ function handleTextureFiles(files) {
     };
 
     for (const file of files) {
+        // Allow re-uploading the same texture to refresh it
+        const textureKey = file.name.toLowerCase();
+        if (loadedTextures[textureKey]) {
+            // Dispose of the old texture to free up GPU memory
+            loadedTextures[textureKey].dispose();
+        }
+
         const objectURL = URL.createObjectURL(file);
         textureLoader.load(
             objectURL,
             (texture) => {
-                texture.name = file.name; // Store original file name
-                loadedTextures[file.name.toLowerCase()] = texture; // Store by lowercase name
+                texture.name = file.name;
+                texture.flipY = false; // A3D UVs seem to match Three.js default, but good to be explicit if issues arise.
+                loadedTextures[textureKey] = texture;
                 console.log(`Loaded texture: ${file.name}`);
                 URL.revokeObjectURL(objectURL);
                 checkAllLoaded();
@@ -239,7 +243,6 @@ function buildThreeJSModel(a3dData) {
             }
         }
         const material = new THREE.MeshStandardMaterial(params);
-        // material.userData.a3dMaterialData = matData; // Store original data
         originalA3dMaterials.push(matData); // Keep original data separate for reference
         return material;
     });
@@ -258,7 +261,6 @@ function buildThreeJSModel(a3dData) {
             } else if (vb.bufferType === A3D_VERTEXTYPE_NORMAL1) {
                 vb.data.forEach(n => normals.push(...n));
             }
-            // Add more vertex types if needed (UV2, Color, Normal2)
         });
 
         if (positions.length > 0) geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -267,18 +269,17 @@ function buildThreeJSModel(a3dData) {
         if (normals.length > 0) {
             geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
         } else if (positions.length > 0) {
-            geometry.computeVertexNormals(); // Calculate if not provided
+            geometry.computeVertexNormals();
         }
 
-        // Handle indices and material groups
         let allIndices = [];
         if (meshData.submeshes.length > 0) {
-            if (a3dData.version === 2) { // V2: submeshes define material groups
+            if (a3dData.version === 2) {
                 meshData.submeshes.forEach((sm, index) => {
                     geometry.addGroup(allIndices.length, sm.indices.length, sm.materialID !== null ? sm.materialID : 0);
                     allIndices.push(...sm.indices);
                 });
-            } else { // V3: submeshes are just index lists, materials assigned by A3DObject
+            } else {
                  meshData.submeshes.forEach(sm => {
                     allIndices.push(...sm.indices);
                 });
@@ -289,7 +290,7 @@ function buildThreeJSModel(a3dData) {
         return { geometry, a3dMeshData: meshData };
     });
 
-    const objectMap = {}; // For parenting { originalIndex: THREE.Object3D }
+    const objectMap = {};
 
     a3dData.objects.forEach((objData, index) => {
         const meshInfo = threeMeshesData[objData.meshID];
@@ -298,8 +299,8 @@ function buildThreeJSModel(a3dData) {
             return;
         }
 
-        let currentObjectMaterials = []; // THREE.Material instances for this object
-        let currentObjectA3dMaterialData = []; // Original A3D material data for this object
+        let currentObjectMaterials = [];
+        let currentObjectA3dMaterialData = [];
 
         if (a3dData.version === 2) {
             const usedMaterialIndexes = new Set();
@@ -312,12 +313,11 @@ function buildThreeJSModel(a3dData) {
                     currentObjectA3dMaterialData.push(originalA3dMaterials[idx]);
                  });
             } else if (threeMaterials.length > 0) {
-                 currentObjectMaterials.push(threeMaterials[0]); // Fallback
+                 currentObjectMaterials.push(threeMaterials[0]);
                  currentObjectA3dMaterialData.push(originalA3dMaterials[0]);
             } else {
                 const fallbackMat = new THREE.MeshStandardMaterial({color: 0xdddddd});
                 currentObjectMaterials.push(fallbackMat);
-                // No specific a3dMaterialData for this ultimate fallback
             }
         } else { // V3
             objData.materialIDs.forEach(matID => {
@@ -327,7 +327,7 @@ function buildThreeJSModel(a3dData) {
                 }
             });
             if (currentObjectMaterials.length === 0 && threeMaterials.length > 0) {
-                currentObjectMaterials.push(threeMaterials[0]); // Default if no specific material
+                currentObjectMaterials.push(threeMaterials[0]);
                 currentObjectA3dMaterialData.push(originalA3dMaterials[0]);
             } else if (currentObjectMaterials.length === 0) {
                 const fallbackMat = new THREE.MeshStandardMaterial({color: 0xcccccc});
@@ -343,9 +343,9 @@ function buildThreeJSModel(a3dData) {
         const transformData = a3dData.transforms[objData.transformID];
         if (transformData) {
             threeMesh.position.fromArray(transformData.position);
-            threeMesh.quaternion.fromArray(transformData.rotation); // x, y, z, w
+            threeMesh.quaternion.fromArray(transformData.rotation);
             threeMesh.scale.fromArray(transformData.scale);
-             if (transformData.scale.every(s => s === 0)) { // Reset empty transform scale
+             if (transformData.scale.every(s => s === 0)) {
                 threeMesh.scale.set(1,1,1);
             }
         }
@@ -369,7 +369,8 @@ function buildThreeJSModel(a3dData) {
         if (textureToApplyByName) {
             if (Array.isArray(threeMesh.material)) {
                 threeMesh.material.forEach(mat => {
-                    if (mat.map !== textureToApplyByName) { // Avoid redundant assignment and update
+                    // Only update if the texture is not already applied
+                    if (mat.map !== textureToApplyByName) {
                         mat.map = textureToApplyByName;
                         mat.needsUpdate = true; // MODIFICATION: Added needsUpdate
                     }
@@ -383,7 +384,7 @@ function buildThreeJSModel(a3dData) {
         }
 
         loadedObjects.push(threeMesh);
-        objectMap[index] = threeMesh; // For parenting
+        objectMap[index] = threeMesh;
         addToListUI(threeMesh, index);
     });
 
@@ -391,28 +392,19 @@ function buildThreeJSModel(a3dData) {
     loadedObjects.forEach((obj, originalIndex) => {
         const parentID = a3dData.transformParentIDs[a3dData.objects[originalIndex].transformID];
         let actualParentId = -1;
-        if (a3dData.version < 3 && parentID === 0 && a3dData.transforms.length > 1) { // V2: 0 can be a valid parent if multiple transforms exist, or no parent if only one transform (root itself)
-            // This logic for V2 parentID=0 might need refinement based on how A3D V2 actually exports root nodes.
-            // Assuming 0 is a valid parent index unless it's the only transform, implying no explicit parent.
-            // For simplicity, we'll stick to the previous interpretation: 0 means root for V2.
-            // The check 'a3dData.objects[originalIndex].transformID !== 0' can be used to infer if an object with transform 0 should be parented.
-             if (a3dData.objects[originalIndex].transformID === 0 && parentID === 0 && a3dData.transforms.length === 1) { // only one transform, it's root
+        if (a3dData.version < 3 && parentID === 0 && a3dData.transforms.length > 1) {
+             if (a3dData.objects[originalIndex].transformID === 0 && parentID === 0 && a3dData.transforms.length === 1) {
                  actualParentId = -1;
-             } else if (parentID === 0 && a3dData.transforms[a3dData.objects[originalIndex].transformID] !== a3dData.transforms[0]) { // Check if it's not trying to parent to itself implicitly
-                 actualParentId = 0; // It means parent is the transform at index 0.
+             } else if (parentID === 0 && a3dData.transforms[a3dData.objects[originalIndex].transformID] !== a3dData.transforms[0]) {
+                 actualParentId = 0;
              } else {
-                 actualParentId = -1; // Default to no parent if transformID is 0 or other ambiguous cases.
+                 actualParentId = -1;
              }
-             // Simplified: if parentID is 0 for V2, it often means root OR the actual 0th transform.
-             // Let's assume 0 is root if the object's own transformID is also 0, otherwise it's a parent.
-             // This part is still a bit ambiguous for V2 without more specific file examples.
-             // The previous logic was: if (a3dData.version < 3 && parentID === 0) actualParentId = -1;
-             // Sticking to a safer interpretation for now:
              if (a3dData.version < 3) {
                 actualParentId = (parentID === 0 && a3dData.objects[originalIndex].transformID !== 0) ? 0 : -1;
              }
 
-        } else if (parentID === -1) { // V3 uses -1 for no parent
+        } else if (parentID === -1) {
              actualParentId = -1;
         } else {
             actualParentId = parentID;
@@ -447,7 +439,7 @@ function buildThreeJSModel(a3dData) {
         const maxSize = Math.max(size.x, size.y, size.z);
         const fitHeightDistance = maxSize / (2 * Math.atan(Math.PI * camera.fov / 360));
         const fitWidthDistance = fitHeightDistance / camera.aspect;
-        const distance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance, 10); // ensure min distance
+        const distance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance, 10);
 
         const direction = controls.object.position.clone().sub(center).normalize().multiplyScalar(distance);
         controls.object.position.copy(center).add(direction);
@@ -460,7 +452,7 @@ function buildThreeJSModel(a3dData) {
 function addToListUI(object, id) {
     const listItem = document.createElement('li');
     listItem.textContent = object.name || `Unnamed Object ${id}`;
-    listItem.dataset.objectId = object.uuid; // Use Three.js UUID
+    listItem.dataset.objectId = object.uuid;
     listItem.addEventListener('click', () => {
         selectObjectUI(object);
     });
