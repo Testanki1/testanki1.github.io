@@ -3,19 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>视频帧提取</title>
+    <title>视频帧精确提取器</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-        video { max-width: 100%; height: auto; border: 1px solid #ccc; }
-        button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; }
-        button:disabled { cursor: not-allowed; opacity: 0.6; }
-        #framesContainer { margin-top: 20px; padding: 10px; border: 1px solid #ddd; min-height: 100px; display: flex; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; background-color: #f9f9f9; }
-        #framesContainer img { height: 80px; width: auto; margin-right: 5px; border: 1px solid #eee; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f7f9; color: #333; }
+        h1 { color: #0056b3; }
+        p { max-width: 720px; margin: 10px auto; }
+        video { max-width: 100%; height: auto; border: 2px solid #ccc; background-color: #000; border-radius: 8px; margin-bottom: 15px;}
+        .controls-container { max-width: 720px; margin: 20px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 3px solid #007bff; }
+        button { padding: 10px 20px; margin: 10px 5px; font-size: 16px; cursor: pointer; border-radius: 5px; border: 1px solid #007bff; background-color: #007bff; color: white; transition: background-color 0.2s, transform 0.1s; }
+        button:hover:not(:disabled) { background-color: #0056b3; }
+        button:active:not(:disabled) { transform: scale(0.98); }
+        button:disabled { cursor: not-allowed; background-color: #a0a0a0; border-color: #a0a0a0; opacity: 0.7; }
+        #status { font-weight: bold; color: #0056b3; min-height: 20px; margin-top: 15px; }
+        .input-group { display: flex; align-items: center; justify-content: center; margin: 15px 0; }
+        .time-input { text-align: center; font-size: 1.2em; width: 120px; margin: 0 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        #framePreviewContainer { margin-top: 20px; padding: 10px; border: 1px dashed #ddd; min-height: 100px; background-color: #f9f9f9; border-radius: 8px; }
+        #framePreview { max-width: 100%; height: auto; border: 1px solid #eee; display: none; margin: 0 auto; }
     </style>
 </head>
 <body>
 
-<h1>提取视频帧</h1>
+<h1>视频帧精确提取器</h1>
+<p>加载视频后，暂停或拖动进度条，即可在下方工具中看到对应时间的预览帧，并可进行微调和保存。</p>
+
 <input type="file" id="videoFile" accept="video/*">
 <br><br>
 <video id="videoPlayer" controls>
@@ -23,287 +33,260 @@
     你的浏览器不支持 HTML5 视频播放。
 </video>
 <br>
-<button id="captureBtn" disabled>提取当前视频帧并保存</button>
-<button id="capture60fpsBtn" disabled>开始每秒60帧截图</button>
-<h2>截取的帧 (最多显示最近120帧):</h2>
-<div id="framesContainer"></div>
+
+<div class="controls-container">
+    <h2>精确时间帧预览与保存</h2>
+    <div class="input-group">
+        <button id="timeDecreaseBtn" title="减小 0.01 秒" disabled>&laquo; -0.01s</button>
+        <input type="number" id="timeInput" class="time-input" min="0" step="0.001" placeholder="时间 (秒)" disabled>
+        <button id="timeIncreaseBtn" title="增加 0.01 秒" disabled>&raquo; +0.01s</button>
+    </div>
+
+    <div id="framePreviewContainer">
+        <p id="previewPlaceholder">此处将显示提取的帧</p>
+        <img id="framePreview" alt="提取的帧预览">
+    </div>
+    
+    <button id="saveFrameBtn" disabled>保存预览中的帧</button>
+</div>
+
+<div id="status"></div>
 
 <script>
+    // --- DOM Elements ---
     const videoFileInput = document.getElementById('videoFile');
     const videoPlayer = document.getElementById('videoPlayer');
     const videoSource = document.getElementById('videoSource');
-    const captureBtn = document.getElementById('captureBtn');
-    const capture60fpsBtn = document.getElementById('capture60fpsBtn');
-    const framesContainer = document.getElementById('framesContainer');
+    const statusDiv = document.getElementById('status');
+    
+    const timeInput = document.getElementById('timeInput');
+    const timeDecreaseBtn = document.getElementById('timeDecreaseBtn');
+    const timeIncreaseBtn = document.getElementById('timeIncreaseBtn');
+    const framePreview = document.getElementById('framePreview');
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const saveFrameBtn = document.getElementById('saveFrameBtn');
 
+    // --- State Variables ---
+    let videoFileName = '';
+    let currentFrameUrl = null; 
+    let isSeeking = false;
+    let timeUpdateTimeout;
+    const TIME_STEP = 0.01;
+
+    // --- Canvas Setup ---
     const hiddenCanvas = document.createElement('canvas');
     const context = hiddenCanvas.getContext('2d');
 
-    let videoFileName = '';
-    let captureIntervalId = null;
-    let isCapturing60fps = false;
-    const MAX_FRAMES_DISPLAYED = 120;
-
-    function disableButtons(reason) {
-        console.log(`Buttons disabled. Reason: ${reason}`);
-        captureBtn.disabled = true;
-        capture60fpsBtn.disabled = true;
-    }
-
-    function enableButtons(reason) {
-        console.log(`Buttons enabled. Reason: ${reason}`);
-        captureBtn.disabled = false;
-        capture60fpsBtn.disabled = false;
-    }
+    // --- Event Listeners ---
 
     videoFileInput.addEventListener('change', function(event) {
-        console.log('File input changed.');
-        stop60fpsCapture();
-        framesContainer.innerHTML = '';
-        disableButtons('New file selected, waiting for load.');
-
+        resetUI();
         const file = event.target.files[0];
         if (file) {
-            videoFileName = file.name.split('.')[0];
+            videoFileName = file.name.split('.').slice(0, -1).join('.') || 'video';
             const url = URL.createObjectURL(file);
-            console.log('File selected:', file.name, 'Blob URL:', url);
             videoSource.src = url;
-            videoPlayer.load(); // Crucial: tell the player to load the new source
-            console.log('videoPlayer.load() called.');
-        } else {
-            console.log('No file selected or selection cancelled.');
-            videoSource.src = '';
             videoPlayer.load();
-            videoFileName = '';
-            disableButtons('No file selected.');
         }
     });
-
+    
     videoPlayer.addEventListener('loadedmetadata', function() {
-        console.log('%cVideo event: loadedmetadata', 'color: green');
-        console.log('  videoPlayer.readyState:', videoPlayer.readyState, `(HAVE_METADATA is ${videoPlayer.HAVE_METADATA})`);
-        console.log('  videoPlayer.currentSrc:', videoPlayer.currentSrc);
-        console.log('  videoPlayer.videoWidth:', videoPlayer.videoWidth, 'videoPlayer.videoHeight:', videoPlayer.videoHeight);
-        console.log('  videoPlayer.duration:', videoPlayer.duration);
-
-        if (videoPlayer.videoWidth > 0 && videoPlayer.videoHeight > 0 && videoPlayer.currentSrc) {
+        if (videoPlayer.videoWidth > 0) {
             hiddenCanvas.width = videoPlayer.videoWidth;
             hiddenCanvas.height = videoPlayer.videoHeight;
-            console.log('  Canvas dimensions set from loadedmetadata.');
-            // Defer enabling buttons to 'canplay' or 'canplaythrough' for more robustness
-            // enableButtons('loadedmetadata with valid dimensions and src');
-            videoPlayer.play().then(() => {
-                console.log('  Video playback started (or resumed) after loadedmetadata.');
-            }).catch(e => {
-                console.warn('  Auto-play after loadedmetadata failed or was interrupted:', e.message);
-            });
-        } else {
-            console.warn('  loadedmetadata: Video dimensions are 0 or currentSrc is invalid. Buttons remain disabled.');
-            disableButtons('loadedmetadata with invalid dimensions or src.');
         }
+        timeInput.max = videoPlayer.duration.toFixed(3);
+        timeInput.value = "0.000";
+        updateButtonStates();
+        statusDiv.textContent = '视频已加载。';
+    });
+    
+    // 当视频播放或暂停时更新按钮状态
+    videoPlayer.addEventListener('play', updateButtonStates);
+    videoPlayer.addEventListener('pause', () => {
+        updateButtonStates();
+        syncTimeAndPreview();
     });
 
-    videoPlayer.addEventListener('canplay', function() {
-        console.log('%cVideo event: canplay', 'color: green');
-        console.log('  videoPlayer.readyState:', videoPlayer.readyState, `(HAVE_CURRENT_DATA is ${videoPlayer.HAVE_CURRENT_DATA}, HAVE_FUTURE_DATA is ${videoPlayer.HAVE_FUTURE_DATA}, HAVE_ENOUGH_DATA is ${videoPlayer.HAVE_ENOUGH_DATA})`);
-        console.log('  videoPlayer.currentSrc:', videoPlayer.currentSrc);
-        console.log('  videoPlayer.videoWidth:', videoPlayer.videoWidth, 'videoPlayer.videoHeight:', videoPlayer.videoHeight);
-
-        if (videoPlayer.videoWidth > 0 && videoPlayer.videoHeight > 0 && videoPlayer.currentSrc && videoPlayer.readyState >= videoPlayer.HAVE_CURRENT_DATA) {
-            if (hiddenCanvas.width !== videoPlayer.videoWidth || hiddenCanvas.height !== videoPlayer.videoHeight) {
-                hiddenCanvas.width = videoPlayer.videoWidth;
-                hiddenCanvas.height = videoPlayer.videoHeight;
-                console.log('  Canvas dimensions updated/confirmed from canplay.');
-            }
-            enableButtons('canplay event with valid video state.');
-        } else {
-            console.warn('  canplay: Video state still not ready for operations. Buttons remain disabled.');
-            disableButtons('canplay but video state not fully ready.');
-        }
-    });
-
-    videoPlayer.addEventListener('error', function(e) {
-        console.error('%cVideo event: error', 'color: red', e);
-        let errorMsg = '未知错误';
-        if (videoPlayer.error) {
-            switch (videoPlayer.error.code) {
-                case videoPlayer.error.MEDIA_ERR_ABORTED: errorMsg = '视频加载被中止。'; break;
-                case videoPlayer.error.MEDIA_ERR_NETWORK: errorMsg = '网络错误导致视频加载失败。'; break;
-                case videoPlayer.error.MEDIA_ERR_DECODE:  errorMsg = '视频解码错误。文件可能损坏或格式不支持。'; break;
-                case videoPlayer.error.MEDIA_ERR_SRC_NOT_SUPPORTED: errorMsg = '视频源格式不支持。'; break;
-                default: errorMsg = `发生媒体错误，代码: ${videoPlayer.error.code}`;
-            }
-        }
-        alert('加载视频时发生错误: ' + errorMsg);
-        disableButtons(`Video error: ${errorMsg}`);
-        videoSource.src = '';
-        videoPlayer.load();
-    });
-
-    function checkVideoReadyForOperation(operationName) {
-        console.log(`%cChecking video readiness for: ${operationName}`, 'color: blue');
-        console.log('  videoPlayer.currentSrc:', videoPlayer.currentSrc);
-        console.log('  videoPlayer.readyState:', videoPlayer.readyState, `(HAVE_METADATA is ${videoPlayer.HAVE_METADATA})`);
-        console.log('  hiddenCanvas.width:', hiddenCanvas.width, 'hiddenCanvas.height:', hiddenCanvas.height);
-        console.log('  videoPlayer.videoWidth:', videoPlayer.videoWidth, 'videoPlayer.videoHeight:', videoPlayer.videoHeight);
-
-
-        if (!videoPlayer.currentSrc || videoPlayer.currentSrc === window.location.href) { // Check if currentSrc is actually a media file
-            alert(`视频尚未准备好 (${operationName})：视频源无效。\ncurrentSrc: "${videoPlayer.currentSrc}"`);
-            return false;
-        }
-        if (videoPlayer.readyState < videoPlayer.HAVE_METADATA) {
-            alert(`视频尚未准备好 (${operationName})：元数据未加载 (readyState: ${videoPlayer.readyState})。`);
-            return false;
-        }
-        if (videoPlayer.videoWidth === 0 || videoPlayer.videoHeight === 0) {
-             alert(`视频尚未准备好 (${operationName})：视频尺寸为0。`);
-            return false;
-        }
-        // Ensure canvas is also ready
-        if (hiddenCanvas.width === 0 || hiddenCanvas.height === 0) {
-            if(videoPlayer.videoWidth > 0 && videoPlayer.videoHeight > 0) {
-                console.log(`  ${operationName}: Canvas dimensions were 0, attempting to set from video.`);
-                hiddenCanvas.width = videoPlayer.videoWidth;
-                hiddenCanvas.height = videoPlayer.videoHeight;
-            } else {
-                alert(`视频尚未准备好 (${operationName})：无法设置截图画板尺寸，视频尺寸无效。`);
-                return false;
-            }
-        }
-        return true;
-    }
-
-    captureBtn.addEventListener('click', function() {
-        if (!checkVideoReadyForOperation('提取单帧')) return;
-
-        if (!videoPlayer.ended) {
-            try {
-                context.drawImage(videoPlayer, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
-                const timestamp = new Date().getTime();
-                const imageUrl = hiddenCanvas.toDataURL('image/png');
-                const link = document.createElement('a');
-                link.href = imageUrl;
-                link.download = `${videoFileName || 'video'}_frame_${timestamp}.png`;
-                link.click();
-                console.log('Single frame captured and download initiated.');
-            } catch (e) {
-                console.error("Error during single frame capture:", e);
-                alert("截图时发生错误: " + e.message);
-            }
-        } else {
-            alert('视频已结束。');
-        }
-    });
-
-    capture60fpsBtn.addEventListener('click', function() {
-        if (!checkVideoReadyForOperation('开始60fps截图')) return;
-
-        if (isCapturing60fps) {
-            stop60fpsCapture();
-        } else {
-            start60fpsCapture();
-        }
-    });
-
-    function start60fpsCapture() {
-        // Final check before starting interval
-        if (videoPlayer.readyState < videoPlayer.HAVE_CURRENT_DATA) {
-            alert('视频数据不足以开始连续截图 (readyState: ' + videoPlayer.readyState + ')。请确保视频正在播放或已缓冲。');
-            disableButtons('Cannot start 60fps, video not ready enough.'); // Disable if we can't start
-            return;
-        }
-
-        isCapturing60fps = true;
-        capture60fpsBtn.textContent = '停止每秒60帧截图';
-        framesContainer.innerHTML = '';
-        console.log('Starting 60fps capture.');
-
+    // 【关键改动】监听seeked事件，处理拖动进度条的情况
+    videoPlayer.addEventListener('seeked', () => {
+        // 只有当视频处于暂停状态时，拖动进度条才更新预览
         if (videoPlayer.paused) {
-            console.log('Video is paused, attempting to play for 60fps capture.');
-            videoPlayer.play().then(() => {
-                 console.log('Playback started for 60fps capture.');
-                 if (isCapturing60fps && !captureIntervalId) { // Check again in case stop was called quickly
-                    captureIntervalId = setInterval(captureAndDisplayFrame, 1000 / 60);
-                 }
-            }).catch(e => {
-                console.warn("Playback failed when trying to start 60fps capture:", e.message);
-                alert("无法自动播放视频以开始截图，请手动播放视频后重试。");
-                stop60fpsCapture(); // Revert state if play fails
-            });
-        } else {
-             captureIntervalId = setInterval(captureAndDisplayFrame, 1000 / 60);
+            updateButtonStates();
+            syncTimeAndPreview();
         }
-    }
+    });
 
-    function stop60fpsCapture() {
-        if (captureIntervalId) {
-            clearInterval(captureIntervalId);
-            captureIntervalId = null;
-        }
-        isCapturing60fps = false;
-        capture60fpsBtn.textContent = '开始每秒60帧截图';
-        console.log('60fps capture stopped.');
-    }
+    videoPlayer.addEventListener('error', function() {
+        alert('加载或播放视频时发生错误。');
+        resetUI();
+    });
 
-    function captureAndDisplayFrame() {
-        if (videoPlayer.paused || videoPlayer.ended || videoPlayer.readyState < videoPlayer.HAVE_CURRENT_DATA) {
-            console.warn('Stopping 60fps capture due to video state change (paused, ended, or not enough data).');
-            stop60fpsCapture();
+    // --- 精确时间控制交互 ---
+    timeInput.addEventListener('input', () => {
+        clearTimeout(timeUpdateTimeout);
+        timeUpdateTimeout = setTimeout(() => {
+            let targetTime = parseFloat(timeInput.value);
+            if (!isNaN(targetTime)) {
+                targetTime = Math.max(0, Math.min(targetTime, videoPlayer.duration));
+                timeInput.value = targetTime.toFixed(3);
+                updateFramePreview(targetTime);
+            }
+        }, 300);
+    });
+
+    timeDecreaseBtn.addEventListener('click', () => {
+        let currentTime = parseFloat(timeInput.value) || 0;
+        let newTime = Math.max(0, currentTime - TIME_STEP);
+        timeInput.value = newTime.toFixed(3);
+        updateFramePreview(newTime);
+    });
+
+    timeIncreaseBtn.addEventListener('click', () => {
+        let currentTime = parseFloat(timeInput.value) || 0;
+        let newTime = Math.min(videoPlayer.duration, currentTime + TIME_STEP);
+        timeInput.value = newTime.toFixed(3);
+        updateFramePreview(newTime);
+    });
+
+    saveFrameBtn.addEventListener('click', () => {
+        if (!currentFrameUrl) {
+            alert('没有可保存的预览帧。');
             return;
         }
-        // Ensure canvas has dimensions, this should have been set by 'loadedmetadata' or 'canplay'
-        if (hiddenCanvas.width === 0 || hiddenCanvas.height === 0) {
-             console.error("Cannot capture frame: hiddenCanvas dimensions are 0.");
-             stop60fpsCapture(); // Stop if canvas is not ready
-             return;
-        }
+        const timestamp = parseFloat(timeInput.value).toFixed(3).replace('.', '_');
+        const filename = `${videoFileName}_frame_at_${timestamp}s.png`;
+        
+        const link = document.createElement('a');
+        link.href = currentFrameUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        statusDiv.textContent = `已保存预览中的帧: ${filename}`;
+    });
+
+    // --- Helper Functions ---
+
+    /**
+     * 【新增】同步视频当前时间到输入框并更新预览
+     */
+    function syncTimeAndPreview() {
+        if (isSeeking || videoPlayer.readyState < videoPlayer.HAVE_METADATA) return;
+        const currentTime = videoPlayer.currentTime;
+        // 更新输入框的值
+        timeInput.value = currentTime.toFixed(3);
+        // 更新预览图像
+        updateFramePreview(currentTime);
+    }
+
+    async function updateFramePreview(targetTime) {
+        if (isSeeking || videoPlayer.readyState < videoPlayer.HAVE_METADATA) return;
+
+        isSeeking = true;
+        updateButtonStates();
+        statusDiv.textContent = `正在定位到 ${targetTime.toFixed(3)}s 并提取...`;
 
         try {
-            context.drawImage(videoPlayer, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
-            const imageUrl = hiddenCanvas.toDataURL('image/png');
-            const img = document.createElement('img');
-            img.src = imageUrl;
-            img.alt = 'Video Frame';
-            framesContainer.appendChild(img);
+            await seekToTime(targetTime);
+            const frameBlob = await captureFrameAsBlob();
+            
+            if (currentFrameUrl) URL.revokeObjectURL(currentFrameUrl);
+            
+            currentFrameUrl = URL.createObjectURL(frameBlob);
+            framePreview.src = currentFrameUrl;
+            framePreview.style.display = 'block';
+            previewPlaceholder.style.display = 'none';
 
-            if (framesContainer.children.length > MAX_FRAMES_DISPLAYED) {
-                framesContainer.removeChild(framesContainer.firstElementChild);
-            }
-            framesContainer.scrollLeft = framesContainer.scrollWidth;
-        } catch (e) {
-            console.error("Error during drawImage/toDataURL in 60fps loop:", e);
-            stop60fpsCapture(); // Stop if there's a drawing error
+            statusDiv.textContent = `已成功提取 ${targetTime.toFixed(3)}s 处的帧。`;
+
+        } catch (error) {
+            console.error('更新帧预览时出错:', error);
+            statusDiv.textContent = `提取失败: ${error.message}`;
+            alert(`提取帧时出错: ${error.message}`);
+        } finally {
+            isSeeking = false;
+            updateButtonStates();
         }
     }
-
-    videoPlayer.addEventListener('ended', function() {
-        console.log('%cVideo event: ended', 'color: orange');
-        if (isCapturing60fps) {
-            stop60fpsCapture();
+    
+    function resetUI() {
+        statusDiv.textContent = '请选择一个视频文件。';
+        isSeeking = false;
+        if(videoPlayer.src && videoPlayer.src.startsWith('blob:')) {
+            URL.revokeObjectURL(videoPlayer.src);
         }
-    });
+        videoSource.src = '';
+        videoFileName = '';
+        videoPlayer.load();
+        
+        resetFramePreview();
+        timeInput.value = '';
+        timeInput.max = null;
 
-    videoPlayer.addEventListener('pause', function() {
-        // Only log if it's not due to the video ending naturally and we are capturing
-        if (!videoPlayer.ended) {
-            console.log('%cVideo event: pause', 'color: orange');
-            // If we are actively capturing 60fps, it will stop in captureAndDisplayFrame
+        updateButtonStates();
+    }
+
+    function resetFramePreview() {
+        if (currentFrameUrl) {
+            URL.revokeObjectURL(currentFrameUrl);
+            currentFrameUrl = null;
         }
-    });
+        framePreview.src = '';
+        framePreview.style.display = 'none';
+        previewPlaceholder.style.display = 'block';
+    }
 
-    videoPlayer.addEventListener('playing', function() {
-        console.log('%cVideo event: playing', 'color: green');
-         // If we were waiting to start 60fps capture and video starts playing, ensure buttons are enabled
-        if (videoPlayer.videoWidth > 0 && videoPlayer.videoHeight > 0 && videoPlayer.currentSrc && videoPlayer.readyState >= videoPlayer.HAVE_CURRENT_DATA) {
-            enableButtons('Video is playing and seems ready.');
-        }
-    });
+    function updateButtonStates() {
+        const videoLoaded = videoPlayer.readyState >= videoPlayer.HAVE_METADATA;
+        const disableAllPreciseControls = !videoLoaded || isSeeking;
+        
+        timeInput.disabled = disableAllPreciseControls;
+        timeDecreaseBtn.disabled = disableAllPreciseControls;
+        timeIncreaseBtn.disabled = disableAllPreciseControls;
+        saveFrameBtn.disabled = disableAllPreciseControls || !currentFrameUrl;
+        videoFileInput.disabled = isSeeking;
+    }
 
+    function seekToTime(time) {
+        return new Promise((resolve) => {
+            const onSeeked = () => {
+                videoPlayer.removeEventListener('seeked', onSeeked);
+                requestAnimationFrame(() => resolve());
+            };
+            
+            if (Math.abs(videoPlayer.currentTime - time) < 0.01) {
+                 requestAnimationFrame(() => resolve());
+                 return;
+            }
 
-    // Initial state
-    disableButtons('Page loaded, no video yet.');
-    console.log("Script loaded. Video player initialized. Buttons disabled.");
+            videoPlayer.addEventListener('seeked', onSeeked);
+            videoPlayer.currentTime = time;
+        });
+    }
+
+    function captureFrameAsBlob() {
+        return new Promise((resolve, reject) => {
+            try {
+                if (hiddenCanvas.width !== videoPlayer.videoWidth || hiddenCanvas.height !== videoPlayer.videoHeight) {
+                    hiddenCanvas.width = videoPlayer.videoWidth;
+                    hiddenCanvas.height = videoPlayer.videoHeight;
+                }
+                context.drawImage(videoPlayer, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+                hiddenCanvas.toBlob(blob => {
+                    if (blob) resolve(blob);
+                    else reject(new Error('无法将Canvas转换为Blob。'));
+                }, 'image/png');
+            } catch (e) {
+                reject(new Error(`捕获帧时出错: ${e.message}`));
+            }
+        });
+    }
+
+    // --- Initial State ---
+    updateButtonStates();
+
 </script>
 
 </body>
