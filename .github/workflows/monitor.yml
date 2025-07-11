@@ -139,14 +139,15 @@ jobs:
             
             此邮件由 GitHub Actions 自动发送。
 
-      # 【新增】步骤 4: 如果有变化，则发送 QQ 群通知
-      - name: Send notification to QQ Group
+      # 【新增】步骤 4: 如果有变化，则通过官方机器人发送 QQ 群通知
+      - name: Send notification via Official QQ Bot
         if: steps.check_script.outputs.has_changes == 'true'
-        uses: Y2Nk4/qmsg-action@master
+        uses: fuwari-leaf/qq-bot-actions@v2
         with:
-          key: ${{ secrets.QMSG_KEY }}
-          groups: ${{ secrets.QQ_GROUP_ID }}
-          message: ${{ steps.check_script.outputs.notification_body }}
+          appid: ${{ secrets.QQ_BOT_APPID }}
+          secret: ${{ secrets.QQ_BOT_APPSECRET }}
+          group_id: ${{ secrets.QQ_GROUP_ID }}
+          content: ${{ steps.check_script.outputs.notification_body }}
 
       # 步骤 5: 如果有变化，则提交状态文件 (原步骤 4)
       - name: Commit status file
