@@ -139,15 +139,50 @@ jobs:
             
             此邮件由 GitHub Actions 自动发送。
 
-      # 【新增】步骤 4: 如果有变化，则通过官方机器人发送 QQ 群通知
-      - name: Send notification via Official QQ Bot
+      # 【新增】步骤 4.1: 获取 QQ 机器人 Access Token
+      - name: Get QQ Bot Access Token
         if: steps.check_script.outputs.has_changes == 'true'
-        uses: he-er/qq-bot-actions@v2.2.0 # 使用当前可用的 he-er/qq-bot-actions
-        with:
-          appid: ${{ secrets.QQ_BOT_APPID }}
-          secret: ${{ secrets.QQ_BOT_APPSECRET }}
-          group_id: ${{ secrets.QQ_GROUP_ID }}
-          content: ${{ steps.check_script.outputs.notification_body }}
+        id: get_token
+        run: |
+          TOKEN_RESPONSE=$(curl -s -X POST 'https://api.sgroup.qq.com/api/v2/token' \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"appId\": \"${{ secrets.QQ_BOT_APPID }}\",
+              \"clientSecret\": \"${{ secrets.QQ_BOT_APPSECRET }}\"
+            }")
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "null" ]; then
+            echo "::error::Failed to get access token. Response: $TOKEN_RESPONSE"
+            exit 1
+          fi
+          echo "access_token=${ACCESS_TOKEN}" >> $GITHUB_OUTPUT
+
+      # 【新增】步骤 4.2: 通过官方 API 发送 QQ 群通知
+      - name: Send notification via Official QQ Bot API
+        if: steps.check_script.outputs.has_changes == 'true'
+        run: |
+          # 将多行通知内容转换为适合 JSON 的格式 (转义换行符等)
+          JSON_CONTENT=$(echo "${{ steps.check_script.outputs.notification_body }}" | awk '{printf "%s\\n", $0}' | sed 's/"/\\"/g')
+          
+          API_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://api.sgroup.qq.com/api/v2/groups/${{ secrets.QQ_GROUP_ID }}/messages" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: QQBot ${{ steps.get_token.outputs.access_token }}" \
+            -d "{
+              \"content\": \"${JSON_CONTENT}\",
+              \"msg_type\": 0
+            }")
+            
+          # 分离响应体和状态码
+          API_BODY=$(echo "$API_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$API_RESPONSE" | tail -n1 | cut -d: -f2)
+
+          # 检查 API 调用是否成功
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ] && [ "$HTTP_STATUS" -ne 201 ]; then
+            echo "::error::Failed to send QQ notification. Status: $HTTP_STATUS, Response: $API_BODY"
+            exit 1
+          else
+            echo "QQ notification sent successfully. Status: $HTTP_STATUS"
+          fi
 
       # 步骤 5: 如果有变化，则提交状态文件 (原步骤 4)
       - name: Commit status file
