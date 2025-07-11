@@ -19,7 +19,7 @@ jobs:
       - name: Run server check script
         id: check_script
         run: |
-          # --- (此部分你的脚本保持不变) ---
+          # --- 配置 ---
           URL_EU_TEMPLATE="https://public-deploy{i}.test-eu.tankionline.com/browser-public/index.html"
           URL_RU_TEMPLATE="https://client-review-{i}-public.test-ru.tankionline.com/"
           STATE_FILE="server_status.json"
@@ -119,7 +119,7 @@ jobs:
             echo "所有服务器状态无变化。"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
-
+          
       # 步骤 3: 如果有变化，则发送邮件
       - name: Send notification email
         if: steps.check_script.outputs.has_changes == 'true'
@@ -132,59 +132,15 @@ jobs:
           subject: "3D坦克测试服务器状态更新"
           to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
+          # 【修改】移除了多余的介绍行，使邮件内容更简洁
           body: |
             你好，
             
             ${{ steps.check_script.outputs.notification_body }}
             
             此邮件由 GitHub Actions 自动发送。
-
-      # 【新增】步骤 4.1: 获取 QQ 机器人 Access Token
-      - name: Get QQ Bot Access Token
-        if: steps.check_script.outputs.has_changes == 'true'
-        id: get_token
-        run: |
-          TOKEN_RESPONSE=$(curl -s -X POST 'https://bots.qq.com/app/getAppAccessToken' \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"appId\": \"${{ secrets.QQ_BOT_APPID }}\",
-              \"clientSecret\": \"${{ secrets.QQ_BOT_APPSECRET }}\"
-            }")
-          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
-          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "null" ]; then
-            echo "::error::Failed to get access token. Response: $TOKEN_RESPONSE"
-            exit 1
-          fi
-          echo "access_token=${ACCESS_TOKEN}" >> $GITHUB_OUTPUT
-
-      # 【新增】步骤 4.2: 通过官方 API 发送 QQ 群通知
-      - name: Send notification via Official QQ Bot API
-        if: steps.check_script.outputs.has_changes == 'true'
-        run: |
-          # 将多行通知内容转换为适合 JSON 的格式 (转义换行符等)
-          JSON_CONTENT=$(echo "${{ steps.check_script.outputs.notification_body }}" | awk '{printf "%s\\n", $0}' | sed 's/"/\\"/g')
-          
-          API_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://api.sgroup.qq.com/api/v2/groups/${{ secrets.QQ_GROUP_ID }}/messages" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: QQBot ${{ steps.get_token.outputs.access_token }}" \
-            -d "{
-              \"content\": \"${JSON_CONTENT}\",
-              \"msg_type\": 0
-            }")
             
-          # 分离响应体和状态码
-          API_BODY=$(echo "$API_RESPONSE" | sed '$d')
-          HTTP_STATUS=$(echo "$API_RESPONSE" | tail -n1 | cut -d: -f2)
-
-          # 检查 API 调用是否成功
-          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ] && [ "$HTTP_STATUS" -ne 201 ]; then
-            echo "::error::Failed to send QQ notification. Status: $HTTP_STATUS, Response: $API_BODY"
-            exit 1
-          else
-            echo "QQ notification sent successfully. Status: $HTTP_STATUS"
-          fi
-
-      # 步骤 5: 如果有变化，则提交状态文件 (原步骤 4)
+      # 步骤 4: 如果有变化，则提交状态文件
       - name: Commit status file
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
@@ -197,4 +153,3 @@ jobs:
             git commit -m "chore: 更新服务器状态文件"
             git push
           fi
-
