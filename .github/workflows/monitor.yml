@@ -19,7 +19,7 @@ jobs:
       - name: Run server check script
         id: check_script
         run: |
-          # --- 配置 ---
+          # --- (此部分你的脚本保持不变) ---
           URL_EU_TEMPLATE="https://public-deploy{i}.test-eu.tankionline.com/browser-public/index.html"
           URL_RU_TEMPLATE="https://client-review-{i}-public.test-ru.tankionline.com/"
           STATE_FILE="server_status.json"
@@ -119,7 +119,7 @@ jobs:
             echo "所有服务器状态无变化。"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
-          
+
       # 步骤 3: 如果有变化，则发送邮件
       - name: Send notification email
         if: steps.check_script.outputs.has_changes == 'true'
@@ -132,15 +132,23 @@ jobs:
           subject: "3D坦克测试服务器状态更新"
           to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
-          # 【修改】移除了多余的介绍行，使邮件内容更简洁
           body: |
             你好，
             
             ${{ steps.check_script.outputs.notification_body }}
             
             此邮件由 GitHub Actions 自动发送。
-            
-      # 步骤 4: 如果有变化，则提交状态文件
+
+      # 【新增】步骤 4: 如果有变化，则发送 QQ 群通知
+      - name: Send notification to QQ Group
+        if: steps.check_script.outputs.has_changes == 'true'
+        uses: Y2Nk4/qmsg-action@master
+        with:
+          key: ${{ secrets.QMSG_KEY }}
+          groups: ${{ secrets.QQ_GROUP_ID }}
+          message: ${{ steps.check_script.outputs.notification_body }}
+
+      # 步骤 5: 如果有变化，则提交状态文件 (原步骤 4)
       - name: Commit status file
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
@@ -153,3 +161,4 @@ jobs:
             git commit -m "chore: 更新服务器状态文件"
             git push
           fi
+
