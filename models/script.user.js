@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
+// @version      2.0.1
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.0.0"; // 您的当前版本号
-    const currentVersionCode = 27;
+    const currentVersion = "2.0.1"; // 您的当前版本号
+    const currentVersionCode = 28;
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     /**
@@ -154,7 +154,8 @@
         'sp': 'SP（蒸汽朋克）',
         'ic': 'IC（冰）',
         'old': '旧',
-        '爆破手': '爆破手（仅音效）'
+        '爆破手': '爆破手（仅音效）',
+        '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）'
     };
 
     function capitalize(s) {
@@ -654,15 +655,15 @@
             "毒": "546/147760/77/170/30545000605361",
             "水": "546/147746/341/23/30545000607474"
         },
-        "richchet_sound_1": {
+        "ricochet_sound_1": {
             "default": "0/114/141/75/30653771331544",
             "爆破手": "600/155645/173/316/30653771331536"
         },
-        "richchet_sound_2": {
+        "ricochet_sound_2": {
             "default": "0/114/141/74/30653771331450",
             "爆破手": "600/155645/173/315/30653771331454"
         },
-        "richchet_sound_3": {
+        "ricochet_sound_3": {
             "default": "0/114/141/110/30653771331253",
             "爆破手": "600/155645/173/305/30653771331271"
         },
@@ -859,15 +860,15 @@
             "紫罗兰色": "546/150165/250/233/30545000605723",
             "岩浆": "546/150164/204/117/30545000607517"
         },
-        "boost_armor_sound": {
+        "supply_boost_armor_sound": {
             "default": "0/16723/157/341/30654312276460",
             "危机": "562/50436/64/45/30654312310442"
         },
-        "boost_damage_sound": {
+        "supply_boost_damage_sound": {
             "default": "0/16723/157/343/30654312276671",
             "危机": "562/50436/64/57/30654312276474"
         },
-        "boost_speed_sound": {
+        "supply_boost_speed_sound": {
             "default": "0/16723/157/346/30654312306133",
             "危机": "562/50436/64/61/30654312314022"
         }
