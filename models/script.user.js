@@ -1,54 +1,143 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      1.3.7
-// @description  替换3D坦克炮塔、底盘、无人机皮肤、节日装饰品、迷彩、射击效果等资源
+// @version      2.0.0
+// @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
 // @match        *://*.test-eu.tankionline.com/browser-public/index.html*
 // @match        *://*.test-ru.tankionline.com/*
 // @grant        none
+// @run-at       document-start
 // ==/UserScript==
 
 (function() {
-	'use strict';
-	// --- START VERSION CHECK ---
-        const currentVersion = "1.3.7"
-	const currentVersionCode = 26
-	const versionUrl = 'https://testanki1.github.io/models/version.json';
+    'use strict';
 
-	fetch(versionUrl)
-		.then(response => {
-			if (!response.ok) throw new Error('网络错误');
-			return response.json();
-		})
-		.then(data => {
-			const latestVersion = data.version;
-			const latestVersionCode = data.version_code;
-			const updateInfo = data.update_info;
-			const downloadUrl = data.download_url;
+    // --- START: Version Check ---
+    const currentVersion = "2.0.0"; // 您的当前版本号
+    const currentVersionCode = 27;
+    const versionUrl = 'https://testanki1.github.io/models/version.json';
 
-			if (latestVersionCode > currentVersionCode) {
-				const message = `
-                    资源替换脚本有新版本可用！
-                    当前版本：${currentVersion}
-                    最新版本：${latestVersion}
-                    更新内容：${updateInfo}
+    /**
+     * 显示自定义的更新提示弹窗
+     * @param {string} message - 要显示在弹窗中的主要信息 (HTML格式)
+     * @param {string} downloadUrl - 新版本的下载链接
+     */
+    function showUpdateDialog(message, downloadUrl) {
+        if (document.getElementById('update-dialog-overlay')) return;
+
+        const dialogHtml = `
+            <div class="update-dialog-overlay" id="update-dialog-overlay">
+                <div class="update-dialog-panel">
+                    <div class="update-dialog-header">脚本更新可用</div>
+                    <div class="update-dialog-body">${message}</div>
+                    <div class="update-dialog-actions">
+                        <button id="update-dialog-close" class="replacer-btn close-btn">稍后提醒</button>
+                        <button id="update-dialog-confirm" class="replacer-btn save-reload-btn">前往下载</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+        const overlay = document.getElementById('update-dialog-overlay');
+        const confirmBtn = document.getElementById('update-dialog-confirm');
+        const closeBtn = document.getElementById('update-dialog-close');
+
+        const closeDialog = () => {
+            if (overlay) overlay.remove();
+        };
+
+        confirmBtn.onclick = () => {
+            window.open(downloadUrl, '_blank');
+            closeDialog();
+        };
+
+        closeBtn.onclick = closeDialog;
+        overlay.onclick = (e) => {
+            if (e.target === overlay) closeDialog();
+        };
+    }
+
+    // 添加 { cache: 'reload' } 来强制清除缓存
+    fetch(versionUrl, { cache: 'reload' })
+        .then(response => {
+            if (!response.ok) throw new Error('网络错误');
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                return response.json();
+            }
+            throw new Error('收到的不是JSON格式的响应');
+        })
+        .then(data => {
+            const latestVersion = data.version;
+            const latestVersionCode = data.version_code;
+            const updateInfo = data.update_info;
+            const downloadUrl = data.download_url;
+
+            if (latestVersionCode > currentVersionCode) {
+                const message = `
+                    <p>资源替换脚本有新版本可用！</p>
+                    <p><b>当前版本：</b>${currentVersion}</p>
+                    <p><b>最新版本：</b>${latestVersion}</p>
+                    <p><b>更新内容：</b></p>
+                    <div class="update-info-box">${updateInfo.replace(/\n/g, '<br>')}</div>
                 `;
-				if (confirm(message + "点击确定下载新版本？")) {
-					window.location.href = downloadUrl;
-				}
-			}
-		})
-		.catch(error => {
-			console.error('更新检查失败:', error);
-		});
-	// --- END VERSION CHECK ---
+                const interval = setInterval(() => {
+                    if (document.body) {
+                        clearInterval(interval);
+                        // 注入弹窗所需的CSS
+                        injectPanelCSS();
+                        showUpdateDialog(message, downloadUrl);
+                    }
+                }, 200);
+            }
+        })
+        .catch(error => {
+            console.error('更新检查失败:', error);
+        });
+    // --- END: Version Check ---
 
-	const currentUrl = window.location.href;
 
-	const turretsRedirectMap = {
+    const nameMapping = {
+        'firebird': '火焰炮', 'freeze': '冰风暴', 'isida': '磁力炮', 'tesla': '特斯拉', 'hammer': '滑膛炮',
+        'twins': '离子炮', 'ricochet': '火龙珠', 'smoky': '轰天炮', 'striker': '火箭炮', 'vulcan': '极速炮',
+        'thunder': '雷暴炮', 'scorpion': '蝎子', 'railgun': '激光炮', 'magnum': '马格南', 'gauss': '电磁炮', 'shaft': '镭射炮',
+        'wasp': '黄蜂轻甲', 'hornet': '蜂王', 'hopper': '霍珀', 'paladin': '圣骑士', 'hunter': '猎人中甲',
+        'crusader': '十字军', 'viking': '维京', 'dictator': '独裁者', 'ares': '阿瑞斯', 'titan': '泰坦',
+        'mammoth': '猛犸象', 'brutus': '布鲁特斯', 'mechanic': '机械师', 'trickster': '魔术师', 'saboteur': '破坏者',
+        'booster': '助推器', 'defender': '守卫者', 'hyperion': '亥伯龙神', 'crisis': '危机', 'supply': '道具',
+        'ut': '超高', 'pr': '青春', 'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT', 'hd': 'HD', 'rf': 'RF',
+        'se': 'SE', 'dk': 'DK', 'sp': 'SP', 'ic': 'IC', 'old': '旧', '爆破手': '爆破手（仅音效）'
+    };
+
+    function capitalize(s) {
+        if (typeof s !== 'string') return '';
+        return s.toUpperCase();
+    }
+
+    function getDisplayName(key) {
+        if (!key) return '';
+        if (key === 'default') return '默认';
+        const processedKey = String(key).replace(/_/g, ' ').trim();
+        const lowerCaseKey = processedKey.toLowerCase();
+        if (nameMapping[lowerCaseKey]) return nameMapping[lowerCaseKey];
+        const parts = processedKey.split(' ');
+        const translatedParts = parts.map(part => nameMapping[part.toLowerCase()] || capitalize(part));
+        return translatedParts.join(' ');
+    }
+
+    const pinyinSorter = (a, b) => getDisplayName(a).localeCompare(getDisplayName(b), 'zh-Hans-CN');
+
+
+
+    // [重要提示]：请将你本地的资源数据直接粘贴到下面对应的 {} 中。
+    // --- START: Raw Data (User needs to fill this) ---
+
+    const turretsRedirectMap = {
 		"firebird": {
 			"default": "573/113511/153/137/31167700271626",
 			"XT": "0/16722/167/100/31033604530020",
@@ -1277,374 +1366,313 @@
 		}
 	};
 
-	const hullsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|GT|RF|SP|DK)$/i;
-	const turretsPattern = /^(|XT|XT_HD|LC|PR|UT|DC|DC_OLD|IC|GT|RF|SE|SP|DK|雪人|僵尸)$/i;
-	const dronesPattern = /^(|XT)$/i;
-	const festivalsPattern = /^(|UFO|万圣节|生日_15|新年_2025|五月假期_2025|生日_16|节日季节 主题|新年 重制)$/i;
-	const shotEffectsPattern = /^(|幻影黑|岩浆|粉红色|寒冷|毒|火|太阳|水|珊瑚礁|暗月|电|金|深红色|紫罗兰色|天空蓝|暴力|黑暗|日食|神秘的红色|天空|虚空|血液|雪|正午|烟雾|危机)$/i; // Added 危机
-	const paintsPattern = /^(|橄榄绿|中国红|光谱|坦克币坦克|天空蓝|幻影黑|海蓝色|芥末|雪山飞狐|黄马甲|珊瑚色|苹果色|合金装备|平静|紫红色|褐红色|黄色|偏蓝色|紫罗兰色|金色|乌拉圭|喀麦隆|巴拿马|希腊|废墟|森林|法国|流沙|游击队|热带|磐石|红色城市|翡翠|锈斑|阿根廷|丛林杀手|五彩纸屑|俄罗斯|克罗地亚|冰岛|哥伦比亚|埃及|塞内加尔|威尔士|岩浆|意大利|摩洛哥|漩涡|智利|松针|比利时|沙漠|沼泽|波斯尼亚和黑塞哥维那|澳大利亚|瑞典|突尼斯|草原|葡萄牙|象牙海岸|雪松|风语者|加纳|墨西哥|巴西|幻影骑士|极地隐身|樱桃|洪都拉斯|海军|激浪|瑞士|秘鲁|美国|苔藓|阿尔及利亚|丛林|丹麦|伊朗伊斯兰共和国|像素|冬天|厄瓜多尔|哥斯达黎加|城市|塞尔维亚|尼日利亚|德国|日本|暴风雪|极地沼泽|毕加索|沙特阿拉伯|波兰|泥浆|火星|破绽|英格兰|荷兰|西班牙|隐身衣|韩国|万花筒|古典|斑纹|原子|外星伪装|宙斯|樱花|死亡骑士|涂鸦|火山|爱你一万年|牛仔裤|番茄玛丽|绿宝石|蜂巢|迪斯科|铁匠|龙鳞骑士|上帝之眼|伐木工|侵略者|像素心|初恋|地狱火|夜晚|宇宙空间|撒哈拉沙漠|毛线衣|浣熊|滑稽演员|犀牛|猛虎|碳纤|纳米|花火|蟒蛇|软花|金钱豹|链甲|镀铅|雪豹|非洲|52 区|E236|丁香花瓣|佩斯利冰|前卫派|包装长筒袜|声纳|游戏手柄|大都市|奇怪的鱼|帽子|恒星和火焰|抽象线条|撕碎|斯堪的那维亚|新年礼物|时尚坦克手|星光大道|春季花束|永恒|流行艺术|海滩|淘金者|烧焦|牛排|琥珀|生锈|病毒|睡衣|石灰爆裂|硅酸盐|祖母的沙发|神经元|神经网络|绿洲|落叶|蓝色几何|蓝色星球|薄荷|西瓜|超立方体|逆波|金星|钢微纤维|青柠|飞驰之星|450 纳米|UFO|VIP 迷彩|丑角|丰富的装饰品|亚当和夏娃|佩斯利火焰|俄罗斯方块|僵尸|冰霜|冷静兄弟！|创意工程师|化装舞会|压碎机|古奇旗子|可怕的事情|和平，工作，五月！|培乐多|塔兰图拉|复活节|外星人的秘密|外星人链甲|多米诺骨牌|大洋洲|天蓝|小木屋|山峰|巴布什卡的被子|干旱|平安夜|幻影|幻觉|彩色玻璃|微型砖石|微风|您所需要的是…|战舰|所有的好东西|故障|救生员|数独|新加坡|日落伪装|昆古尔冰洞|曲折|月球土壤|月球漫步者|木头迷彩|核能太阳|棒棒糖|橙色海胆|毯子|水彩画|波纹|流行它|液态金属|深蓝色像素|游戏玩家|火山喷发|火龙|炼乳|烤炉|烧烤|热带地区|狂野风格|玉鳞|环保型|珍贵的耳钉|理发店|白色星球|瞄准镜|矢量|礼物包装|神鸟|粉红色大象|红色星球|红色果酱|红色标记|红色西装|羽毛|翻滚|脉冲星|苏打水|草莓|芥麦|莫奈|莲花|蓝方块|蓝色果酱|薄荷糖|蛋糕|蜘蛛|观鸟者|视网膜|设计师氛围|越野车|路障胶带|进攻|远古巨龙|金光闪烁|钒|问题|陶艺家|雪花|雷暴球|靶子|飞镖|鱿鱼的手指|鹰眼|黑曜石|X 黑色|几何形状的霓虹灯|化学反应|困在内部|春天|正方体迷彩|片假名|篝火|网络手里剑|藤本植物|银砖|阴极射线管|雷达|LOL|七十年代的乐趣|不是一个灯笼|井字棋|像素等离子|兔子|全息|共生体|冰乱舞|冲浪|初吻|勇气|北极光|华丽的鳄鱼|南瓜浆果|卡普利亚特|印刷电路板|发光二极管|发光器|合金|在树下|地球人|赛博朋克|外星人再生|外星人皮肤|外星人绑架|外星星云|夜城|头部开膛手|宇宙爆炸|富士山|工艺剪刀|帕斯提拉|微生物学|快乐的季节|指北针|指尖玩具|搜捕|放射性果冻|旁观者|旋转器|时髦医学|时髦的霓虹灯|星座|构造板块|枫叶|梦魇|气候状况|泡泡糖|活体护甲|流动|流动的金属|流星雨|流行音乐合成器|火魔像|灵魂|烟幕|煎蛋|熔岩灯|爱的迷彩|獾-獾|玉兰|电动绵羊|电子人|电子蜂巢|眩晕|矩阵|破裂的光|碳星|神童 2.0|秘制酱料|符文|红色烟雾|纳米HUD|纳米防护装甲|绿色四边形|绿锆石|节日彩灯|花火|荣誉|蓝色丁香|西伯利亚虎|视觉干扰者|触手|触摸寒冷|跳动的心|辉光|迅速蔓延|迪斯科 2.0|逆境|通感|遥远的北方|量子迷彩|金合金|金色齿轮|钢铁之心|钻石|铁丝网|银河|银河星爆|银河系|镍|防寒外套|集成电路|雷霆风暴|风扇|飞轮|马赛克|驾驶|魔术圈|鸭子|黑海|黑白|齿轮|三叶草小队|休斯顿坦克|佩佩加|免疫|冠军 1|冠军 2|冠军 3|冠军 4|冠军 5|冠军 6|冠军 7|冠军 8|勇气之火|南瓜泥|团队指针 1|团队指针 2|坦克-黑色|坦克猫|坦克的太阳|对开发人员|声望|新兵|奇点|妖精兄弟会|姜饼|强盗|怀旧之情|恐怖|愁云|手提袋|柑橘|毒|治安关|深红色|甜蜜的礼物|碎片|神圣|等离子体|红色通缉令|绿色随从|美洲驼坦克|银河系|黑兹尔装甲工程|黑色红宝石|退役机器人|钻石|雪域惊喜|青金石|青铜盔甲|高级监护人|拼图|16 岁|跑酷小子|跑酷大师 2015|跑酷大师 2016|跑酷大师 2017|跑酷大师 2019|跑酷大师 2020|跑酷大师 2023|烈焰|顶级|滑翔|凤凰|缟玛瑙|老兵|冠军|白银|青铜|星星|强酸|幸运 7|角斗士|棱镜|火焰|火焰 2.0|蓝宝石|鳄鱼|红宝石|芳纶|记者|微芯片|赫利俄斯|观察者|月度最佳帮手|年度最佳帮手 2017|年度最佳帮手 2019|年度最佳帮手 2020|年度最佳帮手 2021|年度最佳帮手 2022|年度最佳帮手 2023|年度最佳帮手 2024|3D坦克 YouTuber|JMPR|Waider|JERRYYY21|Taspens|BigTanks|Quirky|死亡迷彩|加速燃烧|涡轮增压|洗手液|微笑|未知 1)$/i; // Added more paints
-	// --- END PATTERNS ---
+    // --- END: Raw Data ---
 
-	// --- START GET LAST CHOICES ---
-	let lastHullChoice = localStorage.getItem('userChoiceHull') || '';
-	let lastTurretChoice = localStorage.getItem('userChoiceTurret') || '';
-	let lastDroneChoice = localStorage.getItem('userChoiceDrone') || '';
-	let lastFestivalChoice = localStorage.getItem('userChoiceFestival') || '';
-	let lastShotEffectChoice = localStorage.getItem('userChoiceShotEffect') || '';
-	let lastOriginalPaintChoice = localStorage.getItem('originalChoicePaint') || '';
-	let lastNewPaintChoice = localStorage.getItem('newChoicePaint') || '';
-	// --- END GET LAST CHOICES ---
 
-	// --- START HELPER FUNCTIONS ---
-	function getUserChoice(promptMessage, lastChoice, pattern, invalidMessage) {
-		let userChoice = prompt(promptMessage, lastChoice);
-		if (userChoice === null) {
-			return ''; // User cancelled
-		}
-		userChoice = userChoice.trim(); // Trim whitespace
-		// Allow empty input for "no replacement"
-		if (userChoice === '') {
-			return '';
-		}
-		// Validate against pattern if not empty
-		while (!pattern.test(userChoice)) {
-			alert(invalidMessage);
-			userChoice = prompt(promptMessage, lastChoice);
-			if (userChoice === null) {
-				return ''; // User cancelled during re-prompt
-			}
-			userChoice = userChoice.trim();
-			if (userChoice === '') {
-				return ''; // Allow empty input during re-prompt
-			}
-		}
-		return userChoice.toUpperCase(); // Standardize to uppercase for consistency
-	}
+    const resourceMaps = {
+        turrets: turretsRedirectMap, hulls: hullsRedirectMap, drones: dronesRedirectMap,
+        festivals: festivalsRedirectMap, shotEffects: shotEffectsRedirectMap, paints: paintsRedirectMap
+    };
 
-	function getPaintChoice(promptMessage, lastChoice, invalidMessage) {
-        // Paints need special handling because the map keys are Chinese
-		let userChoice = prompt(promptMessage, lastChoice);
-		if (userChoice === null) {
-			return ''; // User cancelled
-		}
-		userChoice = userChoice.trim(); // Trim whitespace
-		if (userChoice === '') {
-			return '';
-		}
-        // Check if the input (trimmed) exists as a key in the paint map's first level
-        // Requires paintsRedirectMap to be defined
-        /* // This check requires the paintsRedirectMap to be defined
-        if (!paintsRedirectMap || !paintsRedirectMap.paints || !paintsRedirectMap.paints[userChoice]) {
-             alert(invalidMessage);
-             // Re-prompt logic would go here, similar to getUserChoice
-             // For now, just return empty if invalid without re-prompting in this simplified version
-             return '';
+    const CONFIG_KEY = 'tankiAdvancedReplacements_v3_dynamic_selects';
+    let currentConfig = {};
+    let activeReplacements = {};
+
+    function getToOptionsFor(category, fromValue) {
+        const map = resourceMaps[category];
+        if (!map || !fromValue) return [];
+        const options = new Set();
+        if (['turrets', 'hulls', 'drones'].includes(category)) {
+            const itemSkins = map[fromValue];
+            if (itemSkins) Object.keys(itemSkins).forEach(skin => { if (skin !== 'default') options.add(skin); });
+        } else if (category === 'shotEffects') {
+            for (const effectKey in map) {
+                if (effectKey.toLowerCase().startsWith(fromValue.toLowerCase())) {
+                    const effectStyles = map[effectKey];
+                    if (effectStyles) Object.keys(effectStyles).forEach(style => { if (style !== 'default') options.add(style); });
+                }
+            }
+        } else if (category === 'paints') {
+            if (map.paints) Object.keys(map.paints).forEach(paintName => options.add(paintName));
         }
-        */
-        // Simple validation using the pattern for now, as the map is omitted
-         while (!paintsPattern.test(userChoice)) {
-			alert(invalidMessage);
-			userChoice = prompt(promptMessage, lastChoice);
-			if (userChoice === null) {
-				return '';
-			}
-             userChoice = userChoice.trim();
-             if (userChoice === '') {
-                 return '';
-             }
-		}
+        return Array.from(options).sort(pinyinSorter);
+    }
 
-		return userChoice; // Return the exact input (case might matter for map keys)
-	}
-	// --- END HELPER FUNCTIONS ---
-
-	// --- START USER INTERACTION ---
-	let userChoiceHull, userChoiceTurret, userChoiceDrone, userChoiceFestival, userChoiceShotEffect, originalChoicePaint, newChoicePaint;
-	let reuseLastChoices = false;
-
-	// Check if there are any saved choices
-	if (lastHullChoice || lastTurretChoice || lastDroneChoice || lastFestivalChoice || lastShotEffectChoice || (lastOriginalPaintChoice && lastNewPaintChoice) ) {
-		const lastChoicesSummary = `
-            上次选择：
-            底盘: ${lastHullChoice || '无'}
-            炮塔: ${lastTurretChoice || '无'}
-            无人机: ${lastDroneChoice || '无'}
-            节日: ${lastFestivalChoice || '无'}
-            射击效果: ${lastShotEffectChoice || '无'}
-            迷彩: ${lastOriginalPaintChoice || '无'} → ${lastNewPaintChoice || '无'}
-
-            是否沿用上次的选择？ (点击 取消 重新选择)
-        `;
-		if (confirm(lastChoicesSummary)) {
-			reuseLastChoices = true;
-			userChoiceHull = lastHullChoice;
-			userChoiceTurret = lastTurretChoice;
-			userChoiceDrone = lastDroneChoice;
-			userChoiceFestival = lastFestivalChoice;
-			userChoiceShotEffect = lastShotEffectChoice;
-			originalChoicePaint = lastOriginalPaintChoice;
-			newChoicePaint = lastNewPaintChoice;
-		}
-	}
-
-	// If not reusing last choices, prompt the user
-	if (!reuseLastChoices) {
-		userChoiceHull = getUserChoice(
-			"请选择要使用的底盘模型替换 (留空不替换)\n可用: XT, XT_HD, LC, PR, UT, DC, GT, RF, SP, DK",
-			lastHullChoice,
-			hullsPattern,
-			"输入无效，请输入有效的底盘皮肤系列或留空"
-		);
-
-		userChoiceTurret = getUserChoice(
-			"请选择要使用的炮塔模型替换 (留空不替换)\n可用: XT, XT_HD, LC, PR, UT, DC, DC_OLD, IC, GT, RF, SE, SP, DK",
-			lastTurretChoice,
-			turretsPattern,
-			"输入无效，请输入有效的炮塔皮肤系列或留空"
-		);
-
-		userChoiceDrone = getUserChoice(
-			"请选择要使用的无人机模型替换 (留空不替换)\n可用: XT",
-			lastDroneChoice,
-			dronesPattern,
-			"输入无效，请输入有效的无人机皮肤系列或留空"
-		);
-
-		userChoiceFestival = getUserChoice(
-            "请选择要使用的节日替换 (留空不替换)\n可用: UFO, 万圣节, 生日_15, 新年_2025, 五月假期_2025, 生日_16", // Added options
-			lastFestivalChoice,
-			festivalsPattern,
-			"输入无效，请输入有效的节日或留空"
-		);
-
-		userChoiceShotEffect = getUserChoice(
-			"请选择要使用的射击效果替换 (留空不替换)\n可用: 幻影黑, 岩浆, 粉红色, 寒冷, 毒, 火, 太阳, 水, 珊瑚礁, 暗月, 电, 金, 深红色, 紫罗兰色, 天空蓝, 暴力, 黑暗, 日食, 神秘的红色, 天空, 虚空, 血液, 雪, 正午, 烟雾",
-			lastShotEffectChoice,
-			shotEffectsPattern,
-			"输入无效，请输入有效的射击效果或留空"
-		);
-
-        // Use getPaintChoice for paints as keys are specific strings
-		originalChoicePaint = getPaintChoice(
-			"请选择待替换迷彩 (留空不替换)\n(提示: 动画/非动画需匹配，否则可能出错)",
-			lastOriginalPaintChoice,
-			"输入无效，请输入有效的迷彩名称或留空"
-		);
-
-        // Only ask for new paint if original paint was selected
-		if (originalChoicePaint) {
-			newChoicePaint = getPaintChoice(
-			`选择要将 [${originalChoicePaint}] 替换为哪个迷彩？ (留空不替换)`,
-			lastNewPaintChoice,
-			"输入无效，请输入有效的迷彩名称或留空"
-		);
-            // If user cancels new paint selection, cancel the paint swap
-            if (!newChoicePaint) {
-                originalChoicePaint = '';
-            }
-		} else {
-            newChoicePaint = ''; // Ensure new paint is empty if original is empty
-        }
-	}
-	// --- END USER INTERACTION ---
-
-
-	// --- START APPLY CHOICES ---
-	const finalConfirmationMessage = `
-        将应用以下替换：
-        底盘: ${userChoiceHull || '不替换'}
-        炮塔: ${userChoiceTurret || '不替换'}
-        无人机: ${userChoiceDrone || '不替换'}
-        节日: ${userChoiceFestival || '不替换'}
-        射击效果: ${userChoiceShotEffect || '不替换'}
-        迷彩: ${originalChoicePaint ? `[${originalChoicePaint}] → [${newChoicePaint}]` : '不替换'}
-
-        点击 确定 继续应用替换。
-    `;
-
-	if (confirm(finalConfirmationMessage)) {
-		// Save choices whether reused or newly selected
-		localStorage.setItem('userChoiceHull', userChoiceHull);
-		localStorage.setItem('userChoiceTurret', userChoiceTurret);
-		localStorage.setItem('userChoiceDrone', userChoiceDrone);
-		localStorage.setItem('userChoiceFestival', userChoiceFestival);
-		localStorage.setItem('userChoiceShotEffect', userChoiceShotEffect);
-		localStorage.setItem('originalChoicePaint', originalChoicePaint);
-		localStorage.setItem('newChoicePaint', newChoicePaint);
-
-		// --- Resource Replacement Logic ---
-        // [!] This part requires the redirect maps to be defined above!
-
-		function replaceResources(redirectMap, userChoice) {
-            // Check if the map and choice are valid before proceeding
-            if (!redirectMap || !userChoice) {
-                // console.log('Skipping replacement: Invalid map or choice.', redirectMap, userChoice);
-                return;
-            }
-
-			const choiceKey = userChoice.toUpperCase(); // Use standardized key
-
-			// Iterate over main categories (e.g., "firebird", "wasp")
-			for (const categoryKey in redirectMap) {
-                const categoryMap = redirectMap[categoryKey];
-                // Check if the category exists and has a 'default' and the chosen skin
-                if (categoryMap && categoryMap.default && categoryMap[choiceKey]) {
-                    const defaultResource = categoryMap.default;
-                    const targetResource = categoryMap[choiceKey];
-
-                    // Apply to existing DOM elements (less common now with dynamic loading)
-                    document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-                        if (tag.src && tag.src.includes(defaultResource)) {
-                            tag.src = tag.src.replace(defaultResource, targetResource);
-                            // console.log(`Replaced DOM src: ${defaultResource} -> ${targetResource}`);
-                        }
-                        if (tag.href && tag.href.includes(defaultResource)) {
-                            tag.href = tag.href.replace(defaultResource, targetResource);
-                             // console.log(`Replaced DOM href: ${defaultResource} -> ${targetResource}`);
-                        }
-                    });
-                }
-			}
-		}
-
-        function replacePaintResources(paintMap, originalPaint, newPaint) {
-             if (!paintMap || !paintMap.paints || !originalPaint || !newPaint || !paintMap.paints[originalPaint] || !paintMap.paints[newPaint]) {
-                // console.log('Skipping paint replacement: Invalid map or paints.', paintMap, originalPaint, newPaint);
-                return;
-            }
-            const originalResource = paintMap.paints[originalPaint];
-            const newResource = paintMap.paints[newPaint];
-
-             if (!originalResource || !newResource) {
-                // console.log('Skipping paint replacement: Missing resource ID.', originalResource, newResource);
-                return;
-            }
-
-            document.querySelectorAll('script, link, img, audio, video, source').forEach(tag => {
-                if (tag.src && tag.src.includes(originalResource)) {
-                    tag.src = tag.src.replace(originalResource, newResource);
-                     // console.log(`Replaced DOM Paint src: ${originalResource} -> ${newResource}`);
-                }
-                if (tag.href && tag.href.includes(originalResource)) {
-                    tag.href = tag.href.replace(originalResource, newResource);
-                    // console.log(`Replaced DOM Paint href: ${originalResource} -> ${newResource}`);
-                }
+    function createDynamicRuleRow(category, fromOptions, from = "", to = "") {
+        const createOptions = (options, selectedValue, placeholder = '-- 请选择 --') => {
+            let optionsHtml = `<option value="" disabled ${!selectedValue ? 'selected' : ''}>${placeholder}</option>`;
+            options.forEach(opt => {
+                optionsHtml += `<option value="${opt}" ${selectedValue === opt ? 'selected' : ''}>${getDisplayName(opt)}</option>`;
             });
+            return optionsHtml;
+        };
+        const toOptions = from ? getToOptionsFor(category, from) : [];
+        const toPlaceholder = from ? '-- 请选择目标 --' : '-- 请先选择源 --';
+        const toDisabled = !from;
+        return `
+         <div class="replacer-rule-row" data-category="${category}">
+             <select class="from-select">${createOptions(fromOptions, from)}</select>
+             <span class="arrow">→</span>
+             <select class="to-select" ${toDisabled ? 'disabled' : ''}>${createOptions(toOptions, to, toPlaceholder)}</select>
+             <button class="replacer-btn delete-btn">×</button>
+         </div>`;
+    }
+
+    function createCategorySection(id, title, fromOpts, rules = []) {
+        return `
+         <div class="replacer-category" id="category-${id}">
+             <div class="replacer-category-title">
+                 <span>${title}</span>
+                 <button class="replacer-btn add-btn" data-category="${id}">+ 添加规则</button>
+             </div>
+             <div class="rules-container">
+                 ${(rules || []).map(rule => createDynamicRuleRow(id, fromOpts, rule.from, rule.to)).join('')}
+             </div>
+         </div>`;
+    }
+
+    function createFestivalSection(id, title, options, selectedValue = 'default') {
+        const festivalOptions = ['默认 (不替换)', ...options];
+        return `
+            <div class="replacer-category" id="category-${id}" data-category="${id}">
+                <div class="replacer-category-title"><span>${title}</span></div>
+                <div class="replacer-rule-row single-selector-row">
+                    <select id="festival-theme-selector" class="from-select">
+                        ${festivalOptions.map(opt => `<option value="${opt === '默认 (不替换)' ? 'default' : opt}" ${selectedValue === (opt === '默认 (不替换)' ? 'default' : opt) ? 'selected' : ''}>${getDisplayName(opt)}</option>`).join('')}
+                    </select>
+                </div>
+            </div>`;
+    }
+
+    function injectPanelCSS() {
+        if (document.getElementById('replacer-styles')) return;
+        const leftArrowSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E")`;
+        // [修改] 移除了 .replacer-settings-overlay, .update-dialog-overlay 中的 font-family 属性
+        const css = `
+            #replacer-edge-trigger { position: fixed; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 100px; background-color: rgba(0, 25, 38, 0.4); border: 1px solid rgba(118, 255, 51, 0.4); border-right: none; border-radius: 10px 0 0 10px; cursor: pointer; z-index: 19999; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+            #replacer-edge-trigger:hover { background-color: rgba(0, 25, 38, 0.8); width: 35px; }
+            #replacer-edge-trigger .trigger-icon { display: block; width: 24px; height: 24px; background-color: rgba(118, 255, 51, 0.7); -webkit-mask-image: ${leftArrowSvg}; mask-image: ${leftArrowSvg}; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transform: rotate(180deg); transition: all 0.3s ease; }
+            #replacer-edge-trigger:hover .trigger-icon { background-color: #76FF33; transform: rotate(180deg) scale(1.1); }
+            .replacer-settings-overlay, .update-dialog-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 20000; }
+            .replacer-settings-panel, .update-dialog-panel { background-color: rgba(0, 25, 38, 0.95); color: #e0e0e0; border: 1px solid #76FF33; border-radius: 12px; width: 90%; box-shadow: 0 0 30px rgba(118, 255, 51, 0.3); display: flex; flex-direction: column; max-height: 90vh; }
+            .replacer-settings-panel { max-width: 800px; }
+            .update-dialog-panel { max-width: 500px; }
+            .replacer-header, .update-dialog-header { padding: 16px 24px; font-size: 1.75rem; color: #76FF33; border-bottom: 1px solid rgba(118, 255, 51, 0.4); text-align: center; }
+            .replacer-body, .update-dialog-body { padding: 24px; overflow-y: auto; }
+            .update-dialog-body p { margin: 0 0 12px; line-height: 1.6; }
+            .update-dialog-body .update-info-box { background: rgba(0,0,0,0.2); border-left: 3px solid #76FF33; padding: 12px; margin-top: 8px; border-radius: 4px; font-size: 0.9rem; }
+            .replacer-category { margin-bottom: 24px; }
+            .replacer-category-title { font-size: 1.2rem; font-weight: 500; color: #fff; border-bottom: 2px solid #76FF33; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+            .replacer-rule-row { display: grid; grid-template-columns: 1fr auto 1fr 40px; gap: 12px; align-items: center; margin-bottom: 10px; }
+            .replacer-rule-row.single-selector-row { grid-template-columns: 1fr; }
+            .replacer-rule-row select { width: 100%; padding: 10px; font-size: 1rem; background-color: rgba(0, 0, 0, 0.3); border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
+            .replacer-rule-row select:disabled { background-color: rgba(0, 0, 0, 0.1); color: #777; cursor: not-allowed; }
+            .replacer-rule-row select option { background-color: #001926; color: #e0e0e0;}
+            .replacer-rule-row select:focus { outline: 1px solid #76FF33; }
+            .replacer-rule-row .arrow { font-size: 1.5rem; color: #76FF33; text-align: center; }
+            .replacer-btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem; transition: all 0.2s ease; background-color: #76FF33; color: #001926; }
+            .replacer-btn.delete-btn { background-color: transparent; color: #ff5252; font-size: 1.5rem; padding: 0; width: 40px; height: 40px; line-height: 40px; }
+            .replacer-btn.delete-btn:hover { background-color: rgba(255, 82, 82, 0.2); }
+            .replacer-actions, .update-dialog-actions { padding: 16px 24px; border-top: 1px solid rgba(118, 255, 51, 0.4); display: flex; justify-content: flex-end; gap: 12px; }
+            .replacer-btn.close-btn { background-color: #555; color: #fff; }
+            .replacer-btn.save-only-btn { background-color: #0d47a1; color: #fff; }
+        `;
+        document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
+    }
+
+    function createPanel() {
+        if (document.getElementById('replacer-panel-overlay')) return;
+        const config = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+        const getFromOptions = (map, category) => {
+             if (category === 'shotEffects') return Array.from(new Set(Object.keys(map || {}).map(key => key.split('_')[0]))).sort(pinyinSorter);
+             if (category === 'paints') return Object.keys(map?.paints || {}).sort(pinyinSorter);
+             return Object.keys(map || {}).sort(pinyinSorter);
+        };
+        const getAllFestivalThemes = (map) => {
+            const themes = new Set();
+            for (const item in map) for (const theme in map[item]) if (theme !== 'default') themes.add(theme);
+            return Array.from(themes).sort(pinyinSorter);
+        };
+        const categoryFromOptions = {
+            turrets: getFromOptions(turretsRedirectMap, 'turrets'), hulls: getFromOptions(hullsRedirectMap, 'hulls'),
+            paints: getFromOptions(paintsRedirectMap, 'paints'), shotEffects: getFromOptions(shotEffectsRedirectMap, 'shotEffects'),
+            drones: getFromOptions(dronesRedirectMap, 'drones'),
+        };
+        const festivalThemeOpts = getAllFestivalThemes(festivalsRedirectMap);
+        const panelHtml = `
+            <div class="replacer-settings-overlay" id="replacer-panel-overlay" style="display:none;">
+                <div class="replacer-settings-panel">
+                    <div class="replacer-header">资源替换</div>
+                    <div class="replacer-body" id="replacer-main-body">
+                        ${createCategorySection('turrets', '炮塔', categoryFromOptions.turrets, config.turrets)}
+                        ${createCategorySection('hulls', '底盘', categoryFromOptions.hulls, config.hulls)}
+                        ${createCategorySection('paints', '迷彩', categoryFromOptions.paints, config.paints)}
+                        ${createCategorySection('shotEffects', '射击效果', categoryFromOptions.shotEffects, config.shotEffects)}
+                        ${createCategorySection('drones', '无人机', categoryFromOptions.drones, config.drones)}
+                        ${createFestivalSection('festivals', '节日/地图', festivalThemeOpts, config.festivals)}
+                    </div>
+                    <div class="replacer-actions">
+                        <button class="replacer-btn close-btn">关闭</button>
+                        <button class="replacer-btn save-only-btn">仅保存</button>
+                        <button class="replacer-btn save-reload-btn">保存并重载</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', panelHtml);
+        const overlay = document.getElementById('replacer-panel-overlay');
+        const saveConfiguration = () => {
+            const newConfig = {};
+            document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
+                const category = row.dataset.category;
+                if (!newConfig[category]) newConfig[category] = [];
+                const from = row.querySelector('.from-select').value;
+                const to = row.querySelector('.to-select').value;
+                if (from && to) newConfig[category].push({ from, to });
+            });
+            const festivalSelector = document.getElementById('festival-theme-selector');
+            if (festivalSelector) newConfig.festivals = festivalSelector.value;
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(newConfig));
+            console.log("配置已保存:", newConfig);
+            return newConfig;
+        };
+        overlay.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target.classList.contains('add-btn')) {
+                const category = target.dataset.category;
+                const container = target.closest('.replacer-category').querySelector('.rules-container');
+                const fromOpts = categoryFromOptions[category];
+                if (fromOpts) container.insertAdjacentHTML('beforeend', createDynamicRuleRow(category, fromOpts));
+            } else if (target.classList.contains('delete-btn')) {
+                target.closest('.replacer-rule-row').remove();
+            } else if (target.classList.contains('save-reload-btn')) {
+                saveConfiguration();
+                window.location.reload();
+            } else if (target.classList.contains('save-only-btn')) {
+                const newConfig = saveConfiguration();
+                processConfig(newConfig);
+                alert('配置已保存。部分替换可能需要重载页面才能完全生效。');
+                overlay.style.display = 'none';
+            } else if (target.classList.contains('close-btn') || target === overlay) {
+                overlay.style.display = 'none';
+            }
+        });
+        overlay.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.classList.contains('from-select')) {
+                const row = target.closest('.replacer-rule-row');
+                if (!row || row.parentElement.id === 'category-festivals') return;
+                const category = row.dataset.category;
+                const fromValue = target.value;
+                const toSelect = row.querySelector('.to-select');
+                const toOptions = getToOptionsFor(category, fromValue);
+                let optionsHtml = '<option value="" disabled selected>-- 请选择目标 --</option>';
+                toOptions.forEach(opt => { optionsHtml += `<option value="${opt}">${getDisplayName(opt)}</option>`; });
+                toSelect.innerHTML = optionsHtml;
+                toSelect.disabled = false;
+            }
+        });
+    }
+
+    function createEdgeTrigger() {
+        if (document.getElementById('replacer-edge-trigger')) return;
+        const trigger = document.createElement('div');
+        trigger.id = 'replacer-edge-trigger';
+        trigger.innerHTML = '<span class="trigger-icon"></span>';
+        trigger.title = '打开资源替换设置';
+        trigger.onclick = () => {
+            const overlay = document.getElementById('replacer-panel-overlay');
+            if(overlay) overlay.style.display = 'flex';
+        };
+        document.body.appendChild(trigger);
+    }
+
+    function processConfig(config) {
+        const processed = {};
+        if (!config) return;
+        for (const category in config) {
+            if (category !== 'festivals') processed[category] = config[category];
         }
-
-
-        // Apply replacements if maps were defined
-        if (typeof hullsRedirectMap !== 'undefined') replaceResources(hullsRedirectMap, userChoiceHull);
-        if (typeof turretsRedirectMap !== 'undefined') replaceResources(turretsRedirectMap, userChoiceTurret);
-        if (typeof dronesRedirectMap !== 'undefined') replaceResources(dronesRedirectMap, userChoiceDrone);
-        if (typeof festivalsRedirectMap !== 'undefined') replaceResources(festivalsRedirectMap, userChoiceFestival);
-        if (typeof shotEffectsRedirectMap !== 'undefined') replaceResources(shotEffectsRedirectMap, userChoiceShotEffect);
-        if (typeof paintsRedirectMap !== 'undefined' && originalChoicePaint && newChoicePaint) {
-            replacePaintResources(paintsRedirectMap, originalChoicePaint, newChoicePaint);
+        const selectedTheme = config.festivals;
+        if (selectedTheme && selectedTheme !== 'default') {
+            const festivalRules = [];
+            const festivalMap = resourceMaps.festivals;
+            for (const itemName in festivalMap) {
+                if (festivalMap[itemName] && festivalMap[itemName][selectedTheme]) {
+                     festivalRules.push({ from: itemName, to: selectedTheme });
+                }
+            }
+            processed.festivals = festivalRules;
+        } else {
+            processed.festivals = [];
         }
+        activeReplacements = processed;
+        console.log("生效中的替换规则:", activeReplacements);
+    }
 
-
-		// --- Intercept Fetch and XHR ---
-		const originalFetch = window.fetch;
-		window.fetch = function(input, init) {
-			if (typeof input === 'string') {
-                // Helper for fetch/XHR replacement
-                function replaceRequestUrl(url, redirectMap, userChoice) {
-                    if (!redirectMap || !userChoice) return url;
-                    const choiceKey = userChoice.toUpperCase();
-                    for (const categoryKey in redirectMap) {
-                        const categoryMap = redirectMap[categoryKey];
-                         if (categoryMap && categoryMap.default && categoryMap[choiceKey] && url.includes(categoryMap.default)) {
-                            // console.log(`Fetch replacing ${categoryMap.default} with ${categoryMap[choiceKey]} in ${url}`);
-                            return url.replace(categoryMap.default, categoryMap[choiceKey]);
+    function setupInterceptors() {
+        try {
+            currentConfig = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+            processConfig(currentConfig);
+        } catch (e) {
+            console.error("解析替换配置失败:", e);
+            currentConfig = {};
+            activeReplacements = {};
+        }
+        const applyAllReplacements = (url) => {
+            if (typeof url !== 'string' || !activeReplacements) return url;
+            let modifiedUrl = url;
+            for (const category in activeReplacements) {
+                const rules = activeReplacements[category];
+                const map = resourceMaps[category];
+                if (!rules || !map) continue;
+                for (const rule of rules) {
+                    const from = rule.from.toLowerCase();
+                    const to = rule.to;
+                    if (category === 'shotEffects') {
+                        for (const effectKey in map) {
+                            if (effectKey.toLowerCase().startsWith(from)) {
+                                const fromRes = map[effectKey]?.default, toRes = map[effectKey]?.[to];
+                                if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
+                            }
                         }
+                    } else if (['turrets', 'hulls', 'drones', 'festivals'].includes(category)) {
+                        const itemMap = map[rule.from];
+                        if (itemMap) {
+                            const fromRes = itemMap.default, toRes = itemMap[to] || itemMap[to.toUpperCase()];
+                            if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
+                        }
+                    } else if (category === 'paints') {
+                        const fromRes = map.paints?.[rule.from], toRes = map.paints?.[rule.to];
+                        if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
                     }
-                    return url;
                 }
-                 function replacePaintRequestUrl(url, paintMap, originalPaint, newPaint) {
-                    if (!paintMap || !paintMap.paints || !originalPaint || !newPaint || !paintMap.paints[originalPaint] || !paintMap.paints[newPaint]) {
-                        return url;
-                    }
-                    const originalResource = paintMap.paints[originalPaint];
-                    const newResource = paintMap.paints[newPaint];
-                     if (!originalResource || !newResource) return url;
-
-                    if (url.includes(originalResource)) {
-                        // console.log(`Fetch replacing Paint ${originalResource} with ${newResource} in ${url}`);
-                        return url.replace(originalResource, newResource);
-                    }
-                    return url;
-                }
-
-                // Apply replacements
-                if (typeof hullsRedirectMap !== 'undefined') input = replaceRequestUrl(input, hullsRedirectMap, userChoiceHull);
-                if (typeof turretsRedirectMap !== 'undefined') input = replaceRequestUrl(input, turretsRedirectMap, userChoiceTurret);
-                if (typeof dronesRedirectMap !== 'undefined') input = replaceRequestUrl(input, dronesRedirectMap, userChoiceDrone);
-                if (typeof festivalsRedirectMap !== 'undefined') input = replaceRequestUrl(input, festivalsRedirectMap, userChoiceFestival);
-                if (typeof shotEffectsRedirectMap !== 'undefined') input = replaceRequestUrl(input, shotEffectsRedirectMap, userChoiceShotEffect);
-                if (typeof paintsRedirectMap !== 'undefined' && originalChoicePaint && newChoicePaint) {
-                     input = replacePaintRequestUrl(input, paintsRedirectMap, originalChoicePaint, newChoicePaint);
-                }
-			}
-			return originalFetch(input, init);
-		};
-
-		const originalOpen = XMLHttpRequest.prototype.open;
-		XMLHttpRequest.prototype.open = function(method, url) {
-            // Use the same helper functions as fetch
-            function replaceRequestUrl(url, redirectMap, userChoice) {
-                 if (!redirectMap || !userChoice) return url;
-                 const choiceKey = userChoice.toUpperCase();
-                 for (const categoryKey in redirectMap) {
-                     const categoryMap = redirectMap[categoryKey];
-                      if (categoryMap && categoryMap.default && categoryMap[choiceKey] && url.includes(categoryMap.default)) {
-                         // console.log(`XHR replacing ${categoryMap.default} with ${categoryMap[choiceKey]} in ${url}`);
-                         return url.replace(categoryMap.default, categoryMap[choiceKey]);
-                     }
-                 }
-                 return url;
-             }
-            function replacePaintRequestUrl(url, paintMap, originalPaint, newPaint) {
-                 if (!paintMap || !paintMap.paints || !originalPaint || !newPaint || !paintMap.paints[originalPaint] || !paintMap.paints[newPaint]) {
-                     return url;
-                 }
-                 const originalResource = paintMap.paints[originalPaint];
-                 const newResource = paintMap.paints[newPaint];
-                 if (!originalResource || !newResource) return url;
-
-                 if (url.includes(originalResource)) {
-                    // console.log(`XHR replacing Paint ${originalResource} with ${newResource} in ${url}`);
-                    return url.replace(originalResource, newResource);
-                 }
-                 return url;
             }
+            return modifiedUrl;
+        };
+        const originalFetch = window.fetch;
+        window.fetch = function(input, init) {
+            let url = (input instanceof Request) ? input.url : String(input);
+            const newUrl = applyAllReplacements(url);
+            if (newUrl !== url) input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
+            return originalFetch.call(this, input, init);
+        };
+        const originalOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...args) {
+            const newUrl = applyAllReplacements(String(url));
+            return originalOpen.call(this, method, newUrl, ...args);
+        };
+    }
 
+    // --- 主执行逻辑 ---
+    setupInterceptors();
 
-            // Apply replacements
-            if (typeof hullsRedirectMap !== 'undefined') url = replaceRequestUrl(url, hullsRedirectMap, userChoiceHull);
-            if (typeof turretsRedirectMap !== 'undefined') url = replaceRequestUrl(url, turretsRedirectMap, userChoiceTurret);
-            if (typeof dronesRedirectMap !== 'undefined') url = replaceRequestUrl(url, dronesRedirectMap, userChoiceDrone);
-            if (typeof festivalsRedirectMap !== 'undefined') url = replaceRequestUrl(url, festivalsRedirectMap, userChoiceFestival);
-            if (typeof shotEffectsRedirectMap !== 'undefined') url = replaceRequestUrl(url, shotEffectsRedirectMap, userChoiceShotEffect);
-            if (typeof paintsRedirectMap !== 'undefined' && originalChoicePaint && newChoicePaint) {
-                 url = replacePaintRequestUrl(url, paintsRedirectMap, originalChoicePaint, newChoicePaint);
-            }
-
-			originalOpen.call(this, method, url);
-		};
-		// --- End Intercept Fetch and XHR ---
-
-	} else {
-		alert("替换已取消，页面将加载原始内容。");
-        // Clear saved choices if user cancels the final confirmation
-		localStorage.removeItem('userChoiceHull');
-		localStorage.removeItem('userChoiceTurret');
-		localStorage.removeItem('userChoiceDrone');
-		localStorage.removeItem('userChoiceFestival');
-		localStorage.removeItem('userChoiceShotEffect');
-		localStorage.removeItem('originalChoicePaint');
-		localStorage.removeItem('newChoicePaint');
-	}
-	// --- END APPLY CHOICES ---
+    const uiInitInterval = setInterval(() => {
+        if (document.body) {
+            clearInterval(uiInitInterval);
+            injectPanelCSS();
+            createPanel();
+            createEdgeTrigger();
+        }
+    }, 100);
 
 })();
