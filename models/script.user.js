@@ -110,8 +110,8 @@
         'crusader': '十字军', 'viking': '维京', 'dictator': '独裁者', 'ares': '阿瑞斯', 'titan': '泰坦',
         'mammoth': '猛犸象', 'brutus': '布鲁特斯', 'mechanic': '机械师', 'trickster': '魔术师', 'saboteur': '破坏者',
         'booster': '助推器', 'defender': '守卫者', 'hyperion': '亥伯龙神', 'crisis': '危机', 'supply': '道具',
-        'ut': '超高', 'pr': '青春', 'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT', 'hd': 'HD', 'rf': 'RF',
-        'se': 'SE', 'dk': 'DK', 'sp': 'SP', 'ic': 'IC', 'old': '旧', '爆破手': '爆破手（仅音效）'
+        'ut': '超高', 'pr': '青春', 'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT', 'hd': 'HD（高清）', 'rf': 'RF（复古未来）',
+        'se': 'SE（秘密）', 'dk': 'DK（黑暗）', 'sp': 'SP（蒸汽朋克）', 'ic': 'IC（冰）', 'old': '旧', '爆破手': '爆破手（仅音效）'
     };
 
     function capitalize(s) {
