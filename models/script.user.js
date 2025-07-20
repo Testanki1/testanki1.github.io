@@ -1528,7 +1528,7 @@
             .replacer-btn.delete-btn:hover { background-color: rgba(255, 82, 82, 0.2); }
             .replacer-actions, .update-dialog-actions { padding: 16px 24px; border-top: 1px solid rgba(118, 255, 51, 0.4); display: flex; justify-content: flex-end; gap: 12px; }
             .replacer-btn.close-btn { background-color: #555; color: #fff; }
-            .replacer-btn.save-only-btn { background-color: #0d47a1; color: #fff; }
+            .replacer-btn.save-only-btn { background-color: #00D4FF; color: #fff; }
         `;
         document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
     }
