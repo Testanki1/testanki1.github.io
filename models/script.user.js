@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.0.2
+// @version      2.0.3
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.0.2"; // 您的当前版本号
-    const currentVersionCode = 29;
+    const currentVersion = "2.0.3"; // 您的当前版本号
+    const currentVersionCode = 30;
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     /**
@@ -156,7 +156,8 @@
         'old': '旧',
         '爆破手': '爆破手（仅音效）',
         '魔法': '魔法（仅音效）',
-        '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）'
+        '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）',
+        '雪人': '雪人（可能无法正常使用）'
     };
 
     function capitalize(s) {
