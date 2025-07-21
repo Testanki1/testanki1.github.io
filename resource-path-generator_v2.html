@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ID 到 4级路径 生成/解析/范围分析器</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; background-color: #fdfdfd; }
+  h2 { border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 30px; }
+  label { display: inline-block; width: 120px; margin-bottom: 5px; font-weight: bold; }
+  input[type="text"] { width: 350px; margin-bottom: 10px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+  button { padding: 8px 15px; margin-right: 10px; margin-bottom: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  button:hover { background-color: #0056b3; }
+  button.secondary { background-color: #28a745; }
+  button.secondary:hover { background-color: #218838; }
+  .result-box { margin-top: 15px; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 4px; min-height: 20px; white-space: pre-wrap; word-break: break-all; }
+  .error { color: red; font-weight: bold; }
+  hr { margin: 30px 0; border: 0; border-top: 1px solid #ddd; }
+  .explanation-box { margin-top: 15px; background-color: #eef; padding: 15px; border-radius: 4px; border-left: 5px solid #66d; }
+  .explanation-box h3 { margin-top: 0; }
+  .explanation-box ul { margin: 0; padding-left: 20px; list-style-type: none; }
+  .explanation-box li { margin-bottom: 8px; }
+  .explanation-box strong { color: #0056b3; }
+  .full-range { color: #218838; font-style: italic; }
+</style>
+</head>
+<body>
+
+  <h2>ID 到 4级路径 生成器</h2>
+  <div>
+    <label for="inputId1">ID 1 (范围起点):</label>
+    <input type="text" id="inputId1" placeholder="输入第一个长整型 ID">
+  </div>
+  <div>
+    <label for="inputId2">ID 2 (范围终点):</label>
+    <input type="text" id="inputId2" placeholder="输入第二个长整型 ID">
+  </div>
+  <button onclick="generatePaths()">为单个ID生成路径</button>
+  <button onclick="analyzeRange()" class="secondary">分析范围路径可能</button>
+  <div id="resultGenerate" class="result-box"></div>
+
+
+  <hr>
+
+  <h2>范围路径可能性分析结果</h2>
+  <div id="rangeAnalysisResult" class="explanation-box">
+    请在上方输入两个ID作为范围，然后点击“分析范围路径可能”按钮。
+  </div>
+
+
+  <hr>
+
+  <h2>4级路径 到 ID 解析器</h2>
+  <div>
+    <label for="inputPath">4级路径:</label>
+    <input type="text" id="inputPath" placeholder="输入4级路径字符串 (例如 303345470/125553/337/360)">
+  </div>
+  <button onclick="parsePath()">解析ID</button>
+  <div id="resultParse" class="result-box"></div>
+
+
+<script>
+  // --- 核心转换函数 ---
+
+  // 模拟 Kotlin 的 (long ushr 32).toInt()
+  function getHighInt(longValBigInt) {
+    return Number(longValBigInt >> 32n);
+  }
+
+  // 模拟 Kotlin 的 long.toInt()
+  function getLowInt(longValBigInt) {
+    return Number(longValBigInt & 0xFFFFFFFFn);
+  }
+
+  /**
+   * 根据ID生成4级路径
+   * @param {string | number | bigint} id
+   * @returns {string} The generated 4-level path string.
+   */
+  function toPath(id) {
+    const idBigInt = BigInt(id);
+    const highId = getHighInt(idBigInt);
+    const lowId = getLowInt(idBigInt);
+    
+    return [
+      highId.toString(8),                               // Level 1
+      ((lowId >>> 16) & 0xFFFF).toString(8),            // Level 2
+      ((lowId >>> 8) & 0xFF).toString(8),               // Level 3
+      (lowId & 0xFF).toString(8)                        // Level 4
+    ].join("/");
+  }
+
+  /**
+   * 从4级路径字符串反向解析出ID
+   * @param {string} pathStr
+   * @returns {{id: bigint}}
+   */
+  function fromPath(pathStr) {
+    if (!pathStr || typeof pathStr !== 'string') {
+        throw new Error("输入路径不能为空且必须是字符串。");
+    }
+    const parts = pathStr.split('/');
+    if (parts.length !== 4) {
+      throw new Error("路径格式无效，必须有4个部分由'/'分隔。");
+    }
+
+    const parsedOctalParts = parts.map((part, index) => {
+      const num = parseInt(part, 8);
+      if (isNaN(num)) {
+        throw new Error(`路径部分 "${part}" (索引 ${index}) 不是有效的八进制数。`);
+      }
+      return num;
+    });
+
+    const highId_val = BigInt(parsedOctalParts[0]);
+    const lowId_p1_val = BigInt(parsedOctalParts[1]);
+    const lowId_p2_val = BigInt(parsedOctalParts[2]);
+    const lowId_p3_val = BigInt(parsedOctalParts[3]);
+
+    const reconstructedLowIdUnsigned = (lowId_p1_val << 16n) | (lowId_p2_val << 8n) | lowId_p3_val;
+    const id = (highId_val << 32n) | reconstructedLowIdUnsigned;
+
+    return { id };
+  }
+
+
+  // --- UI 事件处理函数 ---
+
+  /**
+   * 为输入框中的ID生成路径
+   */
+  function generatePaths() {
+    const idStr1 = document.getElementById('inputId1').value.trim();
+    const idStr2 = document.getElementById('inputId2').value.trim();
+    const resultDiv = document.getElementById('resultGenerate');
+
+    resultDiv.innerHTML = '';
+    resultDiv.classList.remove('error');
+
+    let outputHtml = '';
+    let hasError = false;
+    let generatedPathForParser = '';
+
+    if (idStr1) {
+        try {
+            const path1 = toPath(idStr1);
+            outputHtml += `<div><strong>ID 1 (${idStr1}) 路径:</strong> ${path1}</div>`;
+            generatedPathForParser = path1;
+        } catch (e) {
+            outputHtml += `<div><strong>ID 1 (${idStr1}) 错误:</strong> <span class="error">${e.message}</span></div>`;
+        }
+    }
+
+    if (idStr2) {
+        if (idStr1) outputHtml += '<br>';
+        try {
+            const path2 = toPath(idStr2);
+            outputHtml += `<div><strong>ID 2 (${idStr2}) 路径:</strong> ${path2}</div>`;
+            if (!generatedPathForParser) generatedPathForParser = path2;
+        } catch (e) {
+            outputHtml += `<div><strong>ID 2 (${idStr2}) 错误:</strong> <span class="error">${e.message}</span></div>`;
+        }
+    }
+    
+    if (!idStr1 && !idStr2) {
+         outputHtml = '请至少输入一个 ID。';
+    }
+
+    resultDiv.innerHTML = outputHtml;
+    if(generatedPathForParser) {
+        document.getElementById('inputPath').value = generatedPathForParser;
+    }
+  }
+
+  /**
+   * 解析路径输入框中的路径
+   */
+  function parsePath() {
+    const pathStr = document.getElementById('inputPath').value.trim();
+    const resultDiv = document.getElementById('resultParse');
+
+    if (!pathStr) {
+      resultDiv.innerHTML = '<span class="error">路径字符串不能为空！</span>';
+      return;
+    }
+
+    try {
+      const { id } = fromPath(pathStr);
+      resultDiv.textContent = `解析结果: ID = ${id.toString()}`;
+      resultDiv.classList.remove('error');
+      document.getElementById('inputId1').value = id.toString();
+      document.getElementById('inputId2').value = '';
+    } catch (e) {
+      resultDiv.innerHTML = '<span class="error">解析错误: ' + e.message + '</span>';
+    }
+  }
+
+  /**
+   *  分析ID范围内的路径可能性
+   */
+  function analyzeRange() {
+      const idStr1 = document.getElementById('inputId1').value.trim();
+      const idStr2 = document.getElementById('inputId2').value.trim();
+      const resultDiv = document.getElementById('rangeAnalysisResult');
+
+      if (!idStr1 || !idStr2) {
+          resultDiv.innerHTML = '<h3>范围分析</h3><span class="error">请输入两个ID以定义分析范围。</span>';
+          return;
+      }
+
+      try {
+          const id1 = BigInt(idStr1);
+          const id2 = BigInt(idStr2);
+
+          const startId = id1 < id2 ? id1 : id2;
+          const endId = id1 < id2 ? id2 : id1;
+          
+          let html = `<h3>ID范围 [${startId}, ${endId}] 的路径可能性：</h3><ul>`;
+
+          // --- Level 1 Analysis (High 32 bits) ---
+          const l1_min = startId >> 32n;
+          const l1_max = endId >> 32n;
+          html += formatRangeResult("第一级", l1_min, l1_max, (l1_max - l1_min) > 1000); // Don't show full range for L1 unless huge
+
+          // --- Level 2, 3, 4 Analysis (Low 32 bits) ---
+          const high_start = startId >> 32n;
+          const high_end = endId >> 32n;
+
+          if (high_start < high_end) {
+              // The range crosses a 32-bit boundary for the high part.
+              // This means the low 32 bits have wrapped around, covering all possible values.
+              html += formatRangeResult("第二级", 0, 65535, true);
+              html += formatRangeResult("第三级", 0, 255, true);
+              html += formatRangeResult("第四级", 0, 255, true);
+          } else {
+              // The range is within a single high-32-bit block.
+              // Analyze the contiguous range of low 32-bit values.
+              const low_start = Number(startId & 0xFFFFFFFFn);
+              const low_end = Number(endId & 0xFFFFFFFFn);
+
+              // Level 2: (low >>> 16) & 0xFFFF. Monotonic with low part.
+              const l2_min = (low_start >>> 16) & 0xFFFF;
+              const l2_max = (low_end >>> 16) & 0xFFFF;
+              html += formatRangeResult("第二级", l2_min, l2_max, l2_min === 0 && l2_max === 65535);
+
+              // Level 3: (low >>> 8) & 0xFF. Wraps every 2^16.
+              // It covers the full range if the L2 value changes.
+              if (l2_min < l2_max) {
+                  html += formatRangeResult("第三级", 0, 255, true);
+              } else {
+                  const l3_min = (low_start >>> 8) & 0xFF;
+                  const l3_max = (low_end >>> 8) & 0xFF;
+                  html += formatRangeResult("第三级", l3_min, l3_max);
+              }
+
+              // Level 4: low & 0xFF. Wraps every 2^8.
+              // It covers the full range if the value of (low >>> 8) changes.
+              if ((low_start >>> 8) < (low_end >>> 8)) {
+                  html += formatRangeResult("第四级", 0, 255, true);
+              } else {
+                  const l4_min = low_start & 0xFF;
+                  const l4_max = low_end & 0xFF;
+                  html += formatRangeResult("第四级", l4_min, l4_max);
+              }
+          }
+
+          html += '</ul>';
+          resultDiv.innerHTML = html;
+
+      } catch (e) {
+          resultDiv.innerHTML = `<h3>范围分析</h3><span class="error">分析错误: ${e.message}</span>`;
+      }
+  }
+
+  /**
+   * 格式化范围分析的结果为HTML字符串
+   * @param {string} levelName - "第一级", "第二级", etc.
+   * @param {number | bigint} minVal
+   * @param {number | bigint} maxVal
+   * @param {boolean} isFullRange - If true, indicates all possible values are covered.
+   * @returns {string}
+   */
+  function formatRangeResult(levelName, minVal, maxVal, isFullRange = false) {
+    let fullRangeText = isFullRange ? ` <span class="full-range">(覆盖所有可能值)</span>` : "";
+    return `<li>
+              <strong>${levelName}:</strong>
+              <div>十进制范围: <code>${minVal.toString()}</code> to <code>${maxVal.toString()}</code>${fullRangeText}</div>
+              <div>八进制范围: <code>${BigInt(minVal).toString(8)}</code> to <code>${BigInt(maxVal).toString(8)}</code></div>
+            </li>`;
+  }
+
+  // 页面加载时设置默认值并自动生成路径和分析
+  window.onload = function() {
+    const defaultId1 = "1311768467294899696"; // 普通ID
+    const defaultId2 = "1311768467299194096"; // 同一个 L1/L2 块，但跨越了 L3/L4
+    document.getElementById('inputId1').value = defaultId1;
+    document.getElementById('inputId2').value = defaultId2;
+
+    generatePaths();
+    analyzeRange();
+  }
+
+</script>
+
+</body>
+</html>
