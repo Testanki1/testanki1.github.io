@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<!-- lang attribute will be set dynamically by JS -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Title will be set dynamically by JS -->
+    <title>JS 字符串比较工具</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500&family=Rubik:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+            margin: 2em;
+            background-color: #001926;
+            color: #e0e0e0;
+            transition: background-color 0.3s;
+        }
+
+        h1, h2, h3 { color: #ffffff; font-weight: 400; }
+        h1 { color: #76FF33; border-bottom: 2px solid #004b6e; padding-bottom: 0.5em; font-weight: 500; }
+        h2 { font-weight: 400; border-bottom: 1px solid #00334d; padding-bottom: 0.3em; margin-top: 0; }
+        h3 { color: #a0c8e8; font-weight: 400; }
+
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 2em; margin-bottom: 2em; }
+        .input-group { background-color: #002538; padding: 2em; border-radius: 8px; border: 1px solid #004b6e; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); transition: all 0.3s ease; }
+        .input-group:hover { border-color: #0072a8; transform: translateY(-2px); }
+
+        #results { margin-top: 2em; }
+        .result-box {
+            background-color: #002538;
+            padding: 1em;
+            border: 1px solid #004b6e;
+            border-radius: 8px;
+            min-height: 80px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: inherit;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .result-line { padding: 0.4em 0.8em; border-bottom: 1px solid #00334d; white-space: pre-wrap; word-break: break-all; color: #f5f5f5; transition: background-color 0.2s; }
+        .result-line:hover { background-color: #00334d; }
+        .result-line:last-child { border-bottom: none; }
+        .no-results { color: #88a1b5; font-style: italic; padding: 0.4em 0.8em; }
+
+        .button-style {
+            display: inline-block;
+            padding: 0.6em 1.2em;
+            font-size: 0.9em;
+            font-weight: bold;
+            background-color: #76FF33;
+            color: #001926;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: inherit;
+            text-align: center;
+        }
+        .button-style:hover {
+            background-color: #8cff5b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(118, 255, 51, 0.25);
+        }
+        #compare-btn {
+            padding: 0.8em 2em;
+            font-size: 1.1em;
+        }
+
+        .file-upload-wrapper {
+            margin-bottom: 1em;
+        }
+        .file-upload-wrapper input[type="file"] {
+            display: none;
+        }
+        .file-name-display {
+            display: inline-block;
+            margin-left: 1em;
+            font-style: italic;
+            color: #a0c8e8;
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+        }
+        
+        label { display: block; margin-bottom: 0.5em; font-weight: 500; color: #c0d0e0; }
+        
+        #error-message { color: #ff6b6b; background-color: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.5); padding: 0.8em; border-radius: 4px; margin-top: 1.5em; font-weight: bold; display: none; }
+
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #002538; }
+        ::-webkit-scrollbar-thumb { background: #004b6e; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0072a8; }
+        @media (max-width: 768px) {
+            body { margin: 1em; }
+            .container { grid-template-columns: 1fr; }
+            .input-group { padding: 1.5em; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1 data-translate-key="mainHeader"></h1>
+    <p data-translate-key="description"></p>
+
+    <div class="container">
+        <div class="input-group">
+            <h2 data-translate-key="originalFileHeader"></h2>
+            <div class="file-upload-wrapper">
+                <label for="original-file" class="button-style" data-translate-key="chooseFile"></label>
+                <input type="file" id="original-file" accept=".js,text/javascript">
+                <span class="file-name-display" id="original-file-name"></span>
+            </div>
+        </div>
+        <div class="input-group">
+            <h2 data-translate-key="newFileHeader"></h2>
+            <div class="file-upload-wrapper">
+                <label for="new-file" class="button-style" data-translate-key="chooseFile"></label>
+                <input type="file" id="new-file" accept=".js,text/javascript">
+                <span class="file-name-display" id="new-file-name"></span>
+            </div>
+        </div>
+    </div>
+
+    <button id="compare-btn" class="button-style" data-translate-key="compareButton"></button>
+    <div id="error-message"></div>
+
+    <div id="results">
+        <h2 data-translate-key="resultsHeader"></h2>
+        <h3 data-translate-key="addedStringsHeader"></h3>
+        <div id="added" class="result-box"></div>
+
+        <h3 data-translate-key="removedStringsHeader"></h3>
+        <div id="removed" class="result-box"></div>
+    </div>
+
+    <script>
+        const translations = {
+            zh: {
+                title: "JS 字符串比较工具",
+                mainHeader: "JS 字符串比较工具",
+                description: "上传两个 JavaScript 文件，工具将提取其中由**单引号或双引号**包围的字符串，并比较新旧版本的差异。",
+                originalFileHeader: "原始 JS 文件 (Old)",
+                newFileHeader: "新 JS 文件 (New)",
+                chooseFile: "选择文件",
+                compareButton: "开始比较",
+                resultsHeader: "比较结果",
+                addedStringsHeader: "新增的字符串（新文件中有，旧文件中没有）",
+                removedStringsHeader: "删除的字符串（旧文件中有，新文件中没有）",
+                noResults: "无",
+                errorPrefix: "发生错误：",
+                errorNoFile: "错误：请至少为“原始文件”或“新文件”选择一个文件。",
+                errorReadFile: "读取本地文件失败"
+            },
+            en: {
+                title: "JS String Comparison Tool",
+                mainHeader: "JS String Comparison Tool",
+                description: "Upload two JavaScript files. The tool will extract strings enclosed in **single or double quotes** and compare the differences between the old and new versions.",
+                originalFileHeader: "Original JS File (Old)",
+                newFileHeader: "New JS File (New)",
+                chooseFile: "Choose File",
+                compareButton: "Compare",
+                resultsHeader: "Comparison Results",
+                addedStringsHeader: "Added Strings (in new file, not in old)",
+                removedStringsHeader: "Removed Strings (in old file, not in new)",
+                noResults: "None",
+                errorPrefix: "An error occurred: ",
+                errorNoFile: "Error: Please select a file for either 'Original File' or 'New File'.",
+                errorReadFile: "Failed to read local file"
+            }
+        };
+
+        let currentLang = 'en';
+
+        function applyTranslations(lang) {
+            document.documentElement.lang = lang.startsWith('zh') ? 'zh-CN' : 'en';
+            currentLang = lang;
+
+            document.title = translations[lang].title;
+
+            document.querySelectorAll('[data-translate-key]').forEach(el => {
+                const key = el.dataset.translateKey;
+                if (translations[lang][key]) {
+                    el.innerHTML = translations[lang][key];
+                }
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const userLang = (navigator.language || navigator.userLanguage).toLowerCase();
+            const lang = userLang.startsWith('zh') ? 'zh' : 'en';
+            applyTranslations(lang);
+        });
+
+        function setupFileNameDisplay(inputId, displayId) {
+            const fileInput = document.getElementById(inputId);
+            const fileNameDisplay = document.getElementById(displayId);
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    fileNameDisplay.textContent = fileInput.files[0].name;
+                } else {
+                    fileNameDisplay.textContent = '';
+                }
+            });
+        }
+        setupFileNameDisplay('original-file', 'original-file-name');
+        setupFileNameDisplay('new-file', 'new-file-name');
+
+        const getFileContent = (fileInput) => {
+            return new Promise((resolve, reject) => {
+                const file = fileInput.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => resolve(event.target.result);
+                    reader.onerror = (error) => reject(new Error(translations[currentLang].errorReadFile));
+                    reader.readAsText(file);
+                } else {
+                    resolve('');
+                }
+            });
+        };
+        
+        const extractStrings = (content) => {
+            if (!content) return new Set();
+            const strings = new Set();
+            let quoteType = null;
+            let currentString = '';
+            for (let i = 0; i < content.length; i++) {
+                const char = content[i];
+                if (quoteType) {
+                    if (char === quoteType) {
+                        let backslashes = 0;
+                        let j = i - 1;
+                        while (j >= 0 && content[j] === '\\') {
+                            backslashes++;
+                            j--;
+                        }
+                        if (backslashes % 2 === 0) {
+                            strings.add(currentString);
+                            currentString = '';
+                            quoteType = null;
+                        } else {
+                            currentString += char;
+                        }
+                    } else {
+                        currentString += char;
+                    }
+                } else {
+                    if (char === '"' || char === "'") {
+                        quoteType = char;
+                    }
+                }
+            }
+            const finalStrings = new Set();
+            for (const str of strings) {
+                const unescaped = str.replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                finalStrings.add(unescaped.trim());
+            }
+            return finalStrings;
+        };
+
+        const renderResults = (container, stringArray) => {
+            container.innerHTML = ''; 
+            if (stringArray.length > 0) {
+                const sortedArray = [...stringArray].sort();
+                sortedArray.forEach(str => {
+                    const lineDiv = document.createElement('div');
+                    lineDiv.className = 'result-line';
+                    lineDiv.textContent = str;
+                    container.appendChild(lineDiv);
+                });
+            } else {
+                const noResultDiv = document.createElement('div');
+                noResultDiv.className = 'no-results';
+                noResultDiv.textContent = translations[currentLang].noResults;
+                container.appendChild(noResultDiv);
+            }
+        };
+
+        document.getElementById('compare-btn').addEventListener('click', async () => {
+            const addedDiv = document.getElementById('added');
+            const removedDiv = document.getElementById('removed');
+            const errorDiv = document.getElementById('error-message');
+            addedDiv.innerHTML = '<div class="no-results">...</div>';
+            removedDiv.innerHTML = '<div class="no-results">...</div>';
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+            
+            try {
+                const originalContentPromise = getFileContent(document.getElementById('original-file'));
+                const newContentPromise = getFileContent(document.getElementById('new-file'));
+                
+                const [originalStrings, newStrings] = await Promise.all([
+                   originalContentPromise.then(extractStrings),
+                   newContentPromise.then(extractStrings)
+                ]);
+
+                if (originalStrings.size === 0 && newStrings.size === 0 && 
+                    !document.getElementById('original-file').files[0] &&
+                    !document.getElementById('new-file').files[0]) {
+                     errorDiv.textContent = translations[currentLang].errorNoFile;
+                     errorDiv.style.display = 'block';
+                     renderResults(addedDiv, []);
+                     renderResults(removedDiv, []);
+                     return;
+                }
+
+                const added = [...newStrings].filter(str => !originalStrings.has(str));
+                const removed = [...originalStrings].filter(str => !newStrings.has(str));
+                
+                renderResults(addedDiv, added);
+                renderResults(removedDiv, removed);
+
+            } catch (error) {
+                errorDiv.textContent = `${translations[currentLang].errorPrefix}${error.message}`;
+                errorDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
