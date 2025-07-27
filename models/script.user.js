@@ -1541,7 +1541,7 @@
     function createDomainSelector(wrapper, ruleRow, isError) {
         const selectId = `domain-${Date.now()}-${Math.random()}`;
         const selectedValue = ruleRow.dataset.domain || "";
-        const selectedText = selectedValue ? getDomainDisplayName(selectedValue) : '-- 选择域名 --';
+        const selectedText = selectedValue ? getDomainDisplayName(selectedValue) : '-- 请更换资源域名 --';
         const optionsHtml = resourceDomains.map(opt =>
                                                 `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDomainDisplayName(opt)}</li>`
         ).join('');
