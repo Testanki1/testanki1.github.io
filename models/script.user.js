@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.0.5
+// @version      2.0.6
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.0.5"; // 您的当前版本号
-    const currentVersionCode = 32; // 版本代码增加
+    const currentVersion = "2.0.6"; // 您的当前版本号
+    const currentVersionCode = 33; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     let iconsInjected = false;
@@ -92,24 +92,24 @@
     }
 
     fetch(versionUrl, {
-            cache: 'reload'
-        })
+        cache: 'reload'
+    })
         .then(response => {
-            if (!response.ok) throw new Error('网络错误');
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-                return response.json();
-            }
-            throw new Error('收到的不是JSON格式的响应');
-        })
+        if (!response.ok) throw new Error('网络错误');
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            return response.json();
+        }
+        throw new Error('收到的不是JSON格式的响应');
+    })
         .then(data => {
-            const latestVersion = data.version;
-            const latestVersionCode = data.version_code;
-            const updateInfo = data.update_info;
-            const downloadUrl = data.download_url;
+        const latestVersion = data.version;
+        const latestVersionCode = data.version_code;
+        const updateInfo = data.update_info;
+        const downloadUrl = data.download_url;
 
-            if (latestVersionCode > currentVersionCode) {
-                const message = `
+        if (latestVersionCode > currentVersionCode) {
+            const message = `
                     <p>资源替换脚本有新版本可用！</p>
                     <p><b>当前版本：</b>${currentVersion}</p>
                     <p><b>最新版本：</b>${latestVersion}</p>
@@ -125,10 +125,10 @@
                     }
                 }, 200);
             }
-        })
+    })
         .catch(error => {
-            console.error('更新检查失败:', error);
-        });
+        console.error('更新检查失败:', error);
+    });
     // --- END: Version Check ---
 
 
@@ -164,7 +164,7 @@
     const pinyinSorter = (a, b) => getDisplayName(a).localeCompare(getDisplayName(b), 'zh-Hans-CN');
 
     // --- START: Raw Data (Omitted as requested) ---
-    // Please re-insert the original redirect maps here.
+    // 请在此处保留你原来的 redirect maps 数据
     const turretsRedirectMap = {
         "firebird": {
             "default": "573/113511/153/137/31167700271626",
@@ -1411,24 +1411,36 @@
 
     function getToOptionsFor(category, fromValue) {
         const map = resourceMaps[category];
-        if (!map || !fromValue) return [];
+        if (!map || !fromValue) {
+            return [];
+        }
         const options = new Set();
         if (['turrets', 'hulls', 'drones'].includes(category)) {
             const itemSkins = map[fromValue];
-            if (itemSkins) Object.keys(itemSkins).forEach(skin => {
-                if (skin !== 'default') options.add(skin);
-            });
+            if (itemSkins) {
+                Object.keys(itemSkins).forEach(skin => {
+                    if (skin !== 'default') {
+                        options.add(skin);
+                    }
+                });
+            }
         } else if (category === 'shotEffects') {
             for (const effectKey in map) {
                 if (effectKey.toLowerCase().startsWith(fromValue.toLowerCase())) {
                     const effectStyles = map[effectKey];
-                    if (effectStyles) Object.keys(effectStyles).forEach(style => {
-                        if (style !== 'default') options.add(style);
-                    });
+                    if (effectStyles) {
+                        Object.keys(effectStyles).forEach(style => {
+                            if (style !== 'default') {
+                                options.add(style);
+                            }
+                        });
+                    }
                 }
             }
         } else if (category === 'paints') {
-            if (map.paints) Object.keys(map.paints).forEach(paintName => options.add(paintName));
+            if (map.paints) {
+                Object.keys(map.paints).forEach(paintName => options.add(paintName));
+            }
         }
         return Array.from(options).sort(pinyinSorter);
     }
@@ -1445,7 +1457,7 @@
     function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选择 --', disabled = false) {
         const selectedText = selectedValue ? getDisplayName(selectedValue) : placeholder;
         const optionsHtml = options.map(opt =>
-            `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDisplayName(opt)}</li>`
+                                        `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDisplayName(opt)}</li>`
         ).join('');
 
         return `
@@ -1575,9 +1587,13 @@
         };
         const getAllFestivalThemes = (map) => {
             const themes = new Set();
-            for (const item in map)
-                for (const theme in map[item])
-                    if (theme !== 'default') themes.add(theme);
+            for (const item in map) {
+                for (const theme in map[item]) {
+                    if (theme !== 'default') {
+                        themes.add(theme);
+                    }
+                }
+            }
             return Array.from(themes).sort(pinyinSorter);
         };
         const categoryFromOptions = {
@@ -1699,7 +1715,7 @@
                 if (container && !container.classList.contains('disabled')) {
                     container.classList.toggle('open');
                     if (container.classList.contains('open')) {
-                         container.querySelector('.cs-search-input').focus();
+                        container.querySelector('.cs-search-input').focus();
                     }
                 }
             }
@@ -1724,7 +1740,7 @@
 
                 // Fire a change event if the value has changed
                 if (oldValue !== newValue) {
-                     container.dispatchEvent(new Event('change', { bubbles: true }));
+                    container.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             }
         });
@@ -1810,7 +1826,7 @@
                         for (const effectKey in map) {
                             if (effectKey.toLowerCase().startsWith(from)) {
                                 const fromRes = map[effectKey]?.default,
-                                    toRes = map[effectKey]?.[to];
+                                      toRes = map[effectKey]?.[to];
                                 if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
                             }
                         }
@@ -1818,12 +1834,12 @@
                         const itemMap = map[rule.from];
                         if (itemMap) {
                             const fromRes = itemMap.default,
-                                toRes = itemMap[to] || itemMap[to.toUpperCase()];
+                                  toRes = itemMap[to] || itemMap[to.toUpperCase()];
                             if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
                         }
                     } else if (category === 'paints') {
                         const fromRes = map.paints?.[rule.from],
-                            toRes = map.paints?.[rule.to];
+                              toRes = map.paints?.[rule.to];
                         if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
                     }
                 }
