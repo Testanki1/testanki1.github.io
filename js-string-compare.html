@@ -232,42 +232,54 @@
         
         const extractStrings = (content) => {
             if (!content) return new Set();
-            const strings = new Set();
-            let quoteType = null;
-            let currentString = '';
-            for (let i = 0; i < content.length; i++) {
-                const char = content[i];
-                if (quoteType) {
-                    if (char === quoteType) {
-                        let backslashes = 0;
-                        let j = i - 1;
-                        while (j >= 0 && content[j] === '\\') {
-                            backslashes++;
-                            j--;
-                        }
-                        if (backslashes % 2 === 0) {
-                            strings.add(currentString);
-                            currentString = '';
-                            quoteType = null;
-                        } else {
-                            currentString += char;
-                        }
-                    } else {
-                        currentString += char;
-                    }
-                } else {
-                    if (char === '"' || char === "'") {
-                        quoteType = char;
-                    }
-                }
-            }
+            const stringRegex = /(["'])(?:\\.|(?!\1).)*\1/g;
+            const matches = content.match(stringRegex);
+
+            if (!matches) return new Set();
+
             const finalStrings = new Set();
-            for (const str of strings) {
-                const unescaped = str.replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+            for (const match of matches) {
+                const innerString = match.slice(1, -1);
+                const unescaped = innerString
+                    .replace(/\\'/g, "'")
+                    .replace(/\\"/g, '"')
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\r/g, '\r')
+                    .replace(/\\t/g, '\t')
+                    .replace(/\\\\/g, '\\');
                 finalStrings.add(unescaped.trim());
             }
             return finalStrings;
         };
+        
+        const filterMeaningfulStrings = (stringSet) => {
+            const meaningfulStrings = new Set();
+
+            const codeKeywordsRegex = /\b(function|var|let|const|return|typeof|null|undefined|if|else|for|while|switch|case|break|new|this|true|false)\b/;
+            const codeStructureRegex = /=>|\|\||&&|===|!==|\+\+|--/;
+
+            for (const str of stringSet) {
+                if (str.length < 2) continue;
+                if (!/[a-zA-Z]/.test(str) && !/[\u4e00-\u9fa5]/.test(str)) continue;
+
+                if (codeKeywordsRegex.test(str)) continue;
+                if (codeStructureRegex.test(str)) continue;
+
+                const specialChars = str.replace(/[a-zA-Z0-9\s\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/g, '');
+                const ratio = str.length > 0 ? specialChars.length / str.length : 0;
+                
+                if (ratio > 0.3) continue;
+
+                const openBrackets = (str.match(/\(/g) || []).length;
+                const closeBrackets = (str.match(/\)/g) || []).length;
+                
+                if (openBrackets !== closeBrackets || openBrackets > 3) continue;
+
+                meaningfulStrings.add(str);
+            }
+            return meaningfulStrings;
+        };
+
 
         const renderResults = (container, stringArray) => {
             container.innerHTML = ''; 
@@ -300,10 +312,14 @@
                 const originalContentPromise = getFileContent(document.getElementById('original-file'));
                 const newContentPromise = getFileContent(document.getElementById('new-file'));
                 
-                const [originalStrings, newStrings] = await Promise.all([
+                const [rawOriginalStrings, rawNewStrings] = await Promise.all([
                    originalContentPromise.then(extractStrings),
                    newContentPromise.then(extractStrings)
                 ]);
+
+                // Apply the filter to get only meaningful strings
+                const originalStrings = filterMeaningfulStrings(rawOriginalStrings);
+                const newStrings = filterMeaningfulStrings(rawNewStrings);
 
                 if (originalStrings.size === 0 && newStrings.size === 0 && 
                     !document.getElementById('original-file').files[0] &&
