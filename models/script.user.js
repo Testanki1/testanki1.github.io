@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.0.3
+// @version      2.0.5
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,15 +16,44 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.0.3"; // 您的当前版本号
-    const currentVersionCode = 30;
+    const currentVersion = "2.0.5"; // 您的当前版本号
+    const currentVersionCode = 32; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
-    /**
-     * 显示自定义的更新提示弹窗
-     * @param {string} message - 要显示在弹窗中的主要信息 (HTML格式)
-     * @param {string} downloadUrl - 新版本的下载链接
-     */
+    let iconsInjected = false;
+
+    function injectMaterialIcons() {
+        if (iconsInjected || document.querySelector('link[href*="Material+Symbols+Outlined"]')) {
+            return;
+        }
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0';
+        document.head.appendChild(link);
+        iconsInjected = true;
+    }
+
+    function showToast(message) {
+        const existingToast = document.querySelector('.replacer-toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'replacer-toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            toast.addEventListener('transitionend', () => toast.remove());
+        }, 3000);
+    }
+
     function showUpdateDialog(message, downloadUrl) {
         if (document.getElementById('update-dialog-overlay')) return;
 
@@ -34,8 +63,8 @@
                     <div class="update-dialog-header">脚本更新可用</div>
                     <div class="update-dialog-body">${message}</div>
                     <div class="update-dialog-actions">
-                        <button id="update-dialog-close" class="replacer-btn close-btn">稍后提醒</button>
-                        <button id="update-dialog-confirm" class="replacer-btn save-reload-btn">前往下载</button>
+                        <button id="update-dialog-close" class="replacer-btn close-btn"><span class="material-symbols-outlined">close</span>稍后提醒</button>
+                        <button id="update-dialog-confirm" class="replacer-btn save-reload-btn"><span class="material-symbols-outlined">download</span>前往下载</button>
                     </div>
                 </div>
             </div>
@@ -62,7 +91,6 @@
         };
     }
 
-    // 添加 { cache: 'reload' } 来强制清除缓存
     fetch(versionUrl, {
             cache: 'reload'
         })
@@ -91,7 +119,7 @@
                 const interval = setInterval(() => {
                     if (document.body) {
                         clearInterval(interval);
-                        // 注入弹窗所需的CSS
+                        injectMaterialIcons();
                         injectPanelCSS();
                         showUpdateDialog(message, downloadUrl);
                     }
@@ -105,59 +133,16 @@
 
 
     const nameMapping = {
-        'firebird': '火焰炮',
-        'freeze': '冰风暴',
-        'isida': '磁力炮',
-        'tesla': '特斯拉',
-        'hammer': '滑膛炮',
-        'twins': '离子炮',
-        'ricochet': '火龙珠',
-        'smoky': '轰天炮',
-        'striker': '火箭炮',
-        'vulcan': '极速炮',
-        'thunder': '雷暴炮',
-        'scorpion': '蝎子',
-        'railgun': '激光炮',
-        'magnum': '马格南',
-        'gauss': '电磁炮',
-        'shaft': '镭射炮',
-        'wasp': '黄蜂轻甲',
-        'hornet': '蜂王',
-        'hopper': '霍珀',
-        'paladin': '圣骑士',
-        'hunter': '猎人中甲',
-        'crusader': '十字军',
-        'viking': '维京',
-        'dictator': '独裁者',
-        'ares': '阿瑞斯',
-        'titan': '泰坦',
-        'mammoth': '猛犸象',
-        'brutus': '布鲁特斯',
-        'mechanic': '机械师',
-        'trickster': '魔术师',
-        'saboteur': '破坏者',
-        'booster': '助推器',
-        'defender': '守卫者',
-        'hyperion': '亥伯龙神',
-        'crisis': '危机',
-        'supply': '道具',
-        'ut': '超高',
-        'pr': '青春',
-        'lc': '遗产',
-        'xt': 'XT',
-        'dc': '恶魔',
-        'gt': 'GT',
-        'hd': 'HD（高清）',
-        'rf': 'RF（复古未来）',
-        'se': 'SE（秘密）',
-        'dk': 'DK（黑暗）',
-        'sp': 'SP（蒸汽朋克）',
-        'ic': 'IC（冰）',
-        'old': '旧',
-        '爆破手': '爆破手（仅音效）',
-        '魔法': '魔法（仅音效）',
-        '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）',
-        '雪人': '雪人（可能无法正常使用）'
+        'firebird': '火焰炮', 'freeze': '冰风暴', 'isida': '磁力炮', 'tesla': '特斯拉', 'hammer': '滑膛炮',
+        'twins': '离子炮', 'ricochet': '火龙珠', 'smoky': '轰天炮', 'striker': '火箭炮', 'vulcan': '极速炮',
+        'thunder': '雷暴炮', 'scorpion': '蝎子', 'railgun': '激光炮', 'magnum': '马格南', 'gauss': '电磁炮', 'shaft': '镭射炮',
+        'wasp': '黄蜂轻甲', 'hornet': '蜂王', 'hopper': '霍珀', 'paladin': '圣骑士', 'hunter': '猎人中甲',
+        'crusader': '十字军', 'viking': '维京', 'dictator': '独裁者', 'ares': '阿瑞斯', 'titan': '泰坦', 'mammoth': '猛犸象',
+        'brutus': '布鲁特斯', 'mechanic': '机械师', 'trickster': '魔术师', 'saboteur': '破坏者', 'booster': '助推器',
+        'defender': '守卫者', 'hyperion': '亥伯龙神', 'crisis': '危机', 'supply': '道具', 'ut': '超高', 'pr': '青春',
+        'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT（跑车）', 'hd': 'HD（高清）', 'rf': 'RF（复古未来）', 'se': 'SE（秘密）',
+        'dk': 'DK（黑暗）', 'sp': 'SP（蒸汽朋克）', 'ic': 'IC（冰）', 'old': '旧', '爆破手': '爆破手（仅音效）',
+        '魔法': '魔法（仅音效）', '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）', '雪人': '雪人（可能无法正常使用）'
     };
 
     function capitalize(s) {
@@ -178,11 +163,8 @@
 
     const pinyinSorter = (a, b) => getDisplayName(a).localeCompare(getDisplayName(b), 'zh-Hans-CN');
 
-
-
-    // [重要提示]：请将你本地的资源数据直接粘贴到下面对应的 {} 中。
-    // --- START: Raw Data (User needs to fill this) ---
-
+    // --- START: Raw Data (Omitted as requested) ---
+    // Please re-insert the original redirect maps here.
     const turretsRedirectMap = {
         "firebird": {
             "default": "573/113511/153/137/31167700271626",
@@ -257,7 +239,7 @@
         "striker": {
             "default": "626/176167/41/146/31345773511404",
             "XT": "551/70756/233/273/31033605117137",
-            "UT": "626/176167/41/146/31345773511404",
+            "UT": "627/101364/237/0/31360275274536",
             "XT_HD": "626/144201/263/252/31342006372645"
         },
         "thunder": {
@@ -1411,7 +1393,6 @@
             "未知 1": "0/16723/234/314/30545000607322"
         }
     };
-
     // --- END: Raw Data ---
 
 
@@ -1452,32 +1433,59 @@
         return Array.from(options).sort(pinyinSorter);
     }
 
+    /**
+     * Creates a custom, searchable select dropdown.
+     * @param {string} id - A unique ID for the select container.
+     * @param {Array<string>} options - Array of option values.
+     * @param {string} selectedValue - The currently selected value.
+     * @param {string} placeholder - Placeholder text.
+     * @param {boolean} disabled - Whether the select is disabled.
+     * @returns {string} - The HTML string for the custom select.
+     */
+    function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选择 --', disabled = false) {
+        const selectedText = selectedValue ? getDisplayName(selectedValue) : placeholder;
+        const optionsHtml = options.map(opt =>
+            `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDisplayName(opt)}</li>`
+        ).join('');
+
+        return `
+        <div id="${id}" class="custom-select-container ${disabled ? 'disabled' : ''}" data-value="${selectedValue || ''}">
+            <div class="cs-trigger">${selectedText}</div>
+            <div class="cs-options">
+                <input type="text" class="cs-search-input" placeholder="搜索...">
+                <ul class="cs-options-list">${optionsHtml}</ul>
+            </div>
+        </div>
+        `;
+    }
+
     function createDynamicRuleRow(category, fromOptions, from = "", to = "") {
-        const createOptions = (options, selectedValue, placeholder = '-- 请选择 --') => {
-            let optionsHtml = `<option value="" disabled ${!selectedValue ? 'selected' : ''}>${placeholder}</option>`;
-            options.forEach(opt => {
-                optionsHtml += `<option value="${opt}" ${selectedValue === opt ? 'selected' : ''}>${getDisplayName(opt)}</option>`;
-            });
-            return optionsHtml;
-        };
+        const fromId = `from-${category}-${Date.now()}-${Math.random()}`;
+        const toId = `to-${category}-${Date.now()}-${Math.random()}`;
         const toOptions = from ? getToOptionsFor(category, from) : [];
         const toPlaceholder = from ? '-- 请选择目标 --' : '-- 请先选择源 --';
         const toDisabled = !from;
+
         return `
          <div class="replacer-rule-row" data-category="${category}">
-             <select class="from-select">${createOptions(fromOptions, from)}</select>
-             <span class="arrow">→</span>
-             <select class="to-select" ${toDisabled ? 'disabled' : ''}>${createOptions(toOptions, to, toPlaceholder)}</select>
-             <button class="replacer-btn delete-btn">×</button>
+             <div class="from-select-wrapper">
+                ${createCustomSelect(fromId, fromOptions, from, '-- 请选择源 --')}
+             </div>
+             <span class="arrow material-symbols-outlined">arrow_forward</span>
+             <div class="to-select-wrapper">
+                ${createCustomSelect(toId, toOptions, to, toPlaceholder, toDisabled)}
+             </div>
+             <button class="replacer-btn delete-btn" title="删除规则"><span class="material-symbols-outlined">delete</span></button>
          </div>`;
     }
+
 
     function createCategorySection(id, title, fromOpts, rules = []) {
         return `
          <div class="replacer-category" id="category-${id}">
              <div class="replacer-category-title">
                  <span>${title}</span>
-                 <button class="replacer-btn add-btn" data-category="${id}">+ 添加规则</button>
+                 <button class="replacer-btn add-btn" data-category="${id}" title="添加新规则"><span class="material-symbols-outlined">add</span></button>
              </div>
              <div class="rules-container">
                  ${(rules || []).map(rule => createDynamicRuleRow(id, fromOpts, rule.from, rule.to)).join('')}
@@ -1486,50 +1494,73 @@
     }
 
     function createFestivalSection(id, title, options, selectedValue = 'default') {
-        const festivalOptions = ['默认 (不替换)', ...options];
+        const festivalOptions = [{value: 'default', text: '默认 (不替换)'}, ...options.map(opt => ({value: opt, text: getDisplayName(opt)}))];
+        const selectorId = 'festival-theme-selector';
+
+        // Use custom select for festivals as well
+        const customSelectHtml = createCustomSelect(
+            selectorId,
+            ['default', ...options],
+            selectedValue,
+            '-- 选择节日主题 --'
+        );
+
         return `
             <div class="replacer-category" id="category-${id}" data-category="${id}">
                 <div class="replacer-category-title"><span>${title}</span></div>
                 <div class="replacer-rule-row single-selector-row">
-                    <select id="festival-theme-selector" class="from-select">
-                        ${festivalOptions.map(opt => `<option value="${opt === '默认 (不替换)' ? 'default' : opt}" ${selectedValue === (opt === '默认 (不替换)' ? 'default' : opt) ? 'selected' : ''}>${getDisplayName(opt)}</option>`).join('')}
-                    </select>
+                    ${customSelectHtml}
                 </div>
             </div>`;
     }
 
+
     function injectPanelCSS() {
         if (document.getElementById('replacer-styles')) return;
-        const leftArrowSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E")`;
-        // [修改] 移除了 .replacer-settings-overlay, .update-dialog-overlay 中的 font-family 属性
         const css = `
+            :root { --rp-main-color: #76FF33; --rp-bg-color: rgba(0, 25, 38, 0.95); --rp-dark-bg: #001926; --rp-text-color: #e0e0e0; }
+            .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-flex; vertical-align: middle; line-height: 1; }
             #replacer-edge-trigger { position: fixed; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 100px; background-color: rgba(0, 25, 38, 0.4); border: 1px solid rgba(118, 255, 51, 0.4); border-right: none; border-radius: 10px 0 0 10px; cursor: pointer; z-index: 19999; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
             #replacer-edge-trigger:hover { background-color: rgba(0, 25, 38, 0.8); width: 35px; }
-            #replacer-edge-trigger .trigger-icon { display: block; width: 24px; height: 24px; background-color: rgba(118, 255, 51, 0.7); -webkit-mask-image: ${leftArrowSvg}; mask-image: ${leftArrowSvg}; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transform: rotate(180deg); transition: all 0.3s ease; }
-            #replacer-edge-trigger:hover .trigger-icon { background-color: #76FF33; transform: rotate(180deg) scale(1.1); }
+            #replacer-edge-trigger .trigger-icon { color: rgba(118, 255, 51, 0.7); font-size: 28px; transform: rotate(180deg); transition: all 0.3s ease; }
+            #replacer-edge-trigger:hover .trigger-icon { color: var(--rp-main-color); transform: rotate(180deg) scale(1.1); }
             .replacer-settings-overlay, .update-dialog-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 20000; }
-            .replacer-settings-panel, .update-dialog-panel { background-color: rgba(0, 25, 38, 0.95); color: #e0e0e0; border: 1px solid #76FF33; border-radius: 12px; width: 90%; box-shadow: 0 0 30px rgba(118, 255, 51, 0.3); display: flex; flex-direction: column; max-height: 90vh; }
+            .replacer-settings-panel, .update-dialog-panel { background-color: var(--rp-bg-color); color: var(--rp-text-color); border: 1px solid var(--rp-main-color); border-radius: 12px; width: 90%; box-shadow: 0 0 30px rgba(118, 255, 51, 0.3); display: flex; flex-direction: column; max-height: 90vh; }
             .replacer-settings-panel { max-width: 800px; }
             .update-dialog-panel { max-width: 500px; }
-            .replacer-header, .update-dialog-header { padding: 16px 24px; font-size: 1.75rem; color: #76FF33; border-bottom: 1px solid rgba(118, 255, 51, 0.4); text-align: center; }
-            .replacer-body, .update-dialog-body { padding: 24px; overflow-y: auto; }
+            .replacer-header, .update-dialog-header { padding: 16px 24px; font-size: 1.75rem; color: var(--rp-main-color); border-bottom: 1px solid rgba(118, 255, 51, 0.4); text-align: center; }
+            .replacer-body, .update-dialog-body { padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--rp-main-color) var(--rp-bg-color); }
             .update-dialog-body p { margin: 0 0 12px; line-height: 1.6; }
-            .update-dialog-body .update-info-box { background: rgba(0,0,0,0.2); border-left: 3px solid #76FF33; padding: 12px; margin-top: 8px; border-radius: 4px; font-size: 0.9rem; }
+            .update-dialog-body .update-info-box { background: rgba(0,0,0,0.2); border-left: 3px solid var(--rp-main-color); padding: 12px; margin-top: 8px; border-radius: 4px; font-size: 0.9rem; }
             .replacer-category { margin-bottom: 24px; }
-            .replacer-category-title { font-size: 1.2rem; font-weight: 500; color: #fff; border-bottom: 2px solid #76FF33; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+            .replacer-category-title { font-size: 1.2rem; font-weight: 500; color: #fff; border-bottom: 2px solid var(--rp-main-color); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
             .replacer-rule-row { display: grid; grid-template-columns: 1fr auto 1fr 40px; gap: 12px; align-items: center; margin-bottom: 10px; }
             .replacer-rule-row.single-selector-row { grid-template-columns: 1fr; }
-            .replacer-rule-row select { width: 100%; padding: 10px; font-size: 1rem; background-color: rgba(0, 0, 0, 0.3); border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
-            .replacer-rule-row select:disabled { background-color: rgba(0, 0, 0, 0.1); color: #777; cursor: not-allowed; }
-            .replacer-rule-row select option { background-color: #001926; color: #e0e0e0;}
-            .replacer-rule-row select:focus { outline: 1px solid #76FF33; }
-            .replacer-rule-row .arrow { font-size: 1.5rem; color: #76FF33; text-align: center; }
-            .replacer-btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem; transition: all 0.2s ease; background-color: #76FF33; color: #001926; }
-            .replacer-btn.delete-btn { background-color: transparent; color: #ff5252; font-size: 1.5rem; padding: 0; width: 40px; height: 40px; line-height: 40px; }
+            .replacer-rule-row .arrow { font-size: 1.8rem; color: var(--rp-main-color); text-align: center; }
+            .replacer-btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem; transition: all 0.2s ease; background-color: var(--rp-main-color); color: var(--rp-dark-bg); display: inline-flex; align-items: center; gap: 8px; }
+            .replacer-btn.delete-btn { background: transparent; color: #ff5252; padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
             .replacer-btn.delete-btn:hover { background-color: rgba(255, 82, 82, 0.2); }
+            .replacer-btn.add-btn { background: transparent; color: var(--rp-main-color); padding: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--rp-main-color); border-radius: 50%; }
+            .replacer-btn.add-btn:hover { background-color: rgba(118, 255, 51, 0.2); }
             .replacer-actions, .update-dialog-actions { padding: 16px 24px; border-top: 1px solid rgba(118, 255, 51, 0.4); display: flex; justify-content: flex-end; gap: 12px; }
             .replacer-btn.close-btn { background-color: #555; color: #fff; }
             .replacer-btn.save-only-btn { background-color: #00D4FF; color: #fff; }
+            .replacer-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background-color: var(--rp-bg-color); color: var(--rp-main-color); padding: 12px 24px; border-radius: 6px; border: 1px solid var(--rp-main-color); z-index: 25000; transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; opacity: 0; }
+            .replacer-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+            /* Custom Select Styles */
+            .custom-select-container { position: relative; width: 100%; font-size: 1rem; }
+            .custom-select-container.disabled .cs-trigger { background-color: rgba(0, 0, 0, 0.1); color: #777; cursor: not-allowed; }
+            .cs-trigger { width: 100%; padding: 10px; background-color: rgba(0, 0, 0, 0.3); border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; cursor: pointer; user-select: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .custom-select-container.open .cs-trigger { border-color: var(--rp-main-color); }
+            .cs-options { display: none; position: absolute; top: 100%; left: 0; right: 0; background-color: var(--rp-dark-bg); border: 1px solid var(--rp-main-color); border-radius: 4px; z-index: 20001; margin-top: 4px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+            .custom-select-container.open .cs-options { display: block; }
+            .cs-search-input { width: 100%; padding: 10px; box-sizing: border-box; background-color: rgba(0,0,0,0.5); border: none; border-bottom: 1px solid #444; color: #fff; font-size: 1rem; }
+            .cs-search-input:focus { outline: none; border-bottom-color: var(--rp-main-color); }
+            .cs-options-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--rp-main-color) var(--rp-dark-bg); }
+            .cs-option { padding: 10px; cursor: pointer; }
+            .cs-option:hover, .cs-option.selected { background-color: rgba(118, 255, 51, 0.2); }
+            .cs-option.hidden { display: none; }
         `;
         document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
     }
@@ -1570,68 +1601,149 @@
                         ${createFestivalSection('festivals', '节日/地图', festivalThemeOpts, config.festivals)}
                     </div>
                     <div class="replacer-actions">
-                        <button class="replacer-btn close-btn">关闭</button>
-                        <button class="replacer-btn save-only-btn">仅保存</button>
-                        <button class="replacer-btn save-reload-btn">保存并重载</button>
+                        <button class="replacer-btn close-btn"><span class="material-symbols-outlined">close</span>关闭</button>
+                        <button class="replacer-btn save-only-btn"><span class="material-symbols-outlined">save</span>仅保存</button>
+                        <button class="replacer-btn save-reload-btn"><span class="material-symbols-outlined">save</span>保存并重载</button>
                     </div>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', panelHtml);
+
         const overlay = document.getElementById('replacer-panel-overlay');
+
         const saveConfiguration = () => {
             const newConfig = {};
             document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
                 const category = row.dataset.category;
                 if (!newConfig[category]) newConfig[category] = [];
-                const from = row.querySelector('.from-select').value;
-                const to = row.querySelector('.to-select').value;
-                if (from && to) newConfig[category].push({
-                    from,
-                    to
-                });
+                const from = row.querySelector('.from-select-wrapper .custom-select-container').dataset.value;
+                const to = row.querySelector('.to-select-wrapper .custom-select-container').dataset.value;
+                if (from && to) newConfig[category].push({ from, to });
             });
             const festivalSelector = document.getElementById('festival-theme-selector');
-            if (festivalSelector) newConfig.festivals = festivalSelector.value;
+            if (festivalSelector) newConfig.festivals = festivalSelector.dataset.value;
+
             localStorage.setItem(CONFIG_KEY, JSON.stringify(newConfig));
             console.log("配置已保存:", newConfig);
             return newConfig;
         };
+
         overlay.addEventListener('click', (e) => {
-            const target = e.target;
-            if (target.classList.contains('add-btn')) {
-                const category = target.dataset.category;
-                const container = target.closest('.replacer-category').querySelector('.rules-container');
+            const btn = e.target.closest('.replacer-btn');
+            if (!btn && e.target === overlay) {
+                overlay.style.display = 'none';
+                return;
+            }
+            if (!btn) return;
+
+            if (btn.classList.contains('add-btn')) {
+                const category = btn.dataset.category;
+                const container = btn.closest('.replacer-category').querySelector('.rules-container');
                 const fromOpts = categoryFromOptions[category];
                 if (fromOpts) container.insertAdjacentHTML('beforeend', createDynamicRuleRow(category, fromOpts));
-            } else if (target.classList.contains('delete-btn')) {
-                target.closest('.replacer-rule-row').remove();
-            } else if (target.classList.contains('save-reload-btn')) {
+            } else if (btn.classList.contains('delete-btn')) {
+                btn.closest('.replacer-rule-row').remove();
+            } else if (btn.classList.contains('save-reload-btn')) {
                 saveConfiguration();
-                window.location.reload();
-            } else if (target.classList.contains('save-only-btn')) {
+                showToast('配置已保存，正在重载页面...');
+                setTimeout(() => window.location.reload(), 1000);
+            } else if (btn.classList.contains('save-only-btn')) {
                 const newConfig = saveConfiguration();
                 processConfig(newConfig);
-                alert('配置已保存。部分替换可能需要重载页面才能完全生效。');
+                showToast('配置已保存。部分替换可能需要重载页面才能完全生效。');
                 overlay.style.display = 'none';
-            } else if (target.classList.contains('close-btn') || target === overlay) {
+            } else if (btn.classList.contains('close-btn')) {
                 overlay.style.display = 'none';
             }
         });
+
+        // Event listener for custom select changes
         overlay.addEventListener('change', (e) => {
-            const target = e.target;
-            if (target.classList.contains('from-select')) {
-                const row = target.closest('.replacer-rule-row');
-                if (!row || row.parentElement.id === 'category-festivals') return;
-                const category = row.dataset.category;
-                const fromValue = target.value;
-                const toSelect = row.querySelector('.to-select');
+            const selectContainer = e.target;
+            if (!selectContainer.classList.contains('custom-select-container')) return;
+
+            const ruleRow = selectContainer.closest('.replacer-rule-row');
+            if (!ruleRow) return; // Not part of a rule
+
+            // If a 'from' select was changed, update the 'to' select
+            if (selectContainer.closest('.from-select-wrapper')) {
+                const category = ruleRow.dataset.category;
+                const fromValue = selectContainer.dataset.value;
+                const toWrapper = ruleRow.querySelector('.to-select-wrapper');
+
                 const toOptions = getToOptionsFor(category, fromValue);
-                let optionsHtml = '<option value="" disabled selected>-- 请选择目标 --</option>';
-                toOptions.forEach(opt => {
-                    optionsHtml += `<option value="${opt}">${getDisplayName(opt)}</option>`;
+                const toId = `to-${category}-${Date.now()}-${Math.random()}`;
+                const newToSelectHtml = createCustomSelect(toId, toOptions, '', '-- 请选择目标 --', false);
+
+                toWrapper.innerHTML = newToSelectHtml;
+            }
+        });
+    }
+
+    /**
+     * Handles all interactions for custom selects.
+     */
+    function initializeCustomSelectHandlers() {
+        document.body.addEventListener('click', (e) => {
+            const trigger = e.target.closest('.cs-trigger');
+
+            // Close all other open selects
+            document.querySelectorAll('.custom-select-container.open').forEach(openSelect => {
+                if (!trigger || openSelect !== trigger.parentElement) {
+                    openSelect.classList.remove('open');
+                }
+            });
+
+            if (trigger) {
+                const container = trigger.closest('.custom-select-container');
+                if (container && !container.classList.contains('disabled')) {
+                    container.classList.toggle('open');
+                    if (container.classList.contains('open')) {
+                         container.querySelector('.cs-search-input').focus();
+                    }
+                }
+            }
+        });
+
+        document.body.addEventListener('click', (e) => {
+            if (e.target.matches('.cs-option')) {
+                const option = e.target;
+                const container = option.closest('.custom-select-container');
+                const trigger = container.querySelector('.cs-trigger');
+
+                const oldValue = container.dataset.value;
+                const newValue = option.dataset.value;
+
+                container.dataset.value = newValue;
+                trigger.textContent = option.textContent;
+
+                container.querySelectorAll('.cs-option.selected').forEach(sel => sel.classList.remove('selected'));
+                option.classList.add('selected');
+
+                container.classList.remove('open');
+
+                // Fire a change event if the value has changed
+                if (oldValue !== newValue) {
+                     container.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        });
+
+        document.body.addEventListener('input', (e) => {
+            if (e.target.matches('.cs-search-input')) {
+                const input = e.target;
+                const filter = input.value.toLowerCase();
+                const optionsList = input.nextElementSibling;
+
+                optionsList.querySelectorAll('.cs-option').forEach(option => {
+                    const text = option.textContent.toLowerCase();
+                    const value = option.dataset.value.toLowerCase();
+                    if (text.includes(filter) || value.includes(filter)) {
+                        option.classList.remove('hidden');
+                    } else {
+                        option.classList.add('hidden');
+                    }
                 });
-                toSelect.innerHTML = optionsHtml;
-                toSelect.disabled = false;
             }
         });
     }
@@ -1640,7 +1752,7 @@
         if (document.getElementById('replacer-edge-trigger')) return;
         const trigger = document.createElement('div');
         trigger.id = 'replacer-edge-trigger';
-        trigger.innerHTML = '<span class="trigger-icon"></span>';
+        trigger.innerHTML = '<span class="trigger-icon material-symbols-outlined">chevron_left</span>';
         trigger.title = '打开资源替换设置';
         trigger.onclick = () => {
             const overlay = document.getElementById('replacer-panel-overlay');
@@ -1722,7 +1834,9 @@
         window.fetch = function(input, init) {
             let url = (input instanceof Request) ? input.url : String(input);
             const newUrl = applyAllReplacements(url);
-            if (newUrl !== url) input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
+            if (newUrl !== url) {
+                input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
+            }
             return originalFetch.call(this, input, init);
         };
         const originalOpen = XMLHttpRequest.prototype.open;
@@ -1734,10 +1848,12 @@
 
     // --- 主执行逻辑 ---
     setupInterceptors();
+    initializeCustomSelectHandlers();
 
     const uiInitInterval = setInterval(() => {
         if (document.body) {
             clearInterval(uiInitInterval);
+            injectMaterialIcons();
             injectPanelCSS();
             createPanel();
             createEdgeTrigger();
