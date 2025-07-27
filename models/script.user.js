@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.0.6
+// @version      2.1.0
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.0.6"; // 您的当前版本号
-    const currentVersionCode = 33; // 版本代码增加
+    const currentVersion = "2.1.0"; // 您的当前版本号
+    const currentVersionCode = 34; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     let iconsInjected = false;
@@ -91,9 +91,7 @@
         };
     }
 
-    fetch(versionUrl, {
-        cache: 'reload'
-    })
+    fetch(versionUrl, { cache: 'reload' })
         .then(response => {
         if (!response.ok) throw new Error('网络错误');
         const contentType = response.headers.get("content-type");
@@ -163,8 +161,10 @@
 
     const pinyinSorter = (a, b) => getDisplayName(a).localeCompare(getDisplayName(b), 'zh-Hans-CN');
 
-    // --- START: Raw Data (Omitted as requested) ---
-    // 请在此处保留你原来的 redirect maps 数据
+    // --- START: Raw Data (Omitted for brevity) ---
+    // The original large data maps (turretsRedirectMap, hullsRedirectMap, dronesRedirectMap,
+    // festivalsRedirectMap, shotEffectsRedirectMap, paintsRedirectMap) are defined here.
+    // They are omitted here as requested.
     const turretsRedirectMap = {
         "firebird": {
             "default": "573/113511/153/137/31167700271626",
@@ -1395,7 +1395,7 @@
             "未知 1": "0/16723/234/314/30545000607322"
         }
     };
-    // --- END: Raw Data ---
+    // --- END: Raw Data (Omitted for brevity) ---
 
 
     const resourceMaps = {
@@ -1407,9 +1407,156 @@
         paints: paintsRedirectMap
     };
 
-    const CONFIG_KEY = 'tankiAdvancedReplacements_v3_dynamic_selects';
+    const CONFIG_KEY = 'tankiAdvancedReplacements_v4_per_rule_domain';
+
+    function getDefaultResourceDomain() {
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+        const hostname = url.hostname;
+
+        if (params.has('resources')) {
+            const resourcesParam = params.get('resources');
+            if (resourcesParam && resourcesParam.startsWith('http')) {
+                return resourcesParam.endsWith('/') ? resourcesParam.slice(0, -1) : resourcesParam;
+            }
+        }
+
+        if (hostname.endsWith('3dtank.com')) {
+            return 'https://res.3dtank.com';
+        }
+        if (hostname.startsWith('public-deploy') && hostname.endsWith('test-eu.tankionline.com')) {
+            return `https://${hostname}/resources`;
+        }
+        if (hostname.endsWith('tankionline.com')) {
+            return 'https://s.eu.tankionline.com';
+        }
+        return 'https://s.eu.tankionline.com';
+    }
+
+    const DEFAULT_RESOURCE_DOMAIN = getDefaultResourceDomain();
+    const allPossibleDomains = [
+        DEFAULT_RESOURCE_DOMAIN,
+        'https://s.eu.tankionline.com',
+        'https://res.3dtank.com',
+        ...Array.from({ length: 9 }, (_, i) => `https://public-deploy${i + 1}.test-eu.tankionline.com/resources`)
+    ];
+    const resourceDomains = [...new Set(allPossibleDomains)];
+
+
     let currentConfig = {};
     let activeReplacements = {};
+    const resourcePathCache = new Map();
+
+    async function checkResourceExists(domain, path) {
+        if (!domain || !path) return false;
+        const url = `${domain}/${path}/meta.info`;
+        try {
+            const response = await fetch(url, { method: 'HEAD', cache: 'reload' });
+            return response.ok;
+        } catch (error) {
+            console.error(`Check failed for ${url}:`, error);
+            return false;
+        }
+    }
+
+    function getResourcePath(category, from, to) {
+        const map = resourceMaps[category];
+        if (!map || !from || !to) return null;
+
+        if (category === 'shotEffects') {
+            for (const effectKey in map) {
+                if (effectKey.toLowerCase().startsWith(from.toLowerCase())) {
+                    const resourcePath = map[effectKey]?.[to];
+                    if (resourcePath) return resourcePath;
+                }
+            }
+        } else if (category === 'paints') {
+            return map.paints?.[to];
+        } else {
+            return map[from]?.[to] || map[from]?.[to.toUpperCase()];
+        }
+        return null;
+    }
+
+    function getDomainDisplayName(domain) {
+        try {
+            return new URL(domain).hostname;
+        } catch {
+            return domain;
+        }
+    }
+
+    async function validateAndHandleResource(ruleRow) {
+        const toWrapper = ruleRow.querySelector('.to-select-wrapper');
+        const toContainer = toWrapper.querySelector('.custom-select-container');
+        if (!toContainer) return;
+
+        const toTrigger = toContainer.querySelector('.cs-trigger');
+        const domainWrapper = ruleRow.querySelector('.domain-selector-wrapper');
+
+        // Reset previous state
+        toTrigger.classList.remove('validation-error');
+        toTrigger.title = '';
+        domainWrapper.innerHTML = ''; // Clear old selector
+
+        const category = ruleRow.dataset.category;
+        const fromValue = ruleRow.querySelector('.from-select-wrapper .custom-select-container').dataset.value;
+        const toValue = toContainer.dataset.value;
+
+        if (!category || !fromValue || !toValue) return;
+
+        const resourcePath = getResourcePath(category, fromValue, toValue);
+        if (!resourcePath) return;
+
+        const currentDomain = ruleRow.dataset.domain || DEFAULT_RESOURCE_DOMAIN;
+        const isDefaultDomain = !ruleRow.dataset.domain;
+
+        const existsOnCurrent = await checkResourceExists(currentDomain, resourcePath);
+
+        if (existsOnCurrent) {
+            if (!isDefaultDomain) {
+                // It exists on a non-default domain, show a success message but still show the selector
+                toTrigger.classList.remove('validation-error');
+                toTrigger.title = `已在 ${getDomainDisplayName(currentDomain)} 上找到资源。`;
+                // Create the selector, but not in an error state
+                createDomainSelector(domainWrapper, ruleRow, false);
+            } else {
+                // It's valid on the default domain, do nothing more.
+                domainWrapper.innerHTML = ''; // Ensure no selector is shown
+            }
+            return;
+        }
+
+        // --- If we reach here, the resource was NOT found on the current (or default) domain ---
+
+        // Mark "To" selector as error
+        toTrigger.classList.add('validation-error');
+        toTrigger.title = `在 ${getDomainDisplayName(currentDomain)} 上未找到资源。请从右侧选择一个可用的资源域名。`;
+
+        // Create and show the domain selector in an error state
+        createDomainSelector(domainWrapper, ruleRow, true);
+    }
+
+
+    function createDomainSelector(wrapper, ruleRow, isError) {
+        const selectId = `domain-${Date.now()}-${Math.random()}`;
+        const selectedValue = ruleRow.dataset.domain || "";
+        const selectedText = selectedValue ? getDomainDisplayName(selectedValue) : '-- 选择域名 --';
+        const optionsHtml = resourceDomains.map(opt =>
+                                                `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDomainDisplayName(opt)}</li>`
+        ).join('');
+
+        const containerClass = `custom-select-container ${isError ? 'validation-error' : ''}`;
+
+        wrapper.innerHTML = `
+        <div id="${selectId}" class="${containerClass}" data-value="${selectedValue}">
+            <div class="cs-trigger">${selectedText}</div>
+            <div class="cs-options">
+                 <input type="text" class="cs-search-input" placeholder="搜索资源域名...">
+                 <ul class="cs-options-list">${optionsHtml}</ul>
+            </div>
+        </div>`;
+    }
 
     function getToOptionsFor(category, fromValue) {
         const map = resourceMaps[category];
@@ -1447,15 +1594,6 @@
         return Array.from(options).sort(pinyinSorter);
     }
 
-    /**
-     * Creates a custom, searchable select dropdown.
-     * @param {string} id - A unique ID for the select container.
-     * @param {Array<string>} options - Array of option values.
-     * @param {string} selectedValue - The currently selected value.
-     * @param {string} placeholder - Placeholder text.
-     * @param {boolean} disabled - Whether the select is disabled.
-     * @returns {string} - The HTML string for the custom select.
-     */
     function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选择 --', disabled = false) {
         const selectedText = selectedValue ? getDisplayName(selectedValue) : placeholder;
         const optionsHtml = options.map(opt =>
@@ -1473,7 +1611,7 @@
         `;
     }
 
-    function createDynamicRuleRow(category, fromOptions, from = "", to = "") {
+    function createDynamicRuleRow(category, fromOptions, from = "", to = "", domain = "") {
         const fromId = `from-${category}-${Date.now()}-${Math.random()}`;
         const toId = `to-${category}-${Date.now()}-${Math.random()}`;
         const toOptions = from ? getToOptionsFor(category, from) : [];
@@ -1481,7 +1619,7 @@
         const toDisabled = !from;
 
         return `
-         <div class="replacer-rule-row" data-category="${category}">
+         <div class="replacer-rule-row" data-category="${category}" data-domain="${domain || ''}">
              <div class="from-select-wrapper">
                 ${createCustomSelect(fromId, fromOptions, from, '-- 请选择源 --')}
              </div>
@@ -1489,6 +1627,7 @@
              <div class="to-select-wrapper">
                 ${createCustomSelect(toId, toOptions, to, toPlaceholder, toDisabled)}
              </div>
+             <div class="domain-selector-wrapper"></div>
              <button class="replacer-btn delete-btn" title="删除规则"><span class="material-symbols-outlined">delete</span></button>
          </div>`;
     }
@@ -1502,16 +1641,13 @@
                  <button class="replacer-btn add-btn" data-category="${id}" title="添加新规则"><span class="material-symbols-outlined">add</span></button>
              </div>
              <div class="rules-container">
-                 ${(rules || []).map(rule => createDynamicRuleRow(id, fromOpts, rule.from, rule.to)).join('')}
+                 ${(rules || []).map(rule => createDynamicRuleRow(id, fromOpts, rule.from, rule.to, rule.domain)).join('')}
              </div>
          </div>`;
     }
 
     function createFestivalSection(id, title, options, selectedValue = 'default') {
-        const festivalOptions = [{value: 'default', text: '默认 (不替换)'}, ...options.map(opt => ({value: opt, text: getDisplayName(opt)}))];
         const selectorId = 'festival-theme-selector';
-
-        // Use custom select for festivals as well
         const customSelectHtml = createCustomSelect(
             selectorId,
             ['default', ...options],
@@ -1532,7 +1668,7 @@
     function injectPanelCSS() {
         if (document.getElementById('replacer-styles')) return;
         const css = `
-            :root { --rp-main-color: #76FF33; --rp-bg-color: rgba(0, 25, 38, 0.95); --rp-dark-bg: #001926; --rp-text-color: #e0e0e0; }
+            :root { --rp-main-color: #76FF33; --rp-bg-color: rgba(0, 25, 38, 0.95); --rp-dark-bg: #001926; --rp-text-color: #bfd5ff; --rp-error-color: #ff6666; }
             .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-flex; vertical-align: middle; line-height: 1; }
             #replacer-edge-trigger { position: fixed; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 100px; background-color: rgba(0, 25, 38, 0.4); border: 1px solid rgba(118, 255, 51, 0.4); border-right: none; border-radius: 10px 0 0 10px; cursor: pointer; z-index: 19999; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
             #replacer-edge-trigger:hover { background-color: rgba(0, 25, 38, 0.8); width: 35px; }
@@ -1540,7 +1676,7 @@
             #replacer-edge-trigger:hover .trigger-icon { color: var(--rp-main-color); transform: rotate(180deg) scale(1.1); }
             .replacer-settings-overlay, .update-dialog-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 20000; }
             .replacer-settings-panel, .update-dialog-panel { background-color: var(--rp-bg-color); color: var(--rp-text-color); border: 1px solid var(--rp-main-color); border-radius: 12px; width: 90%; box-shadow: 0 0 30px rgba(118, 255, 51, 0.3); display: flex; flex-direction: column; max-height: 90vh; }
-            .replacer-settings-panel { max-width: 800px; }
+            .replacer-settings-panel { max-width: 950px; }
             .update-dialog-panel { max-width: 500px; }
             .replacer-header, .update-dialog-header { padding: 16px 24px; font-size: 1.75rem; color: var(--rp-main-color); border-bottom: 1px solid rgba(118, 255, 51, 0.4); text-align: center; }
             .replacer-body, .update-dialog-body { padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--rp-main-color) var(--rp-bg-color); }
@@ -1548,11 +1684,11 @@
             .update-dialog-body .update-info-box { background: rgba(0,0,0,0.2); border-left: 3px solid var(--rp-main-color); padding: 12px; margin-top: 8px; border-radius: 4px; font-size: 0.9rem; }
             .replacer-category { margin-bottom: 24px; }
             .replacer-category-title { font-size: 1.2rem; font-weight: 500; color: #fff; border-bottom: 2px solid var(--rp-main-color); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-            .replacer-rule-row { display: grid; grid-template-columns: 1fr auto 1fr 40px; gap: 12px; align-items: center; margin-bottom: 10px; }
+            .replacer-rule-row { display: grid; grid-template-columns: 2fr auto 2fr 2fr auto; gap: 12px; align-items: center; margin-bottom: 10px; }
             .replacer-rule-row.single-selector-row { grid-template-columns: 1fr; }
             .replacer-rule-row .arrow { font-size: 1.8rem; color: var(--rp-main-color); text-align: center; }
             .replacer-btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem; transition: all 0.2s ease; background-color: var(--rp-main-color); color: var(--rp-dark-bg); display: inline-flex; align-items: center; gap: 8px; }
-            .replacer-btn.delete-btn { background: transparent; color: #ff5252; padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+            .replacer-btn.delete-btn { background: transparent; color: var(--rp-error-color); padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; grid-column: 5; }
             .replacer-btn.delete-btn:hover { background-color: rgba(255, 82, 82, 0.2); }
             .replacer-btn.add-btn { background: transparent; color: var(--rp-main-color); padding: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--rp-main-color); border-radius: 50%; }
             .replacer-btn.add-btn:hover { background-color: rgba(118, 255, 51, 0.2); }
@@ -1561,12 +1697,14 @@
             .replacer-btn.save-only-btn { background-color: #00D4FF; color: #fff; }
             .replacer-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background-color: var(--rp-bg-color); color: var(--rp-main-color); padding: 12px 24px; border-radius: 6px; border: 1px solid var(--rp-main-color); z-index: 25000; transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; opacity: 0; }
             .replacer-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-            /* Custom Select Styles */
             .custom-select-container { position: relative; width: 100%; font-size: 1rem; }
+            .from-select-wrapper { grid-column: 1; }
+            .to-select-wrapper { grid-column: 3; }
+            .domain-selector-wrapper { grid-column: 4; }
             .custom-select-container.disabled .cs-trigger { background-color: rgba(0, 0, 0, 0.1); color: #777; cursor: not-allowed; }
-            .cs-trigger { width: 100%; padding: 10px; background-color: rgba(0, 0, 0, 0.3); border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; cursor: pointer; user-select: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .cs-trigger { width: 100%; padding: 10px; background-color: rgba(0, 0, 0, 0.3); border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; cursor: pointer; user-select: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: border-color 0.2s ease; }
             .custom-select-container.open .cs-trigger { border-color: var(--rp-main-color); }
+            .custom-select-container.validation-error .cs-trigger, .custom-select-container.validation-error { border-color: var(--rp-error-color) !important; }
             .cs-options { display: none; position: absolute; top: 100%; left: 0; right: 0; background-color: var(--rp-dark-bg); border: 1px solid var(--rp-main-color); border-radius: 4px; z-index: 20001; margin-top: 4px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
             .custom-select-container.open .cs-options { display: block; }
             .cs-search-input { width: 100%; padding: 10px; box-sizing: border-box; background-color: rgba(0,0,0,0.5); border: none; border-bottom: 1px solid #444; color: #fff; font-size: 1rem; }
@@ -1579,7 +1717,7 @@
         document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
     }
 
-    function createPanel() {
+    async function createPanel() {
         if (document.getElementById('replacer-panel-overlay')) return;
         const config = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
         const getFromOptions = (map, category) => {
@@ -1627,24 +1765,15 @@
             </div>`;
         document.body.insertAdjacentHTML('beforeend', panelHtml);
 
+        // After panel is in the DOM, run validation on all existing rules that have a 'to' value
+        document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
+            const toValue = row.querySelector('.to-select-wrapper .custom-select-container')?.dataset.value;
+            if (toValue) {
+                validateAndHandleResource(row);
+            }
+        });
+
         const overlay = document.getElementById('replacer-panel-overlay');
-
-        const saveConfiguration = () => {
-            const newConfig = {};
-            document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
-                const category = row.dataset.category;
-                if (!newConfig[category]) newConfig[category] = [];
-                const from = row.querySelector('.from-select-wrapper .custom-select-container').dataset.value;
-                const to = row.querySelector('.to-select-wrapper .custom-select-container').dataset.value;
-                if (from && to) newConfig[category].push({ from, to });
-            });
-            const festivalSelector = document.getElementById('festival-theme-selector');
-            if (festivalSelector) newConfig.festivals = festivalSelector.dataset.value;
-
-            localStorage.setItem(CONFIG_KEY, JSON.stringify(newConfig));
-            console.log("配置已保存:", newConfig);
-            return newConfig;
-        };
 
         overlay.addEventListener('click', (e) => {
             const btn = e.target.closest('.replacer-btn');
@@ -1674,38 +1803,32 @@
                 overlay.style.display = 'none';
             }
         });
-
-        // Event listener for custom select changes
-        overlay.addEventListener('change', (e) => {
-            const selectContainer = e.target;
-            if (!selectContainer.classList.contains('custom-select-container')) return;
-
-            const ruleRow = selectContainer.closest('.replacer-rule-row');
-            if (!ruleRow) return; // Not part of a rule
-
-            // If a 'from' select was changed, update the 'to' select
-            if (selectContainer.closest('.from-select-wrapper')) {
-                const category = ruleRow.dataset.category;
-                const fromValue = selectContainer.dataset.value;
-                const toWrapper = ruleRow.querySelector('.to-select-wrapper');
-
-                const toOptions = getToOptionsFor(category, fromValue);
-                const toId = `to-${category}-${Date.now()}-${Math.random()}`;
-                const newToSelectHtml = createCustomSelect(toId, toOptions, '', '-- 请选择目标 --', false);
-
-                toWrapper.innerHTML = newToSelectHtml;
-            }
-        });
     }
 
-    /**
-     * Handles all interactions for custom selects.
-     */
+    function saveConfiguration() {
+        const newConfig = {};
+        document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
+            const category = row.dataset.category;
+            if (!newConfig[category]) newConfig[category] = [];
+            const from = row.querySelector('.from-select-wrapper .custom-select-container').dataset.value;
+            const to = row.querySelector('.to-select-wrapper .custom-select-container').dataset.value;
+            const domain = row.dataset.domain || ''; // Get domain from data attribute
+            if (from && to) {
+                newConfig[category].push({ from, to, domain });
+            }
+        });
+        const festivalSelector = document.getElementById('festival-theme-selector');
+        if (festivalSelector) newConfig.festivals = festivalSelector.dataset.value;
+
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(newConfig));
+        console.log("配置已保存:", newConfig);
+        return newConfig;
+    }
+
     function initializeCustomSelectHandlers() {
         document.body.addEventListener('click', (e) => {
             const trigger = e.target.closest('.cs-trigger');
 
-            // Close all other open selects
             document.querySelectorAll('.custom-select-container.open').forEach(openSelect => {
                 if (!trigger || openSelect !== trigger.parentElement) {
                     openSelect.classList.remove('open');
@@ -1717,32 +1840,54 @@
                 if (container && !container.classList.contains('disabled')) {
                     container.classList.toggle('open');
                     if (container.classList.contains('open')) {
-                        container.querySelector('.cs-search-input').focus();
+                        const searchInput = container.querySelector('.cs-search-input');
+                        if (searchInput) searchInput.focus();
                     }
                 }
             }
         });
 
-        document.body.addEventListener('click', (e) => {
+        document.body.addEventListener('click', async (e) => {
             if (e.target.matches('.cs-option')) {
                 const option = e.target;
                 const container = option.closest('.custom-select-container');
                 const trigger = container.querySelector('.cs-trigger');
+                const ruleRow = container.closest('.replacer-rule-row');
 
                 const oldValue = container.dataset.value;
                 const newValue = option.dataset.value;
 
                 container.dataset.value = newValue;
-                trigger.textContent = option.textContent;
+                // For domain selector, display name is different
+                if (container.closest('.domain-selector-wrapper')) {
+                    trigger.textContent = getDomainDisplayName(newValue) || '-- 请更换资源域名 --';
+                } else {
+                    trigger.textContent = option.textContent;
+                }
 
                 container.querySelectorAll('.cs-option.selected').forEach(sel => sel.classList.remove('selected'));
                 option.classList.add('selected');
-
                 container.classList.remove('open');
 
-                // Fire a change event if the value has changed
-                if (oldValue !== newValue) {
-                    container.dispatchEvent(new Event('change', { bubbles: true }));
+                if (oldValue !== newValue && ruleRow) {
+                    if (container.closest('.from-select-wrapper')) {
+                        // 'From' select changed: update 'To' options
+                        const category = ruleRow.dataset.category;
+                        const toWrapper = ruleRow.querySelector('.to-select-wrapper');
+                        const toOptions = getToOptionsFor(category, newValue);
+                        const toId = `to-${category}-${Date.now()}-${Math.random()}`;
+                        const newToSelectHtml = createCustomSelect(toId, toOptions, '', '-- 请选择目标 --', toOptions.length === 0);
+                        toWrapper.innerHTML = newToSelectHtml;
+                        ruleRow.querySelector('.domain-selector-wrapper').innerHTML = '';
+                    } else if (container.closest('.to-select-wrapper')) {
+                        // 'To' select changed: validate
+                        ruleRow.dataset.domain = ''; // Reset domain on 'To' change
+                        await validateAndHandleResource(ruleRow);
+                    } else if (container.closest('.domain-selector-wrapper')) {
+                        // Domain select changed: update stored domain and re-validate
+                        ruleRow.dataset.domain = newValue;
+                        await validateAndHandleResource(ruleRow);
+                    }
                 }
             }
         });
@@ -1751,7 +1896,7 @@
             if (e.target.matches('.cs-search-input')) {
                 const input = e.target;
                 const filter = input.value.toLowerCase();
-                const optionsList = input.nextElementSibling;
+                const optionsList = input.closest('.cs-options').querySelector('.cs-options-list');
 
                 optionsList.querySelectorAll('.cs-option').forEach(option => {
                     const text = option.textContent.toLowerCase();
@@ -1782,9 +1927,13 @@
     function processConfig(config) {
         const processed = {};
         if (!config) return;
+
         for (const category in config) {
-            if (category !== 'festivals') processed[category] = config[category];
+            if (category !== 'festivals') {
+                processed[category] = config[category];
+            }
         }
+
         const selectedTheme = config.festivals;
         if (selectedTheme && selectedTheme !== 'default') {
             const festivalRules = [];
@@ -1793,7 +1942,8 @@
                 if (festivalMap[itemName] && festivalMap[itemName][selectedTheme]) {
                     festivalRules.push({
                         from: itemName,
-                        to: selectedTheme
+                        to: selectedTheme,
+                        domain: ''
                     });
                 }
             }
@@ -1801,8 +1951,36 @@
         } else {
             processed.festivals = [];
         }
+
         activeReplacements = processed;
         console.log("生效中的替换规则:", activeReplacements);
+    }
+
+    function buildResourcePathCache() {
+        resourcePathCache.clear();
+        for (const category in resourceMaps) {
+            const map = resourceMaps[category];
+            if (category === 'paints') {
+                if(map.paints){
+                    for (const paintName in map.paints) {
+                        resourcePathCache.set(map.paints[paintName], { category: 'paints', from: paintName });
+                    }
+                }
+            } else if (category === 'shotEffects') {
+                for (const effectKey in map) {
+                    const from = effectKey.split('_')[0];
+                    for (const skin in map[effectKey]) {
+                        resourcePathCache.set(map[effectKey][skin], { category: 'shotEffects', from: from, skin: skin });
+                    }
+                }
+            } else {
+                for (const itemName in map) {
+                    for (const skinName in map[itemName]) {
+                        resourcePathCache.set(map[itemName][skinName], { category: category, from: itemName, skin: skinName });
+                    }
+                }
+            }
+        }
     }
 
     function setupInterceptors() {
@@ -1814,57 +1992,48 @@
             currentConfig = {};
             activeReplacements = {};
         }
-        const applyAllReplacements = (url) => {
-            if (typeof url !== 'string' || !activeReplacements) return url;
-            let modifiedUrl = url;
-            for (const category in activeReplacements) {
-                const rules = activeReplacements[category];
-                const map = resourceMaps[category];
-                if (!rules || !map) continue;
-                for (const rule of rules) {
-                    const from = rule.from.toLowerCase();
-                    const to = rule.to;
-                    if (category === 'shotEffects') {
-                        for (const effectKey in map) {
-                            if (effectKey.toLowerCase().startsWith(from)) {
-                                const fromRes = map[effectKey]?.default,
-                                      toRes = map[effectKey]?.[to];
-                                if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
-                            }
-                        }
-                    } else if (['turrets', 'hulls', 'drones', 'festivals'].includes(category)) {
-                        const itemMap = map[rule.from];
-                        if (itemMap) {
-                            const fromRes = itemMap.default,
-                                  toRes = itemMap[to] || itemMap[to.toUpperCase()];
-                            if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
-                        }
-                    } else if (category === 'paints') {
-                        const fromRes = map.paints?.[rule.from],
-                              toRes = map.paints?.[rule.to];
-                        if (fromRes && toRes && modifiedUrl.includes(fromRes)) modifiedUrl = modifiedUrl.replace(new RegExp(fromRes, 'g'), toRes);
-                    }
-                }
-            }
-            return modifiedUrl;
+
+        const findReplacement = (originalUrl) => {
+            const match = originalUrl.match(/(\d+\/\d+\/[^/]+\/[^/]+\/\d+)/);
+            if (!match) return null;
+
+            const resourcePath = match[1];
+            const originalFile = originalUrl.substring(match.index + resourcePath.length);
+
+            const sourceInfo = resourcePathCache.get(resourcePath);
+            if (!sourceInfo) return null;
+
+            const rules = activeReplacements[sourceInfo.category];
+            const rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
+            if (!rule) return null;
+
+            const targetPath = getResourcePath(sourceInfo.category, rule.from, rule.to);
+            const domain = rule.domain || DEFAULT_RESOURCE_DOMAIN;
+
+            if (!targetPath) return null;
+
+            return `${domain}/${targetPath}${originalFile}`;
         };
+
         const originalFetch = window.fetch;
         window.fetch = function(input, init) {
             let url = (input instanceof Request) ? input.url : String(input);
-            const newUrl = applyAllReplacements(url);
-            if (newUrl !== url) {
+            const newUrl = findReplacement(url);
+            if (newUrl) {
                 input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
             }
             return originalFetch.call(this, input, init);
         };
+
         const originalOpen = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function(method, url, ...args) {
-            const newUrl = applyAllReplacements(String(url));
-            return originalOpen.call(this, method, newUrl, ...args);
+            const newUrl = findReplacement(String(url));
+            return originalOpen.call(this, method, newUrl || url, ...args);
         };
     }
 
     // --- 主执行逻辑 ---
+    buildResourcePathCache();
     setupInterceptors();
     initializeCustomSelectHandlers();
 
