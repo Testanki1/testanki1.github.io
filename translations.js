@@ -337,6 +337,7 @@ const replacementDict = {
 "General": "上将",
 "Marshal": "元帅",
 "Fieldmarshal": "陆军元帅",
+"Field Marshal": "陆军元帅",
 "Commander": "统帅",
 "Generalissimo": "大元帅",
 "Legend": "传奇",
