@@ -116,15 +116,15 @@
                     <p><b>更新内容：</b></p>
                     <div class="update-info-box">${updateInfo.replace(/\n/g, '<br>')}</div>
                 `;
-                const interval = setInterval(() => {
-                    if (document.body) {
-                        clearInterval(interval);
-                        injectMaterialIcons();
-                        injectPanelCSS();
-                        showUpdateDialog(message, downloadUrl);
-                    }
-                }, 200);
-            }
+            const interval = setInterval(() => {
+                if (document.body) {
+                    clearInterval(interval);
+                    injectMaterialIcons();
+                    injectPanelCSS();
+                    showUpdateDialog(message, downloadUrl);
+                }
+            }, 200);
+        }
     })
         .catch(error => {
         console.error('更新检查失败:', error);
@@ -1338,6 +1338,8 @@
             "青铜盔甲": "573/113624/262/40/30545000702657",
             "高级监护人": "604/55511/302/312/30545000606504",
             "拼图": "626/144430/144/203/31331106073703",
+            "墨盒": "630/25640/113/143/31405350075017",
+            //以下迷彩名称为非官方翻译
             "16 岁": "626/166330/71/330/31335466047104",
             "跑酷小子": "0/16717/162/310/30545000606035",
             "跑酷大师 2015": "0/16721/212/43/30545000606553",
