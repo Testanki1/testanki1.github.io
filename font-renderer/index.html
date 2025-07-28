@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多字体图集渲染器</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        h1 {
+            text-align: center;
+            color: #1a2533;
+            margin-top: 0;
+        }
+        /* The upload section style is no longer needed but kept for potential future use */
+        .upload-section {
+            padding: 20px;
+            border: 2px dashed #dce4ec;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 10px;
+        }
+        #text-input {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.2em;
+            border: 2px solid #dce4ec;
+            border-radius: 8px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        #text-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        #text-input:disabled {
+            background-color: #f0f0f0;
+            cursor: not-allowed;
+        }
+        #output-container {
+            border: 1px solid #e0e0e0;
+            background-color: #fafafa;
+            padding: 10px;
+            margin-top: 20px;
+            min-height: 50px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        #output-canvas {
+            display: block;
+            image-rendering: pixelated; /* 保证像素字体清晰 */
+        }
+        #status {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>多字体图集渲染器</h1>
+    <p id="status">正在初始化并加载字体...</p>
+
+    <!-- 文件上传部分已被移除 -->
+
+    <label for="text-input">输入要渲染的文字:</label>
+    <input type="text" id="text-input" placeholder="等待字体加载完成..." disabled>
+
+    <div id="output-container">
+        <canvas id="output-canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const textInput = document.getElementById('text-input');
+    const canvas = document.getElementById('output-canvas');
+    const statusEl = document.getElementById('status');
+    const ctx = canvas.getContext('2d');
+
+    const fontData = {};
+
+    // 定义要加载的字体资源链接
+    const fontSources = [
+        { name: 'open_sans_armenian', png: 'https://testanki1.github.io/font-renderer/images/open_sans_armenian.f4961ef6.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_armenian.0c4bdbc3.txt' },
+        { name: 'open_sans_cjk', png: 'https://testanki1.github.io/font-renderer/images/open_sans_cjk.6b6f51ca.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_cjk.45a1fbad.txt' },
+        { name: 'open_sans_cyrillic', png: 'https://testanki1.github.io/font-renderer/images/open_sans_cyrillic.bb8c7bce.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_cyrillic.0dc1dc77.txt' },
+        { name: 'dejavu-sans-mono-16px-basis33-15px', png: 'https://testanki1.github.io/font-renderer/images/dejavu-sans-mono-16px-basis33-15px.bb61e2ba.png', txt: 'https://testanki1.github.io/font-renderer/textdata/dejavu-sans-mono-16px-basis33-15px.fe819032.txt' },
+        { name: 'en_ru_es_fr_de_pl_pt_sdf', png: 'https://testanki1.github.io/font-renderer/images/en_ru_es_fr_de_pl_pt_sdf.d4d81ec5.png', txt: 'https://testanki1.github.io/font-renderer/textdata/en_ru_es_fr_de_pl_pt_sdf.3cddf9ec.txt' },
+        { name: 'open_sans_georgian', png: 'https://testanki1.github.io/font-renderer/images/open_sans_georgian.8ab2c6cf.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_georgian.cafb6b98.txt' },
+        { name: 'open_sans_latin', png: 'https://testanki1.github.io/font-renderer/images/open_sans_latin.1f261a52.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_latin.87a74077.txt' }
+    ];
+
+    function checkReadyState() {
+        const loadedFonts = [];
+        for (const name in fontData) {
+            if (fontData[name].image && fontData[name].metrics) {
+                loadedFonts.push(name);
+            }
+        }
+        
+        const totalFonts = fontSources.length;
+        if (loadedFonts.length > 0) {
+            textInput.disabled = false;
+            textInput.placeholder = '在此输入...';
+            statusEl.textContent = `已成功加载 ${loadedFonts.length}/${totalFonts} 个字体。可以开始输入了！`;
+            statusEl.style.color = 'green';
+            if (loadedFonts.length < totalFonts) {
+                 statusEl.textContent += ` (部分字体加载失败，请检查控制台)`;
+                 statusEl.style.color = '#d9a50b'; // a warning color
+            }
+        } else {
+             statusEl.textContent = '所有字体加载失败，请检查网络连接或浏览器控制台。';
+             statusEl.style.color = 'red';
+        }
+    }
+
+    // 自动从URL加载字体文件的函数
+    async function loadFontsFromUrls() {
+        statusEl.textContent = `正在从网络加载 ${fontSources.length} 个字体...`;
+        statusEl.style.color = '#4a90e2';
+
+        const loadPromises = fontSources.map(async (source) => {
+            try {
+                // 初始化字体数据结构
+                fontData[source.name] = { image: null, metrics: null };
+
+                // 并行获取图片和文本文件
+                const [imageResponse, textResponse] = await Promise.all([
+                    fetch(source.png),
+                    fetch(source.txt)
+                ]);
+
+                if (!imageResponse.ok) throw new Error(`图片文件加载失败: ${imageResponse.statusText}`);
+                if (!textResponse.ok) throw new Error(`度量文件加载失败: ${textResponse.statusText}`);
+
+                // 处理图片
+                const imageBlob = await imageResponse.blob();
+                const image = await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = (err) => reject(new Error('无法解析图片'));
+                    img.src = URL.createObjectURL(imageBlob);
+                });
+                fontData[source.name].image = image;
+                console.log(`字体图集 '${source.name}' 加载成功!`);
+
+                // 处理度量文件
+                const metricsText = await textResponse.text();
+                fontData[source.name].metrics = parseMetricData(metricsText);
+                console.log(`度量文件 '${source.name}' 加载成功!`);
+            } catch (error) {
+                console.error(`加载字体 '${source.name}' 时发生错误:`, error);
+                // 即使失败，也继续加载其他字体
+            }
+        });
+
+        // 等待所有加载操作完成（无论成功或失败）
+        await Promise.allSettled(loadPromises);
+        
+        // 所有加载尝试结束后，最终更新一次状态
+        checkReadyState();
+    }
+
+    function parseMetricData(text) {
+        const metricsMap = new Map();
+        const lines = text.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const parts = line.split(/\s+/);
+            if (parts.length < 8) continue;
+            
+            const charCode = parseInt(parts[0], 10);
+            const metrics = {
+                x: parseInt(parts[1], 10),
+                y: parseInt(parts[2], 10),
+                width: parseInt(parts[3], 10),
+                height: parseInt(parts[4], 10),
+                xoffset: parseInt(parts[5], 10),
+                yoffset: parseInt(parts[6], 10),
+                xadvance: parseInt(parts[7], 10),
+            };
+            metricsMap.set(charCode, metrics);
+        }
+        return metricsMap;
+    }
+
+    function findCharData(charCode) {
+        // 遍历所有已加载的字体，查找包含该字符的字体
+        for (const name of Object.keys(fontData)) {
+            const font = fontData[name];
+            if (font.image && font.metrics && font.metrics.has(charCode)) {
+                return {
+                    metrics: font.metrics.get(charCode),
+                    image: font.image
+                };
+            }
+        }
+        return null; // 如果所有字体中都找不到该字符
+    }
+
+    function renderText(text) {
+        const isAnyFontReady = Object.values(fontData).some(font => font.image && font.metrics);
+        if (!isAnyFontReady || !text) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.width = 1;
+            canvas.height = 1;
+            return;
+        }
+
+        // 1. 计算最终图片的尺寸
+        let totalWidth = 0;
+        let maxHeight = 0;
+        let minYOffset = 0;
+        let currentX = 0;
+
+        for (const char of text) {
+            const charCode = char.charCodeAt(0);
+            const charData = findCharData(charCode);
+            
+            if (charData) {
+                const metrics = charData.metrics;
+                const charRightBoundary = currentX + metrics.xoffset + metrics.width;
+                totalWidth = Math.max(totalWidth, charRightBoundary);
+                currentX += metrics.xadvance;
+                minYOffset = Math.min(minYOffset, metrics.yoffset);
+                maxHeight = Math.max(maxHeight, metrics.yoffset + metrics.height);
+            } else {
+                const charWidth = 17; // 未知字符的占位宽度
+                totalWidth = Math.max(totalWidth, currentX + charWidth);
+                currentX += charWidth;
+                maxHeight = Math.max(maxHeight, charWidth);
+            }
+        }
+        
+        canvas.height = maxHeight - minYOffset; 
+        canvas.width = totalWidth > 0 ? totalWidth : 1;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 2. 逐个绘制字符
+        let cursorX = 0;
+        const baselineY = -minYOffset;
+
+        for (const char of text) {
+            const charCode = char.charCodeAt(0);
+            const charData = findCharData(charCode);
+
+            if (charData) {
+                const { metrics, image } = charData;
+                ctx.drawImage(
+                    image,
+                    metrics.x, metrics.y, metrics.width, metrics.height,
+                    cursorX + metrics.xoffset,
+                    baselineY + metrics.yoffset,
+                    metrics.width, metrics.height
+                );
+                cursorX += metrics.xadvance;
+            } else {
+                // 绘制一个红色方块代表未知字符
+                ctx.fillStyle = 'red';
+                ctx.fillRect(cursorX, baselineY, 17, 17);
+                cursorX += 17;
+            }
+        }
+    }
+
+    textInput.addEventListener('input', (event) => {
+        renderText(event.target.value);
+    });
+
+    // 页面加载后立即开始加载字体
+    loadFontsFromUrls();
+
+</script>
+
+</body>
+</html>
