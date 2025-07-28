@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多字体图集渲染器</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        h1 {
+            text-align: center;
+            color: #1a2533;
+            margin-top: 0;
+        }
+        .upload-section {
+            padding: 20px;
+            border: 2px dashed #dce4ec;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 10px;
+        }
+        input[type="file"] {
+            width: 100%;
+            max-width: 300px; /* Limit width for better appearance */
+        }
+        #text-input {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.2em;
+            border: 2px solid #dce4ec;
+            border-radius: 8px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        #text-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        #text-input:disabled {
+            background-color: #f0f0f0;
+            cursor: not-allowed;
+        }
+        #output-container {
+            border: 1px solid #e0e0e0;
+            background-color: #fafafa;
+            padding: 10px;
+            margin-top: 20px;
+            min-height: 50px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        #output-canvas {
+            display: block;
+            image-rendering: pixelated; /* 保证像素字体清晰 */
+        }
+        #status {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>多字体图集渲染器</h1>
+    <p id="status">请上传配套的字体图集 (.png) 和度量文件 (.txt)。</p>
+
+    <div class="upload-section">
+        <label for="file-uploader">上传字体文件 (可多选)</label>
+        <input type="file" id="file-uploader" accept=".png,image/png,.txt,text/plain" multiple>
+    </div>
+
+    <label for="text-input">输入要渲染的文字:</label>
+    <input type="text" id="text-input" placeholder="上传文件后在此输入..." disabled>
+
+    <div id="output-container">
+        <canvas id="output-canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const fileUploader = document.getElementById('file-uploader');
+    const textInput = document.getElementById('text-input');
+    const canvas = document.getElementById('output-canvas');
+    const statusEl = document.getElementById('status');
+    const ctx = canvas.getContext('2d');
+
+    const fontData = {};
+
+    function getFontBaseName(filename) {
+        return filename.split('.')[0];
+    }
+
+    function checkReadyState() {
+        const loadedFonts = [];
+        for (const name in fontData) {
+            if (fontData[name].image && fontData[name].metrics) {
+                loadedFonts.push(name);
+            }
+        }
+
+        if (loadedFonts.length > 0) {
+            textInput.disabled = false;
+            statusEl.textContent = `已加载 ${loadedFonts.length} 个字体 (${loadedFonts.join(', ')}). 可以开始输入了！`;
+            statusEl.style.color = 'green';
+            renderText(textInput.value);
+        } else {
+             statusEl.textContent = '请确保上传了完整配对的 .png 和 .txt 文件。';
+             statusEl.style.color = '#888';
+        }
+    }
+
+    fileUploader.addEventListener('change', (event) => {
+        const files = event.target.files;
+        if (!files.length) return;
+
+        statusEl.textContent = `正在处理 ${files.length} 个文件...`;
+        statusEl.style.color = '#4a90e2';
+
+        for (const file of files) {
+            const baseName = getFontBaseName(file.name);
+            if (!fontData[baseName]) {
+                fontData[baseName] = { image: null, metrics: null };
+            }
+
+            const reader = new FileReader();
+
+            if (file.type === 'image/png') {
+                reader.onload = (e) => {
+                    const image = new Image();
+                    image.onload = () => {
+                        console.log(`字体图集 '${baseName}' 加载成功!`);
+                        fontData[baseName].image = image;
+                        checkReadyState();
+                    };
+                    image.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type === 'text/plain') {
+                reader.onload = (e) => {
+                    console.log(`度量文件 '${baseName}' 加载成功!`);
+                    fontData[baseName].metrics = parseMetricData(e.target.result);
+                    checkReadyState();
+                };
+                reader.readAsText(file);
+            }
+        }
+    });
+
+    function parseMetricData(text) {
+        const metricsMap = new Map();
+        const lines = text.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const parts = line.split(/\s+/);
+            if (parts.length < 8) continue;
+            
+            const charCode = parseInt(parts[0], 10);
+            const metrics = {
+                x: parseInt(parts[1], 10),
+                y: parseInt(parts[2], 10),
+                width: parseInt(parts[3], 10),
+                height: parseInt(parts[4], 10),
+                xoffset: parseInt(parts[5], 10),
+                yoffset: parseInt(parts[6], 10),
+                xadvance: parseInt(parts[7], 10),
+            };
+            metricsMap.set(charCode, metrics);
+        }
+        return metricsMap;
+    }
+
+    function findCharData(charCode) {
+        for (const name in fontData) {
+            const font = fontData[name];
+            if (font.image && font.metrics && font.metrics.has(charCode)) {
+                return {
+                    metrics: font.metrics.get(charCode),
+                    image: font.image
+                };
+            }
+        }
+        return null;
+    }
+
+    function renderText(text) {
+        const isAnyFontReady = Object.values(fontData).some(font => font.image && font.metrics);
+        if (!isAnyFontReady || !text) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.width = 1;
+            canvas.height = 1;
+            return;
+        }
+
+        // 1. 计算最终图片的尺寸 (修正后的逻辑)
+        let totalWidth = 0;
+        let maxHeight = 0;
+        let minYOffset = 0;
+        let currentX = 0; // <-- 新增：追踪当前光标位置
+
+        for (const char of text) {
+            const charCode = char.charCodeAt(0);
+            const charData = findCharData(charCode);
+            
+            if (charData) {
+                const metrics = charData.metrics;
+                // --- 关键修正部分 START ---
+                // 计算当前字符绘制后最右边的位置
+                const charRightBoundary = currentX + metrics.xoffset + metrics.width;
+                // 更新总宽度，确保它能容纳下最右边的字符
+                totalWidth = Math.max(totalWidth, charRightBoundary);
+                // 移动光标，为下一个字符做准备
+                currentX += metrics.xadvance;
+                // --- 关键修正部分 END ---
+
+                minYOffset = Math.min(minYOffset, metrics.yoffset);
+                maxHeight = Math.max(maxHeight, metrics.yoffset + metrics.height);
+            } else {
+                // 对未知字符也应用相同的逻辑
+                const charWidth = 17;
+                totalWidth = Math.max(totalWidth, currentX + charWidth);
+                currentX += charWidth;
+                maxHeight = Math.max(maxHeight, charWidth);
+            }
+        }
+        
+        canvas.height = maxHeight - minYOffset; 
+        canvas.width = totalWidth > 0 ? totalWidth : 1;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 2. 逐个绘制字符 (这部分逻辑不变)
+        let cursorX = 0;
+        const baselineY = -minYOffset;
+
+        for (const char of text) {
+            const charCode = char.charCodeAt(0);
+            const charData = findCharData(charCode);
+
+            if (charData) {
+                const { metrics, image } = charData;
+                ctx.drawImage(
+                    image,
+                    metrics.x, metrics.y, metrics.width, metrics.height,
+                    cursorX + metrics.xoffset,
+                    baselineY + metrics.yoffset,
+                    metrics.width, metrics.height
+                );
+                cursorX += metrics.xadvance;
+            } else {
+                ctx.fillStyle = 'red';
+                ctx.fillRect(cursorX, baselineY, 17, 17);
+                cursorX += 17;
+            }
+        }
+    }
+
+    textInput.addEventListener('input', (event) => {
+        renderText(event.target.value);
+    });
+
+</script>
+
+</body>
+</html>
