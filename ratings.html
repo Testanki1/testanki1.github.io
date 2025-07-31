@@ -364,37 +364,31 @@
     const elements = { fetchButton: document.getElementById('fetchButton'), monitorButton: document.getElementById('monitorButton'), serverSelect: document.getElementById('server'), usernameInput: document.getElementById('username'), loader: document.getElementById('loader'), errorMessage: document.getElementById('errorMessage'), leaderboardContainer: document.getElementById('leaderboardContainer'), resultsWrapper: document.getElementById('resultsWrapper'), profileSummary: document.getElementById('profileSummary'), rankingsTableContainer: document.getElementById('rankingsTableContainer'), listsContainer: document.getElementById('listsContainer'), tabs: document.querySelectorAll('.tab-button'), tabContents: document.querySelectorAll('.tab-content'), changeLogContainer: document.getElementById('changeLogContainer'), backButton: document.getElementById('backButton'), backToLeaderboardContainer: document.getElementById('backToLeaderboardContainer') };
     let isMonitoring = false, monitoringTimeoutId = null, lastProfileData = null, changeLog = [], currentUsername = '', currentServer = '', leaderboardData = null, currentLeaderboardIndex = 0;
     
-    // 新增：页面加载时处理 URL 参数
     document.addEventListener('DOMContentLoaded', () => {
         const urlParams = new URLSearchParams(window.location.search);
-        // 如果 URL 中没有 username，则加载排行榜
         if (!urlParams.has('username')) {
             fetchAndRenderLeaderboard();
         }
-        // 处理 URL 参数（无论有无都执行，以处理返回初始页的情况）
         processUrlParams();
     });
 
-    // 新增：监听浏览器历史记录变化（前进/后退按钮）
     window.addEventListener('popstate', (e) => {
         if (isMonitoring) stopMonitoring();
         processUrlParams();
     });
 
     elements.fetchButton.addEventListener('click', () => {
-        // 新增：在查询前更新浏览器 URL
         updateBrowserUrl(elements.serverSelect.value, elements.usernameInput.value.trim());
         handleFetch();
     });
     elements.monitorButton.addEventListener('click', toggleMonitoring);
     elements.usernameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-             // 新增：在查询前更新浏览器 URL
             updateBrowserUrl(elements.serverSelect.value, elements.usernameInput.value.trim());
             handleFetch();
         }
     });
-    elements.backButton.addEventListener('click', () => showLeaderboardView(true)); // 传入 true 以更新 URL
+    elements.backButton.addEventListener('click', () => showLeaderboardView(true)); 
     elements.tabs.forEach(tab => tab.addEventListener('click', () => {
         elements.tabs.forEach(t => t.classList.remove('active'));
         elements.tabContents.forEach(c => c.classList.remove('active'));
@@ -402,39 +396,32 @@
         document.querySelector(`#${tab.dataset.tab}Content`).classList.add('active');
     }));
     
-    // 新增：处理 URL 参数的核心函数
     function processUrlParams() {
         const params = new URLSearchParams(window.location.search);
         const server = params.get('server');
         const username = params.get('username');
 
-        // 如果 URL 中有 server 参数，则设置选择框的值
         if (server && elements.serverSelect.querySelector(`option[value="${server}"]`)) {
             elements.serverSelect.value = server;
         }
 
-        // 如果 URL 中有 username 参数，则填充输入框并自动查询
         if (username) {
             elements.usernameInput.value = username;
-            // 检查所选服务器是否可用
             if (!elements.serverSelect.options[elements.serverSelect.selectedIndex].disabled) {
                 handleFetch();
             } else {
                 displayError("无法查询，因为来自 URL 的服务器当前不可用。");
             }
         } else {
-             // 如果 URL 中没有 username，则确保显示的是排行榜视图
-            showLeaderboardView(false); // 传入 false，避免不必要地修改历史记录
+            showLeaderboardView(false);
         }
     }
 
-    // 新增：更新浏览器地址栏和标题的函数
     function updateBrowserUrl(server, username) {
-        if (!username) return; // 如果没有用户名则不更新
+        if (!username) return;
         const newUrl = `${window.location.pathname}?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}`;
         const pageTitle = `3D坦克排行榜 - ${username}`;
         document.title = pageTitle;
-        // 只有当 URL 发生变化时才推入历史记录，避免重复
         if(window.location.href !== newUrl) {
             history.pushState({server, username}, pageTitle, newUrl);
         }
@@ -442,7 +429,7 @@
     
     function translateText(text) { if (typeof text !== 'string' || !text) return text; let translated = text; const replacementOrder = ['ROCKET_LAUNCHER', 'MACHINE_GUN', 'FIREBIRD', 'RESISTANCE', 'RICOCHET', 'ARTILLERY', 'SHOTGUN', 'THUNDER', 'CRITICAL', 'RAILGUN', 'FREEZE', 'SCORPIO', 'SMOKY', 'SHAFT', 'TWINS', 'GAUSS', 'TESLA', 'ISIS', 'MINE', 'JGR', 'TJR']; replacementOrder.forEach(key => { if (TRANSLATION_MAP[key]) translated = translated.replace(new RegExp(key, 'g'), TRANSLATION_MAP[key]); }); if (translated.includes('_')) translated = translated.replace(/_/g, ''); return translated; }
     
-    // 修改：让此函数可以控制是否修改浏览器历史记录
+    // ############### 已修复的函数 ###############
     function showLeaderboardView(pushState = true) {
         elements.resultsWrapper.style.display = 'none';
         if (isMonitoring) { stopMonitoring(); }
@@ -451,13 +438,18 @@
         elements.leaderboardContainer.style.display = 'block';
         elements.backToLeaderboardContainer.style.display = 'none';
 
-        // 如果需要，将 URL 重置为根路径
+        // 检查排行榜数据是否存在。如果不存在（例如在通过URL直接进入玩家页面后），则加载它。
+        if (!leaderboardData) {
+            fetchAndRenderLeaderboard();
+        }
+
         if(pushState) {
             const pageTitle = '3D坦克排行榜';
             document.title = pageTitle;
             history.pushState({}, pageTitle, window.location.pathname);
         }
     }
+    // #########################################
 
     async function fetchStarsLeaderboardData() {
         const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=';
@@ -633,7 +625,6 @@
         const username = event.target.dataset.username;
         if (username) {
             elements.usernameInput.value = username;
-            // 新增：点击排行榜链接也更新 URL
             updateBrowserUrl(elements.serverSelect.value, username);
             handleFetch();
         }
