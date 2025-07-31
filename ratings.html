@@ -168,22 +168,20 @@
         }
         .leaderboard-category h3 { margin: 15px 0 15px 0; padding: 0 10px; text-align: center; color: var(--accent-color); font-weight: 500; }
         
-        /* MODIFIED: Table Styling */
         .leaderboard-table {
             width: 100%;
-            min-width: 500px; /* Ensure table is wide enough to show scroll effect */
+            min-width: 500px; 
             border-collapse: collapse;
             table-layout: fixed;
         }
         .leaderboard-table th, .leaderboard-table td {
-            padding: 10px 8px; /* Adjusted padding */
+            padding: 10px 8px;
             vertical-align: middle;
             text-align: left;
         }
         .leaderboard-table th { font-weight: 600; color: var(--text-light); border-bottom: 2px solid var(--border-color); }
         .leaderboard-table tr:not(:last-child) { border-bottom: 1px solid var(--border-color); }
         
-        /* NEW: Table Wrapper for Scrolling */
         .leaderboard-table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -296,7 +294,7 @@
     <div class="form-group">
         <label for="server">选择服务器：</label>
         <select id="server">
-            <option value="国服" disabled>国服 (维护中)</option>
+            <option value="cn" disabled>国服 (维护中)</option>
             <option value="eu" selected>外服</option>
         </select>
     </div>
@@ -366,11 +364,30 @@
     const elements = { fetchButton: document.getElementById('fetchButton'), monitorButton: document.getElementById('monitorButton'), serverSelect: document.getElementById('server'), usernameInput: document.getElementById('username'), loader: document.getElementById('loader'), errorMessage: document.getElementById('errorMessage'), leaderboardContainer: document.getElementById('leaderboardContainer'), resultsWrapper: document.getElementById('resultsWrapper'), profileSummary: document.getElementById('profileSummary'), rankingsTableContainer: document.getElementById('rankingsTableContainer'), listsContainer: document.getElementById('listsContainer'), tabs: document.querySelectorAll('.tab-button'), tabContents: document.querySelectorAll('.tab-content'), changeLogContainer: document.getElementById('changeLogContainer'), backButton: document.getElementById('backButton'), backToLeaderboardContainer: document.getElementById('backToLeaderboardContainer') };
     let isMonitoring = false, monitoringTimeoutId = null, lastProfileData = null, changeLog = [], currentUsername = '', currentServer = '', leaderboardData = null, currentLeaderboardIndex = 0;
     
-    document.addEventListener('DOMContentLoaded', () => { if (elements.serverSelect.value === 'eu') fetchAndRenderLeaderboard(); });
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('username')) {
+            fetchAndRenderLeaderboard();
+        }
+        processUrlParams();
+    });
 
-    elements.fetchButton.addEventListener('click', handleFetch);
+    window.addEventListener('popstate', (e) => {
+        if (isMonitoring) stopMonitoring();
+        processUrlParams();
+    });
+
+    elements.fetchButton.addEventListener('click', () => {
+        updateBrowserUrl(elements.serverSelect.value, elements.usernameInput.value.trim());
+        handleFetch();
+    });
     elements.monitorButton.addEventListener('click', toggleMonitoring);
-    elements.usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleFetch(); });
+    elements.usernameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            updateBrowserUrl(elements.serverSelect.value, elements.usernameInput.value.trim());
+            handleFetch();
+        }
+    });
     elements.backButton.addEventListener('click', showLeaderboardView); 
     elements.tabs.forEach(tab => tab.addEventListener('click', () => {
         elements.tabs.forEach(t => t.classList.remove('active'));
@@ -379,14 +396,54 @@
         document.querySelector(`#${tab.dataset.tab}Content`).classList.add('active');
     }));
     
+    function processUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        const server = params.get('server');
+        const username = params.get('username');
+
+        if (server && elements.serverSelect.querySelector(`option[value="${server}"]`)) {
+            elements.serverSelect.value = server;
+        }
+
+        if (username) {
+            elements.usernameInput.value = username;
+            if (!elements.serverSelect.options[elements.serverSelect.selectedIndex].disabled) {
+                handleFetch();
+            } else {
+                displayError("无法查询，因为来自 URL 的服务器当前不可用。");
+            }
+        } else {
+             // If no username in URL, ensure leaderboard is shown
+            showLeaderboardView(false); // Pass false to prevent history push
+        }
+    }
+
+    function updateBrowserUrl(server, username) {
+        if (!username) return;
+        const newUrl = `${window.location.pathname}?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}`;
+        const pageTitle = `3D坦克排行榜 - ${username}`;
+        document.title = pageTitle;
+        // Only push state if it's different from the current one to avoid messy history
+        if(window.location.href !== newUrl) {
+            history.pushState({server, username}, pageTitle, newUrl);
+        }
+    }
+    
     function translateText(text) { if (typeof text !== 'string' || !text) return text; let translated = text; const replacementOrder = ['ROCKET_LAUNCHER', 'MACHINE_GUN', 'FIREBIRD', 'RESISTANCE', 'RICOCHET', 'ARTILLERY', 'SHOTGUN', 'THUNDER', 'CRITICAL', 'RAILGUN', 'FREEZE', 'SCORPIO', 'SMOKY', 'SHAFT', 'TWINS', 'GAUSS', 'TESLA', 'ISIS', 'MINE', 'JGR', 'TJR']; replacementOrder.forEach(key => { if (TRANSLATION_MAP[key]) translated = translated.replace(new RegExp(key, 'g'), TRANSLATION_MAP[key]); }); if (translated.includes('_')) translated = translated.replace(/_/g, ''); return translated; }
-    function showLeaderboardView() {
+    
+    function showLeaderboardView(pushState = true) {
         elements.resultsWrapper.style.display = 'none';
         if (isMonitoring) { stopMonitoring(); }
         elements.usernameInput.value = '';
         displayError('');
         elements.leaderboardContainer.style.display = 'block';
         elements.backToLeaderboardContainer.style.display = 'none';
+
+        if(pushState) {
+            const pageTitle = '3D坦克排行榜';
+            document.title = pageTitle;
+            history.pushState({}, pageTitle, window.location.pathname);
+        }
     }
 
     async function fetchStarsLeaderboardData() {
@@ -558,7 +615,15 @@
         renderCurrentLeaderboard();
     }
 
-    function handleLeaderboardClick(event) { event.preventDefault(); const username = event.target.dataset.username; if (username) { elements.usernameInput.value = username; elements.fetchButton.click(); } }
+    function handleLeaderboardClick(event) {
+        event.preventDefault();
+        const username = event.target.dataset.username;
+        if (username) {
+            elements.usernameInput.value = username;
+            updateBrowserUrl(elements.serverSelect.value, username);
+            handleFetch();
+        }
+    }
     async function handleFetch() { if (isMonitoring) { displayError('请先停止监测再进行新的查询'); return; } currentServer = elements.serverSelect.value; currentUsername = elements.usernameInput.value.trim(); if (!currentUsername) { displayError('请输入昵称'); return; } clearDisplay(true); setLoading(true); try { const profileData = await fetchProfileData(currentServer, currentUsername); updateDisplay(profileData); lastProfileData = profileData; } catch (error) { console.error('获取数据时出错:', error); displayError(error.message); } finally { setLoading(false); } }
     async function fetchProfileData(server, username) { const baseUrl = API_CONFIG.baseUrls[server]; if (!baseUrl) throw new Error('无效的服务器选择'); const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest='; try { const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`; const apiUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; const response = await fetch(apiUrl); if (!response.ok) throw new Error(`网络响应错误: ${response.status}`); const profileData = await response.json(); if (profileData?.responseType === 'NOT_FOUND') { throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。'); } else if (profileData?.response) { return profileData.response; } else { throw new Error('无效的响应数据格式'); } } catch (err) { throw err; } }
     function toggleMonitoring() { if (isMonitoring) stopMonitoring(); else { if (!lastProfileData) { displayError('请先至少查询一次，再开启监测'); return; } isMonitoring = true; startMonitoring(); } }
@@ -632,12 +697,10 @@
             if (item.usages != null && title === '使用的道具') cardHTML += createField('使用量', item.usages?.toLocaleString(), 'usages');
             cardDiv.innerHTML = translateText(cardHTML);
     
-            // Button logic for detailed data
             if (item.detailedGrades && item.detailedGrades.length > 1) {
                 const button = document.createElement('button');
                 button.className = 'view-data-button';
                 
-                // Determine button text based on title
                 if (title === '玩过的模式') {
                     button.textContent = '查看各类型数据';
                 } else if (title === '使用的迷彩') {
@@ -682,18 +745,16 @@
         const isMode = title === '玩过的模式';
         const isPaint = title === '使用的迷彩';
     
-        // Sort data based on its type
         const sortedData = [...detailedGrades].sort((a, b) => {
             if (isMode) {
                 return (a.type || '').localeCompare(b.type || '');
             } else if (isPaint) {
-                return (a.id || 0) - (b.id || 0); // Sort by version ID
+                return (a.id || 0) - (b.id || 0);
             } else {
-                return (a.grade ?? -1) - (b.grade ?? -1); // Sort by grade
+                return (a.grade ?? -1) - (b.grade ?? -1);
             }
         });
     
-        // Determine column header and modal title suffix
         let firstColumnHeader, modalTitleSuffix;
         if (isMode) {
             firstColumnHeader = '类型';
