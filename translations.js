@@ -806,6 +806,7 @@ const replacementDict = {
 "Boxer": "拳师",
 "«Excalibur» rounds": "«圣剑» 炮弹",
 "Excalibur": "圣剑",
+"Tempest": "暴风雨",
 "Elite": "精英",
 "Bomb": "炸弹",
 "Pumpkin": "南瓜",
