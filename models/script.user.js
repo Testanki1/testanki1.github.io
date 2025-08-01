@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.1.1
+// @version      2.1.2
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.1.1"; // 您的当前版本号
-    const currentVersionCode = 35; // 版本代码增加
+    const currentVersion = "2.1.2"; // 您的当前版本号
+    const currentVersionCode = 36; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     let iconsInjected = false;
@@ -252,7 +252,8 @@
         "scorpion": {
             "default": "600/40107/4/364/31172771520222",
             "XT_HD": "602/132677/206/41/31033605253521",
-            "DK": "626/144156/163/60/31342006663170"
+            "DK": "626/144156/163/60/31342006663170",
+            "RF": "627/130231/355/322/31366140324255"
         },
         "magnum": {
             "default": "0/16723/57/323/31167700274631",
@@ -1618,7 +1619,7 @@ function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选
             </div>
         </div>
         `;
-    }
+}
 
 function createDynamicRuleRow(category, fromOptions, from = "", to = "", domain = "") {
     const fromId = `from-${category}-${Date.now()}-${Math.random()}`;
@@ -1639,7 +1640,7 @@ function createDynamicRuleRow(category, fromOptions, from = "", to = "", domain 
              <div class="domain-selector-wrapper"></div>
              <button class="replacer-btn delete-btn" title="删除规则"><span class="material-symbols-outlined">delete</span></button>
          </div>`;
-    }
+}
 
 
 function createCategorySection(id, title, fromOpts, rules = []) {
@@ -1653,7 +1654,7 @@ function createCategorySection(id, title, fromOpts, rules = []) {
                  ${(rules || []).map(rule => createDynamicRuleRow(id, fromOpts, rule.from, rule.to, rule.domain)).join('')}
              </div>
          </div>`;
-    }
+}
 
 function createFestivalSection(id, title, options, selectedValue = 'default') {
     const selectorId = 'festival-theme-selector';
@@ -1671,7 +1672,7 @@ function createFestivalSection(id, title, options, selectedValue = 'default') {
                     ${customSelectHtml}
                 </div>
             </div>`;
-    }
+}
 
 
 function injectPanelCSS() {
@@ -1724,8 +1725,8 @@ function injectPanelCSS() {
             .cs-option:hover, .cs-option.selected { background-color: rgba(118, 255, 51, 0.2); }
             .cs-option.hidden { display: none; }
         `;
-        document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
-    }
+    document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
+}
 
 async function createPanel() {
     if (document.getElementById('replacer-panel-overlay')) return;
@@ -1773,47 +1774,47 @@ async function createPanel() {
                     </div>
                 </div>
             </div>`;
-        document.body.insertAdjacentHTML('beforeend', panelHtml);
+    document.body.insertAdjacentHTML('beforeend', panelHtml);
 
-        // After panel is in the DOM, run validation on all existing rules that have a 'to' value
-        document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
-            const toValue = row.querySelector('.to-select-wrapper .custom-select-container')?.dataset.value;
-            if (toValue) {
-                validateAndHandleResource(row);
-            }
-        });
+    // After panel is in the DOM, run validation on all existing rules that have a 'to' value
+    document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
+        const toValue = row.querySelector('.to-select-wrapper .custom-select-container')?.dataset.value;
+        if (toValue) {
+            validateAndHandleResource(row);
+        }
+    });
 
-        const overlay = document.getElementById('replacer-panel-overlay');
+    const overlay = document.getElementById('replacer-panel-overlay');
 
-        overlay.addEventListener('click', (e) => {
-            const btn = e.target.closest('.replacer-btn');
-            if (!btn && e.target === overlay) {
-                overlay.style.display = 'none';
-                return;
-            }
-            if (!btn) return;
+    overlay.addEventListener('click', (e) => {
+        const btn = e.target.closest('.replacer-btn');
+        if (!btn && e.target === overlay) {
+            overlay.style.display = 'none';
+            return;
+        }
+        if (!btn) return;
 
-            if (btn.classList.contains('add-btn')) {
-                const category = btn.dataset.category;
-                const container = btn.closest('.replacer-category').querySelector('.rules-container');
-                const fromOpts = categoryFromOptions[category];
-                if (fromOpts) container.insertAdjacentHTML('beforeend', createDynamicRuleRow(category, fromOpts));
-            } else if (btn.classList.contains('delete-btn')) {
-                btn.closest('.replacer-rule-row').remove();
-            } else if (btn.classList.contains('save-reload-btn')) {
-                saveConfiguration();
-                showToast('配置已保存，正在重载页面...');
-                setTimeout(() => window.location.reload(), 1000);
-            } else if (btn.classList.contains('save-only-btn')) {
-                const newConfig = saveConfiguration();
-                processConfig(newConfig);
-                showToast('配置已保存。部分替换可能需要重载页面才能完全生效。');
-                overlay.style.display = 'none';
-            } else if (btn.classList.contains('close-btn')) {
-                overlay.style.display = 'none';
-            }
-        });
-    }
+        if (btn.classList.contains('add-btn')) {
+            const category = btn.dataset.category;
+            const container = btn.closest('.replacer-category').querySelector('.rules-container');
+            const fromOpts = categoryFromOptions[category];
+            if (fromOpts) container.insertAdjacentHTML('beforeend', createDynamicRuleRow(category, fromOpts));
+        } else if (btn.classList.contains('delete-btn')) {
+            btn.closest('.replacer-rule-row').remove();
+        } else if (btn.classList.contains('save-reload-btn')) {
+            saveConfiguration();
+            showToast('配置已保存，正在重载页面...');
+            setTimeout(() => window.location.reload(), 1000);
+        } else if (btn.classList.contains('save-only-btn')) {
+            const newConfig = saveConfiguration();
+            processConfig(newConfig);
+            showToast('配置已保存。部分替换可能需要重载页面才能完全生效。');
+            overlay.style.display = 'none';
+        } else if (btn.classList.contains('close-btn')) {
+            overlay.style.display = 'none';
+        }
+    });
+}
 
 function saveConfiguration() {
     const newConfig = {};
