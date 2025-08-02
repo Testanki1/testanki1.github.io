@@ -38,7 +38,6 @@ const replacementDict = {
 'drone': '无人机',
 'Brutus': '布鲁特斯',
 'Sprinter': '奔跑者',
-'Mechanic': '机械师',
 'Trickster': '魔术师',
 'Trooper': '骑兵',
 'Supplier': '供应',
