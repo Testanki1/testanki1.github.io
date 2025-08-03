@@ -155,7 +155,6 @@ const replacementDict = {
 'skin container': '皮肤礼盒',
 'common': '普通',
 'uncommon': '稀有',
-'key': '钥匙',
 'rare': '珍奇',
 'epic': '史诗',
 'legendary': '传奇',
