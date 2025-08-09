@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.1.2
+// @version      2.2.0
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.1.2"; // 您的当前版本号
-    const currentVersionCode = 36; // 版本代码增加
+    const currentVersion = "2.2.0"; // 您的当前版本号
+    const currentVersionCode = 37; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     let iconsInjected = false;
@@ -140,7 +140,7 @@
         'defender': '守卫者', 'hyperion': '亥伯龙神', 'crisis': '危机', 'supply': '道具', 'ut': '超高', 'pr': '青春',
         'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT（跑车）', 'hd': 'HD（高清）', 'rf': 'RF（复古未来）', 'se': 'SE（秘密）',
         'dk': 'DK（黑暗）', 'sp': 'SP（蒸汽朋克）', 'ic': 'IC（冰）', 'old': '旧', '爆破手': '爆破手（仅音效）',
-        '魔法': '魔法（仅音效）', '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）', '雪人': '雪人（可能无法正常使用）'
+        '魔法': '魔法（仅音效）', '新年 重制': '新年 重制（演练场 重制 夏天 ——> 新年 重制）', '雪人': '雪人（进入游戏后再装备马格南）', '番茄炮': '番茄炮（进入游戏后再装备马格南）', '蜘蛛': '蜘蛛（资源域名改为 testanki1.github.io，移动设备不可用）'
     };
 
     function capitalize(s) {
@@ -259,7 +259,8 @@
             "default": "0/16723/57/323/31167700274631",
             "XT": "550/75104/53/350/31033604732253",
             "SP": "612/42416/374/133/31033604725533",
-            "雪人": "575/77444/65/233/31167700273100"
+            "雪人": "575/77444/65/233/31167700273100",
+            "番茄炮": "602/100453/315/334/31167700274347"
         },
         "railgun": {
             "default": "567/105205/202/122/31167700270037",
@@ -296,7 +297,8 @@
             "XT": "0/16722/167/77/31033610130736",
             "DC": "574/113351/211/154/31033610052500",
             "LC": "577/171773/42/62/31033610115062",
-            "GT": "620/112773/325/5/31033610100325"
+            "GT": "620/112773/325/5/31033610100325",
+            "蜘蛛": "spider"
         },
         "hopper": {
             "default": "564/5207/367/304/31244271140755",
@@ -438,7 +440,11 @@
         },
         "goldbox": {
             "default": "577/106265/316/62/31167700270621",
-            "五月假期_2025": "626/66541/105/246/31317431144762"
+            "五月假期_2025": "626/66541/105/246/31317431144762",
+            "夏季节日": "621/52423/231/162/31167700274305"
+        },
+        "goldbox_drop_zone": {
+            "夏季节日": "621/46012/23/64/31051402416107"
         },
         "sandbox_winter": {
             "default": "570/174542/371/61/30544540056777",
@@ -457,17 +463,17 @@
             "新年 重制": "570/174542/371/72/31167257256577"
         },
         "new_year_music_map": {
-            "default": "602/103320/104/163/30654312275414",
-            "节日季节 主题": "575/163160/137/356/30653770533354",
-            "新年 重制": "575/163160/137/356/30653770533354"
+            "default": "602/103320/104/163/31345722114137/sound.mp3",
+            "节日季节 主题": "575/163160/137/356/30653770533354/sound.mp3",
+            "新年 重制": "575/163160/137/356/30653770533354/sound.mp3"
         },
         "new_year_music_lobby": {
-            "default": "624/47563/51/36/31211761360366",
-            "新年_2025": "575/163160/137/356/30653770533354"
+            "default": "624/47563/51/36/31346024736404/sound.mp3",
+            "新年_2025": "575/163160/137/356/30653770533354/sound.mp3"
         },
         "new_year_music_garage": {
-            "default": "624/47563/351/11/31211761433310",
-            "新年_2025": "575/163160/137/356/30653770533354"
+            "default": "624/47563/351/11/31346024735775/sound.mp3",
+            "新年_2025": "575/163160/137/356/30653770533354/sound.mp3"
         }
     };
     const shotEffectsRedirectMap = {
@@ -587,8 +593,8 @@
             "电": "546/145213/171/0/30545000702716"
         },
         "twins_sound_1": {
-            "default": "0/114/113/232/30654312334330",
-            "爆破手": "600/155645/173/315/30653771331454"
+            "default": "0/114/113/232/31345722126256/sound.mp3",
+            "爆破手": "600/155645/173/315/30653771331454/sound.mp3"
         },
         "twins_sound_2": {
             "爆破手": "600/155645/173/305/30653771331271"
@@ -638,16 +644,16 @@
             "水": "546/147746/341/23/30545000607474"
         },
         "ricochet_sound_1": {
-            "default": "0/114/141/75/30653771331544",
-            "爆破手": "600/155645/173/316/30653771331536"
+            "default": "0/114/141/75/30653771331544/sound.mp3",
+            "爆破手": "600/155645/173/316/30653771331536/sound.mp3"
         },
         "ricochet_sound_2": {
-            "default": "0/114/141/74/30653771331450",
-            "爆破手": "600/155645/173/315/30653771331454"
+            "default": "0/114/141/74/30653771331450/sound.mp3",
+            "爆破手": "600/155645/173/315/30653771331454/sound.mp3"
         },
         "ricochet_sound_3": {
-            "default": "0/114/141/110/30653771331253",
-            "爆破手": "600/155645/173/305/30653771331271"
+            "default": "0/114/141/110/30653771331253/sound.mp3",
+            "爆破手": "600/155645/173/305/30653771331271/sound.mp3"
         },
         "vulcan_1": {
             "default": "546/145213/124/120/30545000703060",
@@ -725,7 +731,8 @@
             "深红色": "554/153573/310/141/30545000702743",
             "毒": "554/153573/311/60/30545000702612",
             "紫罗兰色": "554/153573/311/171/30545000703070",
-            "日食": "554/153573/310/340/30545000702671"
+            "日食": "554/153573/310/340/30545000702671",
+            "番茄炮": "602/105615/143/174/30545000703044"
         },
         "magnum_2": {
             "default": "546/145213/177/370/30545000702654",
@@ -733,9 +740,13 @@
             "深红色": "554/153573/312/2/30545000702566",
             "毒": "554/153573/312/212/30545000702764",
             "紫罗兰色": "554/153573/312/317/30545000703014",
-            "日食": "554/153573/312/106/30545000702730"
+            "日食": "554/153573/312/106/30545000702730",
+            "番茄炮": "554/153573/312/2/30545000702566"
         },
-
+        "magnum_sound": {
+            "default": "0/16723/73/221/31345722115044",
+            "番茄炮": "572/75525/322/163/31345722125627"
+        },
         "railgun_1": {
             "default": "546/150126/51/246/30545000607361",
             "血液": "546/150135/217/70/30545000607516",
@@ -771,8 +782,8 @@
             "魔法": "615/171467/335/170/30706105525223"
         },
         "railgun_sound": {
-            "default": "0/114/113/314/30654312335235",
-            "魔法": "617/51351/145/71/30752715761312"
+            "default": "0/114/113/314/31345722126571/sound.mp3",
+            "魔法": "617/51351/145/71/30752715761312/sound.swf"
         },
         "gauss_1": {
             "default": "552/132670/36/315/30545000606571",
@@ -843,16 +854,16 @@
             "岩浆": "546/150164/204/117/30545000607517"
         },
         "supply_boost_armor_sound": {
-            "default": "0/16723/157/341/30654312276460",
-            "危机": "562/50436/64/45/30654312310442"
+            "default": "0/16723/157/341/31345722114575",
+            "危机": "562/50436/64/45/31345722122070"
         },
         "supply_boost_damage_sound": {
-            "default": "0/16723/157/343/30654312276671",
-            "危机": "562/50436/64/57/30654312276474"
+            "default": "0/16723/157/343/31345722114677",
+            "危机": "562/50436/64/57/31345722114600"
         },
         "supply_boost_speed_sound": {
-            "default": "0/16723/157/346/30654312306133",
-            "危机": "562/50436/64/61/30654312314022"
+            "default": "0/16723/157/346/31345722120537",
+            "危机": "562/50436/64/61/31345722123737"
         }
     };
     const paintsRedirectMap = {
@@ -1442,6 +1453,7 @@
         DEFAULT_RESOURCE_DOMAIN,
         'https://s.eu.tankionline.com',
         'https://res.3dtank.com',
+        'https://testanki1.github.io',
         ...Array.from({ length: 9 }, (_, i) => `https://public-deploy${i + 1}.test-eu.tankionline.com/resources`)
     ];
     const resourceDomains = [...new Set(allPossibleDomains)];
@@ -1453,16 +1465,29 @@
 
     async function checkResourceExists(domain, path) {
         if (!domain || !path) return false;
-        const url = `${domain}/${path}/meta.info`;
+
+        let directoryPath = path;
+        const lastSlashIndex = path.lastIndexOf('/');
+        // 检查路径最后一部分是否像文件名（即包含点号'.'）
+        if (lastSlashIndex !== -1) {
+            const lastPart = path.substring(lastSlashIndex + 1);
+            if (lastPart.includes('.')) {
+                // 如果是文件路径，则取其父目录
+                directoryPath = path.substring(0, lastSlashIndex);
+            }
+        }
+        // 如果不是文件路径（例如 '.../31167700271626'），则 directoryPath 保持为原始 path
+
+        const url = `${domain}/${directoryPath}/meta.info`;
         try {
             const response = await fetch(url, { method: 'HEAD', cache: 'reload' });
             return response.ok;
         } catch (error) {
-            console.error(`Check failed for ${url}:`, error);
+            // 网络错误或CORS策略阻止了请求，也视为资源不存在
+            // console.error(`Check failed for ${url}:`, error);
             return false;
         }
     }
-
     function getResourcePath(category, from, to) {
         const map = resourceMaps[category];
         if (!map || !from || !to) return null;
@@ -1972,16 +1997,17 @@ function buildResourcePathCache() {
     for (const category in resourceMaps) {
         const map = resourceMaps[category];
         if (category === 'paints') {
-            if(map.paints){
+            if (map.paints) {
                 for (const paintName in map.paints) {
                     resourcePathCache.set(map.paints[paintName], { category: 'paints', from: paintName });
                 }
             }
         } else if (category === 'shotEffects') {
             for (const effectKey in map) {
-                const from = effectKey.split('_')[0];
+                const from = effectKey.split('_')[0]; // e.g., 'twins' from 'twins_sound_1'
                 for (const skin in map[effectKey]) {
-                    resourcePathCache.set(map[effectKey][skin], { category: 'shotEffects', from: from, skin: skin });
+                    const fullPath = map[effectKey][skin];
+                    resourcePathCache.set(fullPath, { category: 'shotEffects', from: from, skin: skin, fullKey: effectKey });
                 }
             }
         } else {
@@ -2005,32 +2031,55 @@ function setupInterceptors() {
     }
 
     const findReplacement = (originalUrl) => {
-        const match = originalUrl.match(/(\d+\/\d+\/[^/]+\/[^/]+\/\d+)/);
-        if (!match) return null;
+        let longestMatchPath = '';
+        let sourceInfo = null;
 
-        const resourcePath = match[1];
-        const originalFile = originalUrl.substring(match.index + resourcePath.length);
+        // Find the longest matching resource path from the cache
+        for (const [path, info] of resourcePathCache.entries()) {
+            if (originalUrl.includes(path) && path.length > longestMatchPath.length) {
+                longestMatchPath = path;
+                sourceInfo = info;
+            }
+        }
 
-        const sourceInfo = resourcePathCache.get(resourcePath);
         if (!sourceInfo) return null;
 
+        const originalFile = originalUrl.substring(originalUrl.indexOf(longestMatchPath) + longestMatchPath.length);
         const rules = activeReplacements[sourceInfo.category];
-        const rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
+
+        let rule = null;
+        if (sourceInfo.category === 'shotEffects') {
+            // For shot effects, we need to match the 'from' part (e.g., 'twins')
+            rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
+        } else {
+            // For other categories, we match the full 'from' name
+            rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
+        }
+
         if (!rule) return null;
 
-        const targetPath = getResourcePath(sourceInfo.category, rule.from, rule.to);
-        const domain = rule.domain || DEFAULT_RESOURCE_DOMAIN;
+        let targetPath;
+        if (sourceInfo.category === 'shotEffects') {
+            // Find the corresponding target path using the full original key
+            const targetMap = resourceMaps.shotEffects[sourceInfo.fullKey];
+            targetPath = targetMap ? targetMap[rule.to] : null;
+        } else {
+            targetPath = getResourcePath(sourceInfo.category, rule.from, rule.to);
+        }
 
+        const domain = rule.domain || DEFAULT_RESOURCE_DOMAIN;
         if (!targetPath) return null;
 
         return `${domain}/${targetPath}${originalFile}`;
     };
+
 
     const originalFetch = window.fetch;
     window.fetch = function(input, init) {
         let url = (input instanceof Request) ? input.url : String(input);
         const newUrl = findReplacement(url);
         if (newUrl) {
+            console.log(`[Replacer] Fetch: ${url} -> ${newUrl}`);
             input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
         }
         return originalFetch.call(this, input, init);
@@ -2039,6 +2088,9 @@ function setupInterceptors() {
     const originalOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, ...args) {
         const newUrl = findReplacement(String(url));
+        if (newUrl) {
+            console.log(`[Replacer] XHR: ${url} -> ${newUrl}`);
+        }
         return originalOpen.call(this, method, newUrl || url, ...args);
     };
 }
@@ -2046,15 +2098,20 @@ function setupInterceptors() {
 // --- 主执行逻辑 ---
 buildResourcePathCache();
 setupInterceptors();
-initializeCustomSelectHandlers();
 
-const uiInitInterval = setInterval(() => {
+
+const interval = setInterval(() => {
     if (document.body) {
-        clearInterval(uiInitInterval);
-        injectMaterialIcons();
-        injectPanelCSS();
-        createPanel();
-        createEdgeTrigger();
+        clearInterval(interval);
+        try {
+            injectMaterialIcons();
+            injectPanelCSS();
+            createPanel();
+            createEdgeTrigger();
+            initializeCustomSelectHandlers();
+        } catch (e) {
+            console.error("UI 初始化失败:", e);
+        }
     }
 }, 100);
 
