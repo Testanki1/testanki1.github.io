@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.2.1
+// @version      2.2.2
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.2.1"; // 您的当前版本号
-    const currentVersionCode = 38; // 版本代码增加
+    const currentVersion = "2.2.2"; // 您的当前版本号
+    const currentVersionCode = 39; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     let iconsInjected = false;
@@ -1349,6 +1349,7 @@
             "拼图": "626/144430/144/203/31331106073703",
             "墨盒": "630/25640/113/143/31405350075017",
             "烈火": "542/137056/361/250/30545000607033",
+            "洒红节": "551/27323/272/14/30545000703040",
             //以下迷彩名称为非官方翻译
             "16 岁": "626/166330/71/330/31335466047104",
             "跑酷小子": "0/16717/162/310/30545000606035",
