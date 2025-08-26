@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         3D坦克资源替换
 // @namespace    http://tampermonkey.net/
-// @version      2.2.2
+// @version      2.2.3
 // @description  3D坦克炮塔、底盘、迷彩、无人机、射击效果和节日等资源替换。
 // @author       Testanki
 // @match        *://*.3dtank.com/play*
@@ -16,8 +16,8 @@
     'use strict';
 
     // --- START: Version Check ---
-    const currentVersion = "2.2.2"; // 您的当前版本号
-    const currentVersionCode = 39; // 版本代码增加
+    const currentVersion = "2.2.3"; // 您的当前版本号
+    const currentVersionCode = 40; // 版本代码增加
     const versionUrl = 'https://testanki1.github.io/models/version.json';
 
     let iconsInjected = false;
@@ -1337,7 +1337,7 @@
             "红色通缉令": "604/55507/216/315/30545000607562",
             "绿色随从": "606/142716/315/260/30545000606622",
             "美洲驼坦克": "606/52064/106/231/30545000606726",
-            "银河系": "607/11377/342/30/30545000607017",
+            "银河系（特殊）": "607/11377/342/30/30545000607017",
             "黑兹尔装甲工程": "606/52062/372/31/30545000607021",
             "黑色红宝石": "623/63452/73/13/31154712437072",
             "退役机器人": "604/55475/147/173/30545000606212",
@@ -1594,46 +1594,46 @@
         </div>`;
     }
 
-function getToOptionsFor(category, fromValue) {
-    const map = resourceMaps[category];
-    if (!map || !fromValue) {
-        return [];
-    }
-    const options = new Set();
-    if (['turrets', 'hulls', 'drones'].includes(category)) {
-        const itemSkins = map[fromValue];
-        if (itemSkins) {
-            Object.keys(itemSkins).forEach(skin => {
-                if (skin !== 'default') {
-                    options.add(skin);
-                }
-            });
+    function getToOptionsFor(category, fromValue) {
+        const map = resourceMaps[category];
+        if (!map || !fromValue) {
+            return [];
         }
-    } else if (category === 'shotEffects') {
-        for (const effectKey in map) {
-            if (effectKey.toLowerCase().startsWith(fromValue.toLowerCase())) {
-                const effectStyles = map[effectKey];
-                if (effectStyles) {
-                    Object.keys(effectStyles).forEach(style => {
-                        if (style !== 'default') {
-                            options.add(style);
-                        }
-                    });
+        const options = new Set();
+        if (['turrets', 'hulls', 'drones'].includes(category)) {
+            const itemSkins = map[fromValue];
+            if (itemSkins) {
+                Object.keys(itemSkins).forEach(skin => {
+                    if (skin !== 'default') {
+                        options.add(skin);
+                    }
+                });
+            }
+        } else if (category === 'shotEffects') {
+            for (const effectKey in map) {
+                if (effectKey.toLowerCase().startsWith(fromValue.toLowerCase())) {
+                    const effectStyles = map[effectKey];
+                    if (effectStyles) {
+                        Object.keys(effectStyles).forEach(style => {
+                            if (style !== 'default') {
+                                options.add(style);
+                            }
+                        });
+                    }
                 }
             }
+        } else if (category === 'paints') {
+            if (map.paints) {
+                Object.keys(map.paints).forEach(paintName => options.add(paintName));
+            }
         }
-    } else if (category === 'paints') {
-        if (map.paints) {
-            Object.keys(map.paints).forEach(paintName => options.add(paintName));
-        }
+        return Array.from(options).sort(pinyinSorter);
     }
-    return Array.from(options).sort(pinyinSorter);
-}
 
-function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选择 --', disabled = false) {
-    const selectedText = selectedValue ? getDisplayName(selectedValue) : placeholder;
-    const optionsHtml = options.map(opt =>
-                                    `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDisplayName(opt)}</li>`
+    function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选择 --', disabled = false) {
+        const selectedText = selectedValue ? getDisplayName(selectedValue) : placeholder;
+        const optionsHtml = options.map(opt =>
+                                        `<li class="cs-option ${selectedValue === opt ? 'selected' : ''}" data-value="${opt}">${getDisplayName(opt)}</li>`
         ).join('');
 
     return `
@@ -1647,14 +1647,14 @@ function createCustomSelect(id, options, selectedValue, placeholder = '-- 请选
         `;
 }
 
-function createDynamicRuleRow(category, fromOptions, from = "", to = "", domain = "") {
-    const fromId = `from-${category}-${Date.now()}-${Math.random()}`;
-    const toId = `to-${category}-${Date.now()}-${Math.random()}`;
-    const toOptions = from ? getToOptionsFor(category, from) : [];
-    const toPlaceholder = from ? '-- 请选择目标 --' : '-- 请先选择源 --';
-    const toDisabled = !from;
+    function createDynamicRuleRow(category, fromOptions, from = "", to = "", domain = "") {
+        const fromId = `from-${category}-${Date.now()}-${Math.random()}`;
+        const toId = `to-${category}-${Date.now()}-${Math.random()}`;
+        const toOptions = from ? getToOptionsFor(category, from) : [];
+        const toPlaceholder = from ? '-- 请选择目标 --' : '-- 请先选择源 --';
+        const toDisabled = !from;
 
-    return `
+        return `
          <div class="replacer-rule-row" data-category="${category}" data-domain="${domain || ''}">
              <div class="from-select-wrapper">
                 ${createCustomSelect(fromId, fromOptions, from, '-- 请选择源 --')}
@@ -1669,8 +1669,8 @@ function createDynamicRuleRow(category, fromOptions, from = "", to = "", domain 
 }
 
 
-function createCategorySection(id, title, fromOpts, rules = []) {
-    return `
+    function createCategorySection(id, title, fromOpts, rules = []) {
+        return `
          <div class="replacer-category" id="category-${id}">
              <div class="replacer-category-title">
                  <span>${title}</span>
@@ -1682,16 +1682,16 @@ function createCategorySection(id, title, fromOpts, rules = []) {
          </div>`;
 }
 
-function createFestivalSection(id, title, options, selectedValue = 'default') {
-    const selectorId = 'festival-theme-selector';
-    const customSelectHtml = createCustomSelect(
-        selectorId,
-        ['default', ...options],
-        selectedValue,
-        '-- 选择节日主题 --'
-    );
+    function createFestivalSection(id, title, options, selectedValue = 'default') {
+        const selectorId = 'festival-theme-selector';
+        const customSelectHtml = createCustomSelect(
+            selectorId,
+            ['default', ...options],
+            selectedValue,
+            '-- 选择节日主题 --'
+        );
 
-    return `
+        return `
             <div class="replacer-category" id="category-${id}" data-category="${id}">
                 <div class="replacer-category-title"><span>${title}</span></div>
                 <div class="replacer-rule-row single-selector-row">
@@ -1701,9 +1701,9 @@ function createFestivalSection(id, title, options, selectedValue = 'default') {
 }
 
 
-function injectPanelCSS() {
-    if (document.getElementById('replacer-styles')) return;
-    const css = `
+    function injectPanelCSS() {
+        if (document.getElementById('replacer-styles')) return;
+        const css = `
             :root { --rp-main-color: #76FF33; --rp-bg-color: rgba(0, 25, 38, 0.95); --rp-dark-bg: #001926; --rp-text-color: #bfd5ff; --rp-error-color: #ff6666; }
             .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-flex; vertical-align: middle; line-height: 1; }
             #replacer-edge-trigger { position: fixed; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 100px; background-color: rgba(0, 25, 38, 0.4); border: 1px solid rgba(118, 255, 51, 0.4); border-right: none; border-radius: 10px 0 0 10px; cursor: pointer; z-index: 19999; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
@@ -1754,34 +1754,34 @@ function injectPanelCSS() {
     document.head.insertAdjacentHTML('beforeend', `<style id="replacer-styles">${css}</style>`);
 }
 
-async function createPanel() {
-    if (document.getElementById('replacer-panel-overlay')) return;
-    const config = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
-    const getFromOptions = (map, category) => {
-        if (category === 'shotEffects') return Array.from(new Set(Object.keys(map || {}).map(key => key.split('_')[0]))).sort(pinyinSorter);
-        if (category === 'paints') return Object.keys(map?.paints || {}).sort(pinyinSorter);
-        return Object.keys(map || {}).sort(pinyinSorter);
-    };
-    const getAllFestivalThemes = (map) => {
-        const themes = new Set();
-        for (const item in map) {
-            for (const theme in map[item]) {
-                if (theme !== 'default') {
-                    themes.add(theme);
+    async function createPanel() {
+        if (document.getElementById('replacer-panel-overlay')) return;
+        const config = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+        const getFromOptions = (map, category) => {
+            if (category === 'shotEffects') return Array.from(new Set(Object.keys(map || {}).map(key => key.split('_')[0]))).sort(pinyinSorter);
+            if (category === 'paints') return Object.keys(map?.paints || {}).sort(pinyinSorter);
+            return Object.keys(map || {}).sort(pinyinSorter);
+        };
+        const getAllFestivalThemes = (map) => {
+            const themes = new Set();
+            for (const item in map) {
+                for (const theme in map[item]) {
+                    if (theme !== 'default') {
+                        themes.add(theme);
+                    }
                 }
             }
-        }
-        return Array.from(themes).sort(pinyinSorter);
-    };
-    const categoryFromOptions = {
-        turrets: getFromOptions(turretsRedirectMap, 'turrets'),
-        hulls: getFromOptions(hullsRedirectMap, 'hulls'),
-        paints: getFromOptions(paintsRedirectMap, 'paints'),
-        shotEffects: getFromOptions(shotEffectsRedirectMap, 'shotEffects'),
-        drones: getFromOptions(dronesRedirectMap, 'drones'),
-    };
-    const festivalThemeOpts = getAllFestivalThemes(festivalsRedirectMap);
-    const panelHtml = `
+            return Array.from(themes).sort(pinyinSorter);
+        };
+        const categoryFromOptions = {
+            turrets: getFromOptions(turretsRedirectMap, 'turrets'),
+            hulls: getFromOptions(hullsRedirectMap, 'hulls'),
+            paints: getFromOptions(paintsRedirectMap, 'paints'),
+            shotEffects: getFromOptions(shotEffectsRedirectMap, 'shotEffects'),
+            drones: getFromOptions(dronesRedirectMap, 'drones'),
+        };
+        const festivalThemeOpts = getAllFestivalThemes(festivalsRedirectMap);
+        const panelHtml = `
             <div class="replacer-settings-overlay" id="replacer-panel-overlay" style="display:none;">
                 <div class="replacer-settings-panel">
                     <div class="replacer-header">资源替换</div>
@@ -1842,278 +1842,278 @@ async function createPanel() {
     });
 }
 
-function saveConfiguration() {
-    const newConfig = {};
-    document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
-        const category = row.dataset.category;
-        if (!newConfig[category]) newConfig[category] = [];
-        const from = row.querySelector('.from-select-wrapper .custom-select-container').dataset.value;
-        const to = row.querySelector('.to-select-wrapper .custom-select-container').dataset.value;
-        const domain = row.dataset.domain || ''; // Get domain from data attribute
-        if (from && to) {
-            newConfig[category].push({ from, to, domain });
-        }
-    });
-    const festivalSelector = document.getElementById('festival-theme-selector');
-    if (festivalSelector) newConfig.festivals = festivalSelector.dataset.value;
+    function saveConfiguration() {
+        const newConfig = {};
+        document.querySelectorAll('.replacer-rule-row[data-category]').forEach(row => {
+            const category = row.dataset.category;
+            if (!newConfig[category]) newConfig[category] = [];
+            const from = row.querySelector('.from-select-wrapper .custom-select-container').dataset.value;
+            const to = row.querySelector('.to-select-wrapper .custom-select-container').dataset.value;
+            const domain = row.dataset.domain || ''; // Get domain from data attribute
+            if (from && to) {
+                newConfig[category].push({ from, to, domain });
+            }
+        });
+        const festivalSelector = document.getElementById('festival-theme-selector');
+        if (festivalSelector) newConfig.festivals = festivalSelector.dataset.value;
 
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(newConfig));
-    console.log("配置已保存:", newConfig);
-    return newConfig;
-}
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(newConfig));
+        console.log("配置已保存:", newConfig);
+        return newConfig;
+    }
 
-function initializeCustomSelectHandlers() {
-    document.body.addEventListener('click', (e) => {
-        const trigger = e.target.closest('.cs-trigger');
+    function initializeCustomSelectHandlers() {
+        document.body.addEventListener('click', (e) => {
+            const trigger = e.target.closest('.cs-trigger');
 
-        document.querySelectorAll('.custom-select-container.open').forEach(openSelect => {
-            if (!trigger || openSelect !== trigger.parentElement) {
-                openSelect.classList.remove('open');
+            document.querySelectorAll('.custom-select-container.open').forEach(openSelect => {
+                if (!trigger || openSelect !== trigger.parentElement) {
+                    openSelect.classList.remove('open');
+                }
+            });
+
+            if (trigger) {
+                const container = trigger.closest('.custom-select-container');
+                if (container && !container.classList.contains('disabled')) {
+                    container.classList.toggle('open');
+                    if (container.classList.contains('open')) {
+                        const searchInput = container.querySelector('.cs-search-input');
+                        if (searchInput) searchInput.focus();
+                    }
+                }
             }
         });
 
-        if (trigger) {
-            const container = trigger.closest('.custom-select-container');
-            if (container && !container.classList.contains('disabled')) {
-                container.classList.toggle('open');
-                if (container.classList.contains('open')) {
-                    const searchInput = container.querySelector('.cs-search-input');
-                    if (searchInput) searchInput.focus();
-                }
-            }
-        }
-    });
+        document.body.addEventListener('click', async (e) => {
+            if (e.target.matches('.cs-option')) {
+                const option = e.target;
+                const container = option.closest('.custom-select-container');
+                const trigger = container.querySelector('.cs-trigger');
+                const ruleRow = container.closest('.replacer-rule-row');
 
-    document.body.addEventListener('click', async (e) => {
-        if (e.target.matches('.cs-option')) {
-            const option = e.target;
-            const container = option.closest('.custom-select-container');
-            const trigger = container.querySelector('.cs-trigger');
-            const ruleRow = container.closest('.replacer-rule-row');
+                const oldValue = container.dataset.value;
+                const newValue = option.dataset.value;
 
-            const oldValue = container.dataset.value;
-            const newValue = option.dataset.value;
-
-            container.dataset.value = newValue;
-            // For domain selector, display name is different
-            if (container.closest('.domain-selector-wrapper')) {
-                trigger.textContent = getDomainDisplayName(newValue) || '-- 请更换资源域名 --';
-            } else {
-                trigger.textContent = option.textContent;
-            }
-
-            container.querySelectorAll('.cs-option.selected').forEach(sel => sel.classList.remove('selected'));
-            option.classList.add('selected');
-            container.classList.remove('open');
-
-            if (oldValue !== newValue && ruleRow) {
-                if (container.closest('.from-select-wrapper')) {
-                    // 'From' select changed: update 'To' options
-                    const category = ruleRow.dataset.category;
-                    const toWrapper = ruleRow.querySelector('.to-select-wrapper');
-                    const toOptions = getToOptionsFor(category, newValue);
-                    const toId = `to-${category}-${Date.now()}-${Math.random()}`;
-                    const newToSelectHtml = createCustomSelect(toId, toOptions, '', '-- 请选择目标 --', toOptions.length === 0);
-                    toWrapper.innerHTML = newToSelectHtml;
-                    ruleRow.querySelector('.domain-selector-wrapper').innerHTML = '';
-                } else if (container.closest('.to-select-wrapper')) {
-                    // 'To' select changed: validate
-                    ruleRow.dataset.domain = ''; // Reset domain on 'To' change
-                    await validateAndHandleResource(ruleRow);
-                } else if (container.closest('.domain-selector-wrapper')) {
-                    // Domain select changed: update stored domain and re-validate
-                    ruleRow.dataset.domain = newValue;
-                    await validateAndHandleResource(ruleRow);
-                }
-            }
-        }
-    });
-
-    document.body.addEventListener('input', (e) => {
-        if (e.target.matches('.cs-search-input')) {
-            const input = e.target;
-            const filter = input.value.toLowerCase();
-            const optionsList = input.closest('.cs-options').querySelector('.cs-options-list');
-
-            optionsList.querySelectorAll('.cs-option').forEach(option => {
-                const text = option.textContent.toLowerCase();
-                const value = option.dataset.value.toLowerCase();
-                if (text.includes(filter) || value.includes(filter)) {
-                    option.classList.remove('hidden');
+                container.dataset.value = newValue;
+                // For domain selector, display name is different
+                if (container.closest('.domain-selector-wrapper')) {
+                    trigger.textContent = getDomainDisplayName(newValue) || '-- 请更换资源域名 --';
                 } else {
-                    option.classList.add('hidden');
+                    trigger.textContent = option.textContent;
                 }
-            });
-        }
-    });
-}
 
-function createEdgeTrigger() {
-    if (document.getElementById('replacer-edge-trigger')) return;
-    const trigger = document.createElement('div');
-    trigger.id = 'replacer-edge-trigger';
-    trigger.innerHTML = '<span class="trigger-icon material-symbols-outlined">chevron_left</span>';
-    trigger.title = '打开资源替换设置';
-    trigger.onclick = () => {
-        const overlay = document.getElementById('replacer-panel-overlay');
-        if (overlay) overlay.style.display = 'flex';
-    };
-    document.body.appendChild(trigger);
-}
+                container.querySelectorAll('.cs-option.selected').forEach(sel => sel.classList.remove('selected'));
+                option.classList.add('selected');
+                container.classList.remove('open');
 
-function processConfig(config) {
-    const processed = {};
-    if (!config) return;
+                if (oldValue !== newValue && ruleRow) {
+                    if (container.closest('.from-select-wrapper')) {
+                        // 'From' select changed: update 'To' options
+                        const category = ruleRow.dataset.category;
+                        const toWrapper = ruleRow.querySelector('.to-select-wrapper');
+                        const toOptions = getToOptionsFor(category, newValue);
+                        const toId = `to-${category}-${Date.now()}-${Math.random()}`;
+                        const newToSelectHtml = createCustomSelect(toId, toOptions, '', '-- 请选择目标 --', toOptions.length === 0);
+                        toWrapper.innerHTML = newToSelectHtml;
+                        ruleRow.querySelector('.domain-selector-wrapper').innerHTML = '';
+                    } else if (container.closest('.to-select-wrapper')) {
+                        // 'To' select changed: validate
+                        ruleRow.dataset.domain = ''; // Reset domain on 'To' change
+                        await validateAndHandleResource(ruleRow);
+                    } else if (container.closest('.domain-selector-wrapper')) {
+                        // Domain select changed: update stored domain and re-validate
+                        ruleRow.dataset.domain = newValue;
+                        await validateAndHandleResource(ruleRow);
+                    }
+                }
+            }
+        });
 
-    for (const category in config) {
-        if (category !== 'festivals') {
-            processed[category] = config[category];
-        }
-    }
+        document.body.addEventListener('input', (e) => {
+            if (e.target.matches('.cs-search-input')) {
+                const input = e.target;
+                const filter = input.value.toLowerCase();
+                const optionsList = input.closest('.cs-options').querySelector('.cs-options-list');
 
-    const selectedTheme = config.festivals;
-    if (selectedTheme && selectedTheme !== 'default') {
-        const festivalRules = [];
-        const festivalMap = resourceMaps.festivals;
-        for (const itemName in festivalMap) {
-            if (festivalMap[itemName] && festivalMap[itemName][selectedTheme]) {
-                festivalRules.push({
-                    from: itemName,
-                    to: selectedTheme,
-                    domain: ''
+                optionsList.querySelectorAll('.cs-option').forEach(option => {
+                    const text = option.textContent.toLowerCase();
+                    const value = option.dataset.value.toLowerCase();
+                    if (text.includes(filter) || value.includes(filter)) {
+                        option.classList.remove('hidden');
+                    } else {
+                        option.classList.add('hidden');
+                    }
                 });
             }
-        }
-        processed.festivals = festivalRules;
-    } else {
-        processed.festivals = [];
+        });
     }
 
-    activeReplacements = processed;
-    console.log("生效中的替换规则:", activeReplacements);
-}
+    function createEdgeTrigger() {
+        if (document.getElementById('replacer-edge-trigger')) return;
+        const trigger = document.createElement('div');
+        trigger.id = 'replacer-edge-trigger';
+        trigger.innerHTML = '<span class="trigger-icon material-symbols-outlined">chevron_left</span>';
+        trigger.title = '打开资源替换设置';
+        trigger.onclick = () => {
+            const overlay = document.getElementById('replacer-panel-overlay');
+            if (overlay) overlay.style.display = 'flex';
+        };
+        document.body.appendChild(trigger);
+    }
 
-function buildResourcePathCache() {
-    resourcePathCache.clear();
-    for (const category in resourceMaps) {
-        const map = resourceMaps[category];
-        if (category === 'paints') {
-            if (map.paints) {
-                for (const paintName in map.paints) {
-                    resourcePathCache.set(map.paints[paintName], { category: 'paints', from: paintName });
+    function processConfig(config) {
+        const processed = {};
+        if (!config) return;
+
+        for (const category in config) {
+            if (category !== 'festivals') {
+                processed[category] = config[category];
+            }
+        }
+
+        const selectedTheme = config.festivals;
+        if (selectedTheme && selectedTheme !== 'default') {
+            const festivalRules = [];
+            const festivalMap = resourceMaps.festivals;
+            for (const itemName in festivalMap) {
+                if (festivalMap[itemName] && festivalMap[itemName][selectedTheme]) {
+                    festivalRules.push({
+                        from: itemName,
+                        to: selectedTheme,
+                        domain: ''
+                    });
                 }
             }
-        } else if (category === 'shotEffects') {
-            for (const effectKey in map) {
-                const from = effectKey.split('_')[0]; // e.g., 'twins' from 'twins_sound_1'
-                for (const skin in map[effectKey]) {
-                    const fullPath = map[effectKey][skin];
-                    resourcePathCache.set(fullPath, { category: 'shotEffects', from: from, skin: skin, fullKey: effectKey });
-                }
-            }
+            processed.festivals = festivalRules;
         } else {
-            for (const itemName in map) {
-                for (const skinName in map[itemName]) {
-                    resourcePathCache.set(map[itemName][skinName], { category: category, from: itemName, skin: skinName });
+            processed.festivals = [];
+        }
+
+        activeReplacements = processed;
+        console.log("生效中的替换规则:", activeReplacements);
+    }
+
+    function buildResourcePathCache() {
+        resourcePathCache.clear();
+        for (const category in resourceMaps) {
+            const map = resourceMaps[category];
+            if (category === 'paints') {
+                if (map.paints) {
+                    for (const paintName in map.paints) {
+                        resourcePathCache.set(map.paints[paintName], { category: 'paints', from: paintName });
+                    }
+                }
+            } else if (category === 'shotEffects') {
+                for (const effectKey in map) {
+                    const from = effectKey.split('_')[0]; // e.g., 'twins' from 'twins_sound_1'
+                    for (const skin in map[effectKey]) {
+                        const fullPath = map[effectKey][skin];
+                        resourcePathCache.set(fullPath, { category: 'shotEffects', from: from, skin: skin, fullKey: effectKey });
+                    }
+                }
+            } else {
+                for (const itemName in map) {
+                    for (const skinName in map[itemName]) {
+                        resourcePathCache.set(map[itemName][skinName], { category: category, from: itemName, skin: skinName });
+                    }
                 }
             }
         }
     }
-}
 
-function setupInterceptors() {
-    try {
-        currentConfig = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
-        processConfig(currentConfig);
-    } catch (e) {
-        console.error("解析替换配置失败:", e);
-        currentConfig = {};
-        activeReplacements = {};
-    }
-
-    const findReplacement = (originalUrl) => {
-        let longestMatchPath = '';
-        let sourceInfo = null;
-
-        // Find the longest matching resource path from the cache
-        for (const [path, info] of resourcePathCache.entries()) {
-            if (originalUrl.includes(path) && path.length > longestMatchPath.length) {
-                longestMatchPath = path;
-                sourceInfo = info;
-            }
-        }
-
-        if (!sourceInfo) return null;
-
-        const originalFile = originalUrl.substring(originalUrl.indexOf(longestMatchPath) + longestMatchPath.length);
-        const rules = activeReplacements[sourceInfo.category];
-
-        let rule = null;
-        if (sourceInfo.category === 'shotEffects') {
-            // For shot effects, we need to match the 'from' part (e.g., 'twins')
-            rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
-        } else {
-            // For other categories, we match the full 'from' name
-            rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
-        }
-
-        if (!rule) return null;
-
-        let targetPath;
-        if (sourceInfo.category === 'shotEffects') {
-            // Find the corresponding target path using the full original key
-            const targetMap = resourceMaps.shotEffects[sourceInfo.fullKey];
-            targetPath = targetMap ? targetMap[rule.to] : null;
-        } else {
-            targetPath = getResourcePath(sourceInfo.category, rule.from, rule.to);
-        }
-
-        const domain = rule.domain || DEFAULT_RESOURCE_DOMAIN;
-        if (!targetPath) return null;
-
-        return `${domain}/${targetPath}${originalFile}`;
-    };
-
-
-    const originalFetch = window.fetch;
-    window.fetch = function(input, init) {
-        let url = (input instanceof Request) ? input.url : String(input);
-        const newUrl = findReplacement(url);
-        if (newUrl) {
-            console.log(`[Replacer] Fetch: ${url} -> ${newUrl}`);
-            input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
-        }
-        return originalFetch.call(this, input, init);
-    };
-
-    const originalOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url, ...args) {
-        const newUrl = findReplacement(String(url));
-        if (newUrl) {
-            console.log(`[Replacer] XHR: ${url} -> ${newUrl}`);
-        }
-        return originalOpen.call(this, method, newUrl || url, ...args);
-    };
-}
-
-// --- 主执行逻辑 ---
-buildResourcePathCache();
-setupInterceptors();
-
-
-const interval = setInterval(() => {
-    if (document.body) {
-        clearInterval(interval);
+    function setupInterceptors() {
         try {
-            injectMaterialIcons();
-            injectPanelCSS();
-            createPanel();
-            createEdgeTrigger();
-            initializeCustomSelectHandlers();
+            currentConfig = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+            processConfig(currentConfig);
         } catch (e) {
-            console.error("UI 初始化失败:", e);
+            console.error("解析替换配置失败:", e);
+            currentConfig = {};
+            activeReplacements = {};
         }
+
+        const findReplacement = (originalUrl) => {
+            let longestMatchPath = '';
+            let sourceInfo = null;
+
+            // Find the longest matching resource path from the cache
+            for (const [path, info] of resourcePathCache.entries()) {
+                if (originalUrl.includes(path) && path.length > longestMatchPath.length) {
+                    longestMatchPath = path;
+                    sourceInfo = info;
+                }
+            }
+
+            if (!sourceInfo) return null;
+
+            const originalFile = originalUrl.substring(originalUrl.indexOf(longestMatchPath) + longestMatchPath.length);
+            const rules = activeReplacements[sourceInfo.category];
+
+            let rule = null;
+            if (sourceInfo.category === 'shotEffects') {
+                // For shot effects, we need to match the 'from' part (e.g., 'twins')
+                rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
+            } else {
+                // For other categories, we match the full 'from' name
+                rule = rules?.find(r => r.from.toLowerCase() === sourceInfo.from.toLowerCase());
+            }
+
+            if (!rule) return null;
+
+            let targetPath;
+            if (sourceInfo.category === 'shotEffects') {
+                // Find the corresponding target path using the full original key
+                const targetMap = resourceMaps.shotEffects[sourceInfo.fullKey];
+                targetPath = targetMap ? targetMap[rule.to] : null;
+            } else {
+                targetPath = getResourcePath(sourceInfo.category, rule.from, rule.to);
+            }
+
+            const domain = rule.domain || DEFAULT_RESOURCE_DOMAIN;
+            if (!targetPath) return null;
+
+            return `${domain}/${targetPath}${originalFile}`;
+        };
+
+
+        const originalFetch = window.fetch;
+        window.fetch = function(input, init) {
+            let url = (input instanceof Request) ? input.url : String(input);
+            const newUrl = findReplacement(url);
+            if (newUrl) {
+                console.log(`[Replacer] Fetch: ${url} -> ${newUrl}`);
+                input = (input instanceof Request) ? new Request(newUrl, input) : newUrl;
+            }
+            return originalFetch.call(this, input, init);
+        };
+
+        const originalOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...args) {
+            const newUrl = findReplacement(String(url));
+            if (newUrl) {
+                console.log(`[Replacer] XHR: ${url} -> ${newUrl}`);
+            }
+            return originalOpen.call(this, method, newUrl || url, ...args);
+        };
     }
-}, 100);
+
+    // --- 主执行逻辑 ---
+    buildResourcePathCache();
+    setupInterceptors();
+
+
+    const interval = setInterval(() => {
+        if (document.body) {
+            clearInterval(interval);
+            try {
+                injectMaterialIcons();
+                injectPanelCSS();
+                createPanel();
+                createEdgeTrigger();
+                initializeCustomSelectHandlers();
+            } catch (e) {
+                console.error("UI 初始化失败:", e);
+            }
+        }
+    }, 100);
 
 })();
