@@ -98,7 +98,10 @@
         timeInput.max = videoPlayer.duration.toFixed(3);
         timeInput.value = "0.000";
         updateButtonStates();
-        statusDiv.textContent = '视频已加载。';
+        statusDiv.textContent = '视频已加载，正在提取第一帧...';
+
+        // ✅ 修改点 2: 视频元数据加载完成后，主动更新并显示第一帧
+        updateFramePreview(0);
     });
     
     // 当视频播放或暂停时更新按钮状态
@@ -108,7 +111,7 @@
         syncTimeAndPreview();
     });
 
-    // 【关键改动】监听seeked事件，处理拖动进度条的情况
+    // 监听seeked事件，处理拖动进度条的情况
     videoPlayer.addEventListener('seeked', () => {
         // 只有当视频处于暂停状态时，拖动进度条才更新预览
         if (videoPlayer.paused) {
@@ -170,14 +173,12 @@
     // --- Helper Functions ---
 
     /**
-     * 【新增】同步视频当前时间到输入框并更新预览
+     * 同步视频当前时间到输入框并更新预览
      */
     function syncTimeAndPreview() {
         if (isSeeking || videoPlayer.readyState < videoPlayer.HAVE_METADATA) return;
         const currentTime = videoPlayer.currentTime;
-        // 更新输入框的值
         timeInput.value = currentTime.toFixed(3);
-        // 更新预览图像
         updateFramePreview(currentTime);
     }
 
@@ -273,6 +274,8 @@
                     hiddenCanvas.width = videoPlayer.videoWidth;
                     hiddenCanvas.height = videoPlayer.videoHeight;
                 }
+                // ✅ 修改点 1: 在绘制新帧之前，先清空画布
+                context.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
                 context.drawImage(videoPlayer, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
                 hiddenCanvas.toBlob(blob => {
                     if (blob) resolve(blob);
