@@ -18,6 +18,7 @@
 // @connect      balancer.public-deploy7.test-eu.tankionline.com
 // @connect      balancer.public-deploy8.test-eu.tankionline.com
 // @connect      balancer.public-deploy9.test-eu.tankionline.com
+// @connect      balancer.public-deploy10.test-eu.tankionline.com
 // @connect      balancer.review-1-public.test-ru.tankionline.com
 // @connect      balancer.review-2-public.test-ru.tankionline.com
 // @connect      balancer.review-3-public.test-ru.tankionline.com
@@ -27,6 +28,7 @@
 // @connect      balancer.review-7-public.test-ru.tankionline.com
 // @connect      balancer.review-8-public.test-ru.tankionline.com
 // @connect      balancer.review-9-public.test-ru.tankionline.com
+// @connect      balancer.review-10-public.test-ru.tankionline.com
 // ==/UserScript==
 
 (function() {
@@ -43,13 +45,13 @@
         url = balancerParam;
     } else if (/^https:\/\/3dtank\.com\//.test(currentUrl)) {
         url = 'https://balancer.3dtank.com/balancer';
-    } else if (/^https:\/\/public-deploy[1-9]\.test-eu\.tankionline\.com\//.test(currentUrl)) {
-        const match = currentUrl.match(/^https:\/\/public-deploy([1-9])\.test-eu\.tankionline\.com\//);
+    } else if (/^https:\/\/public-deploy[1-10]\.test-eu\.tankionline\.com\//.test(currentUrl)) {
+        const match = currentUrl.match(/^https:\/\/public-deploy([1-10])\.test-eu\.tankionline\.com\//);
         if (match) {
             url = `https://balancer.public-deploy${match[1]}.test-eu.tankionline.com/balancer`;
         }
-    } else if (/^https:\/\/client-review-[1-9]-public\.test-ru\.tankionline\.com\//.test(currentUrl)) {
-        const match = currentUrl.match(/^https:\/\/client-review-([1-9])\-public\.test-ru\.tankionline\.com\//);
+    } else if (/^https:\/\/client-review-[1-10]-public\.test-ru\.tankionline\.com\//.test(currentUrl)) {
+        const match = currentUrl.match(/^https:\/\/client-review-([1-10])\-public\.test-ru\.tankionline\.com\//);
         if (match) {
             url = `https://balancer.review-${match[1]}-public.test-ru.tankionline.com/balancer`;
         }
