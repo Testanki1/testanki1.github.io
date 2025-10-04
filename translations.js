@@ -57,7 +57,7 @@ const replacementDict = {
 'SteamPunk': '蒸汽朋克',
 'RetroFuture': '复古未来',
 'splash': '溅射',
-'module': '防御模块',
+'module': '模块',
 'Fox': '狐狸',
 'Badger': '獾',
 'Ocelot': '山猫',
