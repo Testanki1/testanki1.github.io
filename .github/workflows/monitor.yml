@@ -33,12 +33,15 @@ jobs:
           cat << 'EOF' > check_browser.js
           const { chromium } = require('playwright');
           const { expect } = require('@playwright/test');
+          const fs = require('fs');
 
           (async () => {
             const originalUrl = process.argv[2];
             const urlToVisit = process.argv[3];
-            if (!originalUrl || !urlToVisit) {
-              console.error('Missing URL arguments!');
+            const screenshotFilename = process.argv[4];
+
+            if (!originalUrl || !urlToVisit || !screenshotFilename) {
+              console.error('Missing arguments!');
               process.exit(1);
             }
 
@@ -48,15 +51,14 @@ jobs:
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
               const page = await context.newPage();
               
-              await page.goto(urlToVisit, { waitUntil: 'networkidle', timeout: 60000 });
+              // 【修改】使用 'domcontentloaded' 以快速加载页面，避免因网络活动频繁而超时
+              await page.goto(urlToVisit, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
               const openLocator = page.locator('text=/Log in via/i');
               const closedLocator = page.locator('text=/Invite/i');
 
-              // 等待两个目标中的任意一个出现，最长等待60秒
               await expect(openLocator.or(closedLocator)).toBeVisible({ timeout: 60000 });
 
-              // 检查是哪个目标出现了
               if (await openLocator.isVisible()) {
                 console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Open' }));
               } else {
@@ -64,7 +66,14 @@ jobs:
               }
 
             } catch (error) {
-              // 如果超时或发生任何其他错误，则视为Offline
+              // 【增强】如果发生错误，保存截图用于调试
+              if (page) {
+                const screenshotDir = './screenshots';
+                if (!fs.existsSync(screenshotDir)){
+                    fs.mkdirSync(screenshotDir);
+                }
+                await page.screenshot({ path: `${screenshotDir}/${screenshotFilename}`, fullPage: true });
+              }
               console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Offline' }));
             } finally {
               if (browser) await browser.close();
@@ -89,13 +98,13 @@ jobs:
           done
           urls+=("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com")
 
-          # --- 读取旧状态 ---
           old_status_json=$(cat "$STATE_FILE" 2>/dev/null || echo "{}")
           
           # --- 第一阶段: 并行 CURL 检查 ---
           pids=()
           online_urls_for_browser_check=()
           echo "阶段 1: 开始并行 CURL 检查 ${#urls[@]} 个服务器..."
+          # ... (此部分无改动) ...
           for url in "${urls[@]}"; do
             (
               response=$(curl --insecure --silent --location --write-out "HTTP_CODE:%{http_code}" --max-time 15 "$url" || echo "HTTP_CODE:000")
@@ -121,7 +130,6 @@ jobs:
           done
           echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个在线服务器..."
           for url in "${online_urls_for_browser_check[@]}"; do
-            # 【修改】为URL添加 skipEntranceAnyKey 参数
             url_to_visit="$url"
             if [[ "$url" == *"?"* ]]; then
               url_to_visit="${url}&skipEntranceAnyKey"
@@ -130,14 +138,16 @@ jobs:
             fi
 
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            # 【修改】传递原始URL和修改后的URL
-            node check_browser.js "$url" "$url_to_visit" > "$RESULTS_DIR/$filename.browser.json" &
+            # 【修改】增加一个用于截图的文件名参数
+            screenshot_filename="failure-$(date +%Y%m%d-%H%M%S)-${filename}.png"
+            node check_browser.js "$url" "$url_to_visit" "$screenshot_filename" > "$RESULTS_DIR/$filename.browser.json" &
             pids+=($!)
           done
           wait "${pids[@]}"
           echo "Playwright 检查完成。"
 
           # --- 第三阶段: 汇总结果并生成通知 ---
+          # ... (此部分无改动) ...
           echo "阶段 3: 汇总结果并比较状态..."
           for url in "${urls[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
@@ -146,7 +156,6 @@ jobs:
             current_hash=$(echo "$curl_result" | jq -r '.hash')
             interactive_status=""
             if [ -f "$RESULTS_DIR/$filename.browser.json" ]; then
-              # Playwright脚本现在会自己输出原始URL，我们只需读取状态
               interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json" 2>/dev/null || echo "Offline")
             fi
             
@@ -223,6 +232,7 @@ jobs:
           fi
           
       - name: Send notification email
+        # ... (此部分无改动) ...
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
@@ -241,6 +251,7 @@ jobs:
             此邮件由 GitHub Actions 自动发送。
             
       - name: Commit status file
+        # ... (此部分无改动) ...
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
@@ -252,3 +263,13 @@ jobs:
             git commit -m "chore: 更新服务器状态文件"
             git push
           fi
+          
+      # 【新增】上传调试截图的步骤
+      - name: Upload failure screenshots
+        # 'always()' 确保即使前面的步骤失败了，这个步骤也会运行
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: ./screenshots/
+          retention-days: 5 # 截图保留5天
