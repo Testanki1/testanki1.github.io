@@ -114,7 +114,7 @@ jobs:
               online_urls_for_browser_check+=("$url")
             fi
           done
-          echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个已上线服务器..."
+          echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个已上线的服务器..."
           for url in "${online_urls_for_browser_check[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
             node check_browser.js "$url" > "$RESULTS_DIR/$filename.browser.json" &
@@ -155,8 +155,8 @@ jobs:
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
 
-            # 【修改】优化通知文案和格式
-            local display_status_bold=""
+            # 【修复】移除了所有 'local' 关键字
+            display_status_bold=""
             if [ "$final_status" == "Open" ]; then display_status_bold="<b>开放</b>"; fi
             if [ "$final_status" == "Closed" ]; then display_status_bold="<b>封闭</b>"; fi
             
@@ -168,12 +168,12 @@ jobs:
                 if [ "$final_status" == "Open" ]; then message="服务器已上线并<b>开放</b>"; fi
                 if [ "$final_status" == "Closed" ]; then message="服务器已上线，当前为<b>封闭</b>状态"; fi
               elif [ "$final_status" == "Offline" ]; then
-                local old_display_status_bold=""
+                old_display_status_bold=""
                 if [ "$old_status" == "Open" ]; then old_display_status_bold="<b>开放</b>"; fi
                 if [ "$old_status" == "Closed" ]; then old_display_status_bold="<b>封闭</b>"; fi
                 message="服务器已下线 (原状态: $old_display_status_bold)"
               else # Open <-> Closed
-                local old_display_status_bold=""
+                old_display_status_bold=""
                 if [ "$old_status" == "Open" ]; then old_display_status_bold="<b>开放</b>"; fi
                 if [ "$old_status" == "Closed" ]; then old_display_status_bold="<b>封闭</b>"; fi
                 message="服务器状态已从 $old_display_status_bold 变为 $display_status_bold"
