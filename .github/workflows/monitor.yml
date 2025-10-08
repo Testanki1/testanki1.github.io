@@ -41,7 +41,7 @@ jobs:
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
               const page = await context.newPage();
               await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-              await page.waitForTimeout(15000);
+              await page.waitForTimeout(30000);
               const viewportSize = page.viewportSize();
               if (viewportSize) await page.mouse.click(viewportSize.width / 2, viewportSize.height / 2);
               await page.waitForTimeout(5000);
@@ -134,16 +134,12 @@ jobs:
               final_status="$interactive_status"
             fi
             
-            # 【修改】创建用于显示的中文状态变量
             display_status=""
-            if [ "$final_status" == "Open" ]; then
-              display_status="开放"
-            elif [ "$final_status" == "Closed" ]; then
-              display_status="封闭"
-            fi
+            old_display_status=""
+            if [ "$final_status" == "Open" ]; then display_status="开放"; fi
+            if [ "$final_status" == "Closed" ]; then display_status="封闭"; fi
 
             if [ "$final_status" != "Offline" ]; then
-              # 【修改】使用中文状态变量
               available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$display_status</b>)")
             fi
 
@@ -151,21 +147,29 @@ jobs:
             old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
-
-            if [ "$final_status" != "$old_status" ]; then
-                if [ "$old_status" != "null" ]; then
-                    if [ "$final_status" == "Open" ]; then message="服务器已开放"; fi
-                    if [ "$final_status" == "Closed" ]; then message="服务器已转为封闭测试"; fi
-                    if [ "$final_status" == "Offline" ]; then message="服务器已关闭"; fi
-                elif [ "$final_status" != "Offline" ]; then
-                    # 【修改】使用中文状态变量
-                    message="首次发现服务器 (状态: $display_status)"
-                fi
+            
+            # 【修改】重构通知生成逻辑
+            if [ "$old_status" == "null" ] && [ "$final_status" != "Offline" ]; then
+              # 首次发现
+              message="首次发现服务器 (状态: $display_status)"
+            elif [ "$final_status" != "$old_status" ]; then
+              # 状态发生变化
+              if [ "$old_status" == "Offline" ]; then
+                if [ "$final_status" == "Open" ]; then message="服务器已上线并开放"; fi
+                if [ "$final_status" == "Closed" ]; then message="服务器已上线并转为封闭测试"; fi
+              elif [ "$final_status" == "Offline" ]; then
+                if [ "$old_status" == "Open" ]; then old_display_status="开放"; fi
+                if [ "$old_status" == "Closed" ]; then old_display_status="封闭"; fi
+                message="服务器已下线 (原状态: $old_display_status)"
+              else # Open <-> Closed
+                if [ "$final_status" == "Open" ]; then message="服务器从 [封闭] 转为 [开放]"; fi
+                if [ "$final_status" == "Closed" ]; then message="服务器从 [开放] 转为 [封闭]"; fi
+              fi
             elif [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
-                # 【修改】使用中文状态变量
-                message="网页代码已更新 (状态: $display_status)"
+              # 状态未变，但代码更新
+              message="网页代码已更新 (状态: $display_status)"
             fi
-
+            
             if [ -n "$message" ]; then
                 notifications+=("- <a href=\"$url\">$url</a>: $message")
             fi
