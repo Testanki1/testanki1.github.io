@@ -23,8 +23,7 @@ jobs:
 
       - name: Install Playwright and dependencies
         run: |
-          # 需要 @playwright/test 来使用 expect() 功能
-          npm i -D playwright @playwright/test
+          npm i -D playwright
           npx playwright install --with-deps chromium
 
       - name: Run server check script
@@ -33,52 +32,35 @@ jobs:
           # --- 动态创建浏览器检查脚本 (check_browser.js) ---
           cat << 'EOF' > check_browser.js
           const { chromium } = require('playwright');
-          const { expect } = require('@playwright/test');
-          const fs = require('fs');
-
           (async () => {
-            const originalUrl = process.argv[2];
-            const urlToVisit = process.argv[3];
-            const screenshotFilename = process.argv[4];
+            const url = process.argv[2];
+            if (!url) process.exit(1);
 
-            if (!originalUrl || !urlToVisit || !screenshotFilename) {
-              console.error('Missing arguments!');
-              process.exit(1);
+            let targetUrl = url;
+            if (targetUrl.includes('?')) {
+              targetUrl += '&skipEntranceAnyKey';
+            } else {
+              targetUrl += '?skipEntranceAnyKey';
             }
 
             let browser;
-            let page;
             try {
               browser = await chromium.launch();
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
-              page = await context.newPage();
+              const page = await context.newPage();
               
-              await page.goto(urlToVisit, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-              // 定义两个目标的定位器
-              const openLocator = page.locator('text=/Log in via/i');
-              const closedLocator = page.locator('text=/Invite/i');
-
-              // 智能等待：等待两个目标中的任意一个出现，最长等待60秒
-              await expect(openLocator.or(closedLocator)).toBeVisible({ timeout: 60000 });
-
-              // 检查具体是哪个目标出现了
-              if (await openLocator.isVisible()) {
-                console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Open' }));
+              await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+              await page.waitForTimeout(30000);
+              await page.waitForTimeout(5000);
+              const content = await page.content();
+              
+              if (/invite/i.test(content)) {
+                console.log(JSON.stringify({ url: url, interactive_status: 'Closed' }));
               } else {
-                console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Closed' }));
+                console.log(JSON.stringify({ url: url, interactive_status: 'Open' }));
               }
-
             } catch (error) {
-              // 如果超时或发生任何其他错误，保存截图用于调试
-              if (page) {
-                const screenshotDir = './screenshots';
-                if (!fs.existsSync(screenshotDir)){
-                    fs.mkdirSync(screenshotDir);
-                }
-                await page.screenshot({ path: `${screenshotDir}/${screenshotFilename}`, fullPage: true });
-              }
-              console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Offline' }));
+              console.log(JSON.stringify({ url: url, interactive_status: 'Offline' }));
             } finally {
               if (browser) await browser.close();
             }
@@ -102,6 +84,7 @@ jobs:
           done
           urls+=("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com")
 
+          # --- 读取旧状态 ---
           old_status_json=$(cat "$STATE_FILE" 2>/dev/null || echo "{}")
           
           # --- 第一阶段: 并行 CURL 检查 ---
@@ -133,23 +116,14 @@ jobs:
           done
           echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个在线服务器..."
           for url in "${online_urls_for_browser_check[@]}"; do
-            url_to_visit="$url"
-            if [[ "$url" == *"?"* ]]; then
-              url_to_visit="${url}&skipEntranceAnyKey"
-            else
-              url_to_visit="${url}?skipEntranceAnyKey"
-            fi
-
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            screenshot_filename="failure-$(date +%Y%m%d-%H%M%S)-${filename}.png"
-            node check_browser.js "$url" "$url_to_visit" "$screenshot_filename" > "$RESULTS_DIR/$filename.browser.json" &
+            node check_browser.js "$url" > "$RESULTS_DIR/$filename.browser.json" &
             pids+=($!)
           done
           wait "${pids[@]}"
           echo "Playwright 检查完成。"
 
           # --- 第三阶段: 汇总结果并生成通知 ---
-          # (此部分无改动)
           echo "阶段 3: 汇总结果并比较状态..."
           for url in "${urls[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
@@ -158,7 +132,7 @@ jobs:
             current_hash=$(echo "$curl_result" | jq -r '.hash')
             interactive_status=""
             if [ -f "$RESULTS_DIR/$filename.browser.json" ]; then
-              interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json" 2>/dev/null || echo "Offline")
+              interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json")
             fi
             
             final_status=""
@@ -169,7 +143,6 @@ jobs:
             fi
             
             display_status=""
-            old_display_status=""
             if [ "$final_status" == "Open" ]; then display_status="开放"; fi
             if [ "$final_status" == "Closed" ]; then display_status="封闭"; fi
 
@@ -182,13 +155,15 @@ jobs:
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
             
+            # 第一部分：处理状态变化
             if [ "$old_status" == "null" ] && [ "$final_status" != "Offline" ]; then
               message="首次发现服务器 (状态: $display_status)"
-            elif [ "$final_status" != "$old_status" ]; then
+            elif [ "$final_status" != "$old_status" ] && [ "$old_status" != "null" ]; then
               if [ "$old_status" == "Offline" ]; then
                 if [ "$final_status" == "Open" ]; then message="服务器已上线并开放"; fi
                 if [ "$final_status" == "Closed" ]; then message="服务器已上线并转为封闭测试"; fi
               elif [ "$final_status" == "Offline" ]; then
+                local old_display_status=""
                 if [ "$old_status" == "Open" ]; then old_display_status="开放"; fi
                 if [ "$old_status" == "Closed" ]; then old_display_status="封闭"; fi
                 message="服务器已下线 (原状态: $old_display_status)"
@@ -196,8 +171,18 @@ jobs:
                 if [ "$final_status" == "Open" ]; then message="服务器从 [封闭] 转为 [开放]"; fi
                 if [ "$final_status" == "Closed" ]; then message="服务器从 [开放] 转为 [封闭]"; fi
               fi
-            elif [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
-              message="网页代码已更新 (状态: $display_status)"
+            fi
+
+            # 第二部分：独立处理代码更新
+            # 【修改】增加 old_status != "Offline" 判断
+            if [ "$old_status" != "Offline" ] && [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
+              if [ -n "$message" ]; then
+                # 如果已有状态变化消息，则追加
+                message+=", 且网页代码已更新"
+              else
+                # 如果没有状态变化，则这是唯一的消息
+                message="网页代码已更新 (状态: $display_status)"
+              fi
             fi
             
             if [ -n "$message" ]; then
@@ -210,7 +195,6 @@ jobs:
           rm -rf "$RESULTS_DIR"
 
           # --- 判断是否有变化并设置输出 ---
-          # (此部分无改动)
           if [ ${#notifications[@]} -gt 0 ]; then
             echo "发现服务器状态变化。"
             change_details=$(printf "%s<br>" "${notifications[@]}")
@@ -235,7 +219,6 @@ jobs:
           fi
           
       - name: Send notification email
-        # (此部分无改动)
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
@@ -254,7 +237,6 @@ jobs:
             此邮件由 GitHub Actions 自动发送。
             
       - name: Commit status file
-        # (此部分无改动)
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
@@ -266,11 +248,3 @@ jobs:
             git commit -m "chore: 更新服务器状态文件"
             git push
           fi
-          
-      - name: Upload failure screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: failure-screenshots
-          path: ./screenshots/
-          retention-days: 5
