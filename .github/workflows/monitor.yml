@@ -79,7 +79,7 @@ jobs:
           # --- 读取旧状态 ---
           old_status_json=$(cat "$STATE_FILE" 2>/dev/null || echo "{}")
           
-          # --- 【新】第一阶段: 并行 CURL 检查 ---
+          # --- 第一阶段: 并行 CURL 检查 ---
           pids=()
           online_urls_for_browser_check=()
           echo "阶段 1: 开始并行 CURL 检查 ${#urls[@]} 个服务器..."
@@ -89,7 +89,6 @@ jobs:
               http_code=$(echo "$response" | sed -n 's/.*HTTP_CODE:\([0-9]\{3\}\)/\1/p')
               body=$(echo "$response" | sed 's/HTTP_CODE:[0-9]\{3\}$//')
               current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
-              
               filename=$(echo -n "$url" | md5sum | awk '{print $1}')
               echo "{\"http_code\": \"$http_code\", \"hash\": \"$current_hash\"}" > "$RESULTS_DIR/$filename.curl.json"
             ) &
@@ -98,9 +97,8 @@ jobs:
           wait "${pids[@]}"
           echo "CURL 检查完成。"
 
-          # --- 【新】第二阶段: 并行 Playwright 检查 (仅限在线服务器) ---
+          # --- 第二阶段: 并行 Playwright 检查 ---
           pids=()
-          # 收集在线的URL
           for url in "${urls[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
             http_code=$(jq -r '.http_code' "$RESULTS_DIR/$filename.curl.json")
@@ -108,7 +106,6 @@ jobs:
               online_urls_for_browser_check+=("$url")
             fi
           done
-
           echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个在线服务器..."
           for url in "${online_urls_for_browser_check[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
@@ -118,52 +115,55 @@ jobs:
           wait "${pids[@]}"
           echo "Playwright 检查完成。"
 
-          # --- 【新】第三阶段: 汇总结果并生成通知 ---
+          # --- 第三阶段: 汇总结果并生成通知 ---
           echo "阶段 3: 汇总结果并比较状态..."
           for url in "${urls[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            
-            # 读取CURL结果
             curl_result=$(cat "$RESULTS_DIR/$filename.curl.json")
             http_code=$(echo "$curl_result" | jq -r '.http_code')
             current_hash=$(echo "$curl_result" | jq -r '.hash')
-
-            # 读取Playwright结果 (如果存在)
             interactive_status=""
             if [ -f "$RESULTS_DIR/$filename.browser.json" ]; then
               interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json")
             fi
             
-            # 确定最终状态
             final_status=""
             if [[ "$http_code" == "404" || "$http_code" == "000" ]]; then
               final_status="Offline"
             else
-              final_status="$interactive_status" # Open, Closed, 或 Playwright 失败时的 Offline
+              final_status="$interactive_status"
+            fi
+            
+            # 【修改】创建用于显示的中文状态变量
+            display_status=""
+            if [ "$final_status" == "Open" ]; then
+              display_status="开放"
+            elif [ "$final_status" == "Closed" ]; then
+              display_status="封闭"
             fi
 
             if [ "$final_status" != "Offline" ]; then
-              available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$final_status</b>)")
+              # 【修改】使用中文状态变量
+              available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$display_status</b>)")
             fi
 
-            # 与旧状态比较
             old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
             old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
 
-            # 状态变化检测 (e.g., Offline -> Open)
             if [ "$final_status" != "$old_status" ]; then
-                if [ "$old_status" != "null" ]; then # 排除首次发现
+                if [ "$old_status" != "null" ]; then
                     if [ "$final_status" == "Open" ]; then message="服务器已开放"; fi
                     if [ "$final_status" == "Closed" ]; then message="服务器已转为封闭测试"; fi
                     if [ "$final_status" == "Offline" ]; then message="服务器已关闭"; fi
-                elif [ "$final_status" != "Offline" ]; then # 首次发现且在线
-                    message="首次发现服务器 (状态: $final_status)"
+                elif [ "$final_status" != "Offline" ]; then
+                    # 【修改】使用中文状态变量
+                    message="首次发现服务器 (状态: $display_status)"
                 fi
-            # 代码更新检测 (仅当状态未变为Offline时)
             elif [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
-                message="网页代码已更新 (状态: $final_status)"
+                # 【修改】使用中文状态变量
+                message="网页代码已更新 (状态: $display_status)"
             fi
 
             if [ -n "$message" ]; then
