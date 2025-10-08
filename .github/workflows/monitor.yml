@@ -16,13 +16,76 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Playwright and dependencies
+        run: |
+          npm i -D playwright
+          npx playwright install --with-deps chromium
+
       - name: Run server check script
         id: check_script
         run: |
+          # --- 动态创建浏览器检查脚本 (check_server.js) ---
+          cat << 'EOF' > check_server.js
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const url = process.argv[2];
+            if (!url) {
+              console.error('URL argument is missing!');
+              process.exit(1);
+            }
+
+            let browser;
+            try {
+              browser = await chromium.launch();
+              const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
+              const page = await context.newPage();
+              
+              // 导航到页面，设置60秒超时
+              await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+              // 等待30秒让游戏加载
+              await page.waitForTimeout(30000);
+
+              // 自动点击屏幕中心，尝试激活页面
+              const viewportSize = page.viewportSize();
+              if (viewportSize) {
+                await page.mouse.click(viewportSize.width / 2, viewportSize.height / 2);
+              }
+              
+              // 点击后再稍等一下，让内容有机会变化
+              await page.waitForTimeout(5000);
+
+              const content = await page.content();
+              
+              // 检查 "Invite" 字符串 (不区分大小写)
+              if (/invite/i.test(content)) {
+                console.log(JSON.stringify({ url: url, status: 'Closed' }));
+              } else {
+                console.log(JSON.stringify({ url: url, status: 'Open' }));
+              }
+
+            } catch (error) {
+              // 如果发生任何错误 (如404, 超时), 都视为离线
+              console.log(JSON.stringify({ url: url, status: 'Offline', error: error.message }));
+            } finally {
+              if (browser) {
+                await browser.close();
+              }
+            }
+          })();
+          EOF
+
           # --- 配置 ---
           URL_EU_TEMPLATE="https://public-deploy{i}.test-eu.tankionline.com/browser-public/index.html"
           URL_RU_TEMPLATE="https://client-review-{i}-public.test-ru.tankionline.com/"
           STATE_FILE="server_status.json"
+          RESULTS_DIR=$(mktemp -d)
           notifications=()
           available_servers=()
           new_status_json="{}"
@@ -43,74 +106,76 @@ jobs:
             old_status_json="{}"
           fi
           
-          # --- 循环检测每个 URL ---
+          # --- 并行检测每个 URL ---
+          pids=()
+          echo "开始并行检测 ${#urls[@]} 个服务器..."
           for url in "${urls[@]}"; do
-            echo "正在检测: $url"
+            # 使用 base64 编码 URL 作为文件名，避免特殊字符问题
+            filename=$(echo -n "$url" | base64)
+            node check_server.js "$url" > "$RESULTS_DIR/$filename.json" &
+            pids+=($!)
+          done
+
+          # 等待所有后台任务完成
+          wait "${pids[@]}"
+          echo "所有检测任务已完成。"
+
+          # --- 处理检测结果 ---
+          for url in "${urls[@]}"; do
+            filename=$(echo -n "$url" | base64)
+            result_file="$RESULTS_DIR/$filename.json"
+
+            if [ -f "$result_file" ]; then
+                result_json=$(cat "$result_file")
+                current_status=$(echo "$result_json" | jq -r '.status')
+            else
+                current_status="Offline" # 如果文件不存在，说明脚本可能失败了
+            fi
             
-            response=$(curl --insecure --silent --location --write-out "%{http_code}" --max-time 10 "$url" || true)
-            http_code="${response: -3}"
-            body="${response:0:${#response}-3}"
-            
-            # 【修改】检查服务器是否可用时，使用<a>标签包装URL
-            if [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]] && [[ -n "$http_code" ]]; then
-              available_servers+=("<a href=\"$url\">$url</a> (状态: $http_code)")
+            # 将非离线服务器加入可用列表
+            if [[ "$current_status" != "Offline" ]]; then
+              available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$current_status</b>)")
             fi
             
             old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
             old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
-            old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             
-            current_hash="null"
             message=""
 
-            if [ "$http_code" -eq 404 ]; then
-              if [ "$old_status" != "404" ] && [ "$old_status" != "null" ]; then
-                message="服务器已关闭 (404 Not Found)"
-                # 【修改】使用<a>标签包装URL
-                notifications+=("- <a href=\"$url\">$url</a>: $message")
+            if [ "$current_status" != "$old_status" ] && [ "$old_status" != "null" ]; then
+              if [ "$current_status" == "Open" ]; then
+                message="服务器已开放"
+              elif [ "$current_status" == "Closed" ]; then
+                message="服务器已转为封闭测试"
+              elif [ "$current_status" == "Offline" ]; then
+                message="服务器已关闭"
               fi
-              current_status="404"
-            else
-              if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
-                current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
-              fi
-              current_status="$http_code"
-
-              if [ "$old_status" == "404" ]; then
-                message="服务器已开放 (状态: $http_code)"
-                notifications+=("- <a href=\"$url\">$url</a>: $message")
-              elif [ "$old_status" != "null" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
-                message="网页代码已更新 (状态: $http_code)"
-                notifications+=("- <a href=\"$url\">$url</a>: $message")
-              elif [ "$old_status" == "null" ] && [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]]; then
-                message="首次发现服务器 (状态: $http_code)"
-                notifications+=("- <a href=\"$url\">$url</a>: $message")
-              elif [ "$old_status" != "000" ] && [ "$http_code" == "000" ] && [ "$old_status" != "null" ]; then
-                message="服务器连接失败 (状态: 000)"
-                notifications+=("- <a href=\"$url\">$url</a>: $message")
-              fi
+            elif [ "$old_status" == "null" ] && [ "$current_status" != "Offline" ]; then
+              message="首次发现服务器 (状态: $current_status)"
             fi
 
-            new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$current_status\", \"hash\": \"$current_hash\"}}")
+            if [ -n "$message" ]; then
+                notifications+=("- <a href=\"$url\">$url</a>: $message")
+            fi
+            
+            new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$current_status\"}}")
           done
+
+          # 清理临时文件
+          rm -rf "$RESULTS_DIR"
 
           # --- 判断是否有变化并设置输出 ---
           if [ ${#notifications[@]} -gt 0 ]; then
             echo "发现服务器状态变化。"
-            
-            # 【修改】将数组转换为以<br>分隔的HTML字符串
             change_details=$(printf "%s<br>" "${notifications[@]}")
             
-            # 【修改】创建HTML格式的头部
             available_list_header="<br><hr><b>当前可用服务器列表 (${#available_servers[@]} 个):</b><br>"
             if [ ${#available_servers[@]} -gt 0 ]; then
-              # 【修改】将数组转换为以<br>分隔的HTML字符串
               available_list_body=$(printf "%s<br>" "${available_servers[@]}")
             else
               available_list_body="目前没有检测到可用的服务器。"
             fi
             
-            # 【修改】组合成最终的HTML邮件正文
             full_notification_body="检测到以下服务器状态发生变化：<br>$change_details$available_list_header$available_list_body"
 
             echo "has_changes=true" >> $GITHUB_OUTPUT
@@ -125,7 +190,6 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
           
-      # 步骤 3: 如果有变化，则发送邮件
       - name: Send notification email
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
@@ -135,9 +199,8 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }},${{ secrets.MAIL_TO_5 }}
+          to: ${{ secrets.MAIL_TO_1 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
-          # 【修改】将 body 修改为 html_body，以支持HTML格式
           html_body: |
             你好，
             <br><br>
@@ -145,7 +208,6 @@ jobs:
             <br><br>
             此邮件由 GitHub Actions 自动发送。
             
-      # 步骤 4: 如果有变化，则提交状态文件
       - name: Commit status file
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
