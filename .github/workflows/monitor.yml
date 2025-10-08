@@ -46,12 +46,14 @@ jobs:
             }
 
             let browser;
+            // 【修改】将 page 的声明提到 try 块外部
+            let page;
             try {
               browser = await chromium.launch();
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
-              const page = await context.newPage();
+              // 【修改】在这里为 page 赋值，而不是用 const 重新声明
+              page = await context.newPage();
               
-              // 【修改】使用 'domcontentloaded' 以快速加载页面，避免因网络活动频繁而超时
               await page.goto(urlToVisit, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
               const openLocator = page.locator('text=/Log in via/i');
@@ -66,7 +68,7 @@ jobs:
               }
 
             } catch (error) {
-              // 【增强】如果发生错误，保存截图用于调试
+              // 现在这里的 'page' 变量是可访问的
               if (page) {
                 const screenshotDir = './screenshots';
                 if (!fs.existsSync(screenshotDir)){
@@ -104,7 +106,6 @@ jobs:
           pids=()
           online_urls_for_browser_check=()
           echo "阶段 1: 开始并行 CURL 检查 ${#urls[@]} 个服务器..."
-          # ... (此部分无改动) ...
           for url in "${urls[@]}"; do
             (
               response=$(curl --insecure --silent --location --write-out "HTTP_CODE:%{http_code}" --max-time 15 "$url" || echo "HTTP_CODE:000")
@@ -138,7 +139,6 @@ jobs:
             fi
 
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            # 【修改】增加一个用于截图的文件名参数
             screenshot_filename="failure-$(date +%Y%m%d-%H%M%S)-${filename}.png"
             node check_browser.js "$url" "$url_to_visit" "$screenshot_filename" > "$RESULTS_DIR/$filename.browser.json" &
             pids+=($!)
@@ -147,7 +147,6 @@ jobs:
           echo "Playwright 检查完成。"
 
           # --- 第三阶段: 汇总结果并生成通知 ---
-          # ... (此部分无改动) ...
           echo "阶段 3: 汇总结果并比较状态..."
           for url in "${urls[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
@@ -232,7 +231,6 @@ jobs:
           fi
           
       - name: Send notification email
-        # ... (此部分无改动) ...
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
@@ -241,7 +239,7 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO_1 }}
+          to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }},${{ secrets.MAIL_TO_5 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
           html_body: |
             你好，
@@ -251,7 +249,6 @@ jobs:
             此邮件由 GitHub Actions 自动发送。
             
       - name: Commit status file
-        # ... (此部分无改动) ...
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
@@ -264,12 +261,10 @@ jobs:
             git push
           fi
           
-      # 【新增】上传调试截图的步骤
       - name: Upload failure screenshots
-        # 'always()' 确保即使前面的步骤失败了，这个步骤也会运行
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: failure-screenshots
           path: ./screenshots/
-          retention-days: 5 # 截图保留5天
+          retention-days: 5
