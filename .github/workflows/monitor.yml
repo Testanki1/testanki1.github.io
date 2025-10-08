@@ -29,46 +29,32 @@ jobs:
       - name: Run server check script
         id: check_script
         run: |
-          # --- 动态创建浏览器检查脚本 (check_server.js) ---
-          cat << 'EOF' > check_server.js
+          # --- 动态创建浏览器检查脚本 (check_browser.js) ---
+          cat << 'EOF' > check_browser.js
           const { chromium } = require('playwright');
-
           (async () => {
             const url = process.argv[2];
-            if (!url) {
-              console.error('URL argument is missing!');
-              process.exit(1);
-            }
-
+            if (!url) process.exit(1);
             let browser;
             try {
               browser = await chromium.launch();
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
               const page = await context.newPage();
-              
               await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
               await page.waitForTimeout(30000);
-
               const viewportSize = page.viewportSize();
-              if (viewportSize) {
-                await page.mouse.click(viewportSize.width / 2, viewportSize.height / 2);
-              }
-              
+              if (viewportSize) await page.mouse.click(viewportSize.width / 2, viewportSize.height / 2);
               await page.waitForTimeout(5000);
               const content = await page.content();
-              
               if (/invite/i.test(content)) {
-                console.log(JSON.stringify({ url: url, status: 'Closed' }));
+                console.log(JSON.stringify({ url: url, interactive_status: 'Closed' }));
               } else {
-                console.log(JSON.stringify({ url: url, status: 'Open' }));
+                console.log(JSON.stringify({ url: url, interactive_status: 'Open' }));
               }
-
             } catch (error) {
-              console.log(JSON.stringify({ url: url, status: 'Offline', error: error.message }));
+              console.log(JSON.stringify({ url: url, interactive_status: 'Offline' }));
             } finally {
-              if (browser) {
-                await browser.close();
-              }
+              if (browser) await browser.close();
             }
           })();
           EOF
@@ -91,66 +77,100 @@ jobs:
           urls+=("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com")
 
           # --- 读取旧状态 ---
-          if [ -f "$STATE_FILE" ]; then
-            old_status_json=$(cat "$STATE_FILE")
-          else
-            echo "状态文件 $STATE_FILE 未找到，将创建新文件。"
-            old_status_json="{}"
-          fi
+          old_status_json=$(cat "$STATE_FILE" 2>/dev/null || echo "{}")
           
-          # --- 并行检测每个 URL ---
+          # --- 【新】第一阶段: 并行 CURL 检查 ---
           pids=()
-          echo "开始并行检测 ${#urls[@]} 个服务器..."
+          online_urls_for_browser_check=()
+          echo "阶段 1: 开始并行 CURL 检查 ${#urls[@]} 个服务器..."
           for url in "${urls[@]}"; do
-            # 【修改】使用 md5sum 生成短而唯一的哈希值作为文件名
-            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            node check_server.js "$url" > "$RESULTS_DIR/$filename.json" &
+            (
+              response=$(curl --insecure --silent --location --write-out "HTTP_CODE:%{http_code}" --max-time 15 "$url" || echo "HTTP_CODE:000")
+              http_code=$(echo "$response" | sed -n 's/.*HTTP_CODE:\([0-9]\{3\}\)/\1/p')
+              body=$(echo "$response" | sed 's/HTTP_CODE:[0-9]\{3\}$//')
+              current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
+              
+              filename=$(echo -n "$url" | md5sum | awk '{print $1}')
+              echo "{\"http_code\": \"$http_code\", \"hash\": \"$current_hash\"}" > "$RESULTS_DIR/$filename.curl.json"
+            ) &
             pids+=($!)
           done
-
-          # 等待所有后台任务完成
           wait "${pids[@]}"
-          echo "所有检测任务已完成。"
+          echo "CURL 检查完成。"
 
-          # --- 处理检测结果 ---
+          # --- 【新】第二阶段: 并行 Playwright 检查 (仅限在线服务器) ---
+          pids=()
+          # 收集在线的URL
           for url in "${urls[@]}"; do
-            # 【修改】同样使用 md5sum 来找到对应的结果文件
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            result_file="$RESULTS_DIR/$filename.json"
+            http_code=$(jq -r '.http_code' "$RESULTS_DIR/$filename.curl.json")
+            if [[ "$http_code" != "404" && "$http_code" != "000" ]]; then
+              online_urls_for_browser_check+=("$url")
+            fi
+          done
 
-            if [ -f "$result_file" ]; then
-                result_json=$(cat "$result_file")
-                current_status=$(echo "$result_json" | jq -r '.status')
+          echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个在线服务器..."
+          for url in "${online_urls_for_browser_check[@]}"; do
+            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
+            node check_browser.js "$url" > "$RESULTS_DIR/$filename.browser.json" &
+            pids+=($!)
+          done
+          wait "${pids[@]}"
+          echo "Playwright 检查完成。"
+
+          # --- 【新】第三阶段: 汇总结果并生成通知 ---
+          echo "阶段 3: 汇总结果并比较状态..."
+          for url in "${urls[@]}"; do
+            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
+            
+            # 读取CURL结果
+            curl_result=$(cat "$RESULTS_DIR/$filename.curl.json")
+            http_code=$(echo "$curl_result" | jq -r '.http_code')
+            current_hash=$(echo "$curl_result" | jq -r '.hash')
+
+            # 读取Playwright结果 (如果存在)
+            interactive_status=""
+            if [ -f "$RESULTS_DIR/$filename.browser.json" ]; then
+              interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json")
+            fi
+            
+            # 确定最终状态
+            final_status=""
+            if [[ "$http_code" == "404" || "$http_code" == "000" ]]; then
+              final_status="Offline"
             else
-                current_status="Offline"
+              final_status="$interactive_status" # Open, Closed, 或 Playwright 失败时的 Offline
             fi
-            
-            if [[ "$current_status" != "Offline" ]]; then
-              available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$current_status</b>)")
+
+            if [ "$final_status" != "Offline" ]; then
+              available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$final_status</b>)")
             fi
-            
+
+            # 与旧状态比较
             old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
             old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
-            
+            old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
 
-            if [ "$current_status" != "$old_status" ] && [ "$old_status" != "null" ]; then
-              if [ "$current_status" == "Open" ]; then
-                message="服务器已开放"
-              elif [ "$current_status" == "Closed" ]; then
-                message="服务器已转为封闭测试"
-              elif [ "$current_status" == "Offline" ]; then
-                message="服务器已关闭"
-              fi
-            elif [ "$old_status" == "null" ] && [ "$current_status" != "Offline" ]; then
-              message="首次发现服务器 (状态: $current_status)"
+            # 状态变化检测 (e.g., Offline -> Open)
+            if [ "$final_status" != "$old_status" ]; then
+                if [ "$old_status" != "null" ]; then # 排除首次发现
+                    if [ "$final_status" == "Open" ]; then message="服务器已开放"; fi
+                    if [ "$final_status" == "Closed" ]; then message="服务器已转为封闭测试"; fi
+                    if [ "$final_status" == "Offline" ]; then message="服务器已关闭"; fi
+                elif [ "$final_status" != "Offline" ]; then # 首次发现且在线
+                    message="首次发现服务器 (状态: $final_status)"
+                fi
+            # 代码更新检测 (仅当状态未变为Offline时)
+            elif [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
+                message="网页代码已更新 (状态: $final_status)"
             fi
 
             if [ -n "$message" ]; then
                 notifications+=("- <a href=\"$url\">$url</a>: $message")
             fi
             
-            new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$current_status\"}}")
+            new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$final_status\", \"hash\": \"$current_hash\"}}")
           done
 
           rm -rf "$RESULTS_DIR"
@@ -159,14 +179,12 @@ jobs:
           if [ ${#notifications[@]} -gt 0 ]; then
             echo "发现服务器状态变化。"
             change_details=$(printf "%s<br>" "${notifications[@]}")
-            
             available_list_header="<br><hr><b>当前可用服务器列表 (${#available_servers[@]} 个):</b><br>"
             if [ ${#available_servers[@]} -gt 0 ]; then
               available_list_body=$(printf "%s<br>" "${available_servers[@]}")
             else
               available_list_body="目前没有检测到可用的服务器。"
             fi
-            
             full_notification_body="检测到以下服务器状态发生变化：<br>$change_details$available_list_header$available_list_body"
 
             echo "has_changes=true" >> $GITHUB_OUTPUT
@@ -190,7 +208,7 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO_1 }}
+          to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }},${{ secrets.MAIL_TO_5 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
           html_body: |
             你好，
