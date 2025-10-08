@@ -33,8 +33,6 @@ jobs:
             urls+=("${URL_EU_TEMPLATE//\{i\}/$i}")
             urls+=("${URL_RU_TEMPLATE//\{i\}/$i}")
           done
-
-          # 添加一个新的独立服务器
           urls+=("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com")
 
           # --- 读取旧状态 ---
@@ -53,12 +51,11 @@ jobs:
             http_code="${response: -3}"
             body="${response:0:${#response}-3}"
             
-            # 检查服务器是否可用 (非404, 非000, 且有响应) 并加入列表
+            # 【修改】检查服务器是否可用时，使用<a>标签包装URL
             if [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]] && [[ -n "$http_code" ]]; then
-              available_servers+=("$url (状态: $http_code)")
+              available_servers+=("<a href=\"$url\">$url</a> (状态: $http_code)")
             fi
             
-            # 从旧状态文件中获取此 URL 的记录
             old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
             old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
@@ -69,7 +66,8 @@ jobs:
             if [ "$http_code" -eq 404 ]; then
               if [ "$old_status" != "404" ] && [ "$old_status" != "null" ]; then
                 message="服务器已关闭 (404 Not Found)"
-                notifications+=("- $url: $message")
+                # 【修改】使用<a>标签包装URL
+                notifications+=("- <a href=\"$url\">$url</a>: $message")
               fi
               current_status="404"
             else
@@ -80,16 +78,16 @@ jobs:
 
               if [ "$old_status" == "404" ]; then
                 message="服务器已开放 (状态: $http_code)"
-                notifications+=("- $url: $message")
+                notifications+=("- <a href=\"$url\">$url</a>: $message")
               elif [ "$old_status" != "null" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "null" ] && [ "$old_hash" != "$current_hash" ]; then
                 message="网页代码已更新 (状态: $http_code)"
-                notifications+=("- $url: $message")
+                notifications+=("- <a href=\"$url\">$url</a>: $message")
               elif [ "$old_status" == "null" ] && [[ "$http_code" -ne 404 ]] && [[ "$http_code" -ne "000" ]]; then
                 message="首次发现服务器 (状态: $http_code)"
-                notifications+=("- $url: $message")
+                notifications+=("- <a href=\"$url\">$url</a>: $message")
               elif [ "$old_status" != "000" ] && [ "$http_code" == "000" ] && [ "$old_status" != "null" ]; then
                 message="服务器连接失败 (状态: 000)"
-                notifications+=("- $url: $message")
+                notifications+=("- <a href=\"$url\">$url</a>: $message")
               fi
             fi
 
@@ -100,21 +98,25 @@ jobs:
           if [ ${#notifications[@]} -gt 0 ]; then
             echo "发现服务器状态变化。"
             
-            change_details=$(printf "%s\n" "${notifications[@]}")
+            # 【修改】将数组转换为以<br>分隔的HTML字符串
+            change_details=$(printf "%s<br>" "${notifications[@]}")
             
-            available_list_header="\n--------------------\n当前可用服务器列表 (${#available_servers[@]} 个):\n"
+            # 【修改】创建HTML格式的头部
+            available_list_header="<br><hr><b>当前可用服务器列表 (${#available_servers[@]} 个):</b><br>"
             if [ ${#available_servers[@]} -gt 0 ]; then
-              available_list_body=$(printf "%s\n" "${available_servers[@]}")
+              # 【修改】将数组转换为以<br>分隔的HTML字符串
+              available_list_body=$(printf "%s<br>" "${available_servers[@]}")
             else
               available_list_body="目前没有检测到可用的服务器。"
             fi
             
-            full_notification_body="检测到以下服务器状态发生变化：\n$change_details$available_list_header$available_list_body"
+            # 【修改】组合成最终的HTML邮件正文
+            full_notification_body="检测到以下服务器状态发生变化：<br>$change_details$available_list_header$available_list_body"
 
             echo "has_changes=true" >> $GITHUB_OUTPUT
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "notification_body<<$EOF" >> $GITHUB_OUTPUT
-            echo -e "$full_notification_body" >> $GITHUB_OUTPUT
+            echo "$full_notification_body" >> $GITHUB_OUTPUT
             echo "$EOF" >> $GITHUB_OUTPUT
             
             echo "$new_status_json" | jq '.' > "$STATE_FILE"
@@ -133,14 +135,14 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }},${{ secrets.MAIL_TO_5 }}
+          to: ${{ secrets.MAIL_TO_1 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
-          # 【修改】移除了多余的介绍行，使邮件内容更简洁
-          body: |
+          # 【修改】将 body 修改为 html_body，以支持HTML格式
+          html_body: |
             你好，
-            
+            <br><br>
             ${{ steps.check_script.outputs.notification_body }}
-            
+            <br><br>
             此邮件由 GitHub Actions 自动发送。
             
       # 步骤 4: 如果有变化，则提交状态文件
