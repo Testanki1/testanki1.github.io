@@ -154,34 +154,38 @@ jobs:
             old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
+
+            # 【修改】优化通知文案和格式
+            local display_status_bold=""
+            if [ "$final_status" == "Open" ]; then display_status_bold="<b>开放</b>"; fi
+            if [ "$final_status" == "Closed" ]; then display_status_bold="<b>封闭</b>"; fi
             
             # 第一部分：处理状态变化
             if [ "$old_status" == "null" ] && [ "$final_status" != "Offline" ]; then
-              message="首次发现服务器 (状态: $display_status)"
+              message="首次发现服务器 (状态: $display_status_bold)"
             elif [ "$final_status" != "$old_status" ] && [ "$old_status" != "null" ]; then
               if [ "$old_status" == "Offline" ]; then
-                if [ "$final_status" == "Open" ]; then message="服务器已上线并开放"; fi
-                if [ "$final_status" == "Closed" ]; then message="服务器已上线并转为封闭测试"; fi
+                if [ "$final_status" == "Open" ]; then message="服务器已上线并<b>开放</b>"; fi
+                if [ "$final_status" == "Closed" ]; then message="服务器已上线，当前为<b>封闭</b>状态"; fi
               elif [ "$final_status" == "Offline" ]; then
-                local old_display_status=""
-                if [ "$old_status" == "Open" ]; then old_display_status="开放"; fi
-                if [ "$old_status" == "Closed" ]; then old_display_status="封闭"; fi
-                message="服务器已下线 (原状态: $old_display_status)"
+                local old_display_status_bold=""
+                if [ "$old_status" == "Open" ]; then old_display_status_bold="<b>开放</b>"; fi
+                if [ "$old_status" == "Closed" ]; then old_display_status_bold="<b>封闭</b>"; fi
+                message="服务器已下线 (原状态: $old_display_status_bold)"
               else # Open <-> Closed
-                if [ "$final_status" == "Open" ]; then message="服务器从 [封闭] 转为 [开放]"; fi
-                if [ "$final_status" == "Closed" ]; then message="服务器从 [开放] 转为 [封闭]"; fi
+                local old_display_status_bold=""
+                if [ "$old_status" == "Open" ]; then old_display_status_bold="<b>开放</b>"; fi
+                if [ "$old_status" == "Closed" ]; then old_display_status_bold="<b>封闭</b>"; fi
+                message="服务器状态已从 $old_display_status_bold 变为 $display_status_bold"
               fi
             fi
 
             # 第二部分：独立处理代码更新
-            # 【修改】增加 old_status != "Offline" 判断
             if [ "$old_status" != "Offline" ] && [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
               if [ -n "$message" ]; then
-                # 如果已有状态变化消息，则追加
                 message+=", 且网页代码已更新"
               else
-                # 如果没有状态变化，则这是唯一的消息
-                message="网页代码已更新 (状态: $display_status)"
+                message="网页代码已更新 (状态: $display_status_bold)"
               fi
             fi
             
