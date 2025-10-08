@@ -46,24 +46,17 @@ jobs:
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
               const page = await context.newPage();
               
-              // 导航到页面，设置60秒超时
               await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-              // 等待30秒让游戏加载
               await page.waitForTimeout(30000);
 
-              // 自动点击屏幕中心，尝试激活页面
               const viewportSize = page.viewportSize();
               if (viewportSize) {
                 await page.mouse.click(viewportSize.width / 2, viewportSize.height / 2);
               }
               
-              // 点击后再稍等一下，让内容有机会变化
               await page.waitForTimeout(5000);
-
               const content = await page.content();
               
-              // 检查 "Invite" 字符串 (不区分大小写)
               if (/invite/i.test(content)) {
                 console.log(JSON.stringify({ url: url, status: 'Closed' }));
               } else {
@@ -71,7 +64,6 @@ jobs:
               }
 
             } catch (error) {
-              // 如果发生任何错误 (如404, 超时), 都视为离线
               console.log(JSON.stringify({ url: url, status: 'Offline', error: error.message }));
             } finally {
               if (browser) {
@@ -110,8 +102,8 @@ jobs:
           pids=()
           echo "开始并行检测 ${#urls[@]} 个服务器..."
           for url in "${urls[@]}"; do
-            # 使用 base64 编码 URL 作为文件名，避免特殊字符问题
-            filename=$(echo -n "$url" | base64)
+            # 【修改】使用 md5sum 生成短而唯一的哈希值作为文件名
+            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
             node check_server.js "$url" > "$RESULTS_DIR/$filename.json" &
             pids+=($!)
           done
@@ -122,17 +114,17 @@ jobs:
 
           # --- 处理检测结果 ---
           for url in "${urls[@]}"; do
-            filename=$(echo -n "$url" | base64)
+            # 【修改】同样使用 md5sum 来找到对应的结果文件
+            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
             result_file="$RESULTS_DIR/$filename.json"
 
             if [ -f "$result_file" ]; then
                 result_json=$(cat "$result_file")
                 current_status=$(echo "$result_json" | jq -r '.status')
             else
-                current_status="Offline" # 如果文件不存在，说明脚本可能失败了
+                current_status="Offline"
             fi
             
-            # 将非离线服务器加入可用列表
             if [[ "$current_status" != "Offline" ]]; then
               available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$current_status</b>)")
             fi
@@ -161,7 +153,6 @@ jobs:
             new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$current_status\"}}")
           done
 
-          # 清理临时文件
           rm -rf "$RESULTS_DIR"
 
           # --- 判断是否有变化并设置输出 ---
