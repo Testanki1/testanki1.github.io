@@ -23,6 +23,7 @@ jobs:
 
       - name: Install Playwright and dependencies
         run: |
+          # 需要 @playwright/test 来使用 expect() 功能
           npm i -D playwright @playwright/test
           npx playwright install --with-deps chromium
 
@@ -46,21 +47,22 @@ jobs:
             }
 
             let browser;
-            // 【修改】将 page 的声明提到 try 块外部
             let page;
             try {
               browser = await chromium.launch();
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
-              // 【修改】在这里为 page 赋值，而不是用 const 重新声明
               page = await context.newPage();
               
               await page.goto(urlToVisit, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
+              // 定义两个目标的定位器
               const openLocator = page.locator('text=/Log in via/i');
               const closedLocator = page.locator('text=/Invite/i');
 
+              // 智能等待：等待两个目标中的任意一个出现，最长等待60秒
               await expect(openLocator.or(closedLocator)).toBeVisible({ timeout: 60000 });
 
+              // 检查具体是哪个目标出现了
               if (await openLocator.isVisible()) {
                 console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Open' }));
               } else {
@@ -68,7 +70,7 @@ jobs:
               }
 
             } catch (error) {
-              // 现在这里的 'page' 变量是可访问的
+              // 如果超时或发生任何其他错误，保存截图用于调试
               if (page) {
                 const screenshotDir = './screenshots';
                 if (!fs.existsSync(screenshotDir)){
@@ -147,6 +149,7 @@ jobs:
           echo "Playwright 检查完成。"
 
           # --- 第三阶段: 汇总结果并生成通知 ---
+          # (此部分无改动)
           echo "阶段 3: 汇总结果并比较状态..."
           for url in "${urls[@]}"; do
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
@@ -207,6 +210,7 @@ jobs:
           rm -rf "$RESULTS_DIR"
 
           # --- 判断是否有变化并设置输出 ---
+          # (此部分无改动)
           if [ ${#notifications[@]} -gt 0 ]; then
             echo "发现服务器状态变化。"
             change_details=$(printf "%s<br>" "${notifications[@]}")
@@ -231,6 +235,7 @@ jobs:
           fi
           
       - name: Send notification email
+        # (此部分无改动)
         if: steps.check_script.outputs.has_changes == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
@@ -249,6 +254,7 @@ jobs:
             此邮件由 GitHub Actions 自动发送。
             
       - name: Commit status file
+        # (此部分无改动)
         if: steps.check_script.outputs.has_changes == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
