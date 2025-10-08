@@ -23,7 +23,7 @@ jobs:
 
       - name: Install Playwright and dependencies
         run: |
-          npm i -D playwright
+          npm i -D playwright @playwright/test
           npx playwright install --with-deps chromium
 
       - name: Run server check script
@@ -32,27 +32,40 @@ jobs:
           # --- 动态创建浏览器检查脚本 (check_browser.js) ---
           cat << 'EOF' > check_browser.js
           const { chromium } = require('playwright');
+          const { expect } = require('@playwright/test');
+
           (async () => {
-            const url = process.argv[2];
-            if (!url) process.exit(1);
+            const originalUrl = process.argv[2];
+            const urlToVisit = process.argv[3];
+            if (!originalUrl || !urlToVisit) {
+              console.error('Missing URL arguments!');
+              process.exit(1);
+            }
+
             let browser;
             try {
               browser = await chromium.launch();
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
               const page = await context.newPage();
-              await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-              await page.waitForTimeout(30000);
-              const viewportSize = page.viewportSize();
-              if (viewportSize) await page.mouse.click(viewportSize.width / 2, viewportSize.height / 2);
-              await page.waitForTimeout(5000);
-              const content = await page.content();
-              if (/invite/i.test(content)) {
-                console.log(JSON.stringify({ url: url, interactive_status: 'Closed' }));
+              
+              await page.goto(urlToVisit, { waitUntil: 'networkidle', timeout: 60000 });
+
+              const openLocator = page.locator('text=/Log in via/i');
+              const closedLocator = page.locator('text=/Invite/i');
+
+              // 等待两个目标中的任意一个出现，最长等待60秒
+              await expect(openLocator.or(closedLocator)).toBeVisible({ timeout: 60000 });
+
+              // 检查是哪个目标出现了
+              if (await openLocator.isVisible()) {
+                console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Open' }));
               } else {
-                console.log(JSON.stringify({ url: url, interactive_status: 'Open' }));
+                console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Closed' }));
               }
+
             } catch (error) {
-              console.log(JSON.stringify({ url: url, interactive_status: 'Offline' }));
+              // 如果超时或发生任何其他错误，则视为Offline
+              console.log(JSON.stringify({ url: originalUrl, interactive_status: 'Offline' }));
             } finally {
               if (browser) await browser.close();
             }
@@ -106,10 +119,19 @@ jobs:
               online_urls_for_browser_check+=("$url")
             fi
           done
-          echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个已上线服务器..."
+          echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个在线服务器..."
           for url in "${online_urls_for_browser_check[@]}"; do
+            # 【修改】为URL添加 skipEntranceAnyKey 参数
+            url_to_visit="$url"
+            if [[ "$url" == *"?"* ]]; then
+              url_to_visit="${url}&skipEntranceAnyKey"
+            else
+              url_to_visit="${url}?skipEntranceAnyKey"
+            fi
+
             filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            node check_browser.js "$url" > "$RESULTS_DIR/$filename.browser.json" &
+            # 【修改】传递原始URL和修改后的URL
+            node check_browser.js "$url" "$url_to_visit" > "$RESULTS_DIR/$filename.browser.json" &
             pids+=($!)
           done
           wait "${pids[@]}"
@@ -124,7 +146,8 @@ jobs:
             current_hash=$(echo "$curl_result" | jq -r '.hash')
             interactive_status=""
             if [ -f "$RESULTS_DIR/$filename.browser.json" ]; then
-              interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json")
+              # Playwright脚本现在会自己输出原始URL，我们只需读取状态
+              interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json" 2>/dev/null || echo "Offline")
             fi
             
             final_status=""
@@ -148,12 +171,9 @@ jobs:
             old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
             message=""
             
-            # 【修改】重构通知生成逻辑
             if [ "$old_status" == "null" ] && [ "$final_status" != "Offline" ]; then
-              # 首次发现
               message="首次发现服务器 (状态: $display_status)"
             elif [ "$final_status" != "$old_status" ]; then
-              # 状态发生变化
               if [ "$old_status" == "Offline" ]; then
                 if [ "$final_status" == "Open" ]; then message="服务器已上线并开放"; fi
                 if [ "$final_status" == "Closed" ]; then message="服务器已上线并转为封闭测试"; fi
@@ -166,7 +186,6 @@ jobs:
                 if [ "$final_status" == "Closed" ]; then message="服务器从 [开放] 转为 [封闭]"; fi
               fi
             elif [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
-              # 状态未变，但代码更新
               message="网页代码已更新 (状态: $display_status)"
             fi
             
@@ -212,7 +231,7 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO_1 }},${{ secrets.MAIL_TO_2 }},${{ secrets.MAIL_TO_3 }},${{ secrets.MAIL_TO_4 }},${{ secrets.MAIL_TO_5 }}
+          to: ${{ secrets.MAIL_TO_1 }}
           from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
           html_body: |
             你好，
