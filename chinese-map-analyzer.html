@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D坦克地图主题浏览器 (Fixed Scroll)</title>
+    <!-- 字体: 思源黑体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- 图标库: Material Symbols -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        :root {
+            /* M3 Expressive Palette */
+            --md-sys-color-primary: #6750A4;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-primary-container: #EADDFF;
+            --md-sys-color-on-primary-container: #21005E;
+            --md-sys-color-secondary: #625B71;
+            --md-sys-color-tertiary: #7D5260;
+            --md-sys-color-background: #FFFBFE;
+            --md-sys-color-on-background: #1C1B1F;
+            --md-sys-color-surface: #F3EDF7; /* Subtle lavender surface */
+            --md-sys-color-surface-container: #FFFBFE; /* The floating card bg */
+            --md-sys-color-surface-container-highest: #E6E0E9;
+            --md-sys-color-surface-variant: #E7E0EC;
+            --md-sys-color-on-surface-variant: #49454E;
+            --md-sys-color-outline: #79747E;
+            /* Animation Variables */
+            --transition-speed: 0.25s;
+        }
+
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px;
+            box-sizing: border-box;
+            /* FIX: Removed 'overflow: hidden' to re-enable scrolling globally */
+        }
+
+        .container { width: 100%; max-width: 700px; text-align: center; }
+
+        .header h1 { font-size: 2.8rem; font-weight: 700; color: var(--md-sys-color-primary); letter-spacing: -1px; margin: 0 0 16px; }
+        .header p { font-size: 1.2rem; color: var(--md-sys-color-on-surface-variant); max-width: 600px; margin: 0 auto 48px; }
+        
+        .interactive-viewer {
+            background-color: var(--md-sys-color-surface);
+            border-radius: 28px;
+            border: 1px solid var(--md-sys-color-surface-variant);
+            box-shadow: 0 8px 32px 0 rgba(0,0,0,0.08);
+            padding: 32px;
+            /* ENHANCEMENT: Allow the main viewer to scroll if content overflows viewport */
+            max-height: 85vh; /* Never taller than 85% of the screen */
+            overflow-y: auto; /* Show scrollbar only when needed */
+        }
+
+        .controls { margin-bottom: 24px; }
+        .length-filters { display: flex; justify-content: center; gap: 16px; margin-bottom: 32px; }
+
+        .filter-btn {
+            width: 52px; height: 52px; display: flex; justify-content: center; align-items: center; border-radius: 50%;
+            border: 2px solid var(--md-sys-color-outline); background-color: transparent; color: var(--md-sys-color-outline);
+            cursor: pointer; transition: all var(--transition-speed) ease;
+        }
+        .filter-btn .material-symbols-outlined { font-size: 28px; }
+        .filter-btn:hover { background-color: var(--md-sys-color-surface-container-highest); transform: scale(1.1); }
+        .filter-btn.active {
+            background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+            border-color: var(--md-sys-color-primary); transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(103, 80, 164, 0.3);
+        }
+
+        .navigation { display: flex; justify-content: space-between; align-items: center; }
+        
+        .nav-btn {
+            display: flex; justify-content: center; align-items: center; width: 48px; height: 48px; border-radius: 50%; border: none;
+            background-color: transparent; color: var(--md-sys-color-primary); cursor: pointer;
+            transition: all var(--transition-speed) ease;
+        }
+        .nav-btn:hover:not(:disabled) { background-color: var(--md-sys-color-primary-container); transform: scale(1.1); }
+        .nav-btn:disabled { color: var(--md-sys-color-outline); cursor: not-allowed; background-color: transparent; transform: scale(1); }
+        .nav-btn .material-symbols-outlined { font-size: 32px; }
+
+        #position-indicator { font-size: 1.1rem; font-weight: 500; color: var(--md-sys-color-secondary); min-width: 60px; }
+        
+        .display-card {
+            background-color: var(--md-sys-color-surface-container);
+            border: 1px solid var(--md-sys-color-surface-variant);
+            border-radius: 20px;
+            padding: 24px;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity var(--transition-speed) ease, transform var(--transition-speed) ease;
+        }
+        .display-card.content-fading {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        #keyword-display {
+            font-size: 3rem; font-weight: 700; margin-bottom: 8px;
+            background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+        }
+
+        #frequency-display { font-size: 1.1rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px; }
+        
+        #map-list-display .map-item { font-size: 1rem; padding: 10px 0; }
+        #map-list-display .map-item:not(:first-child) { border-top: 1px solid var(--md-sys-color-surface-variant); }
+
+        .empty-state { padding: 40px 0; color: var(--md-sys-color-on-surface-variant); }
+        .empty-state .material-symbols-outlined { font-size: 48px; margin-bottom: 16px; }
+        .empty-state p { margin: 0; font-size: 1.1rem; font-weight: 500; }
+
+        /* ENHANCEMENT: M3-style scrollbar for Webkit browsers */
+        .interactive-viewer::-webkit-scrollbar { width: 8px; }
+        .interactive-viewer::-webkit-scrollbar-track { background: var(--md-sys-color-surface-variant); border-radius: 4px;}
+        .interactive-viewer::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline); border-radius: 4px; }
+        
+        @media (max-width: 600px) {
+            body { padding: 16px; align-items: flex-start; }
+            .header h1 { font-size: 2rem; }
+            .header p { font-size: 1rem; margin-bottom: 32px; }
+            .interactive-viewer { padding: 16px; max-height: 80vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>3D坦克地图主题浏览器</h1>
+            <p>点击图标选择关键词长度，再使用箭头探索发现。</p>
+        </div>
+
+        <div class="interactive-viewer">
+            <div class="controls">
+                <div class="length-filters" id="length-filters-container"></div>
+                <div class="navigation">
+                    <button class="nav-btn" id="prev-btn" title="上一个"><span class="material-symbols-outlined">chevron_left</span></button>
+                    <span id="position-indicator">1 / 1</span>
+                    <button class="nav-btn" id="next-btn" title="下一个"><span class="material-symbols-outlined">chevron_right</span></button>
+                </div>
+            </div>
+
+            <div class="display-card" id="display-card">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // All JavaScript logic remains exactly the same as the previous perfect version.
+        // It correctly handles the data analysis and UI state updates.
+        // The fix is purely in the CSS.
+        const mapNames = [ "亚历山大罗夫斯克", "群岛", "竞技场", "天空管道", "城镇3C", "柏林巷站", "山城大战", "训练场", "要塞3C", "路桥大战", "黑色营地", "峡谷", "核电站", "切尔努什卡", "科隆", "孔贝", "空中楼阁", "十字路口", "死亡轨道", "甲板9号", "沙漠", "异次元空间", "城镇角斗场", "古代城堡", "爱丁堡", "海滨中心", "遗弃工厂", "农场", "黑色森林", "黑色城堡", "未来世界", "古墓废墟", "铁塔", "双塔遗迹", "高原", "公路大战", "山岗", "工厂之战", "圣地之战", "小岛", "欧洲村庄", "大桥3C", "失落神庙", "疯狂思维空间", "十字角斗场", "高架桥", "平原", "火车站", "天空要塞", "山顶城堡", "炼油厂保卫战", "隧道对抗", "德国小镇", "边塞角斗场", "穿越之战", "小方块", "多边形", "红色警戒", "重制", "渡桥之战", "里约", "演练场", "高地角斗场", "辽源", "山城3C", "小桥之战", "寂静", "混乱城市", "摩天大楼", "废墟大战", "运动场", "火车站2", "地铁", "广场3C", "山谷", "潮汐", "城堡争夺", "2042", "约克郡", "动感区域" ];
+        let groupedWords = {}, activeLength = 0, currentIndex = 0;
+        const lengthIcons = { 3: 'segment', 2: 'drag_handle', 1: 'match_case' };
+
+        const filtersContainer = document.getElementById('length-filters-container');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const positionIndicator = document.getElementById('position-indicator');
+        const displayCard = document.getElementById('display-card');
+
+        function analyzeAndSetup() {
+            const wordCounts={};mapNames.forEach(t=>{const e=new Set;for(let s=0;s<t.length;s++)for(let a=s+1;a<=t.length;a++)e.add(t.substring(s,a));e.forEach(t=>{wordCounts[t]=(wordCounts[t]||0)+1})});let candidates=Object.entries(wordCounts).filter(([,t])=>t>=2);const finalWords=candidates.filter(([t,e])=>!candidates.some(([s,a])=>s.length>t.length&&s.includes(t)&&a===e));finalWords.sort(([t,e],[s,a])=>{const n=s.length-t.length;if(n)return n;const r=a-e;if(r)return r;return t.localeCompare(s,"zh-Hans-CN")}),finalWords.forEach(([t,e])=>{const s=t.length;groupedWords[s]||(groupedWords[s]=[]),groupedWords[s].push({word:t,count:e})}),setupFilters();const availableLengths=Object.keys(groupedWords).map(Number).sort((t,e)=>e-t);availableLengths.length>0&&setActiveLength(availableLengths[0], true);
+        }
+        
+        function setupFilters() {
+            filtersContainer.innerHTML = '';
+            Object.keys(groupedWords).map(Number).sort((a,b)=>b-a).forEach(len => {
+                const btn = document.createElement('button');
+                btn.className = 'filter-btn'; btn.dataset.length = len;
+                btn.title = `${len}个字`;
+                btn.innerHTML = `<span class="material-symbols-outlined">${lengthIcons[len] || 'help'}</span>`;
+                btn.onclick = () => setActiveLength(len);
+                filtersContainer.appendChild(btn);
+            });
+        }
+        
+        function setActiveLength(len, isInitialLoad = false) {
+            activeLength = len; currentIndex = 0;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.length) === len));
+            updateDisplay(isInitialLoad);
+        }
+
+        function navigate(direction) {
+            const list = groupedWords[activeLength];
+            if (!list) return;
+            let newIndex = currentIndex + direction;
+            if (newIndex < 0) newIndex = list.length - 1;
+            if (newIndex >= list.length) newIndex = 0;
+            currentIndex = newIndex;
+            updateDisplay();
+        }
+
+        function updateDisplay(isInitialLoad = false) {
+            displayCard.classList.add('content-fading');
+            
+            setTimeout(() => {
+                const list = groupedWords[activeLength];
+                if (!list || list.length === 0) {
+                    displayCard.innerHTML = `<div class="empty-state">
+                        <span class="material-symbols-outlined">sentiment_dissatisfied</span>
+                        <p>该长度下无高频词</p>
+                    </div>`;
+                    positionIndicator.textContent = '0 / 0';
+                    prevBtn.disabled = true; nextBtn.disabled = true;
+                } else {
+                    const data = list[currentIndex];
+                    const mapsHTML = mapNames.filter(n => n.includes(data.word)).sort((a,b) => a.localeCompare(b,'zh-Hans-CN')).map(name => `<div class="map-item">${name}</div>`).join('');
+                    displayCard.innerHTML = `
+                        <div id="keyword-display">${data.word}</div>
+                        <div id="frequency-display">频次: ${data.count}</div>
+                        <div id="map-list-display">${mapsHTML}</div>`;
+                    positionIndicator.textContent = `${currentIndex + 1} / ${list.length}`;
+                    prevBtn.disabled = list.length <= 1; nextBtn.disabled = list.length <= 1;
+                }
+                if (!isInitialLoad) { // Only scroll to top on navigation/filter, not initial page load
+                   document.querySelector('.interactive-viewer').scrollTop = 0;
+                }
+                displayCard.classList.remove('content-fading');
+            }, isInitialLoad ? 0 : 150);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            analyzeAndSetup();
+            prevBtn.onclick = () => navigate(-1);
+            nextBtn.onclick = () => navigate(1);
+        });
+    </script>
+</body>
+</html>
