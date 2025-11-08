@@ -49,7 +49,7 @@
             --md-sys-color-surface-container-highest: #00405F;
             --md-sys-color-surface-variant: #40484C;
             --md-sys-color-on-surface-variant: #C0C8CC;
-            --md-sys-color-outline: #8A9296;
+            --md-sys-color-outline: #BFD5FF;
             --md-sys-color-shadow: rgba(118, 255, 51, 0.3);
         }
 
@@ -70,7 +70,7 @@
 
         .container { width: 100%; max-width: 700px; text-align: center; }
 
-        .header { position: relative; } /* 添加相对定位，以便主题按钮可以绝对定位 */
+        .header { position: relative; } 
         .header h1 { font-size: 2.8rem; font-weight: 700; color: var(--md-sys-color-primary); letter-spacing: -1px; margin: 0 0 16px; }
         .header p { font-size: 1.2rem; color: var(--md-sys-color-on-surface-variant); max-width: 600px; margin: 0 auto 48px; }
         
@@ -164,10 +164,10 @@
         
         @media (max-width: 600px) {
             body { padding: 16px; align-items: flex-start; }
-            .header { padding-top: 48px; } /* 为主题按钮留出空间 */
+            .header { padding-top: 48px; }
             .header h1 { font-size: 2rem; }
             .header p { font-size: 1rem; margin-bottom: 32px; }
-            .theme-btn { top: 8px; right: 8px; } /* 调整移动设备上按钮的位置 */
+            .theme-btn { top: 8px; right: 8px; }
             .interactive-viewer { padding: 16px; max-height: 80vh; }
         }
     </style>
@@ -178,7 +178,6 @@
         <div class="header">
             <h1>3D坦克中文地图高频词分析</h1>
             <p>发现中文地图名称中的重复词语，洞察命名规律。</p>
-            <!-- 新增的主题切换按钮 -->
             <button id="theme-toggle-btn" class="theme-btn" title="切换主题">
                 <span class="material-symbols-outlined">dark_mode</span>
             </button>
@@ -278,17 +277,17 @@
             const icon = themeToggleBtn.querySelector('.material-symbols-outlined');
             if (theme === 'dark') {
                 document.body.classList.add('theme-dark');
-                icon.textContent = 'light_mode'; // 在暗色模式下，显示切换到亮色的图标
+                icon.textContent = 'light_mode';
             } else {
                 document.body.classList.remove('theme-dark');
-                icon.textContent = 'dark_mode'; // 在亮色模式下，显示切换到暗色的图标
+                icon.textContent = 'dark_mode';
             }
         }
 
         function toggleTheme() {
             const currentThemeIsDark = document.body.classList.contains('theme-dark');
             const newTheme = currentThemeIsDark ? 'light' : 'dark';
-            localStorage.setItem('theme', newTheme);
+            localStorage.setItem('theme', newTheme); // 保存用户选择
             applyTheme(newTheme);
         }
 
@@ -301,9 +300,24 @@
             nextBtn.onclick = () => navigate(1);
             themeToggleBtn.onclick = toggleTheme;
 
-            // 加载保存的主题
-            const savedTheme = localStorage.getItem('theme') || 'light'; // 默认为浅色主题
-            applyTheme(savedTheme);
+            // --- 主题初始化 ---
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                // 如果用户有保存的选择，则使用该选择
+                applyTheme(savedTheme);
+            } else {
+                // 否则，跟随系统主题
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                applyTheme(prefersDark ? 'dark' : 'light');
+            }
+
+            // 监听系统主题变化
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+                // 仅当用户没有手动设置主题时才响应系统变化
+                if (!localStorage.getItem('theme')) {
+                    applyTheme(event.matches ? 'dark' : 'light');
+                }
+            });
         });
     </script>
 </body>
