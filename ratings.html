@@ -1,237 +1,577 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap" rel="stylesheet">
+    <!-- 引入字体和图标 -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
     <title>3D坦克排行榜</title>
     <style>
+        /* --- M3 Design Tokens & Theme Engine --- */
         :root {
-            --primary-bg: #001926;
-            --secondary-bg: #0a192f;
-            --border-color: #5C6C74;
-            --accent-color: #76FF33;
-            --accent-color-hover: #66cc29;
-            --text-color: #e0e0e0;
-            --text-light: #BFD5FF;
-            --error-color: #FF6666;
-            --header-bg: rgba(125, 157, 186, 0.12);
-            --increase-color: #76FF33;
-            --decrease-color: #FF6666;
+            /* 基础排版 */
+            --font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+            
+            /* 动画 */
+            --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+            --motion-duration-short: 200ms;
+            --motion-duration-medium: 400ms;
         }
 
+        /* 深色主题 (默认 - 保留经典 Tanki 配色) */
+        [data-theme="dark"] {
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-on-primary: #00390a;
+            --md-sys-color-primary-container: #005313;
+            --md-sys-color-on-primary-container: #96ff68;
+            
+            --md-sys-color-secondary: #baccb0;
+            --md-sys-color-on-secondary: #253420;
+            --md-sys-color-secondary-container: #3b4b35;
+            --md-sys-color-on-secondary-container: #d6e8cb;
+
+            --md-sys-color-background: #001926;
+            --md-sys-color-on-background: #e1e3df;
+            
+            --md-sys-color-surface: #0a192f;
+            --md-sys-color-on-surface: #e1e3df;
+            --md-sys-color-surface-variant: #414941;
+            --md-sys-color-on-surface-variant: #c1c9be;
+            
+            --md-sys-color-surface-container: #0f2238;
+            --md-sys-color-surface-container-high: #162b45;
+            
+            --md-sys-color-outline: #8b9389;
+            --md-sys-color-outline-variant: #414941;
+
+            --md-sys-color-error: #ffb4ab;
+            --md-sys-color-on-error: #690005;
+            
+            --chart-increase: #76FF33;
+            --chart-decrease: #ffb4ab;
+            --elevation-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 浅色主题 (现代清新) */
+        [data-theme="light"] {
+            --md-sys-color-primary: #006d2c;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #96ff68;
+            --md-sys-color-on-primary-container: #002208;
+
+            --md-sys-color-secondary: #53634f;
+            --md-sys-color-on-secondary: #ffffff;
+            --md-sys-color-secondary-container: #d6e8cb;
+            --md-sys-color-on-secondary-container: #111f0f;
+
+            --md-sys-color-background: #f6fcf3;
+            --md-sys-color-on-background: #181d18;
+
+            --md-sys-color-surface: #fbfdf8;
+            --md-sys-color-on-surface: #181d18;
+            --md-sys-color-surface-variant: #dde5d9;
+            --md-sys-color-on-surface-variant: #414941;
+            
+            --md-sys-color-surface-container: #eff5ec;
+            --md-sys-color-surface-container-high: #e9efea;
+
+            --md-sys-color-outline: #717970;
+            --md-sys-color-outline-variant: #c1c9be;
+
+            --md-sys-color-error: #ba1a1a;
+            --md-sys-color-on-error: #ffffff;
+
+            --chart-increase: #008000;
+            --chart-decrease: #ba1a1a;
+            --elevation-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        /* --- 全局样式重置 --- */
         * {
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-            -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: var(--font-family);
         }
 
         body {
             margin: 0;
-            padding: 20px;
-            background-color: var(--primary-bg);
-            color: var(--text-color);
+            padding: 0;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            transition: background-color var(--motion-duration-medium), color var(--motion-duration-medium);
+            min-height: 100vh;
         }
 
+        .app-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px;
+            padding-top: 80px; /* 为顶部悬浮栏留出空间 */
+        }
+
+        /* --- 排版 --- */
         h1 {
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 700;
             text-align: center;
-            margin: 0 0 20px;
-            color: var(--accent-color);
+            margin-bottom: 40px;
+            color: var(--md-sys-color-on-background);
+        }
+
+        h2, h3 {
+            color: var(--md-sys-color-on-surface);
         }
         
-        #backToLeaderboardContainer {
+        a { text-decoration: none; color: inherit; }
+
+        /* --- 顶部操作栏 (主题切换 & 返回) --- */
+        .top-bar-actions {
             position: fixed;
-            top: 20px;
-            left: 20px;
+            top: 16px;
+            right: 16px;
+            left: 16px;
+            display: flex;
+            justify-content: space-between;
             z-index: 100;
-            animation: fadeIn 0.5s ease-in-out;
+            pointer-events: none; /* 允许点击穿透到下方内容 */
         }
-
-        #backButton {
-            padding: 10px 20px;
-            background-color: var(--secondary-bg);
-            color: var(--text-light);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        #backButton:hover {
-            background-color: var(--primary-bg);
-            border-color: var(--accent-color);
-            color: var(--accent-color);
-        }
-
-        .form-container { max-width: 400px; margin: 0 auto 20px; padding: 20px; background-color: var(--secondary-bg); border-radius: 12px; border: 1px solid var(--border-color); }
-        .form-group { margin-bottom: 15px; }
-        .form-group:last-child { margin-bottom: 0; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-light); }
-        .form-group input, .form-group select { width: 100%; padding: 12px; background-color: var(--primary-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
-        .form-group input:disabled, .form-group select:disabled { background-color: #2a3b4c; cursor: not-allowed; }
-        .form-group input:focus, .form-group select:focus { border-color: var(--accent-color); outline: none; }
-        .form-group button { width: 100%; padding: 12px 24px; background-color: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 8px; transition: background-color 0.3s, box-shadow 0.3s; cursor: pointer; font-size: 16px; font-weight: bold; }
-        .form-group button:hover:not(:disabled) { background-color: var(--accent-color-hover); }
-        .form-group button:disabled { background-color: #555; cursor: not-allowed; }
-        .error-message { color: var(--error-color); text-align: center; margin-top: 15px; min-height: 1.2em; }
         
-        .results-wrapper { display: none; }
-        .fade-in { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .top-bar-actions > * {
+            pointer-events: auto; /* 恢复按钮的可点击性 */
+        }
 
-        .monitor-container { text-align: center; margin-bottom: 20px; }
-        #monitorButton { padding: 12px 24px; border: none; border-radius: 8px; transition: background-color 0.3s, box-shadow 0.3s; cursor: pointer; font-size: 16px; font-weight: bold; background-color: #00D4FF; color: white; }
-        #monitorButton:hover:not(:disabled) { background-color: #2e5a8e; }
-        #monitorButton:disabled { background-color: #555; cursor: not-allowed; }
-        #monitorButton.monitoring { background-color: var(--error-color); color: white; animation: pulse 1.5s infinite; }
-        #monitorButton.monitoring:hover { background-color: #cc5252; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 102, 102, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 102, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 102, 102, 0); } }
+        /* 图标按钮 (主题切换) */
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface-variant);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s;
+            box-shadow: var(--elevation-shadow);
+        }
+        .icon-btn:hover {
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            transform: scale(1.05);
+        }
+        .material-symbols-rounded { font-size: 24px; }
 
-        .tabs { display: flex; justify-content: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
-        .tab-button { padding: 10px 20px; cursor: pointer; border: none; background: none; color: var(--text-light); font-size: 16px; font-weight: 500; position: relative; transition: color 0.3s; }
-        .tab-button:after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 3px; background-color: var(--accent-color); transform: scaleX(0); transition: transform 0.3s; }
-        .tab-button.active { color: var(--accent-color); }
-        .tab-button.active:after { transform: scaleX(1); }
-        .tab-content { display: none; }
+        /* 返回按钮 (扩展 FAB 风格) */
+        #backToLeaderboardContainer {
+            animation: fadeScaleIn 0.3s var(--motion-easing-standard);
+        }
+        
+        #backButton {
+            height: 48px;
+            padding: 0 24px 0 16px;
+            border-radius: 24px;
+            border: none;
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--elevation-shadow);
+            transition: all 0.2s;
+        }
+        #backButton:hover {
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            filter: brightness(1.05);
+        }
+
+        /* --- 搜索表单卡片 --- */
+        .form-container {
+            max-width: 500px;
+            margin: 0 auto 40px;
+            padding: 32px 24px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 28px;
+            /* box-shadow: var(--elevation-shadow); */
+            transition: background-color 0.3s;
+        }
+
+        .form-group { margin-bottom: 24px; position: relative; }
+        .form-group:last-child { margin-bottom: 0; }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--md-sys-color-on-surface-variant);
+            margin-bottom: 8px;
+            margin-left: 4px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            height: 56px;
+            padding: 0 16px;
+            background-color: transparent;
+            color: var(--md-sys-color-on-surface);
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.2s;
+            caret-color: var(--md-sys-color-primary);
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--md-sys-color-primary);
+            border-width: 2px;
+            padding: 0 15px; /* 调整 padding 以适应边框变化 */
+            outline: none;
+            background-color: var(--md-sys-color-surface-container-high);
+        }
+        
+        .form-group input:disabled, .form-group select:disabled {
+            opacity: 0.5; cursor: not-allowed;
+        }
+
+        /* 实心按钮 */
+        .form-group button {
+            width: 100%;
+            height: 52px;
+            border-radius: 26px;
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.1s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group button:hover:not(:disabled) {
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+            filter: brightness(1.08);
+        }
+        .form-group button:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+        .form-group button:disabled {
+            background-color: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-on-surface-variant);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .error-message {
+            color: var(--md-sys-color-error);
+            text-align: center;
+            margin-top: 16px;
+            font-size: 14px;
+            min-height: 20px;
+            font-weight: 500;
+        }
+
+        /* --- 监测按钮 --- */
+        .monitor-container { text-align: center; margin-bottom: 24px; }
+        #monitorButton {
+            height: 44px;
+            padding: 0 28px;
+            border-radius: 22px;
+            border: 1px solid var(--md-sys-color-outline);
+            background-color: transparent;
+            color: var(--md-sys-color-primary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #monitorButton:hover:not(:disabled) {
+            background-color: var(--md-sys-color-primary-container);
+            border-color: transparent;
+            color: var(--md-sys-color-on-primary-container);
+        }
+        #monitorButton.monitoring {
+            background-color: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error);
+            border-color: transparent;
+            animation: pulse-red 2s infinite;
+        }
+        
+        /* --- 选项卡 (Tabs) --- */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--md-sys-color-surface-variant);
+        }
+        .tab-button {
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.2s;
+        }
+        .tab-button.active { color: var(--md-sys-color-primary); }
+        .tab-button::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--md-sys-color-primary);
+            border-radius: 3px 3px 0 0;
+            transform: scaleX(0);
+            transition: transform 0.2s var(--motion-easing-standard);
+        }
+        .tab-button.active::after { transform: scaleX(1); }
+        .tab-content { display: none; animation: fadeUp 0.3s var(--motion-easing-standard); }
         .tab-content.active { display: block; }
 
-        .loader { display: none; justify-content: center; align-items: center; margin: 30px 0; }
-        .loader-inner { width: 30px; height: 30px; border-radius: 50%; border: 4px solid var(--border-color); border-top-color: var(--text-color); animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* --- 卡片与列表风格 --- */
+        /* 通用卡片样式 */
+        .card-style {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 24px;
+            padding: 24px;
+            transition: transform 0.2s;
+        }
 
-        #leaderboardContainer {
-            width: 100%;
-            margin: 0 auto;
+        /* 玩家概览网格 */
+        #profileSummary {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
         }
-        #leaderboardContainer h2 {
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            background-color: var(--md-sys-color-surface);
+            border-radius: 16px;
+            transition: transform 0.2s;
+        }
+        .summary-item:hover { transform: translateY(-2px); }
+        .summary-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .summary-value { font-size: 18px; font-weight: 600; color: var(--md-sys-color-on-surface); word-break: break-all; }
+        .summary-value.premium { color: var(--md-sys-color-primary); }
+
+        /* --- 排行榜轮播 --- */
+        .leaderboard-category {
+            @extend .card-style;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 24px;
+            padding: 20px;
+            border: 1px solid var(--md-sys-color-outline-variant);
+            max-height: 600px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .leaderboard-category h3 {
+            font-size: 20px;
             text-align: center;
-            color: var(--text-light);
-            margin-bottom: 20px;
+            margin: 10px 0 20px;
+            font-weight: 500;
+            color: var(--md-sys-color-primary);
         }
-        .leaderboard-carousel-container {
-            position: relative;
-        }
-        #leaderboardCarouselContent {
-            width: 100%;
-            transition: opacity 0.3s ease-in-out;
-        }
-        @media (min-width: 768px) {
-            #leaderboardCarouselContent {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-            }
-        }
+
+        /* 轮播按钮 */
+        .leaderboard-carousel-container { position: relative; }
         .carousel-nav-button {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
             z-index: 10;
-            width: 40px;
-            height: 40px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            border: 1px solid var(--border-color);
-            background-color: rgba(10, 25, 47, 0.8);
-            color: var(--text-light);
-            font-size: 20px;
-            font-weight: bold;
+            border: none;
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface);
             cursor: pointer;
-            transition: all 0.3s;
+            box-shadow: var(--elevation-shadow);
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .carousel-nav-button:hover {
-            background-color: var(--primary-bg);
-            border-color: var(--accent-color);
-            color: var(--accent-color);
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            transform: translateY(-50%) scale(1.1);
         }
-        #leaderboardPrev {
-            left: 5px;
+        #leaderboardPrev { left: -24px; }
+        #leaderboardNext { right: -24px; }
+        @media (max-width: 768px) {
+            #leaderboardPrev { left: -10px; width: 40px; height: 40px; }
+            #leaderboardNext { right: -10px; width: 40px; height: 40px; }
         }
-        #leaderboardNext {
-            right: 5px;
+        
+        #leaderboardCarouselContent {
+            transition: opacity 0.3s ease;
+        }
+        @media (min-width: 768px) {
+            #leaderboardCarouselContent {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 24px;
+            }
         }
 
-        .leaderboard-category {
-            background-color: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            max-height: 550px;
-            overflow-y: auto;
-            overflow-x: hidden;
+        /* 表格样式 */
+        .leaderboard-table, table {
+            width: 100%;
+            border-collapse: collapse; 
+        }
+        .leaderboard-table th, .leaderboard-table td, table th, table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+        }
+        .leaderboard-table th {
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 13px;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            background-color: var(--md-sys-color-surface-container);
+        }
+        .leaderboard-table tr:last-child td { border-bottom: none; }
+        .player-link {
+            color: var(--md-sys-color-on-surface);
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .player-link:hover { color: var(--md-sys-color-primary); text-decoration: underline; }
+
+        /* 滚动条美化 */
+        .leaderboard-table-wrapper, .list-container {
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: var(--md-sys-color-outline-variant); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--md-sys-color-outline); }
+
+        /* --- 横向滚动数据列表 (卡片) --- */
+        .list-section { margin-bottom: 40px; }
+        .list-title { 
+            font-size: 20px; 
+            margin-left: 8px; 
+            margin-bottom: 16px; 
+            font-weight: 500;
+            border-left: 4px solid var(--md-sys-color-primary);
+            padding-left: 12px;
+        }
+        .list-container {
+            display: flex;
+            padding: 8px 4px 24px 4px; /* 底部留出阴影空间 */
+            gap: 16px;
+            scroll-snap-type: x mandatory; /* 移动端优化：吸附滚动 */
+        }
+        .data-card {
+            flex: 0 0 260px;
+            scroll-snap-align: start;
+            background-color: var(--md-sys-color-surface);
+            padding: 20px;
+            border-radius: 24px;
             display: flex;
             flex-direction: column;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            border: 1px solid transparent;
         }
-        .leaderboard-category h3 { margin: 15px 0 15px 0; padding: 0 10px; text-align: center; color: var(--accent-color); font-weight: 500; }
-        
-        .leaderboard-table {
-            width: 100%;
-            min-width: 500px; 
-            border-collapse: collapse;
-            table-layout: fixed;
+        .data-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
         }
-        .leaderboard-table th, .leaderboard-table td {
-            padding: 10px 8px;
-            vertical-align: middle;
-            text-align: left;
+        .data-card.changed {
+            border: 1px solid var(--md-sys-color-primary);
+            background-color: var(--md-sys-color-surface-container-high);
         }
-        .leaderboard-table th { font-weight: 600; color: var(--text-light); border-bottom: 2px solid var(--border-color); }
-        .leaderboard-table tr:not(:last-child) { border-bottom: 1px solid var(--border-color); }
-        
-        .leaderboard-table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 10px;
+        .item-name { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--md-sys-color-on-surface); height: 48px; display: flex; align-items: center; justify-content: center; }
+        .item-image { width: 100px; height: 100px; object-fit: contain; margin: 0 auto 16px; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1)); }
+        .data-card div { font-size: 14px; margin: 4px 0; color: var(--md-sys-color-on-surface-variant); }
+        .data-card strong { color: var(--md-sys-color-on-surface); }
+
+        .view-data-button {
+            margin-top: auto;
+            padding: 10px 16px;
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            border: none;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: filter 0.2s;
         }
-        .leaderboard-table-wrapper::-webkit-scrollbar {
-            height: 8px;
+        .view-data-button:hover { filter: brightness(0.95); }
+
+        /* --- 模态框 --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
         }
-        .leaderboard-table-wrapper::-webkit-scrollbar-track {
-            background: var(--primary-bg);
-            border-radius: 4px;
+        .modal-content {
+            background-color: var(--md-sys-color-surface-container);
+            color: var(--md-sys-color-on-surface);
+            padding: 24px;
+            border-radius: 28px;
+            width: 90%; max-width: 450px; max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--elevation-shadow);
+            animation: scaleUp 0.3s cubic-bezier(0.2, 0, 0, 1);
         }
-        .leaderboard-table-wrapper::-webkit-scrollbar-thumb {
-            background-color: var(--border-color);
-            border-radius: 4px;
-        }
-        .leaderboard-table-wrapper::-webkit-scrollbar-thumb:hover {
-            background-color: var(--accent-color);
+        .modal-content h3 { margin-top: 0; color: var(--md-sys-color-primary); text-align: center; }
+        .close-button {
+            display: block; margin: 20px auto 0;
+            padding: 10px 32px;
+            background-color: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error);
+            border: none; border-radius: 20px;
+            cursor: pointer; font-weight: bold;
         }
 
-        .rank-col {
-            width: 5%;
-            text-align: center;
-        }
-        .player-col {
-            width: 25%;
-        }
-        .value-col {
-            width: 35%;
-            text-align: right;
-            white-space: nowrap;
-            padding-right: 10px;
-        }
-        .player-link { color: var(--text-color); text-decoration: none; cursor: pointer; transition: color 0.3s; }
-        .player-link:hover { color: var(--accent-color); text-decoration: underline; }
+        /* --- 工具类 & 动画 --- */
+        .change-indicator { font-size: 0.85em; font-weight: 700; margin-left: 6px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.1); }
+        .change-increase { color: var(--chart-increase); background-color: rgba(118, 255, 51, 0.1); }
+        .change-decrease { color: var(--chart-decrease); background-color: rgba(255, 180, 171, 0.1); }
         
-        .prize-icons-container {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-            justify-content: flex-start;
+        .loader { display: none; justify-content: center; padding: 40px; }
+        .loader-inner {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            border: 5px solid var(--md-sys-color-surface-variant);
+            border-top-color: var(--md-sys-color-primary);
+            animation: spin 1s linear infinite;
         }
-        .prize-icon {
-            width: 20px;
-            height: 20px;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            display: inline-block;
-        }
+
+        /* 奖励图标 */
+        .prize-icons-container { display: flex; gap: 4px; align-items: center; }
+        .prize-icon { width: 24px; height: 24px; background-size: contain; background-repeat: no-repeat; background-position: center; }
         .prize-icon.drone { background-image: url('https://pages.tankionline.com/images/challenge/hyperion.png'); }
         .prize-icon.nuclear { background-image: url('https://pages.tankionline.com/images/challenge/nuclear-energy.png'); }
         .prize-icon.ruby { background-image: url('https://pages.tankionline.com/images/challenge/rubies.png'); }
@@ -239,110 +579,147 @@
         .prize-icon.rare-key { background-image: url('https://pages.tankionline.com/images/challenge/rare-key.png'); }
         .prize-icon.common-key { background-image: url('https://pages.tankionline.com/images/challenge/common-key.png'); }
 
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleUp { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 180, 171, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 180, 171, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 180, 171, 0); } }
 
-        #profileSummary { background-color: var(--secondary-bg); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-        .summary-item { display: flex; flex-direction: column; }
-        .summary-label { font-size: 14px; color: var(--text-light); margin-bottom: 4px; }
-        .summary-value { font-size: 16px; font-weight: 500; }
-        .summary-value.premium { color: var(--accent-color); }
-        #rankingsTableContainer { margin-bottom: 30px; overflow-x: auto; }
-        table { width: 100%; min-width: 500px; border-collapse: collapse; color: var(--text-color); }
-        th, td { padding: 12px 15px; text-align: center; font-size: 14px; white-space: nowrap; }
-        th { background: var(--header-bg); font-weight: 600; border-bottom: 2px solid var(--accent-color); position: sticky; top: 0; z-index: 2; }
-        tr:nth-child(even) { background: var(--header-bg); }
-        tr:nth-child(odd) { background: rgba(125, 157, 186, 0.05); }
-        .change-indicator { font-size: 0.8em; font-weight: bold; margin-left: 8px; padding: 2px 5px; border-radius: 4px; }
-        .change-increase { color: var(--increase-color); }
-        .change-decrease { color: var(--decrease-color); }
-        .field-changed { color: var(--increase-color); transition: color 0.3s ease-in-out; }
-        .list-section { margin-bottom: 30px; }
-        .list-title { text-align: center; margin-bottom: 15px; font-size: 1.5em; color: var(--text-light); font-weight: 500; }
-        .list-container { display: flex; overflow-x: auto; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        .list-container > * { scroll-snap-align: center; }
-        .data-card { flex: 0 0 280px; background-color: var(--secondary-bg); padding: 15px; margin: 0 10px; border-radius: 10px; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; text-align: center; border: 1px solid var(--border-color); transition: border-color 0.3s, transform 0.3s; }
-        .data-card.changed { border-color: var(--accent-color); transform: translateY(-5px); }
-        .item-name { position: sticky; top: 0; background-color: var(--secondary-bg); z-index: 1; padding: 5px 0 10px 0; font-size: 18px; font-weight: 500; }
-        .item-image { display: block; width: 80px; height: 80px; margin: 0 auto 10px auto; object-fit: contain; }
-        .data-card div { font-size: 14px; margin: 5px 0; }
-        .view-data-button, .close-button { display: inline-block; padding: 8px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; cursor: pointer; transition: background-color 0.3s; margin: 15px auto 5px auto; text-decoration: none; }
-        .view-data-button { background-color: var(--accent-color); color: var(--primary-bg); }
-        .view-data-button:hover { background-color: var(--accent-color-hover); }
-        .close-button { background-color: var(--error-color); color: #fff; }
-        .no-data-message { text-align: center; color: #aaa; padding: 20px; background-color: rgba(10, 25, 47, 0.5); border-radius: 8px; font-style: italic; flex-grow: 1; display: flex; align-items: center; justify-content: center;}
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(5px); }
-        .modal-content { background-color: var(--primary-bg); padding: 20px; border-radius: 10px; width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border-color); text-align: center; }
-        .modal-content h3 { margin-top: 0; color: var(--accent-color); }
-        .modal-content table { margin: 15px 0; min-width: auto; }
-        .modal-content th { background: rgba(125, 157, 186, 0.2); }
-        #changeLogContainer { max-height: 80vh; overflow-y: auto; padding: 10px; background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 12px; }
-        .log-entry { background-color: var(--primary-bg); padding: 12px; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid var(--accent-color); }
-        .log-entry:last-child { margin-bottom: 0; }
-        .log-timestamp { font-size: 12px; color: #aaa; margin-bottom: 8px; }
-        .log-details { font-size: 14px; }
-        .log-details strong { color: var(--text-light); }
+        /* --- 日志区域 --- */
+        #changeLogContainer {
+            max-height: 80vh; overflow-y: auto;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 24px; padding: 16px;
+        }
+        .log-entry {
+            background-color: var(--md-sys-color-surface);
+            padding: 16px; margin-bottom: 12px;
+            border-radius: 12px;
+            border-left: 4px solid var(--md-sys-color-primary);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .log-timestamp { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 6px; }
+
+        .no-data-message {
+            text-align: center; color: var(--md-sys-color-on-surface-variant);
+            padding: 30px; font-style: italic;
+        }
+
+        /* 排名表格容器特化 */
+        #rankingsTableContainer { 
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 24px;
+            padding: 16px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+        #rankingsTableContainer th { background: var(--md-sys-color-surface-container); }
+        #rankingsTableContainer tr:hover { background-color: rgba(255,255,255,0.03); }
     </style>
 </head>
 <body>
 
-<div id="backToLeaderboardContainer" style="display: none;">
-    <button id="backButton">← 查看排行榜</button>
-</div>
-
-<h1>3D坦克排行榜</h1>
-
-<div class="form-container">
-    <div class="form-group">
-        <label for="server">选择服务器：</label>
-        <select id="server">
-            <option value="cn" disabled>国服 (维护中)</option>
-            <option value="eu" selected>外服</option>
-        </select>
+<div class="app-container">
+    <!-- 顶部操作栏 -->
+    <div class="top-bar-actions">
+        <div id="backToLeaderboardContainer" style="display: none;">
+            <button id="backButton">
+                <span class="material-symbols-rounded">arrow_back</span>
+                <span>返回</span>
+            </button>
+        </div>
+        <!-- 占位符，确保主题按钮靠右 -->
+        <div style="flex-grow: 1;"></div> 
+        <button id="themeToggle" class="icon-btn" aria-label="切换主题" title="切换深色/浅色主题">
+            <span class="material-symbols-rounded">dark_mode</span>
+        </button>
     </div>
 
-    <div class="form-group">
-        <label for="username">输入昵称查询详细资料：</label>
-        <input type="text" id="username" placeholder="或点击下方排行榜中的昵称" />
-    </div>
-    
-    <div class="form-group">
-        <button id="fetchButton">查询资料</button>
-    </div>
+    <h1>3D坦克排行榜</h1>
 
-    <div id="errorMessage" class="error-message"></div>
-</div>
+    <div class="form-container">
+        <div class="form-group">
+            <label for="server">服务器</label>
+            <select id="server">
+                <option value="cn" disabled>国服 (维护中)</option>
+                <option value="eu" selected>外服 (EU)</option>
+            </select>
+        </div>
 
-<div class="loader" id="loader">
-    <div class="loader-inner"></div>
-</div>
+        <div class="form-group">
+            <label for="username">玩家昵称</label>
+            <input type="text" id="username" placeholder="例如: Godmode_ON" autocomplete="off" />
+        </div>
+        
+        <div class="form-group">
+            <button id="fetchButton">查询资料</button>
+        </div>
 
-<div id="leaderboardContainer">
-</div>
-
-<div id="resultsWrapper" class="results-wrapper">
-    
-    <div class="monitor-container">
-        <button id="monitorButton">开启监测</button>
+        <div id="errorMessage" class="error-message"></div>
     </div>
 
-    <div class="tabs">
-        <button class="tab-button active" data-tab="profile">玩家资料</button>
-        <button class="tab-button" data-tab="log">变更日志</button>
+    <div class="loader" id="loader">
+        <div class="loader-inner"></div>
     </div>
 
-    <div id="profileContent" class="tab-content active">
-        <div id="profileSummary"></div>
-        <div id="rankingsTableContainer"></div>
-        <div id="listsContainer"></div>
+    <div id="leaderboardContainer">
+        <!-- 动态加载轮播图 -->
     </div>
 
-    <div id="logContent" class="tab-content">
-        <div id="changeLogContainer">
-            <p class="no-data-message">暂无数据变更记录</p>
+    <div id="resultsWrapper" class="results-wrapper" style="display: none;">
+        
+        <div class="monitor-container">
+            <button id="monitorButton">开启实时监测</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="profile">玩家资料</button>
+            <button class="tab-button" data-tab="log">变更日志</button>
+        </div>
+
+        <div id="profileContent" class="tab-content active">
+            <div id="profileSummary"></div>
+            <div id="rankingsTableContainer"></div>
+            <div id="listsContainer"></div>
+        </div>
+
+        <div id="logContent" class="tab-content">
+            <div id="changeLogContainer">
+                <p class="no-data-message">暂无数据变更记录</p>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+    // --- 主题引擎逻辑 (持久化保存) ---
+    const themeToggleBtn = document.getElementById('themeToggle');
+    const themeIcon = themeToggleBtn.querySelector('span');
+    const htmlEl = document.documentElement;
+
+    function initTheme() {
+        // 优先读取本地存储，否则默认为 Dark (符合 Tanki 风格)
+        const savedTheme = localStorage.getItem('theme') || 'dark'; 
+        setTheme(savedTheme);
+    }
+
+    function setTheme(theme) {
+        htmlEl.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        // 切换图标：Dark模式下显示月亮，Light模式下显示太阳
+        themeIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = htmlEl.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+    });
+
+    initTheme();
+
+    // --- 核心业务逻辑 ---
     const API_CONFIG = {
         baseUrls: { 'eu': 'https://ratings.tankionline.com/api/eu/profile/', 'cn': 'https://ratings.3dtank.com/get_stat/profile/' },
         leaderboardUrl: 'https://ratings.tankionline.com/api/eu/top/',
@@ -356,7 +733,7 @@
         { key: 'score', title: '经验值' },
         { key: 'crystals', title: '获得的水晶' },
         { key: 'golds', title: '获得的金箱子' },
-        { key: 'efficiency', title: '效率' },
+        { key: 'efficiency', title: '效率 (经验值/小时)' }, // 修改标题
         { key: 'stars_current', title: '星级挑战 (当前)' },
         { key: 'stars_previous', title: '星级挑战 (上次)' }
     ];
@@ -429,7 +806,6 @@
     
     function translateText(text) { if (typeof text !== 'string' || !text) return text; let translated = text; const replacementOrder = ['ROCKET_LAUNCHER', 'MACHINE_GUN', 'FIREBIRD', 'RESISTANCE', 'RICOCHET', 'ARTILLERY', 'SHOTGUN', 'THUNDER', 'CRITICAL', 'RAILGUN', 'FREEZE', 'SCORPIO', 'SMOKY', 'SHAFT', 'TWINS', 'GAUSS', 'TESLA', 'ISIS', 'MINE', 'JGR', 'TJR']; replacementOrder.forEach(key => { if (TRANSLATION_MAP[key]) translated = translated.replace(new RegExp(key, 'g'), TRANSLATION_MAP[key]); }); if (translated.includes('_')) translated = translated.replace(/_/g, ''); return translated; }
     
-    // ############### 已修复的函数 ###############
     function showLeaderboardView(pushState = true) {
         elements.resultsWrapper.style.display = 'none';
         if (isMonitoring) { stopMonitoring(); }
@@ -438,7 +814,6 @@
         elements.leaderboardContainer.style.display = 'block';
         elements.backToLeaderboardContainer.style.display = 'none';
 
-        // 检查排行榜数据是否存在。如果不存在（例如在通过URL直接进入玩家页面后），则加载它。
         if (!leaderboardData) {
             fetchAndRenderLeaderboard();
         }
@@ -449,61 +824,53 @@
             history.pushState({}, pageTitle, window.location.pathname);
         }
     }
-    // #########################################
 
     async function fetchStarsLeaderboardData() {
         const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=';
         const starsUrl = 'https://pages.tankionline.com/challenge-accepted';
         const apiUrl = `${proxyUrl}${encodeURIComponent(starsUrl)}`;
         
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`无法获取星级挑战数据: ${response.status}`);
-        }
-        const htmlText = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlText, 'text/html');
+        try {
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error('Status ' + response.status);
+            const htmlText = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlText, 'text/html');
 
-        const parseList = (selector, prizeParser) => {
-            const list = doc.querySelector(selector);
-            if (!list) return [];
-            const players = [];
-            list.querySelectorAll('ul.list-content li').forEach(li => {
-                const name = li.querySelector('.name')?.textContent.trim();
-                const starsText = li.querySelector('.stars')?.textContent.trim().replace(/\s/g, '');
-                const value = parseInt(starsText, 10);
-                
-                if (name && !isNaN(value)) {
-                    const player = { uid: name, value: value };
-                    if (prizeParser) {
-                        player.prizes = prizeParser(li);
+            const parseList = (selector, prizeParser) => {
+                const list = doc.querySelector(selector);
+                if (!list) return [];
+                const players = [];
+                list.querySelectorAll('ul.list-content li').forEach(li => {
+                    const name = li.querySelector('.name')?.textContent.trim();
+                    const starsText = li.querySelector('.stars')?.textContent.trim().replace(/\s/g, '');
+                    const value = parseInt(starsText, 10);
+                    
+                    if (name && !isNaN(value)) {
+                        const player = { uid: name, value: value };
+                        if (prizeParser) player.prizes = prizeParser(li);
+                        players.push(player);
                     }
-                    players.push(player);
-                }
-            });
-            return players;
-        };
-        
-        const prizeParser = (li) => {
-            const prizeContainer = li.querySelector('.prizes');
-            if (!prizeContainer) return [];
-            const prizes = [];
-            prizeContainer.querySelectorAll('.prize').forEach(prizeDiv => {
-                const prizeClass = Array.from(prizeDiv.classList).find(c => c !== 'prize');
-                if (prizeClass) {
-                    prizes.push(prizeClass);
-                }
-            });
-            return prizes;
-        };
+                });
+                return players;
+            };
+            
+            const prizeParser = (li) => {
+                const prizeContainer = li.querySelector('.prizes');
+                if (!prizeContainer) return [];
+                return Array.from(prizeContainer.querySelectorAll('.prize')).map(p => {
+                   return Array.from(p.classList).find(c => c !== 'prize');
+                }).filter(Boolean);
+            };
 
-        const currentStars = parseList('.rating-list.active');
-        const previousStars = parseList('.rating-list.old-list', prizeParser);
+            const currentStars = parseList('.rating-list.active');
+            const previousStars = parseList('.rating-list.old-list', prizeParser);
 
-        return {
-            stars_current: currentStars,
-            stars_previous: previousStars
-        };
+            return { stars_current: currentStars, stars_previous: previousStars };
+        } catch (e) {
+            console.warn("Stars data fetch failed", e);
+            return { stars_current: [], stars_previous: [] };
+        }
     }
 
     async function fetchAndRenderLeaderboard() {
@@ -528,7 +895,7 @@
             }
         } catch (error) {
             console.error('获取排行榜数据失败:', error);
-            container.innerHTML = `<p class="no-data-message" style="color: var(--error-color);">无法加载排行榜: ${error.message}</p>`;
+            container.innerHTML = `<p class="no-data-message" style="color: var(--md-sys-color-error);">无法加载排行榜: ${error.message}</p>`;
         }
     }
 
@@ -537,8 +904,8 @@
         container.innerHTML = `<h2>每周/活动排行榜</h2>
                                <div class="leaderboard-carousel-container">
                                    <div id="leaderboardCarouselContent"></div>
-                                   <button id="leaderboardPrev" class="carousel-nav-button"><</button>
-                                   <button id="leaderboardNext" class="carousel-nav-button">></button>
+                                   <button id="leaderboardPrev" class="carousel-nav-button"><span class="material-symbols-rounded">chevron_left</span></button>
+                                   <button id="leaderboardNext" class="carousel-nav-button"><span class="material-symbols-rounded">chevron_right</span></button>
                                </div>`;
         document.getElementById('leaderboardPrev').addEventListener('click', showPrevLeaderboard);
         document.getElementById('leaderboardNext').addEventListener('click', showNextLeaderboard);
@@ -562,7 +929,7 @@
                 const categoryData = leaderboardData[category.key];
                 
                 let html = `<div class="leaderboard-category">`;
-                html += `<h3 class="list-title">${category.title}</h3>`;
+                html += `<h3 class="list-title" style="border:none; padding:0;">${category.title}</h3>`;
 
                 if (categoryData && categoryData.length > 0) {
                     html += '<div class="leaderboard-table-wrapper">';
@@ -570,7 +937,7 @@
                          html += `<table class="leaderboard-table" style="min-width: 600px;">
                                     <thead><tr><th class="rank-col" style="width: 10%;">#</th><th class="player-col" style="width: 35%;">昵称</th><th style="width: 35%; text-align: left; padding-left: 5px;">奖励</th><th class="value-col" style="width: 20%">星星</th></tr></thead>
                                     <tbody>${categoryData.map((player, index) => {
-                                        const prizeHtml = player.prizes.map(p => `<div class="prize-icon ${p.replace(/_/g, '-')}" title="${p}"></div>`).join('');
+                                        const prizeHtml = (player.prizes || []).map(p => `<div class="prize-icon ${p.replace(/_/g, '-')}" title="${p}"></div>`).join('');
                                         return `<tr>
                                             <td class="rank-col">${index + 1}</td>
                                             <td class="player-col"><a href="#" class="player-link" data-username="${player.uid}">${player.uid}</a></td>
@@ -583,12 +950,20 @@
                     } else {
                          html += `<table class="leaderboard-table">
                                     <thead><tr><th class="rank-col">#</th><th class="player-col">昵称</th><th class="value-col">数值</th></tr></thead>
-                                    <tbody>${categoryData.map((player, index) => `
+                                    <tbody>${categoryData.map((player, index) => {
+                                        // 处理效率值，除以1000
+                                        const isEfficiency = category.key === 'efficiency';
+                                        const rawValue = player.value;
+                                        const displayValue = isEfficiency ? (rawValue / 1000) : rawValue;
+                                        const formattedValue = displayValue.toLocaleString(undefined, { maximumFractionDigits: isEfficiency ? 3 : 0 });
+
+                                        return `
                                         <tr>
                                             <td class="rank-col">${index + 1}</td>
                                             <td class="player-col"><a href="#" class="player-link" data-username="${player.uid}">${player.uid}</a></td>
-                                            <td class="value-col">${player.value.toLocaleString()}</td>
-                                        </tr>`).join('')}
+                                            <td class="value-col">${formattedValue}</td>
+                                        </tr>`
+                                    }).join('')}
                                     </tbody>
                                 </table>`;
                     }
@@ -633,25 +1008,77 @@
     async function fetchProfileData(server, username) { const baseUrl = API_CONFIG.baseUrls[server]; if (!baseUrl) throw new Error('无效的服务器选择'); const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest='; try { const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`; const apiUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; const response = await fetch(apiUrl); if (!response.ok) throw new Error(`网络响应错误: ${response.status}`); const profileData = await response.json(); if (profileData?.responseType === 'NOT_FOUND') { throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。'); } else if (profileData?.response) { return profileData.response; } else { throw new Error('无效的响应数据格式'); } } catch (err) { throw err; } }
     function toggleMonitoring() { if (isMonitoring) stopMonitoring(); else { if (!lastProfileData) { displayError('请先至少查询一次，再开启监测'); return; } isMonitoring = true; startMonitoring(); } }
     function startMonitoring() { if (!isMonitoring) return; elements.monitorButton.textContent = "停止监测"; elements.monitorButton.classList.add('monitoring'); elements.fetchButton.disabled = true; elements.usernameInput.disabled = true; elements.serverSelect.disabled = true; displayError("监测已开启..."); performMonitoringFetch(); }
-    function stopMonitoring() { isMonitoring = false; clearTimeout(monitoringTimeoutId); elements.monitorButton.textContent = "开启监测"; elements.monitorButton.classList.remove('monitoring'); elements.fetchButton.disabled = false; elements.usernameInput.disabled = false; elements.serverSelect.disabled = false; displayError(''); }
+    function stopMonitoring() { isMonitoring = false; clearTimeout(monitoringTimeoutId); elements.monitorButton.textContent = "开启实时监测"; elements.monitorButton.classList.remove('monitoring'); elements.fetchButton.disabled = false; elements.usernameInput.disabled = false; elements.serverSelect.disabled = false; displayError(''); }
     async function performMonitoringFetch() { if (!isMonitoring) return; try { const newData = await fetchProfileData(currentServer, currentUsername); if (isMonitoring) displayError('监测中...数据已刷新'); updateDisplay(newData, lastProfileData); lastProfileData = newData; } catch (error) { console.error("Monitoring fetch failed, will retry:", error); if (isMonitoring) displayError(`监测中断: ${error.message} (${API_CONFIG.monitorInterval / 1000}秒后重试)`); } finally { if (isMonitoring) { monitoringTimeoutId = setTimeout(performMonitoringFetch, API_CONFIG.monitorInterval); } } }
     function updateDisplay(newData, oldData = null) { 
         if (oldData === null) {
             elements.leaderboardContainer.style.display = 'none';
             elements.resultsWrapper.style.display = 'block';
-            elements.resultsWrapper.classList.add('fade-in');
-            setTimeout(() => elements.resultsWrapper.classList.remove('fade-in'), 500);
             elements.backToLeaderboardContainer.style.display = 'block'; 
         }
         displayProfileSummary(newData, oldData);
         displayRankingsTable(newData, oldData);
         displayAllLists(newData, oldData);
     }
-    function createChangeSpan(diff) { if (diff === 0 || isNaN(diff)) return ''; const sign = diff > 0 ? '+' : ''; const className = diff > 0 ? 'change-increase' : 'change-decrease'; return `<span class="change-indicator ${className}">${sign}${diff.toLocaleString()}</span>`; }
-    function logChange(item, oldValue, newValue) { const entry = { timestamp: new Date().toLocaleString('zh-CN'), item: translateText(item), oldValue: oldValue?.toLocaleString() || 'N/A', newValue: newValue?.toLocaleString() || 'N/A' }; changeLog.unshift(entry); renderChangeLog(); }
+    function createChangeSpan(diff) { if (diff === 0 || isNaN(diff)) return ''; const sign = diff > 0 ? '+' : ''; const className = diff > 0 ? 'change-increase' : 'change-decrease'; return `<span class="change-indicator ${className}">${sign}${diff.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span>`; }
+    function logChange(item, oldValue, newValue) { const entry = { timestamp: new Date().toLocaleString('zh-CN'), item: translateText(item), oldValue: oldValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A', newValue: newValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A' }; changeLog.unshift(entry); renderChangeLog(); }
     function renderChangeLog() { if (changeLog.length === 0) { elements.changeLogContainer.innerHTML = `<p class="no-data-message">暂无数据变更记录</p>`; return; } elements.changeLogContainer.innerHTML = changeLog.map(log => `<div class="log-entry"><div class="log-timestamp">${log.timestamp}</div><div class="log-details"><strong>${log.item}:</strong> 从 ${log.oldValue} 变为 ${log.newValue}</div></div>`).join(''); }
     function displayProfileSummary(profile, oldProfile = null) { const getStat = (p, key, oldP, label) => { const value = p?.[key] ?? 0; if (!oldP) return { value: value.toLocaleString(), changeHTML: '' }; const oldValue = oldP?.[key] ?? 0; if (value !== oldValue) { logChange(label || key, oldValue, value); return { value: value.toLocaleString(), changeHTML: createChangeSpan(value - oldValue) }; } return { value: value.toLocaleString(), changeHTML: '' }; }; const kills = getStat(profile, 'kills', oldProfile, '击杀'), deaths = getStat(profile, 'deaths', oldProfile, '死亡'), score = getStat(profile, 'score', oldProfile, '经验值'), gearScore = getStat(profile, 'gearScore', oldProfile, '战斗力'), earnedCrystals = getStat(profile, 'earnedCrystals', oldProfile, '获得水晶'), caughtGolds = getStat(profile, 'caughtGolds', oldProfile, '获得金箱子'); const totalTimePlayedMs = (profile.hullsPlayed || []).reduce((t, h) => t + (h.timePlayed || 0), 0), totalSuppliesUsed = (profile.suppliesUsage || []).reduce((t, s) => t + (s.usages || 0), 0); const rankNum = profile.rank || 1, rankName = (rankNum > 0) ? (rankNum <= RANKS.length ? RANKS[rankNum - 1] : `传奇 ${rankNum - RANKS.length}`) : "未知等级"; const summaryData = [ { label: '昵称', value: profile.name || 'N/A' }, { label: '等级', value: rankName }, { label: '经验值', value: `${score.value}${score.changeHTML} / ${profile.scoreNext?.toLocaleString() || 0}` }, { label: 'VIP 状态', value: profile.hasPremium ? '已激活' : '未激活', isPremium: profile.hasPremium }, { label: '战斗力', value: `${gearScore.value}${gearScore.changeHTML}` }, { label: '击杀/死亡', value: `${kills.value}${kills.changeHTML} / ${deaths.value}${deaths.changeHTML}` }, { label: 'K/D', value: (profile.deaths === 0) ? '∞' : (profile.kills / profile.deaths).toFixed(2) }, { label: '游戏时长', value: formatTime(totalTimePlayedMs) }, { label: '已用道具', value: totalSuppliesUsed.toLocaleString() }, { label: '获得水晶', value: `${earnedCrystals.value}${earnedCrystals.changeHTML}` }, { label: '获得金箱子', value: `${caughtGolds.value}${caughtGolds.changeHTML}` }, ]; elements.profileSummary.innerHTML = summaryData.map(item => `<div class="summary-item"><span class="summary-label">${item.label}</span><span class="summary-value ${item.isPremium ? 'premium' : ''}">${item.value}</span></div>`).join(''); }
-    function displayRankingsTable(newData, oldData = null) { const categories = [{ key: 'score', name: '经验值' }, { key: 'golds', name: '金箱子' }, { key: 'crystals', name: '水晶' }, { key: 'efficiency', name: '效率' }]; const currentRating = newData.rating || {}, previousRating = newData.previousRating || {}, oldRating = oldData ? (oldData.rating || {}) : null; const getDisplayValue = (value) => (value === -1 || value == null) ? '-' : value.toLocaleString(); const tableRows = categories.map(category => { const current = currentRating[category.key] || {}, previous = previousRating[category.key] || {}; let posChangeHTML = '', valChangeHTML = ''; if (oldRating && oldRating[category.key]) { const oldCat = oldRating[category.key]; if (current.position > 0 && oldCat.position > 0 && current.position !== oldCat.position) { posChangeHTML = createChangeSpan(oldCat.position - current.position); logChange(`${category.name} 排名`, oldCat.position, current.position); } if (current.value !== oldCat.value) { valChangeHTML = createChangeSpan(current.value - oldCat.value); logChange(`${category.name} 数值`, oldCat.value, current.value); } } return `<tr><td>${category.name}</td><td>${getDisplayValue(current.position)}${posChangeHTML}</td><td>${getDisplayValue(current.value)}${valChangeHTML}</td><td>${getDisplayValue(previous.position)}</td><td>${getDisplayValue(previous.value)}</td></tr>`; }).join(''); elements.rankingsTableContainer.innerHTML = `<h3 class="list-title">每周排名</h3><table cellpadding="1" cellspacing="0"><thead><tr><th>类别</th><th>当前排名</th><th>当前数值</th><th>上周排名</th><th>上周数值</th></tr></thead><tbody>${tableRows}</tbody></table>`; }
+    
+    function displayRankingsTable(newData, oldData = null) { 
+        const categories = [
+            { key: 'score', name: '经验值' }, 
+            { key: 'golds', name: '金箱子' }, 
+            { key: 'crystals', name: '水晶' }, 
+            { key: 'efficiency', name: '效率 (经验/小时)' } 
+        ]; 
+        const currentRating = newData.rating || {}, previousRating = newData.previousRating || {}, oldRating = oldData ? (oldData.rating || {}) : null; 
+        
+        // 辅助函数：根据类别格式化数值
+        const formatVal = (val, key) => {
+            if (val === -1 || val == null) return '-';
+            return val.toLocaleString(undefined, { maximumFractionDigits: key === 'efficiency' ? 3 : 0 });
+        };
+        
+        // 辅助函数：处理数值逻辑（除以1000）
+        const processVal = (key, val) => (key === 'efficiency' && val != null && val !== -1) ? val / 1000 : val;
+
+        const tableRows = categories.map(category => { 
+            const rawCurrent = currentRating[category.key] || {};
+            const rawPrevious = previousRating[category.key] || {};
+            const rawOldCat = oldRating && oldRating[category.key] ? oldRating[category.key] : null;
+
+            // 获取处理后的数值（效率除以1000）
+            const currentVal = processVal(category.key, rawCurrent.value);
+            const prevVal = processVal(category.key, rawPrevious.value);
+            const oldVal = processVal(category.key, rawOldCat?.value);
+            
+            let posChangeHTML = '', valChangeHTML = ''; 
+            
+            if (rawOldCat) { 
+                if (rawCurrent.position > 0 && rawOldCat.position > 0 && rawCurrent.position !== rawOldCat.position) { 
+                    posChangeHTML = createChangeSpan(rawOldCat.position - rawCurrent.position); 
+                    logChange(`${category.name} 排名`, rawOldCat.position, rawCurrent.position); 
+                } 
+                // 对比处理后的数值
+                if (currentVal !== oldVal) { 
+                    valChangeHTML = createChangeSpan(currentVal - oldVal); 
+                    logChange(`${category.name} 数值`, oldVal, currentVal); 
+                } 
+            } 
+            
+            return `<tr>
+                <td>${category.name}</td>
+                <td>${formatVal(rawCurrent.position)}${posChangeHTML}</td>
+                <td>${formatVal(currentVal, category.key)}${valChangeHTML}</td>
+                <td>${formatVal(rawPrevious.position)}</td>
+                <td>${formatVal(prevVal, category.key)}</td>
+            </tr>`; 
+        }).join(''); 
+        
+        elements.rankingsTableContainer.innerHTML = `<h3 class="list-title" style="text-align:center;margin-bottom:16px;border:none;padding:0;">每周排名</h3><table cellpadding="0" cellspacing="0"><thead><tr><th>类别</th><th>当前排名</th><th>当前数值</th><th>上周排名</th><th>上周数值</th></tr></thead><tbody>${tableRows}</tbody></table>`; 
+    }
+    
     function displayAllLists(newData, oldData = null) { elements.listsContainer.innerHTML = ''; LIST_DATA_CONFIGS.forEach(config => { const newItems = newData[config.key] || [], oldItems = oldData ? (oldData[config.key] || []) : []; const section = document.createElement('div'); section.className = 'list-section'; const title = document.createElement('h3'); title.className = 'list-title'; title.textContent = config.title; section.appendChild(title); if (newItems.length === 0) { section.appendChild(document.createElement('p')).className = 'no-data-message'; section.lastChild.textContent = '无数据'; } else { const container = document.createElement('div'); container.className = 'list-container'; displayListData(newItems, oldItems, container, config.title); section.appendChild(container); } elements.listsContainer.appendChild(section); }); }
     
     function displayListData(newItems, oldItems, container, title) {
@@ -751,36 +1178,21 @@
         const isPaint = title === '使用的迷彩';
     
         const sortedData = [...detailedGrades].sort((a, b) => {
-            if (isMode) {
-                return (a.type || '').localeCompare(b.type || '');
-            } else if (isPaint) {
-                return (a.id || 0) - (b.id || 0);
-            } else {
-                return (a.grade ?? -1) - (b.grade ?? -1);
-            }
+            if (isMode) return (a.type || '').localeCompare(b.type || '');
+            if (isPaint) return (a.id || 0) - (b.id || 0);
+            return (a.grade ?? -1) - (b.grade ?? -1);
         });
     
         let firstColumnHeader, modalTitleSuffix;
-        if (isMode) {
-            firstColumnHeader = '类型';
-            modalTitleSuffix = '各类型数据';
-        } else if (isPaint) {
-            firstColumnHeader = '版本';
-            modalTitleSuffix = '各版本数据';
-        } else {
-            firstColumnHeader = '等级';
-            modalTitleSuffix = '各等级数据';
-        }
+        if (isMode) { firstColumnHeader = '类型'; modalTitleSuffix = '各类型数据'; }
+        else if (isPaint) { firstColumnHeader = '版本'; modalTitleSuffix = '各版本数据'; }
+        else { firstColumnHeader = '等级'; modalTitleSuffix = '各等级数据'; }
     
         const tableRows = sortedData.map(data => {
             let firstColumnValue;
-            if (isMode) {
-                firstColumnValue = data.type || '-';
-            } else if (isPaint) {
-                firstColumnValue = `${data.id}`;
-            } else {
-                firstColumnValue = getGradeName(data.grade);
-            }
+            if (isMode) firstColumnValue = data.type || '-';
+            else if (isPaint) firstColumnValue = `${data.id}`;
+            else firstColumnValue = getGradeName(data.grade);
             return `<tr><td>${translateText(firstColumnValue)}</td><td>${formatTime(data.timePlayed)}</td><td>${data.scoreEarned?.toLocaleString() || '-'}</td></tr>`;
         }).join('');
     
