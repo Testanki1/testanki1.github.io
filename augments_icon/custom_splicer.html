@@ -9,7 +9,7 @@
     <title>3D坦克装备改造图标自定义拼接器</title>
     <style>
         :root {
-            /* M3 Light Tokens */
+            /* M3 Tokens */
             --md-sys-color-background: #fdfdf5;
             --md-sys-color-on-background: #1a1c19;
             --md-sys-color-surface: #fdfdf5;
@@ -19,14 +19,20 @@
             --md-sys-color-on-primary: #ffffff;
             --md-sys-color-primary-container: #b7f397;
             --md-sys-color-on-primary-container: #042100;
+            --md-sys-color-secondary-container: #dce5d6;
+            --md-sys-color-on-secondary-container: #161e17;
             --md-sys-color-outline: #74796d;
             --md-sys-color-outline-variant: #c3c8bb;
+            --md-sys-color-error: #ba1a1a;
+            --md-sys-color-on-error: #ffffff;
+            --md-sys-color-error-container: #ffdad6;
+            --md-sys-color-on-error-container: #410002;
+
             --radius-l: 24px; --radius-m: 16px; --radius-s: 8px;
             --elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
             --elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
         }
         [data-theme="dark"] {
-            /* Dark Theme */
             --md-sys-color-background: #001926;
             --md-sys-color-on-background: #ffffff;
             --md-sys-color-surface: #001926;
@@ -36,8 +42,14 @@
             --md-sys-color-on-primary: #001926;
             --md-sys-color-primary-container: #004a0f;
             --md-sys-color-on-primary-container: #76FF33;
+            --md-sys-color-secondary-container: #344048;
+            --md-sys-color-on-secondary-container: #dce5d6;
             --md-sys-color-outline: #BFD5FF;
             --md-sys-color-outline-variant: #405060;
+            --md-sys-color-error: #ffb4ab;
+            --md-sys-color-on-error: #690005;
+            --md-sys-color-error-container: #93000a;
+            --md-sys-color-on-error-container: #ffdad6;
         }
         * { font-family: 'Rubik', 'M PLUS 1p', sans-serif; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--md-sys-color-background); color: var(--md-sys-color-on-background); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; transition: background-color 0.3s; }
@@ -48,7 +60,7 @@
         .icon-btn:hover { background-color: rgba(128,128,128, 0.1); }
 
         #appContainer { width: 100%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
-        .preview-card { background-color: var(--md-sys-color-surface-container); border-radius: var(--radius-l); padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: var(--elevation-1); position: relative; overflow: hidden; }
+        .preview-card { background-color: var(--md-sys-color-surface-container); border-radius: var(--radius-l); padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: var(--elevation-1); position: relative; overflow: hidden; min-height: 320px; }
         #svgPreview { width: 256px; height: 256px; display: flex; align-items: center; justify-content: center; }
         #svgPreview svg { width: 100%; height: 100%; }
 
@@ -59,46 +71,22 @@
         .m3-label { font-size: 12px; color: var(--md-sys-color-outline); position: absolute; top: 8px; left: 16px; }
         .m3-value { font-size: 16px; margin-top: 14px; display: flex; align-items: center; gap: 8px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* 折叠面板样式 */
-        .m3-details {
-            width: 100%;
-            background-color: transparent;
-            border-radius: var(--radius-m);
-            overflow: hidden;
-            margin-top: 8px;
-        }
-        .m3-summary {
-            padding: 12px 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            list-style: none;
-            color: var(--md-sys-color-primary);
-            font-weight: 500;
-            font-size: 14px;
-            user-select: none;
-            border-radius: var(--radius-s);
-            transition: background 0.2s;
-        }
+        /* 折叠面板 */
+        .m3-details { width: 100%; background-color: transparent; border-radius: var(--radius-m); overflow: hidden; margin-top: 8px; }
+        .m3-summary { padding: 12px 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; color: var(--md-sys-color-primary); font-weight: 500; font-size: 14px; user-select: none; border-radius: var(--radius-s); transition: background 0.2s; }
         .m3-summary:hover { background-color: rgba(128,128,128, 0.05); }
         .m3-summary::marker { display: none; }
         .m3-summary-icon { transition: transform 0.3s; font-size: 20px; }
         .m3-details[open] .m3-summary-icon { transform: rotate(180deg); }
-        .m3-details-content {
-            padding-top: 16px;
-            display: grid;
-            gap: 16px;
-            /* 简单的淡入动画 */
-            animation: fadeIn 0.3s ease-out;
-        }
+        .m3-details-content { padding-top: 16px; display: grid; gap: 16px; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 重置按钮样式 */
+        /* 小重置按钮 */
         .reset-action { display: none; padding: 4px; margin-left: 8px; border-radius: 50%; color: var(--md-sys-color-outline); transition: 0.2s; z-index: 2; }
         .reset-action:hover { background-color: rgba(0,0,0,0.1); color: var(--md-sys-color-primary); }
         .reset-action.visible { display: flex; }
 
+        /* 模态框 */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 100; display: none; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(2px); }
         .modal-overlay.active { display: flex; opacity: 1; }
         .modal-content { background-color: var(--md-sys-color-surface); width: 100%; max-width: 500px; max-height: 85vh; margin: auto; border-radius: var(--radius-l); display: flex; flex-direction: column; box-shadow: var(--elevation-3); transform: translateY(50px); transition: transform 0.3s cubic-bezier(0.2, 0.0, 0, 1.0); }
@@ -113,20 +101,32 @@
         .option-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 4px; border-radius: var(--radius-s); cursor: pointer; gap: 16px; transition: background-color 0.2s; }
         .option-item:hover { background-color: var(--md-sys-color-surface-container-high); }
         .option-item.selected { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
-        
         .option-preview { width: 48px; height: 48px; border-radius: 8px; background-color: rgba(128,128,128,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
         .option-preview svg, .option-preview img { width: 100%; height: 100%; object-fit: contain; }
         .color-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); }
 
-        .actions { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; }
-        .input-group { display: flex; align-items: center; gap: 12px; justify-content: center; }
-        .m3-input { background-color: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-on-surface); padding: 10px; border-radius: 8px; width: 80px; text-align: center; }
-        .btn-primary { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 12px 24px; border-radius: 100px; font-size: 16px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: box-shadow 0.3s, transform 0.1s; }
+        /* 按钮通用样式 */
+        .btn-base { border: none; padding: 12px 24px; border-radius: 100px; font-size: 16px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; text-decoration: none; width: 100%; }
+        .btn-base:active { transform: scale(0.98); }
+        
+        /* 主要操作按钮 (PNG) - Filled */
+        .btn-primary { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
         .btn-primary:hover { box-shadow: var(--elevation-1); filter: brightness(1.1); }
-        .btn-primary:active { transform: scale(0.98); }
+        
+        /* 次要操作按钮 (SVG) - Tonal / Outlined */
+        .btn-secondary { background-color: transparent; border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-primary); }
+        .btn-secondary:hover { background-color: var(--md-sys-color-secondary-container); }
+
+        /* 危险/重置按钮 */
+        .btn-reset-all { background-color: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); margin-top: 16px; }
+        .btn-reset-all:hover { filter: brightness(0.95); }
+
+        /* 生成结果区域 */
+        .results-container { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; animation: fadeIn 0.5s; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 24px; }
+        .png-controls { display: flex; gap: 12px; align-items: center; }
+        .m3-input { background-color: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-on-surface); padding: 12px; border-radius: 8px; width: 90px; text-align: center; font-size: 16px; }
 
         #loading { position: absolute; background: rgba(0,0,0,0.6); color: white; padding: 8px 16px; border-radius: 16px; backdrop-filter: blur(4px); top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
-        a { text-decoration: none; color: inherit; }
     </style>
 </head>
 <body data-theme="dark">
@@ -139,12 +139,13 @@
     </header>
 
     <div id="appContainer">
+        <!-- 预览区域 -->
         <div class="preview-card">
             <div id="svgPreview"><div style="color: var(--md-sys-color-outline);">预览区域</div></div>
             <div id="loading">加载中...</div>
         </div>
 
-        <!-- 主要控制区域 -->
+        <!-- 主要控制 -->
         <div class="controls-grid">
             <div class="m3-select" onclick="openMenu('equipment')">
                 <div class="m3-select-trigger">
@@ -160,34 +161,29 @@
             </div>
         </div>
 
-        <!-- 可选参数折叠区域 -->
+        <!-- 可选参数 -->
         <details class="m3-details">
             <summary class="m3-summary">
-                <span>可选参数 (稀有度/填充)</span>
+                <span>可选参数 (颜色/填充)</span>
                 <span class="material-symbols-rounded m3-summary-icon">expand_more</span>
             </summary>
             <div class="m3-details-content">
-                <!-- 稀有度颜色选择 -->
+                <!-- 稀有度 -->
                 <div class="m3-select" onclick="openMenu('rarity')">
                     <div class="m3-select-trigger">
                         <div><span class="m3-label">稀有度颜色</span><div class="m3-value" id="display-rarity">默认</div></div>
                         <div style="display:flex;align-items:center">
-                            <div class="reset-action" id="reset-rarity" onclick="resetSelection('rarity', event)" title="重置为默认">
-                                <span class="material-symbols-rounded" style="font-size:20px">restart_alt</span>
-                            </div>
+                            <div class="reset-action" id="reset-rarity" onclick="resetSelection('rarity', event)" title="重置为默认"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
                             <span class="material-symbols-rounded">arrow_drop_down</span>
                         </div>
                     </div>
                 </div>
-                
-                <!-- 填充选择 -->
+                <!-- 填充颜色 -->
                 <div class="m3-select" onclick="openMenu('background')">
                     <div class="m3-select-trigger">
                         <div><span class="m3-label">填充颜色</span><div class="m3-value" id="display-background">默认</div></div>
                         <div style="display:flex;align-items:center">
-                            <div class="reset-action" id="reset-background" onclick="resetSelection('background', event)" title="重置为默认">
-                                <span class="material-symbols-rounded" style="font-size:20px">restart_alt</span>
-                            </div>
+                            <div class="reset-action" id="reset-background" onclick="resetSelection('background', event)" title="重置为默认"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
                             <span class="material-symbols-rounded">arrow_drop_down</span>
                         </div>
                     </div>
@@ -195,20 +191,20 @@
             </div>
         </details>
 
-        <div class="actions">
-            <div id="downloadBtnContainer"></div>
-            <div style="height: 1px; background: var(--md-sys-color-outline-variant); margin: 8px 0;"></div>
-            <div class="input-group">
-                <span style="font-size: 14px;">PNG 尺寸:</span>
-                <input type="number" id="pngSize" class="m3-input" placeholder="1024" value="1024" />
-                <button class="btn-primary" onclick="convertToPNG()"><span class="material-symbols-rounded">image</span> 保存图片</button>
-            </div>
+        <!-- 全部重置按钮 -->
+        <button class="btn-base btn-reset-all" onclick="resetAll()">
+            <span class="material-symbols-rounded">delete_sweep</span> 全部重置
+        </button>
+
+        <!-- 动态生成的下载区域 -->
+        <div id="downloadSection">
+            <!-- 生成后这里会显示 PNG 和 SVG 按钮 -->
         </div>
 
         <p style="color: var(--md-sys-color-outline); font-size: 12px; text-align: center; margin-top: 20px;">注：生成的图标仅供参考</p>
     </div>
 
-    <!-- Modal -->
+    <!-- 模态框 -->
     <div class="modal-overlay" id="selectionModal" onclick="closeMenu(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
@@ -219,7 +215,6 @@
         </div>
     </div>
 
-    <!-- Hidden State -->
     <input type="hidden" id="val-equipment" value=""><input type="hidden" id="val-augment" value="">
     <input type="hidden" id="val-rarity" value="default"><input type="hidden" id="val-background" value="default">
 
@@ -229,10 +224,7 @@
         const groupedAugments = { "炮塔": ["空（炮塔）", "肾上腺素", "螺线管冷却", "拖延协议", "加速协议", "负能量场", "震动冻结", "入侵瞄准处理器", "射击速度调节器", "干扰弹", "更快速的水平跟踪", "橡胶炮弹", "轻型电容器", "重型电容器", "治疗发射器", "纳米反应器", "支援纳米机器人", "宽带纳米发射器", "吸血鬼纳米机器人", "精确瞄准系统", "超累积炮弹", "突击弹药", "穿甲弹", "燃烧弹", "分类弹药", "自动加农炮", "高容量弹鼓", "电子偶", "重炮手", "大口径短炮", "自适应重载（1）", "自适应重载（2）", "导弹发射器“旋风”", "远程火箭炸药", "鱼叉导弹", "加强炮架", "自动火药装载机", "电磁脉冲炮弹", "迫击炮", "导弹发射器“镭射”", "负场稳定", "等离子焰炬", "狂暴", "赫利俄斯", "精确弹药装载", "等离子体加速器", "重型等离子炮", "稳定等离子体", "等离子涡轮加速器", "腐蚀混合物", "等离子发生器", "紧凑型坦克", "高压泵", "脉冲星", "电磁加速器“侦察机”", "超空间炮弹", "爆炸弹头", "爆炸弹", "眩晕弹", "冷冻炮弹", "«滑膛炮» 炮弹", "导弹发射器 «九头蛇»", "导弹发射器 «浮士德»", "导弹发射器 «串联»", "超高速炮弹", "碎纸机", "猎人电子偶", "重型重炮手", "突击弹药库", "大口径颗粒", "电动炮塔", "致命混合物", "可持续纳米机器人", "导弹发射器 «流星»", "轰炸机", "左轮手枪", "破坏者", "注射冲击纳米机器人", "涅墨西斯", "螺栓", "类星体", "稳定混合物", "休克疗法", "露营者", "导弹发射器 «铜指虎»", "仿星器", "拳师", "«圣剑» 炮弹", "暴风雨", "埃克赛尔西奥（炮塔）", "凤凰（炮塔）"], "底盘": ["空（底盘）", "极端轻型结构", "爆破手", "工兵", "驱动器", "轻型结构", "重型结构", "耐寒性", "耐热性", "抗干扰器", "攻强免疫", "抗电磁脉冲", "抗眩晕", "抗热", "抗寒", "救生员", "工程师", "榴弹兵", "埃克赛尔西奥（底盘）", "凤凰（底盘）"], "射击颜色": ["深红色", "岩浆", "幻影黑", "粉红色", "雪", "寒冷", "暗月", "毒（1）", "毒（2）", "太阳", "火", "血液", "日食", "水", "天空蓝", "虚空", "金", "紫罗兰色", "珊瑚礁", "电", "天空", "爆破手（绿）", "爆破手（红）", "神秘的红色", "黑暗", "暴力", "正午", "烟雾", "魔法"] };
         const rarities = [ { name: "默认", value: "default", color: "#aaaaaa" }, { name: "无", value: "#", color: "#333333" }, { name: "普通", value: "#BFD5FF", color: "#BFD5FF" }, { name: "稀有", value: "#76FF33", color: "#76FF33" }, { name: "珍奇", value: "#00D4FF", color: "#00D4FF" }, { name: "史诗", value: "#D580FF", color: "#D580FF" }, { name: "传奇", value: "#FFEE00", color: "#FFEE00" }, { name: "异国情调", value: "#FF6666", color: "#FF6666" } ];
         const groupedBackgroundColors = { "来自装备改造图标": ["蓝紫色", "蓝粉渐变色", "红色", "浅蓝色", "深蓝色", "粉色", "紫色", "黄色", "橙色", "火红色", "蓝色", "绿色", "黑色"], "来自射击颜色图标": ["爆破手（红）", "爆破手（绿）", "电", "毒（1）", "毒（2）", "粉红色", "寒冷", "黑暗", "幻影黑", "火", "金", "魔法", "日食", "珊瑚礁", "深红色", "神秘的红色", "水", "太阳", "天空", "天空蓝", "虚空", "雪", "血液", "岩浆", "正午", "紫罗兰色", "暴力", "暗月", "烟雾"] };
-
         const fileCache = {};
-        
-        // Theme Toggle
         const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             const current = document.body.getAttribute('data-theme');
@@ -241,26 +233,19 @@
             themeToggle.querySelector('span').textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
         });
 
-        // Modal Logic
+        // Modal
         const modal = document.getElementById('selectionModal');
-        const modalTitle = document.getElementById('modalTitle');
         const modalList = document.getElementById('modalList');
-
         function openMenu(type) {
             modalList.innerHTML = ''; modal.classList.add('active');
             const titles = { 'equipment': '选择装备', 'augment': '选择装备改造', 'rarity': '选择稀有度颜色', 'background': '选择填充颜色' };
-            modalTitle.textContent = titles[type];
+            document.getElementById('modalTitle').textContent = titles[type];
             
-            // 特别处理：填充颜色添加“默认”选项
             if (type === 'background') {
-                // 手动添加默认项
-                const defaultEl = document.createElement('div');
-                defaultEl.className = 'option-item';
-                if(document.getElementById('val-background').value === 'default') defaultEl.classList.add('selected');
-                defaultEl.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>默认</span>`;
-                defaultEl.onclick = () => selectItem('background', 'default', null, '默认');
-                modalList.appendChild(defaultEl);
-                
+                const def = document.createElement('div'); def.className = `option-item ${document.getElementById('val-background').value==='default'?'selected':''}`;
+                def.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>默认</span>`;
+                def.onclick = () => selectItem('background', 'default', null, '默认');
+                modalList.appendChild(def);
                 renderGroupedOptions(groupedBackgroundColors, type);
             }
             else if (type === 'equipment') renderGroupedOptions(groupedEquipments, type);
@@ -271,105 +256,78 @@
 
         function renderGroupedOptions(dataObj, type) {
             Object.keys(dataObj).forEach(group => {
-                const header = document.createElement('div');
-                header.className = 'option-group-title'; header.textContent = group; modalList.appendChild(header);
+                const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = group; modalList.appendChild(h);
                 dataObj[group].sort((a, b) => a.localeCompare(b));
                 dataObj[group].forEach(item => {
-                    const el = document.createElement('div');
-                    el.className = 'option-item';
-                    if(document.getElementById(`val-${type}`).value === item) el.classList.add('selected');
-                    
-                    const preview = document.createElement('div'); preview.className = 'option-preview';
-                    if (type === 'augment') preview.innerHTML = `<img src="https://testanki1.github.io/augments_icon/augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
-                    else if (type === 'background') fetchBackgroundPreview(item, preview);
-                    else if (type === 'equipment') fetchEquipmentPreview(item, preview);
-                    
-                    const span = document.createElement('span'); span.textContent = item;
-                    el.append(preview, span);
+                    const el = document.createElement('div'); el.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
+                    const p = document.createElement('div'); p.className = 'option-preview';
+                    if (type === 'augment') p.innerHTML = `<img src="https://testanki1.github.io/augments_icon/augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
+                    else if (type === 'background') fetchBackgroundPreview(item, p);
+                    else if (type === 'equipment') fetchEquipmentPreview(item, p);
+                    el.append(p, Object.assign(document.createElement('span'), {textContent:item}));
                     el.onclick = () => selectItem(type, item, group);
                     modalList.appendChild(el);
                 });
             });
         }
-
         function renderRarityOptions() {
-            const header = document.createElement('div'); header.className = 'option-group-title'; header.textContent = "稀有度颜色"; modalList.appendChild(header);
+            const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = "稀有度颜色"; modalList.appendChild(h);
             rarities.forEach(r => {
-                const el = document.createElement('div'); el.className = 'option-item';
-                if(document.getElementById('val-rarity').value === r.value) el.classList.add('selected');
+                const el = document.createElement('div'); el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
                 el.innerHTML = `<div class="color-circle" style="background:${r.color}"></div><span>${r.name}</span>`;
                 el.onclick = () => selectItem('rarity', r.value, null, r.name, r.color);
                 modalList.appendChild(el);
             });
         }
 
-        // Reset Logic
-        function resetSelection(type, event) {
-            if(event) event.stopPropagation(); // 防止打开菜单
-            selectItem(type, 'default', null, '默认', '#aaaaaa');
-        }
-
-        function updateResetButton(type, value) {
-            const btn = document.getElementById(`reset-${type}`);
-            if(!btn) return;
-            if (value !== 'default') btn.classList.add('visible');
-            else btn.classList.remove('visible');
-        }
-
-        // Fetch Helpers
-        async function fetchTextCached(url) {
-            if(fileCache[url]) return fileCache[url];
-            try { const r = await fetch(url); const t = await r.text(); fileCache[url] = t; return t; } catch(e) { return null; }
-        }
-        async function fetchBackgroundPreview(name, container) {
-            const txt = await fetchTextCached(`https://testanki1.github.io/augments_icon/colors/${encodeURIComponent(name)}.txt`);
-            if(txt) {
-                const id = 'g' + Math.random().toString(36).substr(2,9);
-                container.innerHTML = `<svg viewBox="0 0 100 100"><defs><radialGradient id="${id}">${txt}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;
-            }
-        }
-        async function fetchEquipmentPreview(name, container) {
-            const txt = await fetchTextCached(`https://testanki1.github.io/augments_icon/equipments/${encodeURIComponent(name)}.txt`);
-            if(txt) container.innerHTML = `<svg viewBox="${calculateMultiPathViewBox(txt)}" style="fill:currentColor">${txt}</svg>`;
-        }
-        function calculateMultiPathViewBox(svgContent) {
-            const ns = "http://www.w3.org/2000/svg";
-            const svg = document.createElementNS(ns, "svg");
-            svg.style.position = "absolute"; svg.style.visibility = "hidden"; svg.style.width = "0"; svg.style.height = "0";
-            document.body.appendChild(svg);
-            const group = document.createElementNS(ns, "g"); group.innerHTML = svgContent; svg.appendChild(group);
-            try {
-                const bbox = group.getBBox(); document.body.removeChild(svg);
-                if (bbox.width === 0 && bbox.height === 0) return "0 0 256 256";
-                const padding = Math.max(bbox.width, bbox.height) * 0.1;
-                return `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`;
-            } catch (e) { if(document.body.contains(svg)) document.body.removeChild(svg); return "0 0 256 256"; }
-        }
-
+        // --- Actions ---
         function selectItem(type, value, group, displayOverride, colorOverride) {
             document.getElementById(`val-${type}`).value = value;
             const disp = document.getElementById(`display-${type}`);
+            const btn = document.getElementById(`reset-${type}`);
             
             if (type === 'rarity') {
                 disp.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${colorOverride};border:none"></div> ${displayOverride}`;
-                updateResetButton('rarity', value);
-            }
-            else if (type === 'background') {
+                if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
+            } else if (type === 'background') {
                 disp.textContent = value === 'default' ? '默认' : value;
-                updateResetButton('background', value);
-            }
-            else {
+                if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
+            } else {
                 disp.textContent = value;
             }
-            
             closeMenu();
             checkAndGenerate();
         }
 
+        function resetSelection(type, event) {
+            if(event) event.stopPropagation();
+            selectItem(type, 'default', null, '默认', '#aaaaaa');
+        }
+
+        function resetAll() {
+            document.getElementById('val-equipment').value = "";
+            document.getElementById('display-equipment').textContent = "请选择装备";
+            
+            document.getElementById('val-augment').value = "";
+            document.getElementById('display-augment').textContent = "请选择改造";
+            
+            resetSelection('rarity');
+            resetSelection('background');
+            
+            document.getElementById('svgPreview').innerHTML = '<div style="color: var(--md-sys-color-outline);">预览区域</div>';
+            document.getElementById('downloadSection').innerHTML = ''; // 清空下载按钮
+        }
+
+        // --- Generation ---
+        async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
+        async function fetchBackgroundPreview(n, c) { const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/colors/${encodeURIComponent(n)}.txt`); if(t){ const id='g'+Math.random().toString(36).substr(2,9); c.innerHTML=`<svg viewBox="0 0 100 100"><defs><radialGradient id="${id}">${t}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;}}
+        async function fetchEquipmentPreview(n, c) { const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/equipments/${encodeURIComponent(n)}.txt`); if(t) c.innerHTML=`<svg viewBox="${calculateMultiPathViewBox(t)}" style="fill:currentColor">${t}</svg>`; }
+        function calculateMultiPathViewBox(s) { const n="http://www.w3.org/2000/svg",v=document.createElementNS(n,"svg");v.style.position="absolute";v.style.visibility="hidden";v.style.width="0";v.style.height="0";document.body.appendChild(v);const g=document.createElementNS(n,"g");g.innerHTML=s;v.appendChild(g);try{const b=g.getBBox();document.body.removeChild(v);if(b.width===0)return"0 0 256 256";const p=Math.max(b.width,b.height)*0.1;return`${b.x-p} ${b.y-p} ${b.width+p*2} ${b.height+p*2}`;}catch{if(document.body.contains(v))document.body.removeChild(v);return"0 0 256 256";}}
+
         function checkAndGenerate() {
-            const txtName = document.getElementById('val-equipment').value;
-            const svgName = document.getElementById('val-augment').value;
-            if (txtName && svgName) generateSVG();
+            const e = document.getElementById('val-equipment').value;
+            const a = document.getElementById('val-augment').value;
+            if (e && a) generateSVG();
         }
 
         function generateSVG() {
@@ -378,81 +336,62 @@
             const quality = document.getElementById("val-rarity").value;
             const background = document.getElementById("val-background").value;
 
-            const txtUrl = 'https://testanki1.github.io/augments_icon/equipments/' + encodeURIComponent(txtName) + '.txt';
-            const svgUrl = 'https://testanki1.github.io/augments_icon/augments/' + encodeURIComponent(svgName) + '.svg';
-            const backgroundUrl = background !== 'default' ? 'https://testanki1.github.io/augments_icon/colors/' + encodeURIComponent(background) + '.txt' : null;
-
             document.getElementById("loading").style.display = "block";
-
             Promise.all([
-                fetchTextCached(txtUrl),
-                fetchTextCached(svgUrl),
-                backgroundUrl ? fetchTextCached(backgroundUrl) : null
-            ]).then(([txtContent, svgContent, backgroundContent]) => {
-                
-                // 填充逻辑
-                if (backgroundContent) {
-                    svgContent = svgContent.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${backgroundContent}</radialGradient>`);
-                }
+                fetchTextCached('https://testanki1.github.io/augments_icon/equipments/'+encodeURIComponent(txtName)+'.txt'),
+                fetchTextCached('https://testanki1.github.io/augments_icon/augments/'+encodeURIComponent(svgName)+'.svg'),
+                background!=='default' ? fetchTextCached('https://testanki1.github.io/augments_icon/colors/'+encodeURIComponent(background)+'.txt') : null
+            ]).then(([txt, svg, bg]) => {
+                if (bg) svg = svg.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${bg}</radialGradient>`);
+                const defs = svg.indexOf('<defs>');
+                let final = defs !== -1 ? svg.slice(0, defs) + txt + svg.slice(defs) : svg.replace('>', '>' + txt);
+                if (quality !== 'default') final = final.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
 
-                // 原版拼接逻辑
-                const defsIndex = svgContent.indexOf('<defs>');
-                let finalSVG = "";
-                if (defsIndex !== -1) {
-                    finalSVG = svgContent.slice(0, defsIndex) + txtContent + svgContent.slice(defsIndex);
-                } else {
-                    finalSVG = svgContent.replace('>', '>' + txtContent);
-                }
-
-                // 原版颜色替换逻辑
-                if (quality !== 'default') {
-                    finalSVG = finalSVG.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
-                }
-
-                const svgPreview = document.getElementById("svgPreview");
-                svgPreview.innerHTML = finalSVG;
-                const svgElement = svgPreview.querySelector("svg");
-                if (svgElement) {
-                    svgElement.setAttribute("width", "256");
-                    svgElement.removeAttribute("height");
+                const preview = document.getElementById("svgPreview");
+                preview.innerHTML = final;
+                const svgEl = preview.querySelector("svg");
+                if (svgEl) {
+                    svgEl.setAttribute("width", "256"); svgEl.removeAttribute("height");
                     
-                    const blob = new Blob([finalSVG], { type: 'image/svg+xml' });
+                    // 动态生成下载按钮组
+                    const blob = new Blob([final], { type: 'image/svg+xml' });
                     const url = URL.createObjectURL(blob);
-                    const btnContainer = document.getElementById("downloadBtnContainer");
-                    btnContainer.innerHTML = '';
-                    const btn = document.createElement('a');
-                    btn.href = url;
-                    btn.download = `${txtName}-${svgName}.svg`;
-                    btn.className = 'btn-primary';
-                    btn.style.width = "100%";
-                    btn.innerHTML = '<span class="material-symbols-rounded">download</span> 保存 SVG 矢量图';
-                    btnContainer.appendChild(btn);
+                    const dlSection = document.getElementById("downloadSection");
+                    
+                    dlSection.className = "results-container";
+                    dlSection.innerHTML = `
+                        <div class="png-controls">
+                            <span style="white-space:nowrap">尺寸:</span>
+                            <input type="number" id="pngSize" class="m3-input" placeholder="1024" value="1024">
+                            <button class="btn-base btn-primary" onclick="convertToPNG()">
+                                <span class="material-symbols-rounded">image</span> 保存 PNG
+                            </button>
+                        </div>
+                        <a href="${url}" download="${txtName}-${svgName}.svg" class="btn-base btn-secondary">
+                            <span class="material-symbols-rounded">code</span> 保存 SVG (矢量图)
+                        </a>
+                    `;
                 }
                 document.getElementById("loading").style.display = "none";
-            }).catch(err => { console.error(err); document.getElementById("loading").style.display = "none"; });
+            }).catch(e => { console.error(e); document.getElementById("loading").style.display = "none"; });
         }
 
         function convertToPNG() {
-            const txtName = document.getElementById("val-equipment").value;
-            const svgName = document.getElementById("val-augment").value;
-            if(!txtName || !svgName) return alert("请先生成图标");
-            const svg = document.getElementById("svgPreview").querySelector("svg");
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-            const width = parseInt(document.getElementById("pngSize").value) || 1024;
+            const svg = document.querySelector('#svgPreview svg');
+            if(!svg) return;
+            const canvas = document.createElement('canvas');
+            const w = parseInt(document.getElementById("pngSize").value) || 1024;
             const vb = svg.viewBox.baseVal;
-            const ratio = (vb && vb.width > 0) ? vb.height / vb.width : 1;
-            canvas.width = width; canvas.height = width * ratio;
+            canvas.width = w; canvas.height = w * ((vb&&vb.width>0)?(vb.height/vb.width):1);
             const img = new Image();
-            const svgBlob = new Blob([new XMLSerializer().serializeToString(svg)], {type: 'image/svg+xml;charset=utf-8'});
-            const url = URL.createObjectURL(svgBlob);
-            img.onload = function () {
-                context.drawImage(img, 0, 0, width, canvas.height);
+            const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], {type:'image/svg+xml;charset=utf-8'}));
+            img.onload = () => {
+                canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
                 URL.revokeObjectURL(url);
-                const link = document.createElement('a');
-                link.download = `${txtName}-${svgName}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
+                const a = document.createElement('a');
+                a.download = `${document.getElementById('val-equipment').value}-${document.getElementById('val-augment').value}.png`;
+                a.href = canvas.toDataURL('image/png');
+                a.click();
             };
             img.src = url;
         }
