@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
-    <title>3D坦克装备改造图标自定义拼接器</title>
+    <title>Tanki Online Augment Icon Splicer</title>
     <style>
         :root {
             --md-sys-color-background: #fdfdf5;
@@ -70,7 +70,6 @@
         .m3-label { font-size: 12px; color: var(--md-sys-color-outline); position: absolute; top: 8px; left: 16px; }
         .m3-value { font-size: 16px; margin-top: 14px; display: flex; align-items: center; gap: 8px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* 折叠面板 */
         .m3-details { width: 100%; background-color: transparent; border-radius: var(--radius-m); overflow: hidden; margin-top: 8px; }
         .m3-summary { padding: 12px 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; color: var(--md-sys-color-primary); font-weight: 500; font-size: 14px; user-select: none; border-radius: var(--radius-s); transition: background 0.2s; }
         .m3-summary:hover { background-color: rgba(128,128,128, 0.05); }
@@ -80,12 +79,10 @@
         .m3-details-content { padding-top: 16px; display: grid; gap: 16px; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 小重置按钮 */
         .reset-action { display: none; padding: 4px; margin-left: 8px; border-radius: 50%; color: var(--md-sys-color-outline); transition: 0.2s; z-index: 2; }
         .reset-action:hover { background-color: rgba(0,0,0,0.1); color: var(--md-sys-color-primary); }
         .reset-action.visible { display: flex; }
 
-        /* 模态框 */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 100; display: none; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(2px); }
         .modal-overlay.active { display: flex; opacity: 1; }
         .modal-content { background-color: var(--md-sys-color-surface); width: 100%; max-width: 500px; max-height: 85vh; margin: auto; border-radius: var(--radius-l); display: flex; flex-direction: column; box-shadow: var(--elevation-3); transform: translateY(50px); transition: transform 0.3s cubic-bezier(0.2, 0.0, 0, 1.0); }
@@ -104,23 +101,18 @@
         .option-preview svg, .option-preview img { width: 100%; height: 100%; object-fit: contain; }
         .color-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); }
 
-        /* 按钮通用样式 */
         .btn-base { border: none; padding: 12px 24px; border-radius: 100px; font-size: 16px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; text-decoration: none; width: 100%; }
         .btn-base:active { transform: scale(0.98); }
         
-        /* 主要操作按钮 (PNG) - Filled */
         .btn-primary { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
         .btn-primary:hover { box-shadow: var(--elevation-1); filter: brightness(1.1); }
         
-        /* 次要操作按钮 (SVG) - Tonal / Outlined */
         .btn-secondary { background-color: transparent; border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-primary); }
         .btn-secondary:hover { background-color: var(--md-sys-color-secondary-container); }
 
-        /* 危险/重置按钮 */
         .btn-reset-all { background-color: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); margin-top: 16px; }
         .btn-reset-all:hover { filter: brightness(0.95); }
 
-        /* 生成结果区域 */
         .results-container { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; animation: fadeIn 0.5s; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 24px; }
         .png-controls { display: flex; gap: 12px; align-items: center; }
         .m3-input { background-color: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-on-surface); padding: 12px; border-radius: 8px; width: 90px; text-align: center; font-size: 16px; }
@@ -131,58 +123,54 @@
 <body data-theme="dark">
 
     <header>
-        <h1>装备改造图标拼接器</h1>
-        <button class="icon-btn" id="themeToggle" aria-label="切换主题">
+        <!-- 这里的文字会被 JS 自动替换 -->
+        <h1 id="ui-header">Augment Icon Splicer</h1>
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle Theme">
             <span class="material-symbols-rounded">light_mode</span>
         </button>
     </header>
 
     <div id="appContainer">
-        <!-- 预览区域 -->
         <div class="preview-card">
-            <div id="svgPreview"><div style="color: var(--md-sys-color-outline);">预览区域</div></div>
-            <div id="loading">加载中...</div>
+            <div id="svgPreview"><div style="color: var(--md-sys-color-outline);" id="ui-preview-txt">Preview Area</div></div>
+            <div id="loading">Loading...</div>
         </div>
 
-        <!-- 主要控制 -->
         <div class="controls-grid">
             <div class="m3-select" onclick="openMenu('equipment')">
                 <div class="m3-select-trigger">
-                    <div><span class="m3-label">装备</span><div class="m3-value" id="display-equipment">请选择装备</div></div>
+                    <div><span class="m3-label" id="ui-lbl-equip">Equipment</span><div class="m3-value" id="display-equipment">Select Equipment</div></div>
                     <span class="material-symbols-rounded">arrow_drop_down</span>
                 </div>
             </div>
             <div class="m3-select" onclick="openMenu('augment')">
                 <div class="m3-select-trigger">
-                    <div><span class="m3-label">装备改造</span><div class="m3-value" id="display-augment">请选择装备改造</div></div>
+                    <div><span class="m3-label" id="ui-lbl-aug">Augment</span><div class="m3-value" id="display-augment">Select Augment</div></div>
                     <span class="material-symbols-rounded">arrow_drop_down</span>
                 </div>
             </div>
         </div>
 
-        <!-- 可选参数 -->
         <details class="m3-details">
             <summary class="m3-summary">
-                <span>可选参数 (稀有度/填充)</span>
+                <span id="ui-opt-summary">Optional (Rarity / Fill)</span>
                 <span class="material-symbols-rounded m3-summary-icon">expand_more</span>
             </summary>
             <div class="m3-details-content">
-                <!-- 稀有度 -->
                 <div class="m3-select" onclick="openMenu('rarity')">
                     <div class="m3-select-trigger">
-                        <div><span class="m3-label">稀有度颜色</span><div class="m3-value" id="display-rarity">默认</div></div>
+                        <div><span class="m3-label" id="ui-lbl-rarity">Rarity Color</span><div class="m3-value" id="display-rarity">Default</div></div>
                         <div style="display:flex;align-items:center">
-                            <div class="reset-action" id="reset-rarity" onclick="resetSelection('rarity', event)" title="重置为默认"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
+                            <div class="reset-action" id="reset-rarity" onclick="resetSelection('rarity', event)" title="Reset"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
                             <span class="material-symbols-rounded">arrow_drop_down</span>
                         </div>
                     </div>
                 </div>
-                <!-- 填充颜色 -->
                 <div class="m3-select" onclick="openMenu('background')">
                     <div class="m3-select-trigger">
-                        <div><span class="m3-label">填充颜色</span><div class="m3-value" id="display-background">默认</div></div>
+                        <div><span class="m3-label" id="ui-lbl-fill">Fill Color</span><div class="m3-value" id="display-background">Default</div></div>
                         <div style="display:flex;align-items:center">
-                            <div class="reset-action" id="reset-background" onclick="resetSelection('background', event)" title="重置为默认"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
+                            <div class="reset-action" id="reset-background" onclick="resetSelection('background', event)" title="Reset"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
                             <span class="material-symbols-rounded">arrow_drop_down</span>
                         </div>
                     </div>
@@ -190,24 +178,19 @@
             </div>
         </details>
 
-        <!-- 全部重置按钮 -->
-        <button class="btn-base btn-reset-all" onclick="resetAll()">
-            <span class="material-symbols-rounded">delete_sweep</span> 全部重置
+        <button class="btn-base btn-reset-all" onclick="resetAll()" id="ui-btn-reset">
+            <span class="material-symbols-rounded">delete_sweep</span> Reset All
         </button>
 
-        <!-- 动态生成的下载区域 -->
-        <div id="downloadSection">
-            <!-- 生成后这里会显示 PNG 和 SVG 按钮 -->
-        </div>
+        <div id="downloadSection"></div>
 
-        <p style="color: var(--md-sys-color-outline); font-size: 12px; text-align: center; margin-top: 20px;">注：生成的图标仅供参考</p>
+        <p style="color: var(--md-sys-color-outline); font-size: 12px; text-align: center; margin-top: 20px;" id="ui-note">Note: Generated icons are for reference only.</p>
     </div>
 
-    <!-- 模态框 -->
     <div class="modal-overlay" id="selectionModal" onclick="closeMenu(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <div class="modal-title" id="modalTitle">选择</div>
+                <div class="modal-title" id="modalTitle">Select</div>
                 <button class="icon-btn" onclick="closeMenu()"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div class="modal-body" id="modalList"></div>
@@ -218,13 +201,193 @@
     <input type="hidden" id="val-rarity" value="default"><input type="hidden" id="val-background" value="default">
 
     <script>
-        // Data
+        // 1. 检测是否为中文语言
+        const isZh = navigator.language.toLowerCase().startsWith('zh');
+
+        // 2. 定义中文和英文的 UI 文本
+        const uiTexts = {
+            title: isZh ? "3D坦克装备改造图标自定义拼接器" : "3D Tank Augment Icon Splicer",
+            header: isZh ? "装备改造图标拼接器" : "Augment Icon Splicer",
+            
+            lbl_equip: isZh ? "装备" : "Equipment",
+            sel_equip: isZh ? "请选择装备" : "Select Equipment",
+            lbl_aug: isZh ? "装备改造" : "Augment",
+            sel_aug: isZh ? "请选择装备改造" : "Select Augment",
+            
+            opt_summary: isZh ? "可选参数 (稀有度/填充)" : "Optional (Rarity / Fill)",
+            lbl_rarity: isZh ? "稀有度颜色" : "Rarity Color",
+            val_default: isZh ? "默认" : "Default",
+            lbl_fill: isZh ? "填充颜色" : "Fill Color",
+            
+            btn_reset: isZh ? "全部重置" : "Reset All",
+            preview_txt: isZh ? "预览区域" : "Preview Area",
+            loading: isZh ? "加载中..." : "Loading...",
+            note: isZh ? "注：生成的图标仅供参考" : "Note: Generated icons are for reference only.",
+            
+            // 动态生成部分的文本
+            dl_size: isZh ? "尺寸:" : "Size:",
+            dl_png: isZh ? "保存 PNG" : "Save PNG",
+            dl_svg: isZh ? "保存 SVG (矢量图)" : "Save SVG (Vector)",
+            
+            // 弹窗标题
+            modal_equip: isZh ? "选择装备" : "Select Equipment",
+            modal_aug: isZh ? "选择装备改造" : "Select Augment",
+            modal_rarity: isZh ? "选择稀有度颜色" : "Select Rarity Color",
+            modal_fill: isZh ? "选择填充颜色" : "Select Fill Color",
+            
+            // 稀有度名称映射
+            rarity_names: {
+                "Default": isZh ? "默认" : "Default", "None": isZh ? "无" : "None", 
+                "Common": isZh ? "普通" : "Common", "Uncommon": isZh ? "稀有" : "Uncommon", 
+                "Rare": isZh ? "珍奇" : "Rare", "Epic": isZh ? "史诗" : "Epic", 
+                "Legendary": isZh ? "传奇" : "Legendary", "Exotic": isZh ? "异国情调" : "Exotic"
+            }
+        };
+
+        // 3. 页面加载时应用这些文本
+        document.title = uiTexts.title;
+        document.getElementById('ui-header').textContent = uiTexts.header;
+        document.getElementById('ui-lbl-equip').textContent = uiTexts.lbl_equip;
+        document.getElementById('display-equipment').textContent = uiTexts.sel_equip;
+        document.getElementById('ui-lbl-aug').textContent = uiTexts.lbl_aug;
+        document.getElementById('display-augment').textContent = uiTexts.sel_aug;
+        document.getElementById('ui-opt-summary').textContent = uiTexts.opt_summary;
+        document.getElementById('ui-lbl-rarity').textContent = uiTexts.lbl_rarity;
+        document.getElementById('display-rarity').textContent = uiTexts.val_default;
+        document.getElementById('ui-lbl-fill').textContent = uiTexts.lbl_fill;
+        document.getElementById('display-background').textContent = uiTexts.val_default;
+        document.getElementById('ui-btn-reset').childNodes[2].textContent = " " + uiTexts.btn_reset; // 保留图标
+        document.getElementById('ui-preview-txt').textContent = uiTexts.preview_txt;
+        document.getElementById('loading').textContent = uiTexts.loading;
+        document.getElementById('ui-note').textContent = uiTexts.note;
+
+
+        // --- 英文翻译映射 (仅当 !isZh 时使用) ---
+        const rawTranslationMap = {
+            "炮塔": "Turret", "底盘": "Hull", "射击颜色": "Shot Effect", 
+            "来自装备改造图标": "From Augment Icons", "来自射击颜色图标": "From Shot Effect Icons",
+            "火焰炮": "Firebird", "冰风暴": "Freeze", "磁力炮": "Isida", "特斯拉": "Tesla",
+            "滑膛炮": "Hammer", "离子炮": "Twins", "火龙珠": "Ricochet", "轰天炮": "Smoky",
+            "火箭炮": "Striker", "极速炮": "Vulcan", "雷暴炮": "Thunder", "蝎子": "Scorpion",
+            "激光炮": "Railgun", "马格南": "Magnum", "电磁炮": "Gauss", "镭射炮": "Shaft",
+            "终结者": "Terminator", "雪人": "Snowman", "番茄炮": "Tomato Gun",
+            "黄蜂轻甲": "Wasp", "蜂王": "Hornet", "霍珀": "Hopper", "圣骑士": "Paladin",
+            "猎人中甲": "Hunter", "十字军": "Crusader", "维京": "Viking", "独裁者": "Dictator",
+            "阿瑞斯": "Ares", "泰坦": "Titan", "猛犸象": "Mammoth",
+            "空（炮塔）": "Empty", "空（底盘）": "Empty",
+            "肾上腺素": "Adrenaline", "高压泵": "High-pressure pump", "紧凑型坦克": "Compact fuel tanks",
+            "燃烧混合物": "Incendiary mix", "磁性混合物": "Magnetic Mix", "麻痹混合物": "Paralyzing mix",
+            "有毒混合物": "Toxic Mix", "干扰混合物": "Jamming Mix", "致命混合物": "Critical Mix",
+            "脉冲星": "Pulsar", "凤凰（炮塔）": "Phoenix", "凤凰（底盘）": "Phoenix",
+            "腐蚀混合物": "Corrosive mix", "震动冻结": "Shock freeze", "稳定混合物": "Stable Mix",
+            "宽带纳米发射器": "Broadband radiators", "支援纳米机器人": "Support nanobots", "纳米反应器": "Nanomass reactor",
+            "干扰纳米机器人": "Jamming Nanobots", "磁性纳米机器人": "Magnetic Nanobots", "眩晕纳米机器人": "Stunning Nanobots",
+            "毒性纳米机器人": "Toxic Nanobots", "吸血鬼纳米机器人": "Vampire Nanobots", "注射冲击纳米机器人": "Shock Nanobots Injection",
+            "负能量场": "Minus-field", "加速协议": "Acceleration Protocol", "拖延协议": "Dilatory Protocol",
+            "放热闪电": "Exothermic Lightning", "吸热闪电": "Endothermic Lightning", "超导发射": "Superconducting Discharge",
+            "震撼闪电": "Shocking Lightning", "穿甲发射": "Armor-piercing Discharge", "干扰发射": "Jamming Discharge",
+            "电动炮塔": "Electroturret", "休克疗法": "Shock therapy", "重炮手": "Slugger",
+            "高容量弹鼓": "High-capacity ammo clip", "电子偶": "Duplet", "飞龙之息": "Wyvern's Breath",
+            "龙息": "Dragon's Breath", "磁性颗粒": "Magnetic Pellets", "眩晕颗粒": "Stunning Pellets",
+            "穿甲射击": "Armor-Piercing Shot", "干扰射击": "Jamming Shot", "自适应重载（1）": "Adaptive reload",
+            "自适应重载（2）": "Adaptive reload (Alt)", "大口径短炮": "Blunderbuss", "左轮手枪": "Revolver",
+            "大口径颗粒": "Large Caliber Pellets", "突击弹药库": "Assault Magazine", "重型重炮手": "Heavy Slugger",
+            "猎人电子偶": "Hunter Duplet", "露营者": "Camper", "稳定等离子体": "Stabilized plasma",
+            "等离子体加速器": "Plasma accelerators", "重型等离子炮": "Heavy plasmagun", "低温管": "Cryotron",
+            "喷雾器": "Vaporizer", "磁控管": "Magnetron", "构造等离子体": "Tectonic Plasma",
+            "等离子注射器": "Plasma Injector", "等离子体干扰器": "Plasma Disruptor", "等离子涡轮加速器": "Plasma Turbo Accelerators",
+            "等离子发生器": "Plasmatron", "不稳定等离子体": "Destabilized plasma", "负场稳定": "Minus-field stabilization",
+            "等离子焰炬": "Plasma-torch", "低温领域": "Cryo field", "炙热领域": "Sizzling Field",
+            "构造场": "Tectonic field", "超级智能负能量场": "Super-smart Minus-Field", "干扰场": "Jamming field",
+            "狂暴": "Berserk", "赫利俄斯": "Helios", "等离子体共振器": "Plasma Resonator",
+            "突击弹药": "Assault rounds", "精确瞄准系统": "High-precision aiming system", "超累积炮弹": "Supercumulative rounds",
+            "燃烧弹": "Incendiary rounds", "冷冻炮弹": "Cryo rounds", "电磁脉冲炮弹": "EMP Rounds",
+            "麻痹炮弹": "Paralyzing Rounds", "穿甲弹": "Armor-Piercing Rounds", "干扰弹": "Jamming Rounds",
+            "分类弹药": "Sorted Ammunition", "可持续纳米机器人": "Sustainable Nanobots",
+            "导弹发射器“旋风”": "Missile launcher \"Cyclone\"", "导弹发射器“镭射”": "Missile launcher \"Shaft\"",
+            "自动加农炮": "Autocannon", "橡胶炮弹": "Rubberized Rounds", "爆破炮弹": "Explosive Rounds",
+            "精确弹药装载": "Sorted Ammunition", "超高速炮弹": "Hyperspeed Rounds", "远程火箭炸药": "Remote rocket explosives",
+            "导弹发射器«猎人»": "Missile launcher «Hunter»", "导弹发射器 «旋风»": "Missile launcher «Cyclone»",
+            "燃烧导弹": "Incendiary Missiles", "冷冻导弹": "Cryo Missiles", "磁性导弹": "Magnetic Missiles",
+            "眩晕导弹": "Stunning Missiles", "穿甲导弹": "Armor-Piercing Missiles", "干扰导弹": "Jamming Missiles",
+            "导弹发射器«轴»": "Missile launcher «Uranium»", "导弹发射器 «串联»": "Missile launcher «Tandem»",
+            "导弹发射器 «九头蛇»": "Missile launcher «Hydra»", "导弹发射器 «浮士德»": "Missile launcher «Faust»",
+            "导弹发射器 «铜指虎»": "Missile launcher «Brass Knucles»", "真空导弹": "Vacuum Missiles",
+            "导弹发射器 «流星»": "Missile Launcher «Meteor»", "射击速度调节器": "Shooting speed regulator",
+            "更快速的水平跟踪": "Reinforced aiming transmission", "燃烧带": "Incendiary band",
+            "冷冻带": "Freezing Band", "磁性带": "Magnetic Band", "眩晕带": "Stunning Band",
+            "穿甲带": "Armor-Piercing Band", "干扰带": "Jamming Band", "爆炸带": "Explosive Band",
+            "碎纸机": "Shredder", "大口径": "Large Caliber", "轻型军械自动装载机": "Small caliber charging machine",
+            "穿甲弹药": "Subcaliber rounds", "«大锤»炮弹": "«Sledgehammer» rounds", "«飞龙» 炮弹": "«Wyvern» shells",
+            "«蝾螈»炮弹": "«Salamander» shells", "«万磁王» 炮弹": "«Magneto» shells", "«和平卫士»炮弹": "«Peacekeeper» shells",
+            "«腐蚀» 炮弹": "«Corrosion» shells", "«噪音»炮弹": "«Noise» shells", "真空炮弹": "«Vacuum» shells",
+            "«纳米技术»炮弹": "«Nanotech» shells", "«铁砧»炮弹": "«Anvil» shells", "螺栓": "Bolter",
+            "爆炸弹头": "Explosive warheads", "导弹发射器 «狼群»": "Missile launcher «Wolfpack»",
+            "眩晕弹": "Stun shells", "穿甲弹": "Armor-piercing shells",
+            "导弹发射器 «龙卷风»": "Missile launcher «Tornado»", "导弹发射器 «蜂群»": "Missile launcher «Swarm»",
+            "导弹发射器 «矛»": "Missile launcher «Spear»", "铀弹": "Uranium Shells", "稳定轮环": "Round stabilization",
+            "电磁加速器“侦察机”": "Electromagnetic accelerator \"Scout\"", "超级穿甲弹": "Super Armor-Piercing Rounds",
+            "大口径弹药": "Large caliber rounds", "不稳定轮环": "Round destabilization", "“死亡使者” 强制器": "Death Herald compulsator",
+            "超空间炮弹": "Hyperspace rounds", "«滑膛炮» 炮弹": "«Shotgun» rounds", "加强炮架": "Reinforced gun carriage",
+            "自动火药装载机": "Automated gunpowder loading mechanism", "鱼叉导弹": "Harpoon",
+            "燃烧核心": "Incendiary core", "冷冻核心": "Freezing Core", "磁性核心": "Magnetic core",
+            "眩晕核心": "Stunning Core", "穿甲核心": "Armor-Piercing Core", "干扰核心": "Jamming Core",
+            "迫击炮": "Mortar", "轰炸机": "Bombard", "真空核心": "Vacuum core", "破坏者": "Destroyer",
+            "更快的水平跟踪": "Faster Horizontal Tracking", "入侵瞄准处理器": "Hacked Aiming Processor",
+            "燃烧齐射": "Incendiary Salvo", "冷冻齐射": "Freezing Salvo", "电磁齐射": "Electromagnetic salvo",
+            "眩晕齐射": "Stunning Salvo", "干扰齐射": "Jamming Salvo", "穿甲齐射": "Armor-Piercing Salvo",
+            "涅墨西斯": "Nemesis", "螺线管冷却": "Solenoid Cooling", "超级螺线管": "Super Solenoids",
+            "短波发射器": "Short-band emitter", "重型电容器": "Heavy capacitors", "轻型电容器": "Light capacitors",
+            "燃烧瞄准镜": "Incendiary Sight", "冷冻瞄准镜": "Freezing Sight", "电光瞄准镜": "Electrifying Sight",
+            "眩晕瞄准镜": "Stunning Sight", "穿甲瞄准镜": "Armor-Piercing Sight", "干扰瞄准镜": "Jamming Sight",
+            "快速射击模式": "Rapid-fire mode", "治疗发射器": "Healing Emitters", "类星体": "Quasar",
+            "埃克赛尔西奥（炮塔）": "Excelsior", "埃克赛尔西奥（底盘）": "Excelsior",
+            "耐热性": "Heat Resistance", "耐寒性": "Cold Resistance", "轻型结构": "Lightweight Construction",
+            "重型结构": "Heavyweight Construction", "工程师": "Engineer", "抗热": "Heat Immunity",
+            "抗寒": "Cold Immunity", "抗电磁脉冲": "EMP Immunity", "抗眩晕": "Stun Immunity",
+            "攻强免疫": "AP Immunity", "抗干扰器": "Jammer Immunity", "驱动器": "Driver",
+            "爆破手": "Blaster", "救生员": "Lifeguard", "工兵": "Miner", "榴弹兵": "Grenadier",
+            "极端轻型结构": "Extreme Lightweight Construction", "导弹发射器 «镭射»": "Missile launcher «Shaft»",
+            "仿星器": "Stellarator", "拳师": "Boxer", "«圣剑» 炮弹": "«Excalibur» rounds", "圣剑": "Excalibur", "暴风雨": "Tempest",
+            "爆炸弹": "Explosive rounds",
+            "深红色": "Crimson", "岩浆": "Magma", "幻影黑": "Black", "粉红色": "Pink", "粉色": "Pink",
+            "雪": "Snow", "寒冷": "Cold", "暗月": "Dark Moon", "毒（1）": "Toxic (1)", "毒（2）": "Toxic (2)",
+            "太阳": "Sun", "火": "Fire", "血液": "Blood", "日食": "Eclipse", "水": "Aqua",
+            "天空蓝": "Blue", "虚空": "Void", "金": "Gold", "紫罗兰色": "Violet", "珊瑚礁": "Coral Reef",
+            "电": "Electric", "天空": "Sky", "爆破手（绿）": "Blaster (Green)", "爆破手（红）": "Blaster (Red)",
+            "神秘的红色": "Mysterious Red", "黑暗": "Darkness", "暴力": "VioleNt", "正午": "Noon",
+            "烟雾": "Smoke", "魔法": "Magic",
+            "蓝紫色": "Blue-Purple", "蓝粉渐变色": "Blue-Pink Gradient", "红色": "Red",
+            "浅蓝色": "Light Blue", "深蓝色": "Dark Blue", "紫色": "Purple", "黄色": "Yellow",
+            "橙色": "Orange", "火红色": "Fiery Red", "蓝色": "Blue", "绿色": "Green", "黑色": "Black"
+        };
+
+        // 翻译函数：如果是中文环境，直接返回中文；否则返回英文翻译
+        function t(chineseKey) {
+            if (isZh) return chineseKey;
+            return rawTranslationMap[chineseKey] || chineseKey;
+        }
+
         const groupedEquipments = { "炮塔": ["滑膛炮", "冰风暴", "火焰炮", "蝎子", "镭射炮", "火龙珠", "激光炮", "磁力炮", "雷暴炮", "火箭炮", "轰天炮", "极速炮", "离子炮", "马格南", "电磁炮", "特斯拉"], "底盘": ["泰坦", "圣骑士", "猛犸象", "猎人中甲", "蜂王", "霍珀", "独裁者", "阿瑞斯", "十字军", "维京", "黄蜂轻甲"] };
         const groupedAugments = { "炮塔": ["空（炮塔）", "肾上腺素", "螺线管冷却", "拖延协议", "加速协议", "负能量场", "震动冻结", "入侵瞄准处理器", "射击速度调节器", "干扰弹", "更快速的水平跟踪", "橡胶炮弹", "轻型电容器", "重型电容器", "治疗发射器", "纳米反应器", "支援纳米机器人", "宽带纳米发射器", "吸血鬼纳米机器人", "精确瞄准系统", "超累积炮弹", "突击弹药", "穿甲弹", "燃烧弹", "分类弹药", "自动加农炮", "高容量弹鼓", "电子偶", "重炮手", "大口径短炮", "自适应重载（1）", "自适应重载（2）", "导弹发射器“旋风”", "远程火箭炸药", "鱼叉导弹", "加强炮架", "自动火药装载机", "电磁脉冲炮弹", "迫击炮", "导弹发射器“镭射”", "负场稳定", "等离子焰炬", "狂暴", "赫利俄斯", "精确弹药装载", "等离子体加速器", "重型等离子炮", "稳定等离子体", "等离子涡轮加速器", "腐蚀混合物", "等离子发生器", "紧凑型坦克", "高压泵", "脉冲星", "电磁加速器“侦察机”", "超空间炮弹", "爆炸弹头", "爆炸弹", "眩晕弹", "冷冻炮弹", "«滑膛炮» 炮弹", "导弹发射器 «九头蛇»", "导弹发射器 «浮士德»", "导弹发射器 «串联»", "超高速炮弹", "碎纸机", "猎人电子偶", "重型重炮手", "突击弹药库", "大口径颗粒", "电动炮塔", "致命混合物", "可持续纳米机器人", "导弹发射器 «流星»", "轰炸机", "左轮手枪", "破坏者", "注射冲击纳米机器人", "涅墨西斯", "螺栓", "类星体", "稳定混合物", "休克疗法", "露营者", "导弹发射器 «铜指虎»", "仿星器", "拳师", "«圣剑» 炮弹", "暴风雨", "埃克赛尔西奥（炮塔）", "凤凰（炮塔）"], "底盘": ["空（底盘）", "极端轻型结构", "爆破手", "工兵", "驱动器", "轻型结构", "重型结构", "耐寒性", "耐热性", "抗干扰器", "攻强免疫", "抗电磁脉冲", "抗眩晕", "抗热", "抗寒", "救生员", "工程师", "榴弹兵", "埃克赛尔西奥（底盘）", "凤凰（底盘）"], "射击颜色": ["深红色", "岩浆", "幻影黑", "粉红色", "雪", "寒冷", "暗月", "毒（1）", "毒（2）", "太阳", "火", "血液", "日食", "水", "天空蓝", "虚空", "金", "紫罗兰色", "珊瑚礁", "电", "天空", "爆破手（绿）", "爆破手（红）", "神秘的红色", "黑暗", "暴力", "正午", "烟雾", "魔法"] };
-        const rarities = [ { name: "默认", value: "default", color: "#aaaaaa" }, { name: "无", value: "#", color: "#333333" }, { name: "普通", value: "#BFD5FF", color: "#BFD5FF" }, { name: "稀有", value: "#76FF33", color: "#76FF33" }, { name: "珍奇", value: "#00D4FF", color: "#00D4FF" }, { name: "史诗", value: "#D580FF", color: "#D580FF" }, { name: "传奇", value: "#FFEE00", color: "#FFEE00" }, { name: "异国情调", value: "#FF6666", color: "#FF6666" } ];
+        
+        // 稀有度数据 (这里只保留颜色值，名称从 uiTexts 获取)
+        const rarities = [ 
+            { key: "Default", value: "default", color: "#aaaaaa" }, 
+            { key: "None", value: "#", color: "#333333" }, 
+            { key: "Common", value: "#BFD5FF", color: "#BFD5FF" }, 
+            { key: "Uncommon", value: "#76FF33", color: "#76FF33" }, 
+            { key: "Rare", value: "#00D4FF", color: "#00D4FF" }, 
+            { key: "Epic", value: "#D580FF", color: "#D580FF" }, 
+            { key: "Legendary", value: "#FFEE00", color: "#FFEE00" }, 
+            { key: "Exotic", value: "#FF6666", color: "#FF6666" } 
+        ];
+        
         const groupedBackgroundColors = { "来自装备改造图标": ["蓝紫色", "蓝粉渐变色", "红色", "浅蓝色", "深蓝色", "粉色", "紫色", "黄色", "橙色", "火红色", "蓝色", "绿色", "黑色"], "来自射击颜色图标": ["爆破手（红）", "爆破手（绿）", "电", "毒（1）", "毒（2）", "粉红色", "寒冷", "黑暗", "幻影黑", "火", "金", "魔法", "日食", "珊瑚礁", "深红色", "神秘的红色", "水", "太阳", "天空", "天空蓝", "虚空", "雪", "血液", "岩浆", "正午", "紫罗兰色", "暴力", "暗月", "烟雾"] };
+        
         const fileCache = {};
         const themeToggle = document.getElementById('themeToggle');
+        
         themeToggle.addEventListener('click', () => {
             const current = document.body.getAttribute('data-theme');
             const next = current === 'dark' ? 'light' : 'dark';
@@ -232,18 +395,20 @@
             themeToggle.querySelector('span').textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
         });
 
-        // Modal
+        // Modal Logic
         const modal = document.getElementById('selectionModal');
         const modalList = document.getElementById('modalList');
+        
         function openMenu(type) {
             modalList.innerHTML = ''; modal.classList.add('active');
-            const titles = { 'equipment': '选择装备', 'augment': '选择装备改造', 'rarity': '选择稀有度颜色', 'background': '选择填充颜色' };
+            const titles = { 'equipment': uiTexts.modal_equip, 'augment': uiTexts.modal_aug, 'rarity': uiTexts.modal_rarity, 'background': uiTexts.modal_fill };
             document.getElementById('modalTitle').textContent = titles[type];
             
             if (type === 'background') {
-                const def = document.createElement('div'); def.className = `option-item ${document.getElementById('val-background').value==='default'?'selected':''}`;
-                def.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>默认</span>`;
-                def.onclick = () => selectItem('background', 'default', null, '默认');
+                const def = document.createElement('div'); 
+                def.className = `option-item ${document.getElementById('val-background').value==='default'?'selected':''}`;
+                def.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>${uiTexts.val_default}</span>`;
+                def.onclick = () => selectItem('background', 'default', null, uiTexts.val_default);
                 modalList.appendChild(def);
                 renderGroupedOptions(groupedBackgroundColors, type);
             }
@@ -251,48 +416,65 @@
             else if (type === 'augment') renderGroupedOptions(groupedAugments, type);
             else if (type === 'rarity') renderRarityOptions();
         }
+        
         function closeMenu(e) { if (e) e.preventDefault(); modal.classList.remove('active'); }
 
         function renderGroupedOptions(dataObj, type) {
             Object.keys(dataObj).forEach(group => {
-                const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = group; modalList.appendChild(h);
-                dataObj[group].sort((a, b) => a.localeCompare(b));
-                dataObj[group].forEach(item => {
-                    const el = document.createElement('div'); el.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
+                const h = document.createElement('div'); h.className = 'option-group-title'; 
+                h.textContent = t(group); // Translate Category Name
+                modalList.appendChild(h);
+                
+                const items = [...dataObj[group]];
+                // 仅在非中文环境下才按英文排序
+                if (!isZh) items.sort((a, b) => t(a).localeCompare(t(b)));
+
+                items.forEach(item => {
+                    const displayName = t(item);
+                    const el = document.createElement('div'); 
+                    el.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
+                    
                     const p = document.createElement('div'); p.className = 'option-preview';
                     if (type === 'augment') p.innerHTML = `<img src="https://testanki1.github.io/augments_icon/augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
                     else if (type === 'background') fetchBackgroundPreview(item, p);
                     else if (type === 'equipment') fetchEquipmentPreview(item, p);
-                    el.append(p, Object.assign(document.createElement('span'), {textContent:item}));
-                    el.onclick = () => selectItem(type, item, group);
+                    
+                    el.append(p, Object.assign(document.createElement('span'), {textContent: displayName}));
+                    el.onclick = () => selectItem(type, item, group, displayName);
                     modalList.appendChild(el);
                 });
             });
         }
+        
         function renderRarityOptions() {
-            const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = "稀有度颜色"; modalList.appendChild(h);
+            const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = uiTexts.lbl_rarity; modalList.appendChild(h);
             rarities.forEach(r => {
+                const name = uiTexts.rarity_names[r.key]; // 动态获取名称
                 const el = document.createElement('div'); el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
-                el.innerHTML = `<div class="color-circle" style="background:${r.color}"></div><span>${r.name}</span>`;
-                el.onclick = () => selectItem('rarity', r.value, null, r.name, r.color);
+                el.innerHTML = `<div class="color-circle" style="background:${r.color}"></div><span>${name}</span>`;
+                el.onclick = () => selectItem('rarity', r.value, null, name, r.color);
                 modalList.appendChild(el);
             });
         }
 
         // --- Actions ---
         function selectItem(type, value, group, displayOverride, colorOverride) {
+            // 保存原始值用于文件请求
             document.getElementById(`val-${type}`).value = value;
+            
             const disp = document.getElementById(`display-${type}`);
             const btn = document.getElementById(`reset-${type}`);
             
+            const showText = displayOverride || t(value);
+
             if (type === 'rarity') {
-                disp.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${colorOverride};border:none"></div> ${displayOverride}`;
+                disp.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${colorOverride};border:none"></div> ${showText}`;
                 if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
             } else if (type === 'background') {
-                disp.textContent = value === 'default' ? '默认' : value;
+                disp.textContent = value === 'default' ? uiTexts.val_default : showText;
                 if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
             } else {
-                disp.textContent = value;
+                disp.textContent = showText;
             }
             closeMenu();
             checkAndGenerate();
@@ -300,27 +482,36 @@
 
         function resetSelection(type, event) {
             if(event) event.stopPropagation();
-            selectItem(type, 'default', null, '默认', '#aaaaaa');
+            selectItem(type, 'default', null, uiTexts.val_default, '#aaaaaa');
         }
 
         function resetAll() {
             document.getElementById('val-equipment').value = "";
-            document.getElementById('display-equipment').textContent = "请选择装备";
+            document.getElementById('display-equipment').textContent = uiTexts.sel_equip;
             
             document.getElementById('val-augment').value = "";
-            document.getElementById('display-augment').textContent = "请选择改造";
+            document.getElementById('display-augment').textContent = uiTexts.sel_aug;
             
             resetSelection('rarity');
             resetSelection('background');
             
-            document.getElementById('svgPreview').innerHTML = '<div style="color: var(--md-sys-color-outline);">预览区域</div>';
-            document.getElementById('downloadSection').innerHTML = ''; // 清空下载按钮
+            document.getElementById('svgPreview').innerHTML = `<div style="color: var(--md-sys-color-outline);">${uiTexts.preview_txt}</div>`;
+            document.getElementById('downloadSection').innerHTML = '';
         }
 
         // --- Generation ---
         async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
-        async function fetchBackgroundPreview(n, c) { const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/colors/${encodeURIComponent(n)}.txt`); if(t){ const id='g'+Math.random().toString(36).substr(2,9); c.innerHTML=`<svg viewBox="0 0 100 100"><defs><radialGradient id="${id}">${t}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;}}
-        async function fetchEquipmentPreview(n, c) { const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/equipments/${encodeURIComponent(n)}.txt`); if(t) c.innerHTML=`<svg viewBox="${calculateMultiPathViewBox(t)}" style="fill:currentColor">${t}</svg>`; }
+        
+        async function fetchBackgroundPreview(n, c) { 
+            const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/colors/${encodeURIComponent(n)}.txt`); 
+            if(t){ const id='g'+Math.random().toString(36).substr(2,9); c.innerHTML=`<svg viewBox="0 0 100 100"><defs><radialGradient id="${id}">${t}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;}
+        }
+        
+        async function fetchEquipmentPreview(n, c) { 
+            const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/equipments/${encodeURIComponent(n)}.txt`); 
+            if(t) c.innerHTML=`<svg viewBox="${calculateMultiPathViewBox(t)}" style="fill:currentColor">${t}</svg>`; 
+        }
+        
         function calculateMultiPathViewBox(s) { const n="http://www.w3.org/2000/svg",v=document.createElementNS(n,"svg");v.style.position="absolute";v.style.visibility="hidden";v.style.width="0";v.style.height="0";document.body.appendChild(v);const g=document.createElementNS(n,"g");g.innerHTML=s;v.appendChild(g);try{const b=g.getBBox();document.body.removeChild(v);if(b.width===0)return"0 0 256 256";const p=Math.max(b.width,b.height)*0.1;return`${b.x-p} ${b.y-p} ${b.width+p*2} ${b.height+p*2}`;}catch{if(document.body.contains(v))document.body.removeChild(v);return"0 0 256 256";}}
 
         function checkAndGenerate() {
@@ -330,8 +521,8 @@
         }
 
         function generateSVG() {
-            const txtName = document.getElementById("val-equipment").value;
-            const svgName = document.getElementById("val-augment").value;
+            const txtName = document.getElementById("val-equipment").value; 
+            const svgName = document.getElementById("val-augment").value; 
             const quality = document.getElementById("val-rarity").value;
             const background = document.getElementById("val-background").value;
 
@@ -352,22 +543,23 @@
                 if (svgEl) {
                     svgEl.setAttribute("width", "256"); svgEl.removeAttribute("height");
                     
-                    // 动态生成下载按钮组
                     const blob = new Blob([final], { type: 'image/svg+xml' });
                     const url = URL.createObjectURL(blob);
-                    const dlSection = document.getElementById("downloadSection");
                     
+                    const downloadName = `${t(txtName)}-${t(svgName)}`;
+
+                    const dlSection = document.getElementById("downloadSection");
                     dlSection.className = "results-container";
                     dlSection.innerHTML = `
                         <div class="png-controls">
-                            <span style="white-space:nowrap">尺寸:</span>
+                            <span style="white-space:nowrap">${uiTexts.dl_size}</span>
                             <input type="number" id="pngSize" class="m3-input" placeholder="1024" value="1024">
-                            <button class="btn-base btn-primary" onclick="convertToPNG()">
-                                <span class="material-symbols-rounded">image</span> 保存 PNG
+                            <button class="btn-base btn-primary" onclick="convertToPNG('${downloadName}')">
+                                <span class="material-symbols-rounded">image</span> ${uiTexts.dl_png}
                             </button>
                         </div>
-                        <a href="${url}" download="${txtName}-${svgName}.svg" class="btn-base btn-secondary">
-                            <span class="material-symbols-rounded">code</span> 保存 SVG (矢量图)
+                        <a href="${url}" download="${downloadName}.svg" class="btn-base btn-secondary">
+                            <span class="material-symbols-rounded">code</span> ${uiTexts.dl_svg}
                         </a>
                     `;
                 }
@@ -375,7 +567,7 @@
             }).catch(e => { console.error(e); document.getElementById("loading").style.display = "none"; });
         }
 
-        function convertToPNG() {
+        function convertToPNG(filename) {
             const svg = document.querySelector('#svgPreview svg');
             if(!svg) return;
             const canvas = document.createElement('canvas');
@@ -388,7 +580,7 @@
                 canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
                 URL.revokeObjectURL(url);
                 const a = document.createElement('a');
-                a.download = `${document.getElementById('val-equipment').value}-${document.getElementById('val-augment').value}.png`;
+                a.download = `${filename || 'icon'}.png`;
                 a.href = canvas.toDataURL('image/png');
                 a.click();
             };
