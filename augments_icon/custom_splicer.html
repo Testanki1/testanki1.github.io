@@ -426,8 +426,18 @@
                 modalList.appendChild(h);
                 
                 const items = [...dataObj[group]];
-                // 仅在非中文环境下才按英文排序
-                if (!isZh) items.sort((a, b) => t(a).localeCompare(t(b)));
+                
+                // --- 核心修改：中英文分别排序 ---
+                items.sort((a, b) => {
+                    if (isZh) {
+                        // 如果是中文，使用中文拼音排序 ('zh-CN')
+                        return a.localeCompare(b, 'zh-CN');
+                    } else {
+                        // 如果是英文，使用翻译后的英文名称排序
+                        return t(a).localeCompare(t(b));
+                    }
+                });
+                // --------------------------------
 
                 items.forEach(item => {
                     const displayName = t(item);
