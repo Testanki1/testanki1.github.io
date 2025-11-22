@@ -8,357 +8,698 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>3D坦克服务器列表</title>
     <link rel="shortcut icon" href="https://tankionline.com/favicon.ico" />
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
     <style>
+        :root {
+            /* --- Design Tokens (M3 Style) --- */
+            
+            /* Palette based on your colors */
+            --md-primary: #76ff33;
+            --md-on-primary: #001d05;
+            --md-primary-container: #004e10;
+            --md-on-primary-container: #8dff53;
+            
+            --md-background: radial-gradient(circle at center, rgb(32, 48, 64) 0%, rgb(3, 8, 13) 100%);
+            
+            --md-surface: #1e2b38;
+            --md-surface-container-high: #283746; /* Popup bg */
+            --md-on-surface: #e1e2e6;
+            --md-on-surface-variant: #c4c7c5;
+            
+            --md-outline: #8e918f;
+            --md-outline-variant: #444746;
+
+            /* Typography */
+            --md-font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+            
+            /* Shapes (Expressive = Larger Corners) */
+            --shape-full: 9999px;
+            --shape-extra-large: 28px;
+            --shape-large: 16px;
+            --shape-medium: 12px;
+
+            /* Motion */
+            --motion-easing: cubic-bezier(0.2, 0, 0, 1);
+            --motion-duration: 0.3s;
+        }
+
         * {
-            font-family: 'Rubik', 'M PLUS 1p';
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            font-family: var(--md-font-family);
         }
+
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background: radial-gradient(rgb(32, 48, 64) 0%, rgb(3, 8, 13) 100%);
+            background: var(--md-background);
+            color: var(--md-on-surface);
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-        #modal-root {
-            pointer-events: none;
+
+        /* --- M3 Components --- */
+
+        /* 1. Buttons (Filled, Tonal, Text) */
+        .m3-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 40px;
+            padding: 0 24px;
+            border: none;
+            border-radius: var(--shape-full);
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.1px;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+            text-decoration: none;
+            overflow: hidden;
+            user-select: none;
         }
-        img {
-            pointer-events: none;
+        
+        /* State Layer Effect (Ripple alternative) */
+        .m3-btn::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: currentColor;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
-        #modal-root > div {
-            pointer-events: auto;
+        .m3-btn:hover::after { opacity: 0.08; }
+        .m3-btn:active::after { opacity: 0.12; }
+
+        .m3-btn-filled {
+            background-color: var(--md-primary);
+            color: var(--md-on-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
+        .m3-btn-filled:hover { box-shadow: 0 2px 5px rgba(0,0,0,0.4); transform: translateY(-1px); }
+        .m3-btn-filled:active { transform: translateY(0); }
+
+        .m3-btn-tonal {
+            background-color: rgba(118, 255, 51, 0.15);
+            color: var(--md-on-primary-container);
+        }
+
+        .m3-btn-text {
+            background-color: transparent;
+            color: var(--md-primary);
+            padding: 0 12px;
+        }
+        
+        /* Icon Button (for close X) */
+        .m3-icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--md-on-surface-variant);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .m3-icon-btn:hover {
+            background-color: rgba(255,255,255,0.08);
+            color: var(--md-on-surface);
+        }
+        .material-symbols-rounded { font-size: 24px; }
+
+        /* 2. Cards (The main server links) */
         .container {
             width: 100%;
             height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 16px;
+            opacity: 0;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        .grid-layout {
+            display: grid;
+            gap: 16px;
+            width: 100%;
+            max-width: 800px;
+            perspective: 1000px;
         }
         
-        #mainContent .table, #partnersContent .table { /* Common table parent styles */
-             width: 80%;
-             max-width: 800px;
-             gap: 20px;
-             padding: 20px;
-             background: rgba(255, 255, 255, 0.1);
-             border-radius: 10px;
-        }
-
-        #mainContent .table {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-        }
-        #mainContent .cell {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            /* Removed padding, background, border-radius as buttons will fill more */
-        }
-         #mainContent .cell p {
-            width: 100%; /* Allow p to guide button width */
-            margin: 5px 0;
-        }
-
-
-        #partnersContent .table {
-            max-height: 90vh;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Responsive columns */
-            justify-content: center;
-            grid-auto-rows: min-content;
+        .main-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+        /* Partners Grid: smaller items */
+        .partners-grid { 
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
+            max-height: 85vh;
             overflow-y: auto;
+            padding-bottom: 20px;
+            /* Custom Scrollbar */
+            scrollbar-width: thin;
+            scrollbar-color: var(--md-outline-variant) transparent;
         }
-         #partnersContent .cell {
+        .partners-grid::-webkit-scrollbar { width: 6px; }
+        .partners-grid::-webkit-scrollbar-thumb { background: var(--md-outline-variant); border-radius: 10px; }
+
+        .m3-card {
+            position: relative;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start; /* Align items to the top for potentially varying text lengths */
+            justify-content: center;
             align-items: center;
-            text-align: center;
-             /* Removed padding, background, border-radius as buttons will fill more */
-        }
-        #partnersContent .cell p {
-            width: 100%; /* Allow p to guide button width */
-            margin: 5px 0; /* Space between multiple buttons/text in a cell */
-        }
-        #partnersContent .cell .info-text { /* For text like (暂不支持全屏) */
-            color: #FFFFFF;
-            font-size: 14px;
-            margin-top: 0px;
-        }
-
-
-        a { /* General link styles, not for styled-link-buttons */
+            padding: 24px 16px;
+            background: rgba(30, 43, 56, 0.6); /* Glassy dark */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--shape-extra-large);
             text-decoration: none;
-            color: #BFD5FF;
-            transition: color 0.3s;
-        }
-        a:hover, a:active { /* General link hover/active, will be overridden by button specific active if applicable */
-            color: #76ff33 !important;
-        }
-        a.no-color-change {
-            color: rgba(191, 213, 255, 0.5) !important;
-        }
-        a.no-color-change:hover, a.no-color-change:active {
-            color: rgba(191, 213, 255, 0.5) !important;
-        }
-        /* a:hover span,
-        a:active span {
-            color: inherit !important; 
-        } */ /* This might be too general, handled by .styled-link-button span */
-
-        /* Common Button Styles (for top/bottom utility buttons) */
-        .common-button {
-            position: absolute;
-            background-color: #76ff33;
-            padding: 10px;
-            border: none;
-            color: #001926;
-            font-size: 16px;
+            color: var(--md-on-surface);
+            transition: all var(--motion-duration) var(--motion-easing);
+            min-height: 130px;
             cursor: pointer;
-            border-radius: 10px;
-            transition: background-color 0.3s;
-            text-decoration: none; 
-            text-align: center;
+            overflow: hidden;
         }
-        .common-button:hover {
-            background-color: #4CAF50;
+        /* Hover Effect */
+        .m3-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: var(--md-primary);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 0;
         }
-
-        #mainServerStatusButton { top: 10px; left: 10px; }
-        #mainAboutButton { top: 10px; right: 10px; }
-        #mainSettingsButton { bottom: 10px; right: 10px; }
+        .m3-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: var(--md-primary);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .m3-card:hover::before { opacity: 0.05; }
         
-        #partnersBackButton { top: 10px; left: 10px; display: none; }
-        #partnersMobileButton { top: 10px; right: 10px; display: none; }
+        .m3-card:active { transform: scale(0.98); }
 
-        /* Popups */
-        .popup-container {
+        .card-content { position: relative; z-index: 1; text-align: center; }
+        .card-title { font-size: 24px; font-weight: 600; margin: 0 0 4px 0; }
+        .card-sub { font-size: 12px; color: var(--md-on-surface-variant); opacity: 0.8; }
+        .m3-card:hover .card-title { color: var(--md-primary); }
+
+        /* Partner Card Variants */
+        .partner-card { 
+            min-height: 80px; 
+            padding: 16px; 
+            border-radius: var(--shape-large);
+        }
+        .partner-card .card-title { font-size: 18px; }
+        
+        /* 4399 Group Special Styling */
+        .partner-group-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: var(--shape-large);
+            padding: 8px;
+            border: 1px solid var(--md-outline-variant);
+        }
+        .partner-group-btn {
+            display: block;
+            text-align: center;
+            padding: 10px;
+            text-decoration: none;
+            border-radius: var(--shape-medium);
+            background: rgba(255,255,255,0.05);
+            color: var(--md-on-surface);
+            transition: 0.2s;
+        }
+        .partner-group-btn:first-child {
+            font-weight: bold;
+            font-size: 16px;
+            color: var(--md-primary);
+        }
+        .partner-group-btn:last-child {
+            font-size: 12px;
+            color: var(--md-on-surface-variant);
+        }
+        .partner-group-btn:hover { background: rgba(118, 255, 51, 0.1); }
+
+        /* 3. Dialogs / Modals (M3 Standard) */
+        .dialog-scrim {
             display: none;
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: #001926;
-            color: #BFD5FF;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            z-index: 1000;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
-        .popup-container a { /* Links inside popups */
-            display: block;
-            margin: 10px 0;
-            color: #BFD5FF;
-        }
-        .popup-container a:hover {
-            color: #76ff33;
-        }
-        .popup-container button, .popup-container .popup-close-button {
-            margin-top: 10px;
-            background-color: #76ff33;
-            border: none;
-            color: #001926;
-            padding: 5px 10px;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        .popup-container button:hover, .popup-container .popup-close-button:hover {
-            background-color: #4CAF50;
-        }
-        .popup-container .popup-close-button {
-            position: absolute; top: 5px; right: 10px; background: none;
-            color: #BFD5FF; font-size: 20px; padding: 0; margin:0;
-        }
-        .popup-container .popup-close-button:hover { color: #76ff33; background: none; }
+        .dialog-scrim.open { display: flex; opacity: 1; }
 
-        /* Style for links that should look like main content buttons */
-        .styled-link-button {
-            display: block; 
-            width: 100%;    
-            padding: 15px 10px; 
-            margin: 0; /* Paragraphs will handle spacing */
-            border: 2px solid #BFD5FF;
-            border-radius: 8px;
-            color: #BFD5FF;
-            background-color: rgba(255, 255, 255, 0.05); 
-            font-size: 26px; 
-            text-align: center;
+        .m3-dialog-surface {
+            background: var(--md-surface-container-high);
+            width: 90%;
+            max-width: 320px;
+            border-radius: 28px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .dialog-scrim.open .m3-dialog-surface { transform: scale(1); }
+
+        .dialog-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .dialog-headline {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 400; /* Expressive uses lighter weights for headlines */
+        }
+        
+        /* Mobile Platform List in Dialog */
+        .dialog-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
             text-decoration: none;
-            transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+            color: var(--md-on-surface);
+            border-radius: var(--shape-full); /* Stadium shape items */
+            transition: background 0.2s;
+        }
+        .list-item:hover { background: rgba(255,255,255,0.08); color: var(--md-primary); }
+        .list-item-text { font-size: 16px; }
+
+        /* 4. M3 Input Field (Outlined) */
+        .m3-field {
+            position: relative;
+            margin-top: 8px;
+        }
+        .m3-field input {
+            width: 100%;
+            background: inherit;
+            border: 1px solid var(--md-outline);
+            border-radius: 4px;
+            padding: 14px 16px;
+            color: var(--md-on-surface);
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .m3-field input:focus {
+            border-color: var(--md-primary);
+            border-width: 2px;
+            padding: 13px 15px; /* compensate for border width */
+        }
+        .m3-field label {
+            position: absolute;
+            left: 12px;
+            top: 16px;
+            background-color: var(--md-surface-container-high);
+            padding: 0 4px;
+            color: var(--md-on-surface-variant);
+            font-size: 16px;
+            transition: 0.2s ease-out;
+            pointer-events: none;
+        }
+        /* Float label when focused or has content */
+        .m3-field input:focus + label,
+        .m3-field input:not(:placeholder-shown) + label {
+            top: -10px;
+            font-size: 12px;
+            color: var(--md-primary);
+            font-weight: 500;
+        }
+
+        /* 5. M3 Switch (Replacement for Checkbox) */
+        .m3-switch-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             cursor: pointer;
-            line-height: 1.3;
+            padding: 8px 0;
+            user-select: none;
+        }
+        .m3-switch-label { flex-grow: 1; font-size: 16px; }
+        
+        /* The Switch Track */
+        .m3-switch {
+            position: relative;
+            width: 52px;
+            height: 32px;
+            background-color: var(--md-outline-variant);
+            border-radius: 16px; /* Full rounding */
+            border: 2px solid var(--md-outline);
+            transition: 0.2s;
+            flex-shrink: 0;
+        }
+        /* The Handle (Thumb) */
+        .m3-switch::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 6px;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background-color: var(--md-outline);
+            border-radius: 50%;
+            transition: 0.2s cubic-bezier(0.2, 0, 0, 1.5); /* Bouncy effect */
+        }
+        /* Hidden Input */
+        .m3-switch input { display: none; }
+        
+        /* Checked State */
+        .m3-switch.checked {
+            background-color: var(--md-primary);
+            border-color: var(--md-primary);
+        }
+        .m3-switch.checked::after {
+            background-color: var(--md-on-primary);
+            width: 24px;
+            height: 24px;
+            left: 24px; /* Move right */
         }
 
-        .styled-link-button span { /* For text within <a> that is wrapped in <span> */
-            color: inherit !important; /* Ensure span inherits color from <a> */
-            font-size: inherit !important; /* Ensure span inherits font-size from <a> */
-            /* No need to set color/font-size on span directly anymore */
+        /* Utility Bars (Top/Bottom) */
+        .util-bar {
+            position: absolute;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+            pointer-events: none; /* Allow clicks through empty space */
         }
+        .util-bar > * { pointer-events: auto; }
+        .top-bar { top: 0; left: 0; right: 0; justify-content: space-between; }
+        .bottom-bar { bottom: 0; right: 0; }
 
-        .styled-link-button:hover {
-            color: #76FF33;
-            border-color: #76FF33;
-            background-color: rgba(118, 255, 51, 0.1); 
+        /* Helper for mobile layout optimization */
+        @media (max-width: 600px) {
+            .m3-btn { padding: 0 16px; height: 36px; font-size: 13px; }
+            .card-title { font-size: 20px; }
+            .grid-layout { width: 92%; }
         }
-
-        .styled-link-button:active {
-            color: #76FF33 !important; 
-            border-color: #76FF33 !important;
-            background-color: rgba(118, 255, 51, 0.2); 
-        }
-
     </style>
 </head>
 <body>
-    <!-- Buttons for Main View -->
-    <a href="/status" id="mainServerStatusButton" class="common-button">查看服务器状态</a>
-    <a href="/about" id="mainAboutButton" class="common-button">关于</a>
-    <button id="mainSettingsButton" class="common-button">设置</button>
-
-    <!-- Buttons for Partners View -->
-    <button id="partnersBackButton" class="common-button">返回</button>
-    <button id="partnersMobileButton" class="common-button">移动版平台</button>
-
-    <!-- Settings Popup (for Main View) -->
-    <div id="settingsPopup" class="popup-container">
-        <span class="popup-close-button" id="closeSettingsPopup">×</span>
-        <label for="customUrl">自定义网址：</label>
-        <input type="text" id="customUrl" placeholder="输入网址" />
-        <button id="redirectButton">跳转</button>
-        <div>
-            <input type="checkbox" id="chineseCheckbox" />
-            <label for="chineseCheckbox">外服锁定中文</label>
+    <!-- 顶部按钮组 -->
+    <div class="util-bar top-bar">
+        <div style="display: flex; gap: 8px;">
+            <a href="/status" id="mainServerStatusButton" class="m3-btn m3-btn-filled">服务器状态</a>
+            <button id="partnersBackButton" class="m3-btn m3-btn-tonal" style="display: none;">
+                <span class="material-symbols-rounded" style="font-size: 18px; margin-right: 4px;">arrow_back</span>
+                返回
+            </button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+             <a href="/about" id="mainAboutButton" class="m3-btn m3-btn-tonal">关于</a>
+             <button id="partnersMobileButton" class="m3-btn m3-btn-filled" style="display: none;">移动版</button>
         </div>
     </div>
 
-    <!-- Mobile Platforms Popup (for Partners View) -->
-    <div id="mobilePlatformsPopup" class="popup-container">
-        <span class="popup-close-button" id="closeMobilePopup">×</span>
-        <a href="https://appgallery.huawei.com/app/C101972055">华为</a>
-        <a href="https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145">vivo</a>
-        <a href="https://app.mi.com/details?id=com.tankionline.mi">小米</a>
-        <a href="https://store.oppomobile.com/">OPPO</a>
-        <a href="https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640">荣耀</a>
-        <a href="https://www.ldmnq.com/app/8762.html">雷电模拟器</a>
-        <button class="popup-close-button" onclick="document.getElementById('mobilePlatformsPopup').style.display = 'none';">关闭</button> 
+    <!-- 底部按钮组 -->
+    <div class="util-bar bottom-bar">
+        <button id="mainSettingsButton" class="m3-btn m3-btn-tonal">
+            <span class="material-symbols-rounded" style="font-size: 18px; margin-right: 4px;">settings</span>
+            设置
+        </button>
     </div>
 
-    <div id="modal-root"></div>
-    
+    <!-- 1. 设置弹窗 (Settings Dialog) -->
+    <div id="settingsPopup" class="dialog-scrim">
+        <div class="m3-dialog-surface">
+            <div class="dialog-header">
+                <h2 class="dialog-headline">设置</h2>
+                <button class="m3-icon-btn" id="closeSettingsPopup" aria-label="Close">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+            
+            <!-- M3 Text Field -->
+            <div class="m3-field">
+                <input type="text" id="customUrl" placeholder=" " />
+                <label for="customUrl">自定义网址</label>
+            </div>
+            
+            <!-- M3 Switch (replacing Checkbox) -->
+            <div class="m3-switch-container" onclick="toggleSwitch('chineseSwitch')">
+                <div class="m3-switch-label">外服锁定中文</div>
+                <div class="m3-switch" id="chineseSwitchEl">
+                    <input type="checkbox" id="chineseCheckbox" />
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                <button id="redirectButton" class="m3-btn m3-btn-filled" style="width: 100%;">
+                    跳转
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 移动版平台弹窗 (Mobile Platforms Dialog) -->
+    <div id="mobilePlatformsPopup" class="dialog-scrim">
+        <div class="m3-dialog-surface">
+            <div class="dialog-header">
+                <h2 class="dialog-headline">下载平台</h2>
+                <!-- M3 Icon Button for close -->
+                <button class="m3-icon-btn" id="closeMobilePopup" aria-label="Close">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+            
+            <div class="dialog-list">
+                <a href="https://appgallery.huawei.com/app/C101972055" class="list-item">
+                    <span class="list-item-text">华为应用市场</span>
+                </a>
+                <a href="https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145" class="list-item">
+                    <span class="list-item-text">vivo 应用商店</span>
+                </a>
+                <a href="https://app.mi.com/details?id=com.tankionline.mi" class="list-item">
+                    <span class="list-item-text">小米应用商店</span>
+                </a>
+                <a href="https://store.oppomobile.com/" class="list-item">
+                    <span class="list-item-text">OPPO 软件商店</span>
+                </a>
+                <a href="https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640" class="list-item">
+                    <span class="list-item-text">荣耀应用市场</span>
+                </a>
+                <a href="https://www.ldmnq.com/app/8762.html" class="list-item">
+                    <span class="list-item-text">雷电模拟器</span>
+                </a>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end;">
+                <button class="m3-btn m3-btn-text" onclick="closeDialog('mobilePlatformsPopup')">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content Area -->
     <div id="mainContent" class="container">
-        <div class="table">
-            <div class="cell">
-                <p><a href="https://3dtank.com/play" class="styled-link-button" id="guofuLink">国服</a></p>
-            </div>
-            <div class="cell">
-                <p><a href="https://tankionline.com/play?resources=https://s-de.eu.tankionline.com" class="styled-link-button" id="waifuLink">外服</a></p>
-            </div>
-            <div class="cell">
-                <p><a href="/test" class="styled-link-button" id="testServerLink">测试服</a></p>
-            </div>
-            <div class="cell">
-                <p><a href="#" id="navigateToPartners" class="styled-link-button">国服联运服</a></p>
-            </div>
+        <div class="grid-layout main-grid">
+            <a href="https://3dtank.com/play" class="m3-card" id="guofuLink">
+                <div class="card-content">
+                    <div class="card-title">国服</div>
+                    <div class="card-sub">3dtank.com</div>
+                </div>
+            </a>
+            <a href="https://tankionline.com/play?resources=https://s-de.eu.tankionline.com" class="m3-card" id="waifuLink">
+                <div class="card-content">
+                    <div class="card-title">外服</div>
+                    <div class="card-sub">tankionline.com</div>
+                </div>
+            </a>
+            <a href="/test" class="m3-card" id="testServerLink">
+                <div class="card-content">
+                    <div class="card-title">测试服</div>
+                    <div class="card-sub">Test Server</div>
+                </div>
+            </a>
+            <a href="#" id="navigateToPartners" class="m3-card">
+                <div class="card-content">
+                    <div class="card-title">国服联运服</div>
+                    <div class="card-sub">4399 / 7k7k / YY 等</div>
+                </div>
+            </a>
         </div>
     </div>
 
-    <!-- Partners Content Area (initially hidden) -->
+    <!-- Partners Content Area -->
     <div id="partnersContent" class="container" style="display: none;">
-        <div class="table">
-            <div class="cell">
-                <p><a href="https://my.4399.com/yxtk/" class="styled-link-button"><span>4399</span></a></p>
-                <p><a href="https://my.4399.com/yxtk/play?sid=1" class="styled-link-button"><span>-->自动登录>--</span></a></p>
+        <div class="grid-layout partners-grid">
+            <!-- 4399 Group (Grouped together as requested) -->
+            <div class="partner-group-container">
+                <a href="https://my.4399.com/yxtk/" class="partner-group-btn">4399</a>
+                <a href="https://my.4399.com/yxtk/play?sid=1" class="partner-group-btn">自动登录</a>
             </div>
-            <div class="cell">
-                <p><a href="http://web.7k7k.com/stat/game.php?target=3dtk" class="styled-link-button"><span>7k7k</span></a></p>
-                <p class="info-text">（暂不支持全屏）</p>
-            </div>
-            <div class="cell">
-                <p><a href="https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1" class="styled-link-button"><span>YY</span></a></p>
-            </div>
-            <div class="cell">
-                <p><a href="http://wan.baidu.com/game?gameId=23699359" class="styled-link-button"><span>百度</span></a></p>
-                <p class="info-text">（暂不支持全屏）</p>
-            </div>
-            <div class="cell">
-                <p><a href="http://web.gamersky.com/Games/236.html" class="styled-link-button"><span>游民星空</span></a></p>
-                <p class="info-text">（暂不支持全屏）</p>
-            </div>
-            <div class="cell">
-                <p><a href="https://wans.ixinyou.com/games/tank/" class="styled-link-button"><span>心游</span></a></p>
-                <p class="info-text">（暂不支持全屏）</p>
-            </div>
-            <div class="cell">
-                <p><a href="https://game.qzone.qq.com/1102530450" class="styled-link-button"><span>QQ空间</span></a></p>
-                <p class="info-text">（需要桌面版网站）</p>
-            </div>
-            <div class="cell">
-                <p><a href="https://wan.ludashi.com/yeyou/tk3d?s=1" class="styled-link-button"><span>鲁大师</span></a></p>
-                <p class="info-text">（暂不支持全屏）</p>
-            </div>
+            
+            <a href="http://web.7k7k.com/stat/game.php?target=3dtk" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">7k7k</div>
+                    <div class="card-sub">暂不支持全屏</div>
+                </div>
+            </a>
+            
+            <a href="https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">YY</div>
+                </div>
+            </a>
+            
+            <a href="http://wan.baidu.com/game?gameId=23699359" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">百度</div>
+                    <div class="card-sub">暂不支持全屏</div>
+                </div>
+            </a>
+            
+            <a href="http://web.gamersky.com/Games/236.html" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">游民星空</div>
+                    <div class="card-sub">暂不支持全屏</div>
+                </div>
+            </a>
+            
+            <a href="https://wans.ixinyou.com/games/tank/" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">心游</div>
+                    <div class="card-sub">暂不支持全屏</div>
+                </div>
+            </a>
+            
+            <a href="https://game.qzone.qq.com/1102530450" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">QQ空间</div>
+                    <div class="card-sub">需桌面版</div>
+                </div>
+            </a>
+            
+            <a href="https://wan.ludashi.com/yeyou/tk3d?s=1" class="m3-card partner-card">
+                <div class="card-content">
+                    <div class="card-title">鲁大师</div>
+                    <div class="card-sub">暂不支持全屏</div>
+                </div>
+            </a>
         </div>
     </div>
 
     <script>
-        const mainContent = document.getElementById('mainContent');
-        const partnersContent = document.getElementById('partnersContent');
-        
-        const mainServerStatusButton = document.getElementById('mainServerStatusButton');
-        const mainAboutButton = document.getElementById('mainAboutButton');
-        const mainSettingsButton = document.getElementById('mainSettingsButton');
-        
-        const partnersBackButton = document.getElementById('partnersBackButton');
-        const partnersMobileButton = document.getElementById('partnersMobileButton');
+        // UI Elements
+        const views = {
+            main: document.getElementById('mainContent'),
+            partners: document.getElementById('partnersContent')
+        };
+        const buttons = {
+            status: document.getElementById('mainServerStatusButton'),
+            about: document.getElementById('mainAboutButton'),
+            settings: document.getElementById('mainSettingsButton'),
+            back: document.getElementById('partnersBackButton'),
+            mobile: document.getElementById('partnersMobileButton')
+        };
+        const popups = {
+            settings: document.getElementById('settingsPopup'),
+            mobile: document.getElementById('mobilePlatformsPopup')
+        };
 
-        const settingsPopup = document.getElementById('settingsPopup');
-        const mobilePlatformsPopup = document.getElementById('mobilePlatformsPopup');
+        // Helper: Dialog Functions
+        function openDialog(id) {
+            const el = document.getElementById(id);
+            el.style.display = 'flex'; // needed for flex layout
+            // Trigger reflow
+            void el.offsetWidth; 
+            el.classList.add('open');
+        }
+        
+        function closeDialog(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('open');
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 200); // Match transition duration
+        }
+
+        // Helper: Switch Toggle
+        function toggleSwitch(switchId) {
+            const switchEl = document.getElementById(switchId + 'El');
+            const checkbox = switchEl.querySelector('input');
+            checkbox.checked = !checkbox.checked;
+            
+            if(checkbox.checked) {
+                switchEl.classList.add('checked');
+            } else {
+                switchEl.classList.remove('checked');
+            }
+            
+            // Trigger change event manually
+            const event = new Event('change');
+            checkbox.dispatchEvent(event);
+        }
 
         // --- Navigation Logic ---
         document.getElementById('navigateToPartners').addEventListener('click', function(e) {
             e.preventDefault();
-            mainContent.style.display = 'none';
-            partnersContent.style.display = 'flex'; 
+            views.main.style.display = 'none';
+            views.partners.style.display = 'flex'; 
             document.title = "3D坦克服务器列表 联运服";
 
-            mainServerStatusButton.style.display = 'none';
-            mainAboutButton.style.display = 'none';
-            mainSettingsButton.style.display = 'none';
-            partnersBackButton.style.display = 'block'; 
-            partnersMobileButton.style.display = 'block'; 
+            buttons.status.style.display = 'none';
+            buttons.about.style.display = 'none';
+            buttons.settings.style.display = 'none';
+            buttons.back.style.display = 'inline-flex'; 
+            buttons.mobile.style.display = 'inline-flex'; 
         });
 
-        partnersBackButton.addEventListener('click', function() {
-            partnersContent.style.display = 'none';
-            mainContent.style.display = 'flex'; 
+        buttons.back.addEventListener('click', function() {
+            views.partners.style.display = 'none';
+            views.main.style.display = 'flex'; 
             document.title = "3D坦克服务器列表";
             
-            mainServerStatusButton.style.display = 'block'; 
-            mainAboutButton.style.display = 'block'; 
-            mainSettingsButton.style.display = 'block'; 
-            partnersBackButton.style.display = 'none';
-            partnersMobileButton.style.display = 'none';
+            buttons.status.style.display = 'inline-flex'; 
+            buttons.about.style.display = 'inline-flex'; 
+            buttons.settings.style.display = 'inline-flex'; 
+            buttons.back.style.display = 'none';
+            buttons.mobile.style.display = 'none';
         });
 
-        // --- Settings Popup Logic ---
-        mainSettingsButton.addEventListener('click', function() {
-            settingsPopup.style.display = 'block';
-        });
+        // --- Popup Logic ---
+        buttons.settings.addEventListener('click', () => openDialog('settingsPopup'));
+        buttons.mobile.addEventListener('click', () => openDialog('mobilePlatformsPopup'));
 
-        document.getElementById('closeSettingsPopup').addEventListener('click', function() {
-            settingsPopup.style.display = 'none';
+        document.getElementById('closeSettingsPopup').addEventListener('click', () => closeDialog('settingsPopup'));
+        document.getElementById('closeMobilePopup').addEventListener('click', () => closeDialog('mobilePlatformsPopup'));
+
+        // Close when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('dialog-scrim')) {
+                closeDialog(event.target.id);
+            }
         });
 
         document.getElementById('redirectButton').addEventListener('click', function() {
@@ -368,15 +709,6 @@
                     customUrl = 'http://' + customUrl;
                 }
                 window.location.href = customUrl;
-            }
-        });
-        
-        window.addEventListener('click', function(event) {
-            if (event.target === settingsPopup) {
-                settingsPopup.style.display = 'none';
-            }
-            if (event.target === mobilePlatformsPopup) {
-                mobilePlatformsPopup.style.display = 'none';
             }
         });
 
@@ -402,9 +734,13 @@
         }
         
         window.addEventListener('DOMContentLoaded', function() {
-            var chineseCheckbox = document.getElementById('chineseCheckbox');
+            var checkbox = document.getElementById('chineseCheckbox');
+            var switchEl = document.getElementById('chineseSwitchEl');
             var chineseModeEnabled = localStorage.getItem('chineseModeEnabled') === 'true';
-            chineseCheckbox.checked = chineseModeEnabled;
+            
+            checkbox.checked = chineseModeEnabled;
+            if(chineseModeEnabled) switchEl.classList.add('checked');
+            
             updateWaifuLink(chineseModeEnabled); 
 
             // Mobile Guofu Link
@@ -428,14 +764,6 @@
         function isMobileDevice() {
             return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         }
-
-        // --- Mobile Platforms Popup Logic ---
-        partnersMobileButton.addEventListener('click', function() {
-            mobilePlatformsPopup.style.display = 'block';
-        });
-        document.getElementById('closeMobilePopup').addEventListener('click', function() {
-            mobilePlatformsPopup.style.display = 'none';
-        });
 
     </script>
 </body>
