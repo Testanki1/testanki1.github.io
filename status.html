@@ -12,7 +12,7 @@
     <title>3D坦克服务器状态页面</title>
     <style>
         :root {
-            /* 原始颜色保留 */
+            /* 基础颜色 */
             --md-sys-color-background: rgb(32, 48, 64);
             --md-sys-color-background-end: rgb(3, 8, 13);
             --md-sys-color-primary: #76ff33;
@@ -20,6 +20,9 @@
             --md-sys-color-surface: rgba(255, 255, 255, 0.08);
             --md-sys-color-on-surface: #ffffff;
             --md-sys-color-on-surface-variant: #c4c7c5;
+            
+            /* 状态色 - 寻找刷新点 */
+            --state-searching: #FF6666;
             
             /* M3 规格 */
             --md-sys-shape-corner-large: 28px;
@@ -39,7 +42,7 @@
             overflow: hidden;
         }
 
-        /* 顶部应用栏 Top App Bar */
+        /* 顶部应用栏 */
         header {
             display: flex;
             justify-content: space-between;
@@ -58,46 +61,20 @@
             gap: 12px;
         }
 
-        /* 按钮基础样式 */
-        .m3-button {
+        /* 返回按钮 */
+        .btn-icon {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            height: 40px;
-            padding: 0 24px;
             border: none;
-            border-radius: var(--md-sys-shape-corner-full);
-            font-family: 'Rubik', sans-serif;
-            font-weight: 500;
-            font-size: 14px;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.2, 0.0, 0, 1.0);
-            gap: 8px;
-        }
-
-        .btn-filled {
-            background-color: var(--md-sys-color-primary);
-            color: var(--md-sys-color-on-primary);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
-        
-        .btn-filled:hover {
-            background-color: #65db2b;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            transform: translateY(-1px);
-        }
-
-        .btn-filled:active {
-            transform: scale(0.98);
-        }
-
-        .btn-icon {
             padding: 0;
             width: 40px;
             height: 40px;
             background-color: rgba(255, 255, 255, 0.1);
             color: var(--md-sys-color-on-surface);
             border-radius: var(--md-sys-shape-corner-full);
+            transition: background-color 0.2s;
         }
 
         .btn-icon:hover {
@@ -108,6 +85,53 @@
             display: none;
         }
 
+        /* 状态指示器 (Chip) */
+        .status-chip {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(32, 48, 64, 0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 0 16px;
+            height: 32px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 500;
+            font-feature-settings: "tnum";
+            color: var(--md-sys-color-on-surface-variant);
+            transition: all 0.3s ease;
+        }
+
+        /* 模式：寻找刷新点 (FF6666) */
+        .status-chip.searching-mode {
+            border-color: var(--state-searching);
+            color: var(--state-searching);
+            background-color: rgba(255, 102, 102, 0.1);
+            box-shadow: 0 0 8px rgba(255, 102, 102, 0.2);
+        }
+        
+        .status-chip.searching-mode .material-symbols-rounded {
+            animation: spin-pulse 1s infinite linear;
+        }
+
+        /* 模式：稳定等待 (Green) */
+        .status-chip.stable-mode {
+            border-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-primary);
+            background-color: rgba(118, 255, 51, 0.1);
+        }
+
+        @keyframes spin-pulse {
+            0% { transform: rotate(0deg); opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { transform: rotate(360deg); opacity: 1; }
+        }
+
+        .material-symbols-rounded {
+            font-size: 20px;
+        }
+
+        /* 主容器 */
         .container {
             flex: 1;
             display: flex;
@@ -117,6 +141,7 @@
             animation: fadeIn 0.6s ease-out;
         }
 
+        /* 卡片 */
         .status-card {
             background: var(--md-sys-color-surface);
             backdrop-filter: blur(10px);
@@ -138,6 +163,7 @@
             opacity: 0.9;
         }
 
+        /* 数据网格 */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -176,11 +202,6 @@
             letter-spacing: 1px;
         }
 
-        /* 加载时的微弱闪烁动画 */
-        .updating .stat-value {
-            opacity: 0.8;
-        }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -208,16 +229,16 @@
 
     <header>
         <div class="header-left">
-            <button id="backButton" class="m3-button btn-icon" onclick="goBack()" title="返回">
+            <button id="backButton" class="btn-icon" onclick="goBack()" title="返回">
                 <span class="material-symbols-rounded">arrow_back</span>
             </button>
         </div>
         <div class="header-right">
-            <!-- 计时器已移除 -->
-            <button id="refreshButton" class="m3-button btn-filled" onclick="manualRefresh()">
-                <span class="material-symbols-rounded">refresh</span>
-                <span>刷新</span>
-            </button>
+            <!-- 状态显示 -->
+            <div id="statusChip" class="status-chip searching-mode">
+                <span id="statusIcon" class="material-symbols-rounded" style="font-size:18px; margin-right:6px;">radar</span>
+                <span id="statusText">寻找刷新点</span>
+            </div>
         </div>
     </header>
 
@@ -225,7 +246,7 @@
         <div class="status-card">
             <h1>国服</h1>
             
-            <div id="statsGrid" class="stats-grid">
+            <div class="stats-grid">
                 <div class="stat-item">
                     <span id="onlineCount" class="stat-value">--</span>
                     <span class="stat-label">在线</span>
@@ -245,10 +266,32 @@
     </div>
 
     <script>
-        let refreshIntervalId = null;
+        let nextFetchTimeout = null;
+        let countdownInterval = null;
+        let lastDataSignature = null;
+        let isStableMode = false; 
+        let countdownSeconds = 0;
+
+        // 更新 UI 状态
+        function updateStatusUI(mode, text) {
+            const chip = document.getElementById('statusChip');
+            const icon = document.getElementById('statusIcon');
+            const label = document.getElementById('statusText');
+
+            if (mode === 'searching') {
+                // 寻找刷新点模式
+                chip.className = 'status-chip searching-mode';
+                icon.innerText = 'radar'; // 雷达图标
+                label.innerText = '寻找刷新点';
+            } else {
+                // 稳定倒计时模式
+                chip.className = 'status-chip stable-mode';
+                icon.innerText = 'timer'; // 计时器图标
+                label.innerText = text;
+            }
+        }
 
         function fetchBalancerStats() {
-            // 添加时间戳防止缓存
             const timestamp = Date.now();
             const url = `https://balancer.3dtank.com/balancer?t=${timestamp}`;
 
@@ -264,40 +307,60 @@
                         totalOnline += node.online || 0;
                         totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
                     });
-                    
+
                     const my4399ComCount = totalMy4399Com || 0;
+                    const currentSignature = `${totalOnline}-${totalInbattles}-${my4399ComCount}`;
 
                     // 更新 DOM
                     document.getElementById('inbattlesCount').innerText = totalInbattles;
                     document.getElementById('onlineCount').innerText = totalOnline;
                     document.getElementById('my4399ComCount').innerText = my4399ComCount;
+
+                    // 逻辑核心：对比数据
+                    if (lastDataSignature !== null && currentSignature !== lastDataSignature) {
+                        // 发现变化！切换到稳定模式
+                        isStableMode = true;
+                    }
+
+                    lastDataSignature = currentSignature;
+                    
+                    // 安排下一次刷新
+                    planNextFetch();
                 })
                 .catch(error => {
-                    console.error('Error fetching balancer data:', error);
+                    console.error('Error:', error);
+                    // 出错时略微等待，避免死锁
+                    setTimeout(fetchBalancerStats, 1000);
                 });
         }
 
-        // 手动刷新（虽然现在每秒都在刷，但保留按钮用于视觉反馈或重试）
-        function manualRefresh() {
-            const btn = document.getElementById('refreshButton');
-            const icon = btn.querySelector('.material-symbols-rounded');
-            
-            // 旋转动画
-            icon.style.transition = 'transform 0.5s ease';
-            icon.style.transform = 'rotate(360deg)';
-            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 500);
+        function planNextFetch() {
+            // 清除之前的计时器
+            if (nextFetchTimeout) clearTimeout(nextFetchTimeout);
+            if (countdownInterval) clearInterval(countdownInterval);
 
-            // 立即执行一次
-            fetchBalancerStats();
-            
-            // 重置定时器以对齐手动刷新的时间点
-            startAutoRefresh();
-        }
+            if (!isStableMode) {
+                // --- 寻找刷新点模式 ---
+                updateStatusUI('searching');
+                // 立即执行（0延迟）
+                nextFetchTimeout = setTimeout(fetchBalancerStats, 0);
+            } else {
+                // --- 稳定模式 (等待5秒) ---
+                countdownSeconds = 5;
+                updateStatusUI('stable', countdownSeconds + 's');
 
-        function startAutoRefresh() {
-            if (refreshIntervalId) clearInterval(refreshIntervalId);
-            // 每 1000 毫秒 (1秒) 执行一次
-            refreshIntervalId = setInterval(fetchBalancerStats, 1000);
+                countdownInterval = setInterval(() => {
+                    countdownSeconds--;
+                    if (countdownSeconds > 0) {
+                        updateStatusUI('stable', countdownSeconds + 's');
+                    } else {
+                        updateStatusUI('stable', '更新中');
+                        clearInterval(countdownInterval);
+                    }
+                }, 1000);
+
+                nextFetchTimeout = setTimeout(fetchBalancerStats, 5000);
+            }
         }
 
         function goBack() {
@@ -306,14 +369,12 @@
             }
         }
 
-        // 初始化
         if (document.referrer.includes("testanki1.github.io")) {
             document.getElementById("backButton").style.display = "inline-flex";
         }
 
-        // 立即执行一次并开启循环
+        // 启动循环
         fetchBalancerStats();
-        startAutoRefresh();
 
     </script>
 </body>
