@@ -13,7 +13,7 @@
     <style>
         :root {
             /* 原始颜色保留 */
-            --md-sys-color-background: rgb(32, 48, 64); /* 你的背景基色 */
+            --md-sys-color-background: rgb(32, 48, 64);
             --md-sys-color-background-end: rgb(3, 8, 13);
             --md-sys-color-primary: #76ff33;
             --md-sys-color-on-primary: #001926;
@@ -75,7 +75,6 @@
             gap: 8px;
         }
 
-        /* 填充按钮 (Primary) */
         .btn-filled {
             background-color: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
@@ -83,7 +82,7 @@
         }
         
         .btn-filled:hover {
-            background-color: #65db2b; /* 稍微深一点的绿色用于hover */
+            background-color: #65db2b;
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
             transform: translateY(-1px);
         }
@@ -92,7 +91,6 @@
             transform: scale(0.98);
         }
 
-        /* 图标按钮 (Secondary/Back) */
         .btn-icon {
             padding: 0;
             width: 40px;
@@ -107,7 +105,7 @@
         }
         
         #backButton {
-            display: none; /* JS 控制显示 */
+            display: none;
         }
 
         /* 倒计时指示器 */
@@ -123,13 +121,20 @@
             font-size: 14px;
             font-feature-settings: "tnum";
             color: var(--md-sys-color-on-surface-variant);
+            transition: all 0.3s ease;
+        }
+
+        /* 当状态改变导致长等待时，改变一下计时器颜色提示用户 */
+        .timer-chip.waiting-mode {
+            border-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-primary);
+            background-color: rgba(118, 255, 51, 0.1);
         }
 
         .material-symbols-rounded {
             font-size: 20px;
         }
 
-        /* 主要内容容器 */
         .container {
             flex: 1;
             display: flex;
@@ -139,7 +144,6 @@
             animation: fadeIn 0.6s ease-out;
         }
 
-        /* 卡片设计 Card */
         .status-card {
             background: var(--md-sys-color-surface);
             backdrop-filter: blur(10px);
@@ -161,7 +165,6 @@
             opacity: 0.9;
         }
 
-        /* 数据网格 */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -205,7 +208,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 移动端适配 */
         @media (min-width: 600px) {
             .stats-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -233,9 +235,10 @@
             </button>
         </div>
         <div class="header-right">
-            <div class="timer-chip" title="自动刷新倒计时">
-                <span class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">timer</span>
-                <span id="refreshTimer">11s</span>
+            <!-- 计时器芯片 -->
+            <div id="timerChip" class="timer-chip" title="距离下次刷新">
+                <span id="timerIcon" class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">timer</span>
+                <span id="refreshTimer">--</span>
             </div>
             <button id="refreshButton" class="m3-button btn-filled" onclick="manualRefresh()">
                 <span class="material-symbols-rounded">refresh</span>
@@ -268,12 +271,14 @@
     </div>
 
     <script>
-        let refreshInterval;
-        let refreshTime = 11;
+        let countdownTimer = null;
+        let nextFetchTimeout = null;
+        let lastDataSignature = null; // 用于存储上次数据的“指纹”
+        let remainingTime = 0;
 
+        // 获取数据的核心函数
         function fetchBalancerStats() {
-            // 添加加载状态动画（可选：让数字稍微变暗表示正在请求）
-            document.querySelector('.stats-grid').style.opacity = '0.7';
+            // 如果是手动刷新点击的，视觉上可以给点反馈（这里选择不重置整个UI，保持平滑）
             
             fetch('https://balancer.3dtank.com/balancer')
                 .then(response => response.json())
@@ -287,53 +292,107 @@
                         totalOnline += node.online || 0;
                         totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
                     });
-
-                    const my4399ComCount = totalMy4399Com || 0;
                     
-                    // 更新DOM
+                    const my4399ComCount = totalMy4399Com || 0;
+
+                    // 更新 DOM
                     document.getElementById('inbattlesCount').innerText = totalInbattles;
                     document.getElementById('onlineCount').innerText = totalOnline;
                     document.getElementById('my4399ComCount').innerText = my4399ComCount;
-                    
-                    // 恢复透明度
-                    document.querySelector('.stats-grid').style.opacity = '1';
+
+                    // 生成当前数据的唯一标识（用于比较变化）
+                    const currentSignature = `${totalOnline}-${totalInbattles}-${my4399ComCount}`;
+
+                    // 逻辑核心：决定下次刷新的时间
+                    let nextDelay = 1; // 默认 1秒
+
+                    if (lastDataSignature !== null && currentSignature !== lastDataSignature) {
+                        // 数据发生变化 -> 10秒后刷新
+                        nextDelay = 10;
+                        updateTimerStyle(true); // 改变样式提示进入冷却
+                    } else {
+                        // 数据没变化 (或第一次运行) -> 1秒后刷新
+                        nextDelay = 1;
+                        updateTimerStyle(false); // 恢复普通样式
+                    }
+
+                    // 更新历史数据
+                    lastDataSignature = currentSignature;
+
+                    // 启动倒计时
+                    startCountdown(nextDelay);
                 })
                 .catch(error => {
                     console.error('Error fetching balancer data:', error);
-                    document.querySelector('.stats-grid').style.opacity = '1';
+                    // 出错后保险起见 5秒重试
+                    startCountdown(5);
                 });
         }
 
+        // 倒计时逻辑
+        function startCountdown(seconds) {
+            // 清除旧的定时器
+            if (countdownTimer) clearInterval(countdownTimer);
+            if (nextFetchTimeout) clearTimeout(nextFetchTimeout);
+
+            remainingTime = seconds;
+            updateTimerDisplay(remainingTime);
+
+            // 设置真正的网络请求定时器
+            nextFetchTimeout = setTimeout(fetchBalancerStats, seconds * 1000);
+
+            // 设置 UI 显示倒计时
+            countdownTimer = setInterval(() => {
+                remainingTime--;
+                if (remainingTime < 0) remainingTime = 0;
+                updateTimerDisplay(remainingTime);
+                
+                if (remainingTime <= 0) {
+                    clearInterval(countdownTimer);
+                }
+            }, 1000);
+        }
+
+        // 更新计时器 UI 文字
+        function updateTimerDisplay(val) {
+            const displayVal = val > 0 ? val + "s" : "更新中";
+            document.getElementById('refreshTimer').innerText = displayVal;
+        }
+
+        // 更新计时器样式（区分快刷新和慢刷新）
+        function updateTimerStyle(isWaitingMode) {
+            const chip = document.getElementById('timerChip');
+            const icon = document.getElementById('timerIcon');
+            if (isWaitingMode) {
+                chip.classList.add('waiting-mode');
+                icon.innerText = 'hourglass_top'; // 换成沙漏图标
+            } else {
+                chip.classList.remove('waiting-mode');
+                icon.innerText = 'timer'; // 换回计时器图标
+            }
+        }
+
+        // 手动刷新
         function manualRefresh() {
             const btn = document.getElementById('refreshButton');
             const icon = btn.querySelector('.material-symbols-rounded');
             
-            // 添加点击时的旋转动画
+            // 旋转动画
             icon.style.transition = 'transform 0.5s ease';
             icon.style.transform = 'rotate(360deg)';
-            setTimeout(() => {
-                icon.style.transform = 'rotate(0deg)';
-            }, 500);
+            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 500);
 
-            clearInterval(refreshInterval);
-            refreshTime = 11;
-            startRefreshTimer();
+            // 立即重置倒计时并请求
+            if (countdownTimer) clearInterval(countdownTimer);
+            if (nextFetchTimeout) clearTimeout(nextFetchTimeout);
+            
+            // 手动刷新通常意味着用户想立即看到最新数据
+            // 这里我们重置 lastDataSignature 为 null，
+            // 这样 fetch 完后会判定为 "无变化" 逻辑（因为没有对比基准，或视为重置状态），
+            // 从而在下一次进入 1秒 快速刷新模式，符合用户急切查看的心态。
+            // 或者，保留 lastDataSignature 以检测手动刷新是否正好刷到了变化，这也是合理的。
+            // 按照你的逻辑“每秒刷新”，手动刷新后我们让它立刻执行一次。
             fetchBalancerStats();
-        }
-
-        function startRefreshTimer() {
-            // 确保清除旧的定时器
-            if(refreshInterval) clearInterval(refreshInterval);
-            
-            document.getElementById('refreshTimer').innerText = refreshTime + 's';
-            
-            refreshInterval = setInterval(() => {
-                refreshTime--;
-                document.getElementById('refreshTimer').innerText = refreshTime + 's';
-                if (refreshTime === 0) {
-                    manualRefresh();
-                }
-            }, 1000);
         }
 
         function goBack() {
@@ -347,13 +406,9 @@
             document.getElementById("backButton").style.display = "inline-flex";
         }
 
+        // 启动
         fetchBalancerStats();
-        startRefreshTimer();
-        
-        // 原有的自动刷新逻辑保留
-        // 注意：原代码最后有一行 setInterval(fetchBalancerStats, 11000); 
-        // 但其实 startRefreshTimer 里的 manualRefresh 已经包含了循环调用。
-        // 为了保持逻辑一致性，我们依赖 startRefreshTimer 的倒计时结束触发 manualRefresh 即可。
+
     </script>
 </body>
 </html>
