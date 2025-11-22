@@ -108,33 +108,6 @@
             display: none;
         }
 
-        /* 倒计时指示器 */
-        .timer-chip {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: rgba(32, 48, 64, 0.6);
-            border: 1px solid rgba(255,255,255,0.2);
-            padding: 0 12px;
-            height: 32px;
-            border-radius: 16px;
-            font-size: 14px;
-            font-feature-settings: "tnum";
-            color: var(--md-sys-color-on-surface-variant);
-            transition: all 0.3s ease;
-        }
-
-        /* 当状态改变导致长等待时，改变一下计时器颜色提示用户 */
-        .timer-chip.waiting-mode {
-            border-color: var(--md-sys-color-primary);
-            color: var(--md-sys-color-primary);
-            background-color: rgba(118, 255, 51, 0.1);
-        }
-
-        .material-symbols-rounded {
-            font-size: 20px;
-        }
-
         .container {
             flex: 1;
             display: flex;
@@ -203,6 +176,11 @@
             letter-spacing: 1px;
         }
 
+        /* 加载时的微弱闪烁动画 */
+        .updating .stat-value {
+            opacity: 0.8;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -235,11 +213,7 @@
             </button>
         </div>
         <div class="header-right">
-            <!-- 计时器芯片 -->
-            <div id="timerChip" class="timer-chip" title="距离下次刷新">
-                <span id="timerIcon" class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">timer</span>
-                <span id="refreshTimer">--</span>
-            </div>
+            <!-- 计时器已移除 -->
             <button id="refreshButton" class="m3-button btn-filled" onclick="manualRefresh()">
                 <span class="material-symbols-rounded">refresh</span>
                 <span>刷新</span>
@@ -249,12 +223,12 @@
 
     <div class="container">
         <div class="status-card">
-            <h1>国服</h1>
+            <h1>国服状态</h1>
             
-            <div class="stats-grid">
+            <div id="statsGrid" class="stats-grid">
                 <div class="stat-item">
                     <span id="onlineCount" class="stat-value">--</span>
-                    <span class="stat-label">在线</span>
+                    <span class="stat-label">在线玩家</span>
                 </div>
                 
                 <div class="stat-item">
@@ -271,16 +245,14 @@
     </div>
 
     <script>
-        let countdownTimer = null;
-        let nextFetchTimeout = null;
-        let lastDataSignature = null; // 用于存储上次数据的“指纹”
-        let remainingTime = 0;
+        let refreshIntervalId = null;
 
-        // 获取数据的核心函数
         function fetchBalancerStats() {
-            // 如果是手动刷新点击的，视觉上可以给点反馈（这里选择不重置整个UI，保持平滑）
-            
-            fetch('https://balancer.3dtank.com/balancer')
+            // 添加时间戳防止缓存
+            const timestamp = Date.now();
+            const url = `https://balancer.3dtank.com/balancer?t=${timestamp}`;
+
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     let totalInbattles = 0;
@@ -299,80 +271,13 @@
                     document.getElementById('inbattlesCount').innerText = totalInbattles;
                     document.getElementById('onlineCount').innerText = totalOnline;
                     document.getElementById('my4399ComCount').innerText = my4399ComCount;
-
-                    // 生成当前数据的唯一标识（用于比较变化）
-                    const currentSignature = `${totalOnline}-${totalInbattles}-${my4399ComCount}`;
-
-                    // 逻辑核心：决定下次刷新的时间
-                    let nextDelay = 1; // 默认 1秒
-
-                    if (lastDataSignature !== null && currentSignature !== lastDataSignature) {
-                        // 数据发生变化 -> 10秒后刷新
-                        nextDelay = 10;
-                        updateTimerStyle(true); // 改变样式提示进入冷却
-                    } else {
-                        // 数据没变化 (或第一次运行) -> 1秒后刷新
-                        nextDelay = 1;
-                        updateTimerStyle(false); // 恢复普通样式
-                    }
-
-                    // 更新历史数据
-                    lastDataSignature = currentSignature;
-
-                    // 启动倒计时
-                    startCountdown(nextDelay);
                 })
                 .catch(error => {
                     console.error('Error fetching balancer data:', error);
-                    // 出错后保险起见 5秒重试
-                    startCountdown(5);
                 });
         }
 
-        // 倒计时逻辑
-        function startCountdown(seconds) {
-            // 清除旧的定时器
-            if (countdownTimer) clearInterval(countdownTimer);
-            if (nextFetchTimeout) clearTimeout(nextFetchTimeout);
-
-            remainingTime = seconds;
-            updateTimerDisplay(remainingTime);
-
-            // 设置真正的网络请求定时器
-            nextFetchTimeout = setTimeout(fetchBalancerStats, seconds * 1000);
-
-            // 设置 UI 显示倒计时
-            countdownTimer = setInterval(() => {
-                remainingTime--;
-                if (remainingTime < 0) remainingTime = 0;
-                updateTimerDisplay(remainingTime);
-                
-                if (remainingTime <= 0) {
-                    clearInterval(countdownTimer);
-                }
-            }, 1000);
-        }
-
-        // 更新计时器 UI 文字
-        function updateTimerDisplay(val) {
-            const displayVal = val > 0 ? val + "s" : "更新中";
-            document.getElementById('refreshTimer').innerText = displayVal;
-        }
-
-        // 更新计时器样式（区分快刷新和慢刷新）
-        function updateTimerStyle(isWaitingMode) {
-            const chip = document.getElementById('timerChip');
-            const icon = document.getElementById('timerIcon');
-            if (isWaitingMode) {
-                chip.classList.add('waiting-mode');
-                icon.innerText = 'hourglass_top'; // 换成沙漏图标
-            } else {
-                chip.classList.remove('waiting-mode');
-                icon.innerText = 'timer'; // 换回计时器图标
-            }
-        }
-
-        // 手动刷新
+        // 手动刷新（虽然现在每秒都在刷，但保留按钮用于视觉反馈或重试）
         function manualRefresh() {
             const btn = document.getElementById('refreshButton');
             const icon = btn.querySelector('.material-symbols-rounded');
@@ -382,17 +287,17 @@
             icon.style.transform = 'rotate(360deg)';
             setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 500);
 
-            // 立即重置倒计时并请求
-            if (countdownTimer) clearInterval(countdownTimer);
-            if (nextFetchTimeout) clearTimeout(nextFetchTimeout);
-            
-            // 手动刷新通常意味着用户想立即看到最新数据
-            // 这里我们重置 lastDataSignature 为 null，
-            // 这样 fetch 完后会判定为 "无变化" 逻辑（因为没有对比基准，或视为重置状态），
-            // 从而在下一次进入 1秒 快速刷新模式，符合用户急切查看的心态。
-            // 或者，保留 lastDataSignature 以检测手动刷新是否正好刷到了变化，这也是合理的。
-            // 按照你的逻辑“每秒刷新”，手动刷新后我们让它立刻执行一次。
+            // 立即执行一次
             fetchBalancerStats();
+            
+            // 重置定时器以对齐手动刷新的时间点
+            startAutoRefresh();
+        }
+
+        function startAutoRefresh() {
+            if (refreshIntervalId) clearInterval(refreshIntervalId);
+            // 每 1000 毫秒 (1秒) 执行一次
+            refreshIntervalId = setInterval(fetchBalancerStats, 1000);
         }
 
         function goBack() {
@@ -406,8 +311,9 @@
             document.getElementById("backButton").style.display = "inline-flex";
         }
 
-        // 启动
+        // 立即执行一次并开启循环
         fetchBalancerStats();
+        startAutoRefresh();
 
     </script>
 </body>
