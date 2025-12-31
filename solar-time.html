@@ -95,7 +95,7 @@
         
         .date-display {
             font-size: 13px; font-weight: 500; opacity: 0.8; margin-bottom: 4px;
-            letter-spacing: 0.5px; white-space: pre;
+            letter-spacing: 0.5px; white-space: pre; /* Preserve multiple spaces */
         }
 
         .tz-badge {
@@ -106,12 +106,7 @@
 
         .time-wrapper { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; }
         .big-time { font-family: 'Roboto Mono', monospace; font-size: 48px; font-weight: 500; letter-spacing: -2px; line-height: 1; }
-        
-        /* Adjusted font size for 3 decimals */
-        .ms { 
-            font-family: 'Roboto Mono', monospace; font-size: 18px; opacity: 0.6; margin-left: 2px; font-weight: 400; 
-            width: 38px; /* Fixed width to prevent jitter */
-        }
+        .ms { font-family: 'Roboto Mono', monospace; font-size: 20px; opacity: 0.6; margin-left: 2px; font-weight: 400; }
 
         /* Difference Badge */
         .diff-badge {
@@ -187,6 +182,7 @@
                 <div id="t-solar" class="big-time">--:--:--</div>
                 <div id="m-solar" class="ms">.000</div>
             </div>
+            <!-- Diff Badge (Always Visible) -->
             <div id="diff-solar" class="diff-badge">--</div>
         </div>
 
@@ -244,7 +240,7 @@
         gpsLocked: "已定位",
         netOffline: "等待网络",
         netSyncing: "同步中...",
-        netSampling: "采样中",
+        netSampling: "采样",
         netSynced: "已校准",
         netConnect: "连接",
         offset: "偏差:",
@@ -253,7 +249,9 @@
         diffPrefix: "与标准差: ",
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
         tzDetecting: "检测时区中...", 
-        tzSystem: "系统时区"
+        tzSystem: "系统时区",
+        // Units for Diff (No trailing space here, we handle it in code)
+        units: { h: "小时", m: "分钟", s: "秒" }
     } : {
         title: "Real-time Solar Time",
         labelSolar: "Apparent Solar Time",
@@ -275,7 +273,9 @@
         diffPrefix: "Diff vs Std: ",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         tzDetecting: "Detecting Zone...",
-        tzSystem: "System TZ"
+        tzSystem: "System TZ",
+        // Units for Diff
+        units: { h: "h", m: "m", s: "s" }
     };
 
     document.title = TEXT.title;
@@ -395,6 +395,7 @@
         UI.textNet.innerText = text;
     }
 
+    // --- GREEDY PROGRESSIVE SYNC ---
     async function runGreedyProgressiveSync() {
         let retryCount = 0;
 
@@ -443,7 +444,9 @@
                 }
 
                 if (sys.bestLatency <= TARGET_LATENCY) {
-                    setNetStatus('success', TEXT.netSynced);
+                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
+                    const sign = sys.timeOffset >= 0 ? '+' : '';
+                    setNetStatus('success', `${TEXT.offsetLabel} ${sign}${driftSec}s`);
                     return;
                 }
 
@@ -483,19 +486,21 @@
             mo = getPart('month');
             d = getPart('day');
             w = getPart('weekday');
-            // Milliseconds: get 3 digits
-            ms = date.getMilliseconds().toString().padStart(3, '0');
+            ms = Math.floor(date.getMilliseconds() / 10).toString().padStart(2, '0');
         } else {
             h = date.getUTCHours().toString().padStart(2, '0');
             m = date.getUTCMinutes().toString().padStart(2, '0');
             s = date.getUTCSeconds().toString().padStart(2, '0');
-            ms = date.getUTCMilliseconds().toString().padStart(3, '0');
+            ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
             y = date.getUTCFullYear();
             mo = date.getUTCMonth() + 1;
             d = date.getUTCDate();
             w = TEXT.weekdays[date.getUTCDay()];
         }
         
+        // 3-digit MS
+        const ms3 = date.getMilliseconds().toString().padStart(3, '0');
+
         let dStr;
         if (isCN) {
             dStr = `${y} 年 ${mo} 月 ${d} 日   ${w}`;
@@ -505,27 +510,21 @@
             if (tz && sys.fallbackMode) dStr += `   (System)`; 
         }
 
-        return { t: `${h}:${m}:${s}`, m: `.${ms}`, d: dStr };
+        return { t: `${h}:${m}:${s}`, m: `.${ms3}`, d: dStr };
     }
 
     function formatDiff(solarObj, stdObj) {
         const [sh, sm, ss] = solarObj.t.split(':').map(Number);
-        // parse 3-digit ms (remove dot)
-        const sms = parseInt(solarObj.m.substring(1)); 
+        const sms = parseInt(solarObj.m.substring(1));
         
         const [th, tm, ts] = stdObj.t.split(':').map(Number);
         const tms = parseInt(stdObj.m.substring(1));
 
-        // Use Date objects for easiest diff calculation handling day wrap
-        // We use an arbitrary date since we care about time difference in the same day context
-        // But day wrapping is tricky. Simple second math is safer for "time of day" diff.
-        
         const solarTotalMs = (sh * 3600000) + (sm * 60000) + (ss * 1000) + sms;
         const stdTotalMs = (th * 3600000) + (tm * 60000) + (ts * 1000) + tms;
 
         let diff = solarTotalMs - stdTotalMs;
 
-        // Wrap around 24h (86400000 ms)
         const day = 86400000;
         if (diff > day/2) diff -= day;
         if (diff < -day/2) diff += day;
@@ -541,9 +540,10 @@
         const ms = diff % 1000;
 
         let str = sign;
-        if (h > 0) str += `${h}h `;
-        if (m > 0 || h > 0) str += `${m}m `;
-        str += `${s}.${ms.toString().padStart(3, '0')}s`;
+        // Logic: Number + Space + Unit + Space
+        if (h > 0) str += `${h} ${TEXT.units.h} `;
+        if (m > 0 || h > 0) str += `${m} ${TEXT.units.m} `;
+        str += `${s}.${ms.toString().padStart(3, '0')} ${TEXT.units.s}`;
 
         return TEXT.diffPrefix + str;
     }
