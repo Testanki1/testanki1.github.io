@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Solar Time</title>
+    <title>Real-time Solar Time (M3)</title>
     <style>
+        /* M3 Design Tokens (Dark Theme) */
         :root {
             --md-sys-color-background: #111318;
             --md-sys-color-on-background: #e2e2e6;
@@ -17,10 +18,10 @@
             --md-sys-color-on-primary: #0f305f;
             --md-sys-color-primary-container: #2b4778;
             
-            --md-sys-color-tertiary: #dfc279; /* 太阳金 */
+            --md-sys-color-tertiary: #dfc279;
             --md-sys-color-tertiary-container: #56461a;
             
-            --md-sys-color-secondary: #7cd0ff; /* 地球蓝 */
+            --md-sys-color-secondary: #7cd0ff;
             --md-sys-color-secondary-container: #004b71;
             
             --md-sys-color-error: #ffb4ab;
@@ -50,7 +51,6 @@
         header { text-align: center; margin-bottom: 24px; }
         h1 { font-size: 24px; font-weight: 400; margin: 0; letter-spacing: -0.5px; }
 
-        /* Status Chips */
         .status-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; }
 
         .chip {
@@ -78,7 +78,6 @@
         .chip.active .dot { background-color: var(--md-sys-color-primary); opacity: 1; animation: pulse 1.5s infinite; }
         .chip.warning .dot { background-color: var(--md-sys-color-warning); opacity: 1; animation: flash 0.2s infinite; }
 
-        /* Cards */
         .card {
             background-color: var(--md-sys-color-surface-container);
             border-radius: var(--md-sys-shape-corner-extra-large);
@@ -156,6 +155,7 @@
             </div>
         </div>
 
+        <!-- True Solar Card -->
         <div class="card solar">
             <div class="card-header">
                 <span id="ui-label-solar" class="label">Apparent Solar Time</span>
@@ -170,6 +170,7 @@
             </div>
         </div>
 
+        <!-- Local Mean Card -->
         <div class="card local">
             <div class="card-header">
                 <span id="ui-label-lmt" class="label">Local Mean Time</span>
@@ -184,6 +185,7 @@
             </div>
         </div>
 
+        <!-- Standard Time Card -->
         <div class="card std">
             <div class="card-header">
                 <div style="display:flex; align-items:center;">
@@ -209,6 +211,7 @@
 <script>
     const isCN = navigator.language.toLowerCase().startsWith('zh');
     
+    // I18N Dictionary
     const TEXT = isCN ? {
         title: "实时真太阳时",
         labelSolar: "真太阳时",
@@ -228,7 +231,8 @@
         largeOffset: "偏差",
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
         tzDetecting: "检测时区...",
-        tzSystem: "系统时区"
+        tzSystem: "系统时区",
+        tzAuto: "自动"
     } : {
         title: "Real-time Solar Time",
         labelSolar: "Apparent Solar Time",
@@ -248,9 +252,11 @@
         largeOffset: "Offset",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         tzDetecting: "Detecting TZ...",
-        tzSystem: "System TZ"
+        tzSystem: "System TZ",
+        tzAuto: "Auto"
     };
 
+    // Apply Static Text
     document.title = TEXT.title;
     document.documentElement.lang = isCN ? 'zh-CN' : 'en';
     document.getElementById('ui-title').innerText = TEXT.title;
@@ -261,6 +267,8 @@
     document.getElementById('text-gps').innerText = TEXT.gpsLocating;
     document.getElementById('text-net').innerText = TEXT.netSyncing;
     document.getElementById('val-drift').innerText = `${TEXT.offset} --`;
+    // Initialize badge text with localized "Auto"
+    document.getElementById('tz-badge').innerText = TEXT.tzAuto;
 
     const TARGET_OFFSET = 0.01; 
     const sys = {
@@ -317,7 +325,6 @@
                 sys.latitude = pos.coords.latitude;
                 setGpsStatus('success', TEXT.gpsLocked);
                 
-                // Fetch TimeZone from Open-Meteo on first lock
                 if (isFirstLock) {
                     fetchRealTimeZone(sys.latitude, sys.longitude);
                 }
@@ -329,26 +336,23 @@
         );
     }
 
-    // --- Geo-Timezone Lookup using Open-Meteo ---
     async function fetchRealTimeZone(lat, lon) {
         UI.tzBadge.innerText = TEXT.tzDetecting;
         try {
-            // Using Open-Meteo (Fast, Free, CORS-friendly)
             const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
             if (!res.ok) throw new Error("API Fail");
             const data = await res.json();
             
             if (data && data.timezone) {
-                sys.detectedTimeZone = data.timezone; // e.g. "Asia/Shanghai"
+                sys.detectedTimeZone = data.timezone; 
                 UI.tzBadge.innerText = data.timezone;
                 UI.tzBadge.style.background = "rgba(109, 213, 140, 0.2)";
                 UI.tzBadge.style.color = "#6dd58c";
             } else {
-                throw new Error("No timezone in response");
+                throw new Error("No timezone");
             }
         } catch (e) {
             console.log("TZ Lookup failed:", e);
-            // Fallback: Use browser's system timezone
             sys.detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             UI.tzBadge.innerText = TEXT.tzSystem;
         }
@@ -464,6 +468,7 @@
             if (tz && !sys.detectedTimeZone) dStr += `   (系统)`; 
         } else {
             dStr = `${mo}/${d}/${y}   ${w}`;
+            if (tz && !sys.detectedTimeZone) dStr += `   (System)`; 
         }
 
         return { t: `${h}:${m}:${s}`, m: `.${ms}`, d: dStr };
@@ -474,19 +479,15 @@
             const nowMs = Date.now() + sys.timeOffset;
             const now = new Date(nowMs);
 
-            // 1. Standard Time
             const targetTz = sys.detectedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
             const stdObj = format(now, targetTz);
 
-            // 2. LMT
             const lmtMs = nowMs + (sys.longitude * 4 * 60000);
             const lmtObj = format(new Date(lmtMs), null);
 
-            // 3. Solar
             const eotMs = getEoT(new Date(nowMs));
             const solarObj = format(new Date(lmtMs + eotMs), null);
 
-            // DOM Updates
             if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
             UI.mSolar.innerText = solarObj.m;
             if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
