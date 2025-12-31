@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Solar Time</title>
+    <title>Real-time Solar Time (Fixed)</title>
     <style>
+        /* M3 Design Tokens (Dark Theme) */
         :root {
             --md-sys-color-background: #111318;
             --md-sys-color-on-background: #e2e2e6;
@@ -101,7 +102,7 @@
         .tz-badge {
             font-size: 10px; padding: 2px 6px; border-radius: 4px; 
             background: rgba(255,255,255,0.1); margin-left: 8px; vertical-align: middle;
-            opacity: 0.8;
+            opacity: 0.8; transition: all 0.3s;
         }
 
         .time-wrapper { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; }
@@ -184,12 +185,12 @@
             </div>
         </div>
 
-        <!-- Standard Time Card -->
-        <div class="card std">
+        <!-- Standard Time Card (Always visible, data waits) -->
+        <div class="card std" id="card-std">
             <div class="card-header">
                 <div style="display:flex; align-items:center;">
                     <span id="ui-label-std" class="label">Standard Time</span>
-                    <span id="tz-badge" class="tz-badge">Auto</span>
+                    <span id="tz-badge" class="tz-badge"></span>
                 </div>
                 <div class="icon-box">
                     <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
@@ -229,9 +230,8 @@
         retry: "重试",
         largeOffset: "偏差",
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
-        tzDetecting: "检测时区...",
-        tzSystem: "系统时区",
-        tzAuto: "自动"
+        tzDetecting: "检测时区中...", 
+        tzSystem: "系统时区"
     } : {
         title: "Real-time Solar Time",
         labelSolar: "Apparent Solar Time",
@@ -250,9 +250,8 @@
         retry: "Retry",
         largeOffset: "Offset",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        tzDetecting: "Detecting TZ...",
-        tzSystem: "System TZ",
-        tzAuto: "Auto"
+        tzDetecting: "Detecting Zone...",
+        tzSystem: "System TZ"
     };
 
     // Apply Static Text
@@ -266,8 +265,7 @@
     document.getElementById('text-gps').innerText = TEXT.gpsLocating;
     document.getElementById('text-net').innerText = TEXT.netSyncing;
     document.getElementById('val-drift').innerText = `${TEXT.offset} --`;
-    // Initialize badge text with localized "Auto"
-    document.getElementById('tz-badge').innerText = TEXT.tzAuto;
+    document.getElementById('tz-badge').innerText = TEXT.tzDetecting;
 
     const TARGET_OFFSET = 0.01; 
     const sys = {
@@ -276,7 +274,8 @@
         timeOffset: 0,
         isNetSynced: false,
         failCount: 0,
-        detectedTimeZone: null
+        detectedTimeZone: null,
+        fallbackMode: false
     };
 
     const UI = {
@@ -336,7 +335,7 @@
     }
 
     async function fetchRealTimeZone(lat, lon) {
-        UI.tzBadge.innerText = TEXT.tzDetecting;
+        // Badge already shows "Detecting..."
         try {
             const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
             if (!res.ok) throw new Error("API Fail");
@@ -352,6 +351,7 @@
             }
         } catch (e) {
             console.log("TZ Lookup failed:", e);
+            sys.fallbackMode = true;
             sys.detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             UI.tzBadge.innerText = TEXT.tzSystem;
         }
@@ -464,10 +464,10 @@
         let dStr;
         if (isCN) {
             dStr = `${y} 年 ${mo} 月 ${d} 日   ${w}`;
-            if (tz && !sys.detectedTimeZone) dStr += `   (系统)`; 
+            if (tz && sys.fallbackMode) dStr += `   (系统)`; 
         } else {
             dStr = `${mo}/${d}/${y}   ${w}`;
-            if (tz && !sys.detectedTimeZone) dStr += `   (System)`; 
+            if (tz && sys.fallbackMode) dStr += `   (System)`; 
         }
 
         return { t: `${h}:${m}:${s}`, m: `.${ms}`, d: dStr };
@@ -478,15 +478,23 @@
             const nowMs = Date.now() + sys.timeOffset;
             const now = new Date(nowMs);
 
-            const targetTz = sys.detectedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const stdObj = format(now, targetTz);
+            // 1. Standard Time: Only update if detected (even if fallback)
+            if (sys.detectedTimeZone) {
+                const stdObj = format(now, sys.detectedTimeZone);
+                if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
+                UI.mStd.innerText = stdObj.m;
+                if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
+            }
 
+            // 2. LMT
             const lmtMs = nowMs + (sys.longitude * 4 * 60000);
             const lmtObj = format(new Date(lmtMs), null);
 
+            // 3. Solar
             const eotMs = getEoT(new Date(nowMs));
             const solarObj = format(new Date(lmtMs + eotMs), null);
 
+            // DOM Updates
             if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
             UI.mSolar.innerText = solarObj.m;
             if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
@@ -494,10 +502,6 @@
             if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
             UI.mLmt.innerText = lmtObj.m;
             if (UI.dLmt.innerText !== lmtObj.d) UI.dLmt.innerText = lmtObj.d;
-
-            if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
-            UI.mStd.innerText = stdObj.m;
-            if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
         }
         requestAnimationFrame(renderLoop);
     }
