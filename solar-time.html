@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-time Solar Time (M3)</title>
     <style>
+        /* M3 Design Tokens (Dark Theme) */
         :root {
             --md-sys-color-background: #111318;
             --md-sys-color-on-background: #e2e2e6;
@@ -17,10 +18,10 @@
             --md-sys-color-on-primary: #0f305f;
             --md-sys-color-primary-container: #2b4778;
             
-            --md-sys-color-tertiary: #dfc279;
+            --md-sys-color-tertiary: #dfc279; /* 太阳金 */
             --md-sys-color-tertiary-container: #56461a;
             
-            --md-sys-color-secondary: #7cd0ff;
+            --md-sys-color-secondary: #7cd0ff; /* 地球蓝 */
             --md-sys-color-secondary-container: #004b71;
             
             --md-sys-color-error: #ffb4ab;
@@ -49,7 +50,6 @@
 
         header { text-align: center; margin-bottom: 24px; }
         h1 { font-size: 24px; font-weight: 400; margin: 0; letter-spacing: -0.5px; }
-        /* Subtitle removed */
 
         /* Status Chips */
         .status-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; }
@@ -83,16 +83,24 @@
         .card {
             background-color: var(--md-sys-color-surface-container);
             border-radius: var(--md-sys-shape-corner-extra-large);
-            padding: 32px 24px; position: relative; overflow: hidden; transition: transform 0.2s;
+            padding: 28px 24px; position: relative; overflow: hidden; transition: transform 0.2s;
         }
         .card.solar { background: linear-gradient(145deg, rgba(223, 194, 121, 0.05), rgba(0,0,0,0)); }
-        .card.solar .icon-box, .card.solar .big-time { color: var(--md-sys-color-tertiary); }
+        .card.solar .icon-box, .card.solar .big-time, .card.solar .date-display { color: var(--md-sys-color-tertiary); }
         .card.local { background: linear-gradient(145deg, rgba(124, 208, 255, 0.05), rgba(0,0,0,0)); }
-        .card.local .icon-box, .card.local .big-time { color: var(--md-sys-color-secondary); }
+        .card.local .icon-box, .card.local .big-time, .card.local .date-display { color: var(--md-sys-color-secondary); }
 
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
         .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; opacity: 0.7; }
         .icon-box svg { width: 24px; height: 24px; fill: currentColor; }
+        
+        /* Date Display Styling */
+        .date-display {
+            font-size: 13px; font-weight: 500; opacity: 0.8; margin-bottom: 4px;
+            letter-spacing: 0.5px;
+            white-space: pre; /* Preserve manual spaces */
+        }
+
         .time-wrapper { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; }
         .big-time { font-family: 'Roboto Mono', monospace; font-size: 48px; font-weight: 500; letter-spacing: -2px; line-height: 1; }
         .ms { font-family: 'Roboto Mono', monospace; font-size: 20px; opacity: 0.6; margin-left: 2px; font-weight: 400; }
@@ -150,6 +158,7 @@
                     <svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>
                 </div>
             </div>
+            <div id="d-solar" class="date-display">--</div>
             <div class="time-wrapper">
                 <div id="t-solar" class="big-time">--:--:--</div>
                 <div id="m-solar" class="ms">.00</div>
@@ -163,6 +172,7 @@
                     <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
                 </div>
             </div>
+            <div id="d-lmt" class="date-display">--</div>
             <div class="time-wrapper">
                 <div id="t-lmt" class="big-time">--:--:--</div>
                 <div id="m-lmt" class="ms">.00</div>
@@ -192,7 +202,8 @@
         netConnect: "连接",
         offset: "偏差:",
         retry: "重试",
-        largeOffset: "偏差" 
+        largeOffset: "偏差",
+        weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
     } : {
         title: "Real-time Solar Time",
         labelSolar: "Apparent Solar Time",
@@ -208,7 +219,8 @@
         netConnect: "Connecting",
         offset: "Offset:",
         retry: "Retry",
-        largeOffset: "Offset"
+        largeOffset: "Offset",
+        weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     };
 
     document.title = TEXT.title;
@@ -234,8 +246,9 @@
         chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
         chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
         drift: document.getElementById('val-drift'),
-        tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'),
-        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt')
+        
+        tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'), dSolar: document.getElementById('d-solar'),
+        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt'), dLmt: document.getElementById('d-lmt')
     };
 
     const CLOUDFLARE_URL = "https://www.cloudflare.com/cdn-cgi/trace";
@@ -317,7 +330,7 @@
                 const latency = (tEnd - tStart) / 2;
                 const calculatedOffset = (serverTime + latency) - Date.now();
                 
-                const absOffset = Math.abs(calculatedOffset / 1000); // 秒
+                const absOffset = Math.abs(calculatedOffset / 1000);
 
                 if (absOffset > TARGET_OFFSET) {
                     const sign = calculatedOffset >= 0 ? '+' : '';
@@ -350,26 +363,57 @@
         return (9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)) * 60000;
     }
 
-    function fmt(date) {
+    // Optimized Formatter with Spacing
+    const enDateFmt = new Intl.DateTimeFormat('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', weekday: 'short'
+    });
+
+    function format(date) {
         const h = date.getUTCHours().toString().padStart(2, '0');
         const m = date.getUTCMinutes().toString().padStart(2, '0');
         const s = date.getUTCSeconds().toString().padStart(2, '0');
         const ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
-        return { t: `${h}:${m}:${s}`, m: `.${ms}` };
+        
+        let dStr;
+        if (isCN) {
+            // Manual Chinese Formatting with "Pangu" spacing
+            const y = date.getUTCFullYear();
+            const mo = date.getUTCMonth() + 1;
+            const d = date.getUTCDate();
+            const w = TEXT.weekdays[date.getUTCDay()];
+            // 2026 年 1 月 1 日   周四
+            dStr = `${y} 年 ${mo} 月 ${d} 日   ${w}`;
+        } else {
+            // Standard English Formatting
+            const localLookalike = new Date(date.valueOf() + date.getTimezoneOffset() * 60000);
+            dStr = enDateFmt.format(localLookalike);
+        }
+
+        return { t: `${h}:${m}:${s}`, m: `.${ms}`, d: dStr };
     }
 
     function renderLoop() {
         if (sys.longitude !== null) {
             const nowMs = Date.now() + sys.timeOffset;
+            
+            // LMT
             const lmtMs = nowMs + (sys.longitude * 4 * 60000);
-            const lmtObj = fmt(new Date(lmtMs));
-            const eotMs = getEoT(new Date(nowMs));
-            const solarObj = fmt(new Date(lmtMs + eotMs));
+            const lmtDate = new Date(lmtMs);
+            const lmtObj = format(lmtDate);
 
+            // Solar
+            const eotMs = getEoT(new Date(nowMs));
+            const solarDate = new Date(lmtMs + eotMs);
+            const solarObj = format(solarDate);
+
+            // Update DOM
             if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
             UI.mSolar.innerText = solarObj.m;
+            if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
+
             if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
             UI.mLmt.innerText = lmtObj.m;
+            if (UI.dLmt.innerText !== lmtObj.d) UI.dLmt.innerText = lmtObj.d;
         }
         requestAnimationFrame(renderLoop);
     }
