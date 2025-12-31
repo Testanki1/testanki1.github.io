@@ -210,6 +210,7 @@
 <script>
     const isCN = navigator.language.toLowerCase().startsWith('zh');
     
+    // I18N Dictionary
     const TEXT = isCN ? {
         title: "实时真太阳时",
         labelSolar: "真太阳时",
@@ -222,11 +223,12 @@
         gpsLocked: "已定位",
         netOffline: "等待网络",
         netSyncing: "同步中...",
+        netSampling: "采样中",
         netSynced: "已校准",
         netConnect: "连接",
         offset: "偏差:",
         retry: "重试",
-        largeOffset: "偏差",
+        poorNet: "精度不足",
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
         tzDetecting: "检测时区中...", 
         tzSystem: "系统时区"
@@ -242,11 +244,12 @@
         gpsLocked: "Located",
         netOffline: "Offline",
         netSyncing: "Syncing...",
+        netSampling: "Sampling",
         netSynced: "Synced",
         netConnect: "Connecting",
         offset: "Offset:",
         retry: "Retry",
-        largeOffset: "Offset",
+        poorNet: "Unstable",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         tzDetecting: "Detecting Zone...",
         tzSystem: "System TZ"
@@ -264,7 +267,10 @@
     document.getElementById('val-drift').innerText = `${TEXT.offset} --`;
     document.getElementById('tz-badge').innerText = TEXT.tzDetecting;
 
-    const TARGET_OFFSET = 0.01; 
+    // TARGET LATENCY: 100ms
+    const TARGET_LATENCY = 100; 
+    const SAMPLE_COUNT = 5; 
+    
     const sys = {
         longitude: null,
         latitude: null,
@@ -301,10 +307,10 @@
 
     function startSystem() {
         startLocationService();
-        runOffsetLockSync(); 
+        runBestLatencySync(); 
         requestAnimationFrame(renderLoop);
         window.addEventListener('online', () => {
-            if (!sys.isNetSynced) runOffsetLockSync();
+            if (!sys.isNetSynced) runBestLatencySync();
         });
     }
 
@@ -364,59 +370,81 @@
         UI.textNet.innerText = text;
     }
 
-    async function runOffsetLockSync() {
-        if (sys.isNetSynced) return;
+    // --- Best-of-N Batch Sync (Clock Filter Algorithm) ---
+    async function runBestLatencySync() {
+        if (sys.isNetSynced && sys.failCount === 0) return;
 
-        while (!sys.isNetSynced) {
+        while (true) {
             if (!navigator.onLine) {
                 setNetStatus('error', TEXT.netOffline);
-                return;
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
             }
 
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1500);
-
-                const tStart = performance.now();
-                const res = await fetch(CLOUDFLARE_URL, { 
-                    cache: "no-store", 
-                    signal: controller.signal 
-                });
-                clearTimeout(timeoutId);
-                const tEnd = performance.now();
-
-                if (!res.ok) throw new Error("Status " + res.status);
+            const samples = [];
+            
+            for (let i = 0; i < SAMPLE_COUNT; i++) {
+                setNetStatus('active', `${TEXT.netSampling} ${i+1}/${SAMPLE_COUNT}`);
                 
-                const text = await res.text();
-                const match = text.match(/ts=([0-9]+\.[0-9]+)/);
-                if (!match) throw new Error("Parse Error");
-                const serverTime = parseFloat(match[1]) * 1000;
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 1500);
+                    
+                    const tStart = performance.now();
+                    const res = await fetch(CLOUDFLARE_URL, { 
+                        cache: "no-store", 
+                        signal: controller.signal 
+                    });
+                    clearTimeout(timeoutId);
+                    const tEnd = performance.now();
 
-                const latency = (tEnd - tStart) / 2;
-                const calculatedOffset = (serverTime + latency) - Date.now();
-                const absOffset = Math.abs(calculatedOffset / 1000);
+                    if (!res.ok) throw new Error("Status " + res.status);
+                    
+                    const text = await res.text();
+                    const match = text.match(/ts=([0-9]+\.[0-9]+)/);
+                    if (!match) throw new Error("Parse Error");
+                    const serverTime = parseFloat(match[1]) * 1000;
 
-                if (absOffset > TARGET_OFFSET) {
-                    const sign = calculatedOffset >= 0 ? '+' : '';
-                    setNetStatus('warning', `${TEXT.largeOffset} ${sign}${absOffset.toFixed(3)}s > 0.01s`);
-                    throw new Error("Offset too large");
+                    const latency = (tEnd - tStart) / 2;
+                    const offset = (serverTime + latency) - Date.now();
+                    
+                    samples.push({ latency, offset });
+
+                } catch (e) {
+                    // Ignore individual failures
                 }
-
-                sys.timeOffset = calculatedOffset;
-                sys.isNetSynced = true;
-                sys.failCount = 0;
-
-                setNetStatus('success', TEXT.netSynced);
-                const driftSec = (sys.timeOffset / 1000).toFixed(3);
-                UI.drift.innerText = `${TEXT.offset} ${driftSec > 0 ? '+' : ''}${driftSec}s`;
-
-            } catch (e) {
-                sys.failCount++;
-                if (e.message !== "Offset too large") {
-                     setNetStatus('active', `${TEXT.netConnect}... (${sys.failCount})`);
-                }
-                await new Promise(r => requestAnimationFrame(r));
+                
+                await new Promise(r => setTimeout(r, 200));
             }
+
+            if (samples.length > 0) {
+                samples.sort((a, b) => a.latency - b.latency);
+                const best = samples[0];
+
+                sys.timeOffset = best.offset;
+                sys.isNetSynced = true; 
+
+                if (best.latency <= TARGET_LATENCY) {
+                    setNetStatus('success', TEXT.netSynced);
+                    sys.failCount = 0;
+                    
+                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
+                    const sign = sys.timeOffset >= 0 ? '+' : '';
+                    UI.drift.innerText = `${TEXT.offset} ${sign}${driftSec}s`;
+                    
+                    return; 
+                } else {
+                    sys.failCount++;
+                    setNetStatus('warning', `${TEXT.poorNet} (${best.latency.toFixed(0)}ms)`);
+                    
+                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
+                    UI.drift.innerText = `${TEXT.offset} ~${driftSec}s`;
+                }
+            } else {
+                setNetStatus('active', `${TEXT.retry}...`);
+            }
+            
+            await new Promise(r => setTimeout(r, 1000));
         }
     }
 
@@ -471,12 +499,11 @@
     }
 
     function renderLoop() {
-        // Condition: Location found AND Network Synced
         if (sys.longitude !== null && sys.isNetSynced) {
             const nowMs = Date.now() + sys.timeOffset;
             const now = new Date(nowMs);
 
-            // 1. Standard Time (Smart TZ)
+            // 1. Standard Time
             if (sys.detectedTimeZone) {
                 const stdObj = format(now, sys.detectedTimeZone);
                 if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
