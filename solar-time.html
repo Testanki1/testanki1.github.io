@@ -89,16 +89,22 @@
         .card.solar .icon-box, .card.solar .big-time, .card.solar .date-display { color: var(--md-sys-color-tertiary); }
         .card.local { background: linear-gradient(145deg, rgba(124, 208, 255, 0.05), rgba(0,0,0,0)); }
         .card.local .icon-box, .card.local .big-time, .card.local .date-display { color: var(--md-sys-color-secondary); }
+        .card.std { background: linear-gradient(145deg, rgba(168, 199, 250, 0.05), rgba(0,0,0,0)); }
+        .card.std .icon-box, .card.std .big-time, .card.std .date-display { color: var(--md-sys-color-primary); }
 
         .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
         .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; opacity: 0.7; }
         .icon-box svg { width: 24px; height: 24px; fill: currentColor; }
         
-        /* Date Display Styling */
         .date-display {
             font-size: 13px; font-weight: 500; opacity: 0.8; margin-bottom: 4px;
-            letter-spacing: 0.5px;
-            white-space: pre; /* Preserve manual spaces */
+            letter-spacing: 0.5px; white-space: pre;
+        }
+
+        .tz-badge {
+            font-size: 10px; padding: 2px 6px; border-radius: 4px; 
+            background: rgba(255,255,255,0.1); margin-left: 8px; vertical-align: middle;
+            opacity: 0.8;
         }
 
         .time-wrapper { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; }
@@ -179,6 +185,23 @@
             </div>
         </div>
 
+        <div class="card std">
+            <div class="card-header">
+                <div style="display:flex; align-items:center;">
+                    <span id="ui-label-std" class="label">Standard Time</span>
+                    <span id="tz-badge" class="tz-badge">Auto</span>
+                </div>
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                </div>
+            </div>
+            <div id="d-std" class="date-display">--</div>
+            <div class="time-wrapper">
+                <div id="t-std" class="big-time">--:--:--</div>
+                <div id="m-std" class="ms">.00</div>
+            </div>
+        </div>
+
         <div class="meta-info">
             <span id="val-drift">Offset: --</span>
         </div>
@@ -191,6 +214,7 @@
         title: "实时真太阳时",
         labelSolar: "真太阳时",
         labelLmt: "地方平太阳时",
+        labelStd: "法定标准时间",
         init: "系统初始化...",
         gpsLocating: "定位中...",
         gpsError: "定位中断",
@@ -203,11 +227,14 @@
         offset: "偏差:",
         retry: "重试",
         largeOffset: "偏差",
-        weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+        weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+        tzDetecting: "检测时区...",
+        tzSystem: "系统时区"
     } : {
         title: "Real-time Solar Time",
         labelSolar: "Apparent Solar Time",
         labelLmt: "Local Mean Time",
+        labelStd: "Standard Time",
         init: "Initializing...",
         gpsLocating: "Locating...",
         gpsError: "Lost Signal",
@@ -220,7 +247,9 @@
         offset: "Offset:",
         retry: "Retry",
         largeOffset: "Offset",
-        weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        tzDetecting: "Detecting TZ...",
+        tzSystem: "System TZ"
     };
 
     document.title = TEXT.title;
@@ -228,6 +257,7 @@
     document.getElementById('ui-title').innerText = TEXT.title;
     document.getElementById('ui-label-solar').innerText = TEXT.labelSolar;
     document.getElementById('ui-label-lmt').innerText = TEXT.labelLmt;
+    document.getElementById('ui-label-std').innerText = TEXT.labelStd;
     document.getElementById('ui-init').innerText = TEXT.init;
     document.getElementById('text-gps').innerText = TEXT.gpsLocating;
     document.getElementById('text-net').innerText = TEXT.netSyncing;
@@ -236,9 +266,11 @@
     const TARGET_OFFSET = 0.01; 
     const sys = {
         longitude: null,
+        latitude: null,
         timeOffset: 0,
         isNetSynced: false,
-        failCount: 0 
+        failCount: 0,
+        detectedTimeZone: null
     };
 
     const UI = {
@@ -246,9 +278,11 @@
         chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
         chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
         drift: document.getElementById('val-drift'),
+        tzBadge: document.getElementById('tz-badge'),
         
         tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'), dSolar: document.getElementById('d-solar'),
-        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt'), dLmt: document.getElementById('d-lmt')
+        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt'), dLmt: document.getElementById('d-lmt'),
+        tStd: document.getElementById('t-std'), mStd: document.getElementById('m-std'), dStd: document.getElementById('d-std')
     };
 
     const CLOUDFLARE_URL = "https://www.cloudflare.com/cdn-cgi/trace";
@@ -279,14 +313,46 @@
         setGpsStatus('active', TEXT.gpsLocating);
         navigator.geolocation.watchPosition(
             (pos) => {
+                const isFirstLock = sys.longitude === null;
                 sys.longitude = pos.coords.longitude;
+                sys.latitude = pos.coords.latitude;
                 setGpsStatus('success', TEXT.gpsLocked);
+                
+                // Fetch TimeZone from Open-Meteo on first lock
+                if (isFirstLock) {
+                    fetchRealTimeZone(sys.latitude, sys.longitude);
+                }
             },
             (err) => {
                 setGpsStatus('error', TEXT.gpsError);
             },
             { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
+    }
+
+    // --- Geo-Timezone Lookup using Open-Meteo ---
+    async function fetchRealTimeZone(lat, lon) {
+        UI.tzBadge.innerText = TEXT.tzDetecting;
+        try {
+            // Using Open-Meteo (Fast, Free, CORS-friendly)
+            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
+            if (!res.ok) throw new Error("API Fail");
+            const data = await res.json();
+            
+            if (data && data.timezone) {
+                sys.detectedTimeZone = data.timezone; // e.g. "Asia/Shanghai"
+                UI.tzBadge.innerText = data.timezone;
+                UI.tzBadge.style.background = "rgba(109, 213, 140, 0.2)";
+                UI.tzBadge.style.color = "#6dd58c";
+            } else {
+                throw new Error("No timezone in response");
+            }
+        } catch (e) {
+            console.log("TZ Lookup failed:", e);
+            // Fallback: Use browser's system timezone
+            sys.detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            UI.tzBadge.innerText = TEXT.tzSystem;
+        }
     }
 
     function setGpsStatus(state, text) {
@@ -329,7 +395,6 @@
 
                 const latency = (tEnd - tStart) / 2;
                 const calculatedOffset = (serverTime + latency) - Date.now();
-                
                 const absOffset = Math.abs(calculatedOffset / 1000);
 
                 if (absOffset > TARGET_OFFSET) {
@@ -363,30 +428,43 @@
         return (9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)) * 60000;
     }
 
-    // Optimized Formatter with Spacing
-    const enDateFmt = new Intl.DateTimeFormat('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric', weekday: 'short'
-    });
+    function format(date, tz) {
+        let h, m, s, ms, y, mo, d, w;
 
-    function format(date) {
-        const h = date.getUTCHours().toString().padStart(2, '0');
-        const m = date.getUTCMinutes().toString().padStart(2, '0');
-        const s = date.getUTCSeconds().toString().padStart(2, '0');
-        const ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+        if (tz) {
+            const options = { 
+                timeZone: tz, hour12: false,
+                year: 'numeric', month: 'numeric', day: 'numeric', 
+                hour: 'numeric', minute: 'numeric', second: 'numeric',
+                weekday: 'short'
+            };
+            const parts = new Intl.DateTimeFormat(isCN ? 'zh-CN' : 'en-US', options).formatToParts(date);
+            const getPart = (type) => parts.find(p => p.type === type)?.value;
+            h = getPart('hour').padStart(2, '0');
+            m = getPart('minute').padStart(2, '0');
+            s = getPart('second').padStart(2, '0');
+            y = getPart('year');
+            mo = getPart('month');
+            d = getPart('day');
+            w = getPart('weekday');
+            ms = Math.floor(date.getMilliseconds() / 10).toString().padStart(2, '0');
+        } else {
+            h = date.getUTCHours().toString().padStart(2, '0');
+            m = date.getUTCMinutes().toString().padStart(2, '0');
+            s = date.getUTCSeconds().toString().padStart(2, '0');
+            ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+            y = date.getUTCFullYear();
+            mo = date.getUTCMonth() + 1;
+            d = date.getUTCDate();
+            w = TEXT.weekdays[date.getUTCDay()];
+        }
         
         let dStr;
         if (isCN) {
-            // Manual Chinese Formatting with "Pangu" spacing
-            const y = date.getUTCFullYear();
-            const mo = date.getUTCMonth() + 1;
-            const d = date.getUTCDate();
-            const w = TEXT.weekdays[date.getUTCDay()];
-            // 2026 年 1 月 1 日   周四
             dStr = `${y} 年 ${mo} 月 ${d} 日   ${w}`;
+            if (tz && !sys.detectedTimeZone) dStr += `   (系统)`; 
         } else {
-            // Standard English Formatting
-            const localLookalike = new Date(date.valueOf() + date.getTimezoneOffset() * 60000);
-            dStr = enDateFmt.format(localLookalike);
+            dStr = `${mo}/${d}/${y}   ${w}`;
         }
 
         return { t: `${h}:${m}:${s}`, m: `.${ms}`, d: dStr };
@@ -395,18 +473,21 @@
     function renderLoop() {
         if (sys.longitude !== null) {
             const nowMs = Date.now() + sys.timeOffset;
-            
-            // LMT
+            const now = new Date(nowMs);
+
+            // 1. Standard Time
+            const targetTz = sys.detectedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const stdObj = format(now, targetTz);
+
+            // 2. LMT
             const lmtMs = nowMs + (sys.longitude * 4 * 60000);
-            const lmtDate = new Date(lmtMs);
-            const lmtObj = format(lmtDate);
+            const lmtObj = format(new Date(lmtMs), null);
 
-            // Solar
+            // 3. Solar
             const eotMs = getEoT(new Date(nowMs));
-            const solarDate = new Date(lmtMs + eotMs);
-            const solarObj = format(solarDate);
+            const solarObj = format(new Date(lmtMs + eotMs), null);
 
-            // Update DOM
+            // DOM Updates
             if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
             UI.mSolar.innerText = solarObj.m;
             if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
@@ -414,6 +495,10 @@
             if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
             UI.mLmt.innerText = lmtObj.m;
             if (UI.dLmt.innerText !== lmtObj.d) UI.dLmt.innerText = lmtObj.d;
+
+            if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
+            UI.mStd.innerText = stdObj.m;
+            if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
         }
         requestAnimationFrame(renderLoop);
     }
