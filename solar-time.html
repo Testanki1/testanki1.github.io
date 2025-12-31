@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Solar Time (Fixed)</title>
+    <title>Real-time Solar Time</title>
     <style>
-        /* M3 Design Tokens (Dark Theme) */
         :root {
             --md-sys-color-background: #111318;
             --md-sys-color-on-background: #e2e2e6;
@@ -185,12 +184,12 @@
             </div>
         </div>
 
-        <!-- Standard Time Card (Always visible, data waits) -->
+        <!-- Standard Time Card (Always Visible) -->
         <div class="card std" id="card-std">
             <div class="card-header">
                 <div style="display:flex; align-items:center;">
                     <span id="ui-label-std" class="label">Standard Time</span>
-                    <span id="tz-badge" class="tz-badge"></span>
+                    <span id="tz-badge" class="tz-badge">--</span>
                 </div>
                 <div class="icon-box">
                     <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
@@ -211,7 +210,6 @@
 <script>
     const isCN = navigator.language.toLowerCase().startsWith('zh');
     
-    // I18N Dictionary
     const TEXT = isCN ? {
         title: "实时真太阳时",
         labelSolar: "真太阳时",
@@ -254,7 +252,6 @@
         tzSystem: "System TZ"
     };
 
-    // Apply Static Text
     document.title = TEXT.title;
     document.documentElement.lang = isCN ? 'zh-CN' : 'en';
     document.getElementById('ui-title').innerText = TEXT.title;
@@ -283,6 +280,7 @@
         chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
         chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
         drift: document.getElementById('val-drift'),
+        cardStd: document.getElementById('card-std'),
         tzBadge: document.getElementById('tz-badge'),
         
         tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'), dSolar: document.getElementById('d-solar'),
@@ -335,7 +333,6 @@
     }
 
     async function fetchRealTimeZone(lat, lon) {
-        // Badge already shows "Detecting..."
         try {
             const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
             if (!res.ok) throw new Error("API Fail");
@@ -474,11 +471,12 @@
     }
 
     function renderLoop() {
-        if (sys.longitude !== null) {
+        // Condition: Location found AND Network Synced
+        if (sys.longitude !== null && sys.isNetSynced) {
             const nowMs = Date.now() + sys.timeOffset;
             const now = new Date(nowMs);
 
-            // 1. Standard Time: Only update if detected (even if fallback)
+            // 1. Standard Time (Smart TZ)
             if (sys.detectedTimeZone) {
                 const stdObj = format(now, sys.detectedTimeZone);
                 if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
