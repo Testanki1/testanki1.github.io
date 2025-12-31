@@ -106,7 +106,27 @@
 
         .time-wrapper { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; }
         .big-time { font-family: 'Roboto Mono', monospace; font-size: 48px; font-weight: 500; letter-spacing: -2px; line-height: 1; }
-        .ms { font-family: 'Roboto Mono', monospace; font-size: 20px; opacity: 0.6; margin-left: 2px; font-weight: 400; }
+        
+        /* Adjusted font size for 3 decimals */
+        .ms { 
+            font-family: 'Roboto Mono', monospace; font-size: 18px; opacity: 0.6; margin-left: 2px; font-weight: 400; 
+            width: 38px; /* Fixed width to prevent jitter */
+        }
+
+        /* Difference Badge */
+        .diff-badge {
+            margin-top: 8px; 
+            font-size: 12px; 
+            font-weight: 500; 
+            padding: 4px 8px;
+            border-radius: 6px; 
+            display: inline-block; 
+            background: rgba(0,0,0,0.2);
+            color: var(--md-sys-color-on-background); 
+            opacity: 0.8;
+            font-family: 'Roboto Mono', monospace;
+            min-height: 18px;
+        }
 
         .meta-info {
             display: flex; justify-content: center; margin-top: 8px; padding: 0 16px;
@@ -165,8 +185,9 @@
             <div id="d-solar" class="date-display">--</div>
             <div class="time-wrapper">
                 <div id="t-solar" class="big-time">--:--:--</div>
-                <div id="m-solar" class="ms">.00</div>
+                <div id="m-solar" class="ms">.000</div>
             </div>
+            <div id="diff-solar" class="diff-badge">--</div>
         </div>
 
         <!-- Local Mean Card -->
@@ -180,11 +201,11 @@
             <div id="d-lmt" class="date-display">--</div>
             <div class="time-wrapper">
                 <div id="t-lmt" class="big-time">--:--:--</div>
-                <div id="m-lmt" class="ms">.00</div>
+                <div id="m-lmt" class="ms">.000</div>
             </div>
         </div>
 
-        <!-- Standard Time Card (Always Visible) -->
+        <!-- Standard Time Card -->
         <div class="card std" id="card-std">
             <div class="card-header">
                 <div style="display:flex; align-items:center;">
@@ -198,7 +219,7 @@
             <div id="d-std" class="date-display">--</div>
             <div class="time-wrapper">
                 <div id="t-std" class="big-time">--:--:--</div>
-                <div id="m-std" class="ms">.00</div>
+                <div id="m-std" class="ms">.000</div>
             </div>
         </div>
 
@@ -229,6 +250,7 @@
         offset: "偏差:",
         retry: "重试",
         poorNet: "精度不足",
+        diffPrefix: "与标准差: ",
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
         tzDetecting: "检测时区中...", 
         tzSystem: "系统时区"
@@ -250,6 +272,7 @@
         offset: "Offset:",
         retry: "Retry",
         poorNet: "Unstable",
+        diffPrefix: "Diff vs Std: ",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         tzDetecting: "Detecting Zone...",
         tzSystem: "System TZ"
@@ -266,8 +289,8 @@
     document.getElementById('text-net').innerText = TEXT.netSyncing;
     document.getElementById('val-drift').innerText = `${TEXT.offset} --`;
     document.getElementById('tz-badge').innerText = TEXT.tzDetecting;
+    document.getElementById('diff-solar').innerText = "--";
 
-    // TARGET LATENCY: 100ms
     const TARGET_LATENCY = 100; 
     const SAMPLE_COUNT = 5; 
     
@@ -277,6 +300,7 @@
         timeOffset: 0,
         isNetSynced: false,
         failCount: 0,
+        bestLatency: Infinity,
         detectedTimeZone: null,
         fallbackMode: false
     };
@@ -288,6 +312,7 @@
         drift: document.getElementById('val-drift'),
         cardStd: document.getElementById('card-std'),
         tzBadge: document.getElementById('tz-badge'),
+        diffSolar: document.getElementById('diff-solar'),
         
         tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'), dSolar: document.getElementById('d-solar'),
         tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt'), dLmt: document.getElementById('d-lmt'),
@@ -307,10 +332,10 @@
 
     function startSystem() {
         startLocationService();
-        runBestLatencySync(); 
+        runGreedyProgressiveSync();
         requestAnimationFrame(renderLoop);
         window.addEventListener('online', () => {
-            if (!sys.isNetSynced) runBestLatencySync();
+            if (!sys.isNetSynced || sys.bestLatency > TARGET_LATENCY) runGreedyProgressiveSync();
         });
     }
 
@@ -370,9 +395,8 @@
         UI.textNet.innerText = text;
     }
 
-    // --- Best-of-N Batch Sync (Clock Filter Algorithm) ---
-    async function runBestLatencySync() {
-        if (sys.isNetSynced && sys.failCount === 0) return;
+    async function runGreedyProgressiveSync() {
+        let retryCount = 0;
 
         while (true) {
             if (!navigator.onLine) {
@@ -381,70 +405,55 @@
                 continue;
             }
 
-            const samples = [];
-            
-            for (let i = 0; i < SAMPLE_COUNT; i++) {
-                setNetStatus('active', `${TEXT.netSampling} ${i+1}/${SAMPLE_COUNT}`);
-                
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 1500);
-                    
-                    const tStart = performance.now();
-                    const res = await fetch(CLOUDFLARE_URL, { 
-                        cache: "no-store", 
-                        signal: controller.signal 
-                    });
-                    clearTimeout(timeoutId);
-                    const tEnd = performance.now();
-
-                    if (!res.ok) throw new Error("Status " + res.status);
-                    
-                    const text = await res.text();
-                    const match = text.match(/ts=([0-9]+\.[0-9]+)/);
-                    if (!match) throw new Error("Parse Error");
-                    const serverTime = parseFloat(match[1]) * 1000;
-
-                    const latency = (tEnd - tStart) / 2;
-                    const offset = (serverTime + latency) - Date.now();
-                    
-                    samples.push({ latency, offset });
-
-                } catch (e) {
-                    // Ignore individual failures
-                }
-                
-                await new Promise(r => setTimeout(r, 200));
+            if (!sys.isNetSynced) {
+                setNetStatus('active', `${TEXT.netSyncing}`);
+            } else {
+                setNetStatus('warning', `${TEXT.netSampling} (${sys.bestLatency.toFixed(0)}ms)`);
             }
 
-            if (samples.length > 0) {
-                samples.sort((a, b) => a.latency - b.latency);
-                const best = samples[0];
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1500);
+                
+                const tStart = performance.now();
+                const res = await fetch(CLOUDFLARE_URL, { 
+                    cache: "no-store", 
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+                const tEnd = performance.now();
 
-                sys.timeOffset = best.offset;
-                sys.isNetSynced = true; 
+                if (!res.ok) throw new Error("Status " + res.status);
+                
+                const text = await res.text();
+                const match = text.match(/ts=([0-9]+\.[0-9]+)/);
+                if (!match) throw new Error("Parse Error");
+                const serverTime = parseFloat(match[1]) * 1000;
 
-                if (best.latency <= TARGET_LATENCY) {
-                    setNetStatus('success', TEXT.netSynced);
-                    sys.failCount = 0;
+                const latency = (tEnd - tStart) / 2;
+                
+                if (latency < sys.bestLatency) {
+                    sys.bestLatency = latency;
+                    sys.timeOffset = (serverTime + latency) - Date.now();
+                    sys.isNetSynced = true; 
                     
                     const driftSec = (sys.timeOffset / 1000).toFixed(3);
                     const sign = sys.timeOffset >= 0 ? '+' : '';
                     UI.drift.innerText = `${TEXT.offset} ${sign}${driftSec}s`;
-                    
-                    return; 
-                } else {
-                    sys.failCount++;
-                    setNetStatus('warning', `${TEXT.poorNet} (${best.latency.toFixed(0)}ms)`);
-                    
-                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
-                    UI.drift.innerText = `${TEXT.offset} ~${driftSec}s`;
                 }
-            } else {
-                setNetStatus('active', `${TEXT.retry}...`);
+
+                if (sys.bestLatency <= TARGET_LATENCY) {
+                    setNetStatus('success', TEXT.netSynced);
+                    return;
+                }
+
+                await new Promise(r => setTimeout(r, 500));
+
+            } catch (e) {
+                retryCount++;
+                if(!sys.isNetSynced) setNetStatus('active', `${TEXT.retry} (${retryCount})...`);
+                await new Promise(r => requestAnimationFrame(r));
             }
-            
-            await new Promise(r => setTimeout(r, 1000));
         }
     }
 
@@ -474,12 +483,13 @@
             mo = getPart('month');
             d = getPart('day');
             w = getPart('weekday');
-            ms = Math.floor(date.getMilliseconds() / 10).toString().padStart(2, '0');
+            // Milliseconds: get 3 digits
+            ms = date.getMilliseconds().toString().padStart(3, '0');
         } else {
             h = date.getUTCHours().toString().padStart(2, '0');
             m = date.getUTCMinutes().toString().padStart(2, '0');
             s = date.getUTCSeconds().toString().padStart(2, '0');
-            ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+            ms = date.getUTCMilliseconds().toString().padStart(3, '0');
             y = date.getUTCFullYear();
             mo = date.getUTCMonth() + 1;
             d = date.getUTCDate();
@@ -498,28 +508,65 @@
         return { t: `${h}:${m}:${s}`, m: `.${ms}`, d: dStr };
     }
 
+    function formatDiff(solarObj, stdObj) {
+        const [sh, sm, ss] = solarObj.t.split(':').map(Number);
+        // parse 3-digit ms (remove dot)
+        const sms = parseInt(solarObj.m.substring(1)); 
+        
+        const [th, tm, ts] = stdObj.t.split(':').map(Number);
+        const tms = parseInt(stdObj.m.substring(1));
+
+        // Use Date objects for easiest diff calculation handling day wrap
+        // We use an arbitrary date since we care about time difference in the same day context
+        // But day wrapping is tricky. Simple second math is safer for "time of day" diff.
+        
+        const solarTotalMs = (sh * 3600000) + (sm * 60000) + (ss * 1000) + sms;
+        const stdTotalMs = (th * 3600000) + (tm * 60000) + (ts * 1000) + tms;
+
+        let diff = solarTotalMs - stdTotalMs;
+
+        // Wrap around 24h (86400000 ms)
+        const day = 86400000;
+        if (diff > day/2) diff -= day;
+        if (diff < -day/2) diff += day;
+
+        const sign = diff >= 0 ? '+' : '-';
+        diff = Math.abs(diff);
+
+        const h = Math.floor(diff / 3600000);
+        diff %= 3600000;
+        const m = Math.floor(diff / 60000);
+        diff %= 60000;
+        const s = Math.floor(diff / 1000);
+        const ms = diff % 1000;
+
+        let str = sign;
+        if (h > 0) str += `${h}h `;
+        if (m > 0 || h > 0) str += `${m}m `;
+        str += `${s}.${ms.toString().padStart(3, '0')}s`;
+
+        return TEXT.diffPrefix + str;
+    }
+
     function renderLoop() {
         if (sys.longitude !== null && sys.isNetSynced) {
             const nowMs = Date.now() + sys.timeOffset;
             const now = new Date(nowMs);
 
-            // 1. Standard Time
+            let stdObj = { t: "--:--:--" };
             if (sys.detectedTimeZone) {
-                const stdObj = format(now, sys.detectedTimeZone);
+                stdObj = format(now, sys.detectedTimeZone);
                 if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
                 UI.mStd.innerText = stdObj.m;
                 if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
             }
 
-            // 2. LMT
             const lmtMs = nowMs + (sys.longitude * 4 * 60000);
             const lmtObj = format(new Date(lmtMs), null);
 
-            // 3. Solar
             const eotMs = getEoT(new Date(nowMs));
             const solarObj = format(new Date(lmtMs + eotMs), null);
 
-            // DOM Updates
             if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
             UI.mSolar.innerText = solarObj.m;
             if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
@@ -527,6 +574,14 @@
             if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
             UI.mLmt.innerText = lmtObj.m;
             if (UI.dLmt.innerText !== lmtObj.d) UI.dLmt.innerText = lmtObj.d;
+
+            if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
+            UI.mStd.innerText = stdObj.m;
+            if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
+            
+            if (sys.detectedTimeZone && stdObj.t !== "--:--:--") {
+                UI.diffSolar.innerText = formatDiff(solarObj, stdObj);
+            }
         }
         requestAnimationFrame(renderLoop);
     }
