@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Solar Time (M3)</title>
+    <style>
+        /* M3 Design Tokens (Dark Theme) */
+        :root {
+            --md-sys-color-background: #111318;
+            --md-sys-color-on-background: #e2e2e6;
+            
+            --md-sys-color-surface: #141414;
+            --md-sys-color-surface-container: #1f2229;
+            --md-sys-color-surface-container-high: #292c34;
+            
+            --md-sys-color-primary: #a8c7fa;
+            --md-sys-color-on-primary: #0f305f;
+            --md-sys-color-primary-container: #2b4778;
+            
+            --md-sys-color-tertiary: #dfc279; /* 太阳金 */
+            --md-sys-color-tertiary-container: #56461a;
+            
+            --md-sys-color-secondary: #7cd0ff; /* 地球蓝 */
+            --md-sys-color-secondary-container: #004b71;
+            
+            --md-sys-color-error: #ffb4ab;
+            --md-sys-color-success: #6dd58c;
+            
+            --md-sys-shape-corner-extra-large: 28px;
+            --md-sys-shape-corner-full: 100px;
+        }
+
+        body {
+            font-family: 'Roboto Flex', 'Segoe UI', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Header Area */
+        header { text-align: center; margin-bottom: 24px; }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 400;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            font-size: 13px;
+            color: var(--md-sys-color-primary);
+            opacity: 0.8;
+            margin-top: 8px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        /* Status Chips */
+        .status-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--md-sys-color-surface-container-high);
+            padding: 8px 16px;
+            border-radius: var(--md-sys-shape-corner-full);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--md-sys-color-on-background);
+            transition: all 0.3s cubic-bezier(0.2, 0.0, 0, 1.0);
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .chip svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            opacity: 0.7;
+        }
+
+        /* Active/Error States */
+        .chip.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); }
+        .chip.error { background: #3c1e1e; color: var(--md-sys-color-error); }
+        .chip.success { background: #153320; color: var(--md-sys-color-success); }
+
+        /* Indicator Dot */
+        .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background-color: var(--md-sys-color-on-background); opacity: 0.3;
+        }
+        
+        /* 呼吸动画：表示虽然显示“已定位”，但后台仍在呼吸数据 */
+        @keyframes breathe { 0% { opacity: 0.6; } 50% { opacity: 1; box-shadow: 0 0 8px rgba(109, 213, 140, 0.5); } 100% { opacity: 0.6; } }
+        
+        .chip.success .dot { 
+            background-color: var(--md-sys-color-success); 
+            opacity: 1; 
+            animation: breathe 3s infinite ease-in-out; 
+        }
+        
+        .chip.error .dot { background-color: var(--md-sys-color-error); opacity: 1; animation: blink 0.5s infinite; }
+        .chip.active .dot { background-color: var(--md-sys-color-primary); opacity: 1; animation: pulse 1.5s infinite; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* Cards */
+        .card {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-extra-large);
+            padding: 32px 24px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .card.solar { background: linear-gradient(145deg, rgba(223, 194, 121, 0.05), rgba(0,0,0,0)); }
+        .card.solar .icon-box, .card.solar .big-time { color: var(--md-sys-color-tertiary); }
+
+        .card.local { background: linear-gradient(145deg, rgba(124, 208, 255, 0.05), rgba(0,0,0,0)); }
+        .card.local .icon-box, .card.local .big-time { color: var(--md-sys-color-secondary); }
+
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+        }
+
+        .label {
+            font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; opacity: 0.7;
+        }
+
+        .icon-box svg { width: 24px; height: 24px; fill: currentColor; }
+
+        .time-wrapper { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; }
+
+        .big-time {
+            font-family: 'Roboto Mono', monospace; font-size: 48px; font-weight: 500; letter-spacing: -2px; line-height: 1;
+        }
+
+        .ms {
+            font-family: 'Roboto Mono', monospace; font-size: 20px; opacity: 0.6; margin-left: 2px; font-weight: 400;
+        }
+
+        /* Footer Info */
+        .meta-info {
+            display: flex; justify-content: space-between; margin-top: 8px; padding: 0 16px;
+            font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--md-sys-color-on-background); opacity: 0.4;
+        }
+
+        /* Loader */
+        .loader {
+            position: fixed; inset: 0; background: var(--md-sys-color-background);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; transition: opacity 0.5s;
+        }
+        .loader.hidden { opacity: 0; pointer-events: none; }
+        
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid var(--md-sys-color-surface-container-high);
+            border-top-color: var(--md-sys-color-primary); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        <div id="ui-init" style="font-size: 14px; opacity: 0.7;">Initializing...</div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1 id="ui-title">Real-time Solar Time</h1>
+            <div id="ui-subtitle" class="subtitle">High Precision Sync</div>
+        </header>
+
+        <!-- Status Chips -->
+        <div class="status-row">
+            <!-- GPS Chip -->
+            <div id="chip-gps" class="chip">
+                <div id="dot-gps" class="dot"></div>
+                <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                <span id="text-gps">Locating...</span>
+            </div>
+
+            <!-- Network Chip -->
+            <div id="chip-net" class="chip">
+                <div id="dot-net" class="dot"></div>
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                <span id="text-net">Syncing...</span>
+            </div>
+        </div>
+
+        <!-- True Solar Card -->
+        <div class="card solar">
+            <div class="card-header">
+                <span id="ui-label-solar" class="label">Apparent Solar Time</span>
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>
+                </div>
+            </div>
+            <div class="time-wrapper">
+                <div id="t-solar" class="big-time">--:--:--</div>
+                <div id="m-solar" class="ms">.00</div>
+            </div>
+        </div>
+
+        <!-- Local Mean Card -->
+        <div class="card local">
+            <div class="card-header">
+                <span id="ui-label-lmt" class="label">Local Mean Time</span>
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                </div>
+            </div>
+            <div class="time-wrapper">
+                <div id="t-lmt" class="big-time">--:--:--</div>
+                <div id="m-lmt" class="ms">.00</div>
+            </div>
+        </div>
+
+        <!-- Footer Meta -->
+        <div class="meta-info">
+            <span id="val-source">Source: --</span>
+            <span id="val-drift">Offset: --</span>
+        </div>
+    </div>
+
+<script>
+    const isCN = navigator.language.toLowerCase().startsWith('zh');
+    
+    // I18N Text
+    const TEXT = isCN ? {
+        title: "实时真太阳时",
+        subtitle: "高精度网络同步",
+        labelSolar: "真太阳时",
+        labelLmt: "地方平太阳时",
+        init: "系统初始化...",
+        gpsLocating: "定位中...",
+        gpsError: "定位中断",
+        gpsNo: "不支持定位",
+        gpsLocked: "已定位", // 已修改：最简洁明确
+        netOffline: "等待网络",
+        netSyncing: "同步中...",
+        netSynced: "已校准",
+        netConnect: "连接",
+        source: "数据源:",
+        offset: "偏差:",
+        retry: "重试"
+    } : {
+        title: "Real-time Solar Time",
+        subtitle: "High Precision Sync",
+        labelSolar: "Apparent Solar Time",
+        labelLmt: "Local Mean Time",
+        init: "Initializing...",
+        gpsLocating: "Locating...",
+        gpsError: "Lost Signal",
+        gpsNo: "No GPS",
+        gpsLocked: "Located", // English translation
+        netOffline: "Offline",
+        netSyncing: "Syncing...",
+        netSynced: "Synced",
+        netConnect: "Connecting",
+        source: "Source:",
+        offset: "Offset:",
+        retry: "Retry"
+    };
+
+    document.title = TEXT.title;
+    document.documentElement.lang = isCN ? 'zh-CN' : 'en';
+    document.getElementById('ui-title').innerText = TEXT.title;
+    document.getElementById('ui-subtitle').innerText = TEXT.subtitle;
+    document.getElementById('ui-label-solar').innerText = TEXT.labelSolar;
+    document.getElementById('ui-label-lmt').innerText = TEXT.labelLmt;
+    document.getElementById('ui-init').innerText = TEXT.init;
+    document.getElementById('text-gps').innerText = TEXT.gpsLocating;
+    document.getElementById('text-net').innerText = TEXT.netSyncing;
+    document.getElementById('val-source').innerText = `${TEXT.source} --`;
+    document.getElementById('val-drift').innerText = `${TEXT.offset} --`;
+
+    const MAX_RETRIES = 3; 
+    const sys = {
+        longitude: null,
+        timeOffset: 0,
+        isNetSynced: false,
+        sourceIndex: 0, 
+        sourceFailCount: 0 
+    };
+
+    const UI = {
+        loader: document.getElementById('loader'),
+        chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
+        chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
+        source: document.getElementById('val-source'),
+        drift: document.getElementById('val-drift'),
+        tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'),
+        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt')
+    };
+
+    const SOURCES = [
+        { name: "Cloudflare", url: "https://1.1.1.1/cdn-cgi/trace", type: "cf" },
+        { name: "Suning", url: "https://quan.suning.com/getSysTime.do", type: "suning" }
+    ];
+
+    window.onload = function() {
+        setTimeout(() => UI.loader.classList.add('hidden'), 500);
+        startSystem();
+    };
+
+    document.addEventListener('click', () => {
+        if (!sys.longitude) startLocationService();
+    }, { once: true });
+
+    function startSystem() {
+        startLocationService();
+        runSmartSync(); 
+        requestAnimationFrame(renderLoop);
+        window.addEventListener('online', () => {
+            if (!sys.isNetSynced) runSmartSync();
+        });
+    }
+
+    // --- 1. Location Service ---
+    function startLocationService() {
+        if (!navigator.geolocation) {
+            setGpsStatus('error', TEXT.gpsNo);
+            return;
+        }
+        setGpsStatus('active', TEXT.gpsLocating);
+        
+        navigator.geolocation.watchPosition(
+            (pos) => {
+                sys.longitude = pos.coords.longitude;
+                // 显示“已定位”
+                setGpsStatus('success', TEXT.gpsLocked);
+            },
+            (err) => {
+                setGpsStatus('error', TEXT.gpsError);
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+    }
+
+    function setGpsStatus(state, text) {
+        UI.chipGps.className = `chip ${state}`;
+        UI.textGps.innerText = text;
+    }
+
+    function setNetStatus(state, text) {
+        UI.chipNet.className = `chip ${state}`;
+        UI.textNet.innerText = text;
+    }
+
+    // --- 2. Smart Sync Logic ---
+    async function runSmartSync() {
+        if (sys.isNetSynced) return;
+
+        while (!sys.isNetSynced) {
+            if (!navigator.onLine) {
+                setNetStatus('error', TEXT.netOffline);
+                return;
+            }
+
+            const current = SOURCES[sys.sourceIndex];
+            
+            let statusStr = "";
+            if (sys.sourceFailCount > 0) {
+                statusStr = `${TEXT.netConnect} ${current.name} (${TEXT.retry} ${sys.sourceFailCount}/${MAX_RETRIES})`;
+            } else {
+                statusStr = `${TEXT.netConnect} ${current.name}...`;
+            }
+            setNetStatus('active', statusStr);
+
+            try {
+                const controller = new AbortController();
+                const timeoutMs = current.type === 'cf' ? 1500 : 2000;
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+                const tStart = performance.now();
+                const res = await fetch(current.url, { 
+                    cache: "no-store", 
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+                const tEnd = performance.now();
+
+                if (!res.ok) throw new Error("Status " + res.status);
+                
+                let serverTime = 0;
+
+                if (current.type === "cf") {
+                    const text = await res.text();
+                    const match = text.match(/ts=([0-9]+\.[0-9]+)/);
+                    if (!match) throw new Error("Parse Error");
+                    serverTime = parseFloat(match[1]) * 1000;
+                }
+                else if (current.type === "suning") {
+                    const data = await res.json();
+                    const dateStr = data.sysTime2.replace(' ', 'T') + "+08:00";
+                    serverTime = new Date(dateStr).getTime();
+                }
+
+                const latency = (tEnd - tStart) / 2;
+                sys.timeOffset = (serverTime + latency) - Date.now();
+                sys.isNetSynced = true;
+                sys.sourceFailCount = 0;
+
+                setNetStatus('success', TEXT.netSynced);
+                
+                UI.source.innerText = `${TEXT.source} ${current.name}`;
+                const driftSec = (sys.timeOffset / 1000).toFixed(3);
+                UI.drift.innerText = `${TEXT.offset} ${driftSec > 0 ? '+' : ''}${driftSec}s`;
+
+            } catch (e) {
+                sys.sourceFailCount++;
+                if (sys.sourceFailCount >= MAX_RETRIES) {
+                    sys.sourceFailCount = 0;
+                    sys.sourceIndex = (sys.sourceIndex + 1) % SOURCES.length;
+                }
+                await new Promise(r => requestAnimationFrame(r));
+            }
+        }
+    }
+
+    // --- 3. Render Loop ---
+    function getEoT(d) {
+        const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0));
+        const diff = d - start;
+        const B = (360 * (Math.floor(diff / 86400000) - 81) / 365) * (Math.PI / 180);
+        return (9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)) * 60000;
+    }
+
+    function fmt(date) {
+        const h = date.getUTCHours().toString().padStart(2, '0');
+        const m = date.getUTCMinutes().toString().padStart(2, '0');
+        const s = date.getUTCSeconds().toString().padStart(2, '0');
+        const ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+        return { t: `${h}:${m}:${s}`, m: `.${ms}` };
+    }
+
+    function renderLoop() {
+        if (sys.longitude !== null) {
+            const nowMs = Date.now() + sys.timeOffset;
+            const lmtMs = nowMs + (sys.longitude * 4 * 60000);
+            const lmtObj = fmt(new Date(lmtMs));
+            const eotMs = getEoT(new Date(nowMs));
+            const solarObj = fmt(new Date(lmtMs + eotMs));
+
+            if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
+            UI.mSolar.innerText = solarObj.m;
+            if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
+            UI.mLmt.innerText = lmtObj.m;
+        }
+        requestAnimationFrame(renderLoop);
+    }
+</script>
+</body>
+</html>
