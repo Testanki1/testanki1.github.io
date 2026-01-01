@@ -95,7 +95,7 @@
         
         .date-display {
             font-size: 13px; font-weight: 500; opacity: 0.8; margin-bottom: 4px;
-            letter-spacing: 0.5px; white-space: pre; /* Preserve multiple spaces */
+            letter-spacing: 0.5px; white-space: pre;
         }
 
         .tz-badge {
@@ -108,7 +108,6 @@
         .big-time { font-family: 'Roboto Mono', monospace; font-size: 48px; font-weight: 500; letter-spacing: -2px; line-height: 1; }
         .ms { font-family: 'Roboto Mono', monospace; font-size: 20px; opacity: 0.6; margin-left: 2px; font-weight: 400; }
 
-        /* Difference Badge */
         .diff-badge {
             margin-top: 8px; 
             font-size: 12px; 
@@ -169,7 +168,6 @@
             </div>
         </div>
 
-        <!-- True Solar Card -->
         <div class="card solar">
             <div class="card-header">
                 <span id="ui-label-solar" class="label">Apparent Solar Time</span>
@@ -182,11 +180,9 @@
                 <div id="t-solar" class="big-time">--:--:--</div>
                 <div id="m-solar" class="ms">.000</div>
             </div>
-            <!-- Diff Badge (Always Visible) -->
             <div id="diff-solar" class="diff-badge">--</div>
         </div>
 
-        <!-- Local Mean Card -->
         <div class="card local">
             <div class="card-header">
                 <span id="ui-label-lmt" class="label">Local Mean Time</span>
@@ -201,7 +197,6 @@
             </div>
         </div>
 
-        <!-- Standard Time Card -->
         <div class="card std" id="card-std">
             <div class="card-header">
                 <div style="display:flex; align-items:center;">
@@ -243,15 +238,14 @@
         netSampling: "采样",
         netSynced: "已校准",
         netConnect: "连接",
-        offset: "偏差:",
+        offset: "偏差:", // Correct Key
         retry: "重试",
         poorNet: "精度不足",
         diffPrefix: "与标准差: ",
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
         tzDetecting: "检测时区中...", 
         tzSystem: "系统时区",
-        // Units for Diff (No trailing space here, we handle it in code)
-        units: { h: "小时", m: "分钟", s: "秒" }
+        units: { h: "小时 ", m: "分钟 ", s: "秒" }
     } : {
         title: "Real-time Solar Time",
         labelSolar: "Apparent Solar Time",
@@ -267,15 +261,14 @@
         netSampling: "Sampling",
         netSynced: "Synced",
         netConnect: "Connecting",
-        offset: "Offset:",
+        offset: "Offset:", // Correct Key
         retry: "Retry",
         poorNet: "Unstable",
         diffPrefix: "Diff vs Std: ",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         tzDetecting: "Detecting Zone...",
         tzSystem: "System TZ",
-        // Units for Diff
-        units: { h: "h", m: "m", s: "s" }
+        units: { h: "h ", m: "m ", s: "s" }
     };
 
     document.title = TEXT.title;
@@ -299,7 +292,6 @@
         latitude: null,
         timeOffset: 0,
         isNetSynced: false,
-        failCount: 0,
         bestLatency: Infinity,
         detectedTimeZone: null,
         fallbackMode: false
@@ -395,7 +387,6 @@
         UI.textNet.innerText = text;
     }
 
-    // --- GREEDY PROGRESSIVE SYNC ---
     async function runGreedyProgressiveSync() {
         let retryCount = 0;
 
@@ -440,13 +431,15 @@
                     
                     const driftSec = (sys.timeOffset / 1000).toFixed(3);
                     const sign = sys.timeOffset >= 0 ? '+' : '';
-                    UI.drift.innerText = `${TEXT.offset} ${sign}${driftSec}s`;
+                    
+                    // Use TEXT.offset here (Fixed bug)
+                    setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
                 }
 
                 if (sys.bestLatency <= TARGET_LATENCY) {
                     const driftSec = (sys.timeOffset / 1000).toFixed(3);
                     const sign = sys.timeOffset >= 0 ? '+' : '';
-                    setNetStatus('success', `${TEXT.offsetLabel} ${sign}${driftSec}s`);
+                    setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
                     return;
                 }
 
@@ -498,7 +491,6 @@
             w = TEXT.weekdays[date.getUTCDay()];
         }
         
-        // 3-digit MS
         const ms3 = date.getMilliseconds().toString().padStart(3, '0');
 
         let dStr;
@@ -540,10 +532,9 @@
         const ms = diff % 1000;
 
         let str = sign;
-        // Logic: Number + Space + Unit + Space
-        if (h > 0) str += `${h} ${TEXT.units.h} `;
-        if (m > 0 || h > 0) str += `${m} ${TEXT.units.m} `;
-        str += `${s}.${ms.toString().padStart(3, '0')} ${TEXT.units.s}`;
+        if (h > 0) str += `${h}${TEXT.units.h}`;
+        if (m > 0 || h > 0) str += `${m}${TEXT.units.m}`;
+        str += `${s}.${ms.toString().padStart(3, '0')}${TEXT.units.s}`;
 
         return TEXT.diffPrefix + str;
     }
