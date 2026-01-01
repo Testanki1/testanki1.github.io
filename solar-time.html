@@ -122,11 +122,6 @@
             min-height: 18px;
         }
 
-        .meta-info {
-            display: flex; justify-content: center; margin-top: 8px; padding: 0 16px;
-            font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--md-sys-color-on-background); opacity: 0.4;
-        }
-
         .loader {
             position: fixed; inset: 0; background: var(--md-sys-color-background);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -168,6 +163,7 @@
             </div>
         </div>
 
+        <!-- True Solar Card -->
         <div class="card solar">
             <div class="card-header">
                 <span id="ui-label-solar" class="label">Apparent Solar Time</span>
@@ -183,6 +179,7 @@
             <div id="diff-solar" class="diff-badge">--</div>
         </div>
 
+        <!-- Local Mean Card -->
         <div class="card local">
             <div class="card-header">
                 <span id="ui-label-lmt" class="label">Local Mean Time</span>
@@ -197,6 +194,7 @@
             </div>
         </div>
 
+        <!-- Standard Time Card -->
         <div class="card std" id="card-std">
             <div class="card-header">
                 <div style="display:flex; align-items:center;">
@@ -212,10 +210,6 @@
                 <div id="t-std" class="big-time">--:--:--</div>
                 <div id="m-std" class="ms">.000</div>
             </div>
-        </div>
-
-        <div class="meta-info">
-            <span id="val-drift">Offset: --</span>
         </div>
     </div>
 
@@ -238,7 +232,7 @@
         netSampling: "采样",
         netSynced: "已校准",
         netConnect: "连接",
-        offset: "偏差:", // Correct Key
+        offset: "偏差:", 
         retry: "重试",
         poorNet: "精度不足",
         diffPrefix: "与标准差: ",
@@ -261,7 +255,7 @@
         netSampling: "Sampling",
         netSynced: "Synced",
         netConnect: "Connecting",
-        offset: "Offset:", // Correct Key
+        offset: "Offset:", 
         retry: "Retry",
         poorNet: "Unstable",
         diffPrefix: "Diff vs Std: ",
@@ -280,7 +274,6 @@
     document.getElementById('ui-init').innerText = TEXT.init;
     document.getElementById('text-gps').innerText = TEXT.gpsLocating;
     document.getElementById('text-net').innerText = TEXT.netSyncing;
-    document.getElementById('val-drift').innerText = `${TEXT.offset} --`;
     document.getElementById('tz-badge').innerText = TEXT.tzDetecting;
     document.getElementById('diff-solar').innerText = "--";
 
@@ -292,6 +285,7 @@
         latitude: null,
         timeOffset: 0,
         isNetSynced: false,
+        failCount: 0,
         bestLatency: Infinity,
         detectedTimeZone: null,
         fallbackMode: false
@@ -301,7 +295,6 @@
         loader: document.getElementById('loader'),
         chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
         chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
-        drift: document.getElementById('val-drift'),
         cardStd: document.getElementById('card-std'),
         tzBadge: document.getElementById('tz-badge'),
         diffSolar: document.getElementById('diff-solar'),
@@ -431,8 +424,6 @@
                     
                     const driftSec = (sys.timeOffset / 1000).toFixed(3);
                     const sign = sys.timeOffset >= 0 ? '+' : '';
-                    
-                    // Use TEXT.offset here (Fixed bug)
                     setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
                 }
 
@@ -532,9 +523,9 @@
         const ms = diff % 1000;
 
         let str = sign;
-        if (h > 0) str += `${h}${TEXT.units.h}`;
-        if (m > 0 || h > 0) str += `${m}${TEXT.units.m}`;
-        str += `${s}.${ms.toString().padStart(3, '0')}${TEXT.units.s}`;
+        if (h > 0) str += `${h} ${TEXT.units.h} `;
+        if (m > 0 || h > 0) str += `${m} ${TEXT.units.m} `;
+        str += `${s}.${ms.toString().padStart(3, '0')} ${TEXT.units.s}`;
 
         return TEXT.diffPrefix + str;
     }
