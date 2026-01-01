@@ -251,7 +251,8 @@
         offset: "偏差:", 
         retry: "重试",
         poorNet: "精度不足",
-        diffPrefix: "与标准差: ",
+        diffFast: "比标准时间快", 
+        diffSlow: "比标准时间慢", 
         weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
         tzDetecting: "检测时区中...", 
         tzSystem: "系统时区",
@@ -274,7 +275,8 @@
         offset: "Offset:", 
         retry: "Retry",
         poorNet: "Unstable",
-        diffPrefix: "Diff vs Std: ",
+        diffFast: "Ahead of Std",
+        diffSlow: "Behind Std",
         weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         tzDetecting: "Detecting Zone...",
         tzSystem: "System TZ",
@@ -460,59 +462,26 @@
         }
     }
 
-    // -------------------------------------------------------------
-    // High Precision Equation of Time (EoT) Algorithm
-    // Based on Jean Meeus "Astronomical Algorithms" (NOAA Method)
-    // -------------------------------------------------------------
+    // High Precision Equation of Time (EoT) Algorithm (Jean Meeus / NOAA)
     function getEoT(date) {
-        // 1. Convert JS Date to Julian Date (J2000 epoch)
-        // JS Date is ms since 1970-01-01. JD(1970) = 2440587.5
         const jd = (date.getTime() / 86400000.0) + 2440587.5;
-        
-        // 2. Julian Centuries since J2000.0 (T)
         const T = (jd - 2451545.0) / 36525.0;
-
-        // 3. Sun's Geometric Mean Longitude (L0)
         let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
-        L0 = L0 % 360;
-        if (L0 < 0) L0 += 360;
-
-        // 4. Sun's Mean Anomaly (M)
+        L0 = L0 % 360; if (L0 < 0) L0 += 360;
         let M = 357.52911 + 35999.05029 * T - 0.0001537 * T * T;
-        // Normalize M
-        M = M % 360;
-        if (M < 0) M += 360;
-
-        // 5. Earth's Eccentricity (e)
+        M = M % 360; if (M < 0) M += 360;
         const e = 0.016708634 - 0.000042037 * T - 0.0000001267 * T * T;
-
-        // 6. Mean Obliquity of the Ecliptic (epsilon)
         const epsilon = 23.439291 - 0.0130041 * T - 0.00000016 * T * T + 0.000000504 * T * T * T;
-
-        // 7. Calculate Equation of Time (E)
-        // Using the series expansion from Meeus (Chapter 28)
-        // Let y = tan^2(epsilon/2)
         const rad = Math.PI / 180;
         const y = Math.pow(Math.tan((epsilon * rad) / 2), 2);
-
         const L0_rad = L0 * rad;
         const M_rad = M * rad;
-
-        // Expansion:
-        // E = y*sin(2L0) - 2e*sin(M) + 4ey*sin(M)cos(2L0) - 0.5y^2sin(4L0) - 1.25e^2sin(2M)
         const E_rad = y * Math.sin(2 * L0_rad)
                     - 2 * e * Math.sin(M_rad)
                     + 4 * e * y * Math.sin(M_rad) * Math.cos(2 * L0_rad)
                     - 0.5 * y * y * Math.sin(4 * L0_rad)
                     - 1.25 * e * e * Math.sin(2 * M_rad);
-
-        // Result is in Radians. Convert to Degrees, then to Minutes of time.
-        // 1 Degree = 4 Minutes.
-        const E_degrees = E_rad * (180 / Math.PI);
-        const E_minutes = E_degrees * 4;
-
-        // Return milliseconds to match existing logic
-        return E_minutes * 60000;
+        return (E_rad * (180 / Math.PI) * 4) * 60000;
     }
 
     function format(date, tz) {
@@ -576,7 +545,7 @@
         if (diff > day/2) diff -= day;
         if (diff < -day/2) diff += day;
 
-        const sign = diff >= 0 ? '+' : '-';
+        const isAhead = diff >= 0;
         diff = Math.abs(diff);
 
         const h = Math.floor(diff / 3600000);
@@ -586,12 +555,13 @@
         const s = Math.floor(diff / 1000);
         const ms = diff % 1000;
 
-        let str = sign;
+        let str = "";
         if (h > 0) str += `${h} ${TEXT.units.h} `;
         if (m > 0 || h > 0) str += `${m} ${TEXT.units.m} `;
         str += `${s}.${ms.toString().padStart(3, '0')} ${TEXT.units.s}`;
 
-        return TEXT.diffPrefix + str;
+        const prefix = isAhead ? TEXT.diffFast : TEXT.diffSlow;
+        return `${prefix} ${str}`;
     }
 
     function renderLoop() {
@@ -610,7 +580,6 @@
             const lmtMs = nowMs + (sys.longitude * 4 * 60000);
             const lmtObj = format(new Date(lmtMs), null);
 
-            // getEoT now accepts the precise 'now' date for astronomical calculation
             const eotMs = getEoT(new Date(nowMs));
             const solarObj = format(new Date(lmtMs + eotMs), null);
 
