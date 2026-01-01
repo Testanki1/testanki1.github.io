@@ -1,596 +1,596 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Solar Time</title>
-    <style>
-        :root {
-            --md-sys-color-background: #111318;
-            --md-sys-color-on-background: #e2e2e6;
-            
-            --md-sys-color-surface: #141414;
-            --md-sys-color-surface-container: #1f2229;
-            --md-sys-color-surface-container-high: #292c34;
-            
-            --md-sys-color-primary: #a8c7fa;
-            --md-sys-color-on-primary: #0f305f;
-            --md-sys-color-primary-container: #2b4778;
-            
-            --md-sys-color-tertiary: #dfc279;
-            --md-sys-color-tertiary-container: #56461a;
-            
-            --md-sys-color-secondary: #7cd0ff;
-            --md-sys-color-secondary-container: #004b71;
-            
-            --md-sys-color-error: #ffb4ab;
-            --md-sys-color-success: #6dd58c;
-            --md-sys-color-warning: #ffcc00;
-            
-            --md-sys-shape-corner-extra-large: 28px;
-            --md-sys-shape-corner-full: 100px;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Solar Time</title>
+    <style>
+        :root {
+            --md-sys-color-background: #111318;
+            --md-sys-color-on-background: #e2e2e6;
+            
+            --md-sys-color-surface: #141414;
+            --md-sys-color-surface-container: #1f2229;
+            --md-sys-color-surface-container-high: #292c34;
+            
+            --md-sys-color-primary: #a8c7fa;
+            --md-sys-color-on-primary: #0f305f;
+            --md-sys-color-primary-container: #2b4778;
+            
+            --md-sys-color-tertiary: #dfc279;
+            --md-sys-color-tertiary-container: #56461a;
+            
+            --md-sys-color-secondary: #7cd0ff;
+            --md-sys-color-secondary-container: #004b71;
+            
+            --md-sys-color-error: #ffb4ab;
+            --md-sys-color-success: #6dd58c;
+            --md-sys-color-warning: #ffcc00;
+            
+            --md-sys-shape-corner-extra-large: 28px;
+            --md-sys-shape-corner-full: 100px;
+        }
 
-        body {
-            font-family: 'Roboto Flex', 'Segoe UI', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
-            background-color: var(--md-sys-color-background);
-            color: var(--md-sys-color-on-background);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 24px;
-            box-sizing: border-box;
-        }
+        body {
+            font-family: 'Roboto Flex', 'Segoe UI', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            box-sizing: border-box;
+        }
 
-        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
 
-        header { text-align: center; margin-bottom: 24px; }
-        h1 { font-size: 24px; font-weight: 400; margin: 0; letter-spacing: -0.5px; }
+        header { text-align: center; margin-bottom: 24px; }
+        h1 { font-size: 24px; font-weight: 400; margin: 0; letter-spacing: -0.5px; }
 
-        .status-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; }
+        .status-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; }
 
-        .chip {
-            display: flex; align-items: center; gap: 8px;
-            background: var(--md-sys-color-surface-container-high);
-            padding: 8px 16px; border-radius: var(--md-sys-shape-corner-full);
-            font-size: 12px; font-weight: 500; color: var(--md-sys-color-on-background);
-            transition: all 0.2s; border: 1px solid transparent; white-space: nowrap;
-        }
-        .chip svg { width: 18px; height: 18px; fill: currentColor; opacity: 0.7; }
+        .chip {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--md-sys-color-surface-container-high);
+            padding: 8px 16px; border-radius: var(--md-sys-shape-corner-full);
+            font-size: 12px; font-weight: 500; color: var(--md-sys-color-on-background);
+            transition: all 0.2s; border: 1px solid transparent; white-space: nowrap;
+        }
+        .chip svg { width: 18px; height: 18px; fill: currentColor; opacity: 0.7; }
 
-        .chip.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); }
-        .chip.error { background: #3c1e1e; color: var(--md-sys-color-error); }
-        .chip.success { background: #153320; color: var(--md-sys-color-success); }
-        .chip.warning { background: #3e2e04; color: var(--md-sys-color-warning); }
+        .chip.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); }
+        .chip.error { background: #3c1e1e; color: var(--md-sys-color-error); }
+        .chip.success { background: #153320; color: var(--md-sys-color-success); }
+        .chip.warning { background: #3e2e04; color: var(--md-sys-color-warning); }
 
-        .dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--md-sys-color-on-background); opacity: 0.3; }
-        
-        @keyframes breathe { 0% { opacity: 0.6; } 50% { opacity: 1; box-shadow: 0 0 8px rgba(109, 213, 140, 0.5); } 100% { opacity: 0.6; } }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--md-sys-color-on-background); opacity: 0.3; }
+        
+        @keyframes breathe { 0% { opacity: 0.6; } 50% { opacity: 1; box-shadow: 0 0 8px rgba(109, 213, 140, 0.5); } 100% { opacity: 0.6; } }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        .chip.success .dot { background-color: var(--md-sys-color-success); opacity: 1; animation: breathe 3s infinite ease-in-out; }
-        .chip.error .dot { background-color: var(--md-sys-color-error); opacity: 1; animation: blink 0.5s infinite; }
-        .chip.active .dot { background-color: var(--md-sys-color-primary); opacity: 1; animation: pulse 1.5s infinite; }
-        .chip.warning .dot { background-color: var(--md-sys-color-warning); opacity: 1; animation: flash 0.2s infinite; }
+        .chip.success .dot { background-color: var(--md-sys-color-success); opacity: 1; animation: breathe 3s infinite ease-in-out; }
+        .chip.error .dot { background-color: var(--md-sys-color-error); opacity: 1; animation: blink 0.5s infinite; }
+        .chip.active .dot { background-color: var(--md-sys-color-primary); opacity: 1; animation: pulse 1.5s infinite; }
+        .chip.warning .dot { background-color: var(--md-sys-color-warning); opacity: 1; animation: flash 0.2s infinite; }
 
-        .card {
-            background-color: var(--md-sys-color-surface-container);
-            border-radius: var(--md-sys-shape-corner-extra-large);
-            padding: 28px 24px; position: relative; overflow: hidden; transition: transform 0.2s;
-        }
-        .card.solar { background: linear-gradient(145deg, rgba(223, 194, 121, 0.05), rgba(0,0,0,0)); }
-        .card.solar .icon-box, .card.solar .big-time, .card.solar .date-display { color: var(--md-sys-color-tertiary); }
-        .card.local { background: linear-gradient(145deg, rgba(124, 208, 255, 0.05), rgba(0,0,0,0)); }
-        .card.local .icon-box, .card.local .big-time, .card.local .date-display { color: var(--md-sys-color-secondary); }
-        .card.std { background: linear-gradient(145deg, rgba(168, 199, 250, 0.05), rgba(0,0,0,0)); }
-        .card.std .icon-box, .card.std .big-time, .card.std .date-display { color: var(--md-sys-color-primary); }
+        .card {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-extra-large);
+            padding: 28px 24px; position: relative; overflow: hidden; transition: transform 0.2s;
+        }
+        .card.solar { background: linear-gradient(145deg, rgba(223, 194, 121, 0.05), rgba(0,0,0,0)); }
+        .card.solar .icon-box, .card.solar .big-time, .card.solar .date-display { color: var(--md-sys-color-tertiary); }
+        .card.local { background: linear-gradient(145deg, rgba(124, 208, 255, 0.05), rgba(0,0,0,0)); }
+        .card.local .icon-box, .card.local .big-time, .card.local .date-display { color: var(--md-sys-color-secondary); }
+        .card.std { background: linear-gradient(145deg, rgba(168, 199, 250, 0.05), rgba(0,0,0,0)); }
+        .card.std .icon-box, .card.std .big-time, .card.std .date-display { color: var(--md-sys-color-primary); }
 
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; opacity: 0.7; }
-        .icon-box svg { width: 24px; height: 24px; fill: currentColor; }
-        
-        .date-display {
-            font-size: 13px; font-weight: 500; opacity: 0.8; margin-bottom: 4px;
-            letter-spacing: 0.5px; white-space: pre;
-        }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; opacity: 0.7; }
+        .icon-box svg { width: 24px; height: 24px; fill: currentColor; }
+        
+        .date-display {
+            font-size: 13px; font-weight: 500; opacity: 0.8; margin-bottom: 4px;
+            letter-spacing: 0.5px; white-space: pre;
+        }
 
-        .tz-badge {
-            font-size: 10px; padding: 2px 6px; border-radius: 4px; 
-            background: rgba(255,255,255,0.1); margin-left: 8px; vertical-align: middle;
-            opacity: 0.8; transition: all 0.3s;
-        }
+        .tz-badge {
+            font-size: 10px; padding: 2px 6px; border-radius: 4px; 
+            background: rgba(255,255,255,0.1); margin-left: 8px; vertical-align: middle;
+            opacity: 0.8; transition: all 0.3s;
+        }
 
-        /* 
-           修复的核心部分：
-           1. white-space: nowrap 禁止换行
-           2. 使用 clamp() 动态调整字体大小，小屏用 40px，大屏用 48px
-        */
-        .time-wrapper { 
-            font-variant-numeric: tabular-nums; 
-            display: flex; 
-            align-items: baseline; 
-            white-space: nowrap; /* 强制不换行 */
-        }
-        
-        .big-time { 
-            font-family: 'Roboto Mono', monospace; 
-            font-size: clamp(40px, 10vw, 48px); /* 响应式字体 */
-            font-weight: 500; 
-            letter-spacing: -2px; 
-            line-height: 1; 
-        }
-        
-        .ms { 
-            font-family: 'Roboto Mono', monospace; 
-            font-size: clamp(16px, 4vw, 20px); /* 毫秒也响应式 */
-            opacity: 0.6; 
-            margin-left: 2px; 
-            font-weight: 400; 
-        }
+        /* 
+           修复的核心部分：
+           1. white-space: nowrap 禁止换行
+           2. 使用 clamp() 动态调整字体大小，小屏用 40px，大屏用 48px
+        */
+        .time-wrapper { 
+            font-variant-numeric: tabular-nums; 
+            display: flex; 
+            align-items: baseline; 
+            white-space: nowrap; /* 强制不换行 */
+        }
+        
+        .big-time { 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: clamp(40px, 10vw, 48px); /* 响应式字体 */
+            font-weight: 500; 
+            letter-spacing: -2px; 
+            line-height: 1; 
+        }
+        
+        .ms { 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: clamp(16px, 4vw, 20px); /* 毫秒也响应式 */
+            opacity: 0.6; 
+            margin-left: 2px; 
+            font-weight: 400; 
+        }
 
-        .diff-badge {
-            margin-top: 8px; 
-            font-size: 12px; 
-            font-weight: 500; 
-            padding: 4px 8px;
-            border-radius: 6px; 
-            display: inline-block; 
-            background: rgba(0,0,0,0.2);
-            color: var(--md-sys-color-on-background); 
-            opacity: 0.8;
-            font-family: 'Roboto Mono', monospace;
-            min-height: 18px;
-        }
+        .diff-badge {
+            margin-top: 8px; 
+            font-size: 12px; 
+            font-weight: 500; 
+            padding: 4px 8px;
+            border-radius: 6px; 
+            display: inline-block; 
+            background: rgba(0,0,0,0.2);
+            color: var(--md-sys-color-on-background); 
+            opacity: 0.8;
+            font-family: 'Roboto Mono', monospace;
+            min-height: 18px;
+        }
 
-        .loader {
-            position: fixed; inset: 0; background: var(--md-sys-color-background);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 10; transition: opacity 0.5s;
-        }
-        .loader.hidden { opacity: 0; pointer-events: none; }
-        
-        .spinner {
-            width: 40px; height: 40px; border: 4px solid var(--md-sys-color-surface-container-high);
-            border-top-color: var(--md-sys-color-primary); border-radius: 50%;
-            animation: spin 1s linear infinite; margin-bottom: 16px;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
+        .loader {
+            position: fixed; inset: 0; background: var(--md-sys-color-background);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; transition: opacity 0.5s;
+        }
+        .loader.hidden { opacity: 0; pointer-events: none; }
+        
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid var(--md-sys-color-surface-container-high);
+            border-top-color: var(--md-sys-color-primary); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
 
-    <div id="loader" class="loader">
-        <div class="spinner"></div>
-        <div id="ui-init" style="font-size: 14px; opacity: 0.7;">Initializing...</div>
-    </div>
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        <div id="ui-init" style="font-size: 14px; opacity: 0.7;">Initializing...</div>
+    </div>
 
-    <div class="container">
-        <header>
-            <h1 id="ui-title">Real-time Solar Time</h1>
-        </header>
+    <div class="container">
+        <header>
+            <h1 id="ui-title">Real-time Solar Time</h1>
+        </header>
 
-        <div class="status-row">
-            <div id="chip-gps" class="chip">
-                <div id="dot-gps" class="dot"></div>
-                <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-                <span id="text-gps">Locating...</span>
-            </div>
+        <div class="status-row">
+            <div id="chip-gps" class="chip">
+                <div id="dot-gps" class="dot"></div>
+                <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                <span id="text-gps">Locating...</span>
+            </div>
 
-            <div id="chip-net" class="chip">
-                <div id="dot-net" class="dot"></div>
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                <span id="text-net">Syncing...</span>
-            </div>
-        </div>
+            <div id="chip-net" class="chip">
+                <div id="dot-net" class="dot"></div>
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                <span id="text-net">Syncing...</span>
+            </div>
+        </div>
 
-        <!-- True Solar Card -->
-        <div class="card solar">
-            <div class="card-header">
-                <span id="ui-label-solar" class="label">Apparent Solar Time</span>
-                <div class="icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>
-                </div>
-            </div>
-            <div id="d-solar" class="date-display">--</div>
-            <div class="time-wrapper">
-                <div id="t-solar" class="big-time">--:--:--</div>
-                <div id="m-solar" class="ms">.000</div>
-            </div>
-            <div id="diff-solar" class="diff-badge">--</div>
-        </div>
+        <!-- True Solar Card -->
+        <div class="card solar">
+            <div class="card-header">
+                <span id="ui-label-solar" class="label">Apparent Solar Time</span>
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>
+                </div>
+            </div>
+            <div id="d-solar" class="date-display">--</div>
+            <div class="time-wrapper">
+                <div id="t-solar" class="big-time">--:--:--</div>
+                <div id="m-solar" class="ms">.000</div>
+            </div>
+            <div id="diff-solar" class="diff-badge">--</div>
+        </div>
 
-        <!-- Local Mean Card -->
-        <div class="card local">
-            <div class="card-header">
-                <span id="ui-label-lmt" class="label">Local Mean Time</span>
-                <div class="icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                </div>
-            </div>
-            <div id="d-lmt" class="date-display">--</div>
-            <div class="time-wrapper">
-                <div id="t-lmt" class="big-time">--:--:--</div>
-                <div id="m-lmt" class="ms">.000</div>
-            </div>
-        </div>
+        <!-- Local Mean Card -->
+        <div class="card local">
+            <div class="card-header">
+                <span id="ui-label-lmt" class="label">Local Mean Time</span>
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                </div>
+            </div>
+            <div id="d-lmt" class="date-display">--</div>
+            <div class="time-wrapper">
+                <div id="t-lmt" class="big-time">--:--:--</div>
+                <div id="m-lmt" class="ms">.000</div>
+            </div>
+        </div>
 
-        <!-- Standard Time Card -->
-        <div class="card std" id="card-std">
-            <div class="card-header">
-                <div style="display:flex; align-items:center;">
-                    <span id="ui-label-std" class="label">Standard Time</span>
-                    <span id="tz-badge" class="tz-badge">--</span>
-                </div>
-                <div class="icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-            </div>
-            <div id="d-std" class="date-display">--</div>
-            <div class="time-wrapper">
-                <div id="t-std" class="big-time">--:--:--</div>
-                <div id="m-std" class="ms">.000</div>
-            </div>
-        </div>
-    </div>
+        <!-- Standard Time Card -->
+        <div class="card std" id="card-std">
+            <div class="card-header">
+                <div style="display:flex; align-items:center;">
+                    <span id="ui-label-std" class="label">Standard Time</span>
+                    <span id="tz-badge" class="tz-badge">--</span>
+                </div>
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                </div>
+            </div>
+            <div id="d-std" class="date-display">--</div>
+            <div class="time-wrapper">
+                <div id="t-std" class="big-time">--:--:--</div>
+                <div id="m-std" class="ms">.000</div>
+            </div>
+        </div>
+    </div>
 
 <script>
-    const isCN = navigator.language.toLowerCase().startsWith('zh');
-    
-    // I18N Dictionary
-    const TEXT = isCN ? {
-        title: "实时真太阳时",
-        labelSolar: "真太阳时",
-        labelLmt: "地方平太阳时",
-        labelStd: "法定标准时间",
-        init: "系统初始化...",
-        gpsLocating: "定位中...",
-        gpsError: "定位中断",
-        gpsNo: "不支持定位",
-        gpsLocked: "已定位",
-        netOffline: "等待网络",
-        netSyncing: "同步中...",
-        netSampling: "采样",
-        netSynced: "已校准",
-        netConnect: "连接",
-        offset: "偏差:", 
-        retry: "重试",
-        poorNet: "精度不足",
-        diffPrefix: "与标准差: ",
-        weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
-        tzDetecting: "检测时区中...", 
-        tzSystem: "系统时区",
-        units: { h: "小时 ", m: "分钟 ", s: "秒" }
-    } : {
-        title: "Real-time Solar Time",
-        labelSolar: "Apparent Solar Time",
-        labelLmt: "Local Mean Time",
-        labelStd: "Standard Time",
-        init: "Initializing...",
-        gpsLocating: "Locating...",
-        gpsError: "Lost Signal",
-        gpsNo: "No GPS",
-        gpsLocked: "Located",
-        netOffline: "Offline",
-        netSyncing: "Syncing...",
-        netSampling: "Sampling",
-        netSynced: "Synced",
-        netConnect: "Connecting",
-        offset: "Offset:", 
-        retry: "Retry",
-        poorNet: "Unstable",
-        diffPrefix: "Diff vs Std: ",
-        weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        tzDetecting: "Detecting Zone...",
-        tzSystem: "System TZ",
-        units: { h: "h ", m: "m ", s: "s" }
-    };
+    const isCN = navigator.language.toLowerCase().startsWith('zh');
+    
+    // I18N Dictionary
+    const TEXT = isCN ? {
+        title: "实时真太阳时",
+        labelSolar: "真太阳时",
+        labelLmt: "地方平太阳时",
+        labelStd: "法定标准时间",
+        init: "系统初始化...",
+        gpsLocating: "定位中...",
+        gpsError: "定位中断",
+        gpsNo: "不支持定位",
+        gpsLocked: "已定位",
+        netOffline: "等待网络",
+        netSyncing: "同步中...",
+        netSampling: "采样",
+        netSynced: "已校准",
+        netConnect: "连接",
+        offset: "偏差:", 
+        retry: "重试",
+        poorNet: "精度不足",
+        diffPrefix: "与标准差: ",
+        weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+        tzDetecting: "检测时区中...", 
+        tzSystem: "系统时区",
+        units: { h: "小时 ", m: "分钟 ", s: "秒" }
+    } : {
+        title: "Real-time Solar Time",
+        labelSolar: "Apparent Solar Time",
+        labelLmt: "Local Mean Time",
+        labelStd: "Standard Time",
+        init: "Initializing...",
+        gpsLocating: "Locating...",
+        gpsError: "Lost Signal",
+        gpsNo: "No GPS",
+        gpsLocked: "Located",
+        netOffline: "Offline",
+        netSyncing: "Syncing...",
+        netSampling: "Sampling",
+        netSynced: "Synced",
+        netConnect: "Connecting",
+        offset: "Offset:", 
+        retry: "Retry",
+        poorNet: "Unstable",
+        diffPrefix: "Diff vs Std: ",
+        weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        tzDetecting: "Detecting Zone...",
+        tzSystem: "System TZ",
+        units: { h: "h ", m: "m ", s: "s" }
+    };
 
-    document.title = TEXT.title;
-    document.documentElement.lang = isCN ? 'zh-CN' : 'en';
-    document.getElementById('ui-title').innerText = TEXT.title;
-    document.getElementById('ui-label-solar').innerText = TEXT.labelSolar;
-    document.getElementById('ui-label-lmt').innerText = TEXT.labelLmt;
-    document.getElementById('ui-label-std').innerText = TEXT.labelStd;
-    document.getElementById('ui-init').innerText = TEXT.init;
-    document.getElementById('text-gps').innerText = TEXT.gpsLocating;
-    document.getElementById('text-net').innerText = TEXT.netSyncing;
-    document.getElementById('tz-badge').innerText = TEXT.tzDetecting;
-    document.getElementById('diff-solar').innerText = "--";
+    document.title = TEXT.title;
+    document.documentElement.lang = isCN ? 'zh-CN' : 'en';
+    document.getElementById('ui-title').innerText = TEXT.title;
+    document.getElementById('ui-label-solar').innerText = TEXT.labelSolar;
+    document.getElementById('ui-label-lmt').innerText = TEXT.labelLmt;
+    document.getElementById('ui-label-std').innerText = TEXT.labelStd;
+    document.getElementById('ui-init').innerText = TEXT.init;
+    document.getElementById('text-gps').innerText = TEXT.gpsLocating;
+    document.getElementById('text-net').innerText = TEXT.netSyncing;
+    document.getElementById('tz-badge').innerText = TEXT.tzDetecting;
+    document.getElementById('diff-solar').innerText = "--";
 
-    const TARGET_LATENCY = 100; 
-    const SAMPLE_COUNT = 5; 
-    
-    const sys = {
-        longitude: null,
-        latitude: null,
-        timeOffset: 0,
-        isNetSynced: false,
-        failCount: 0,
-        bestLatency: Infinity,
-        detectedTimeZone: null,
-        fallbackMode: false
-    };
+    const TARGET_LATENCY = 100; 
+    const SAMPLE_COUNT = 5; 
+    
+    const sys = {
+        longitude: null,
+        latitude: null,
+        timeOffset: 0,
+        isNetSynced: false,
+        failCount: 0,
+        bestLatency: Infinity,
+        detectedTimeZone: null,
+        fallbackMode: false
+    };
 
-    const UI = {
-        loader: document.getElementById('loader'),
-        chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
-        chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
-        cardStd: document.getElementById('card-std'),
-        tzBadge: document.getElementById('tz-badge'),
-        diffSolar: document.getElementById('diff-solar'),
-        
-        tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'), dSolar: document.getElementById('d-solar'),
-        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt'), dLmt: document.getElementById('d-lmt'),
-        tStd: document.getElementById('t-std'), mStd: document.getElementById('m-std'), dStd: document.getElementById('d-std')
-    };
+    const UI = {
+        loader: document.getElementById('loader'),
+        chipGps: document.getElementById('chip-gps'), textGps: document.getElementById('text-gps'),
+        chipNet: document.getElementById('chip-net'), textNet: document.getElementById('text-net'),
+        cardStd: document.getElementById('card-std'),
+        tzBadge: document.getElementById('tz-badge'),
+        diffSolar: document.getElementById('diff-solar'),
+        
+        tSolar: document.getElementById('t-solar'), mSolar: document.getElementById('m-solar'), dSolar: document.getElementById('d-solar'),
+        tLmt: document.getElementById('t-lmt'), mLmt: document.getElementById('m-lmt'), dLmt: document.getElementById('d-lmt'),
+        tStd: document.getElementById('t-std'), mStd: document.getElementById('m-std'), dStd: document.getElementById('d-std')
+    };
 
-    const CLOUDFLARE_URL = "https://www.cloudflare.com/cdn-cgi/trace";
+    const CLOUDFLARE_URL = "https://www.cloudflare.com/cdn-cgi/trace";
 
-    window.onload = function() {
-        setTimeout(() => UI.loader.classList.add('hidden'), 500);
-        startSystem();
-    };
+    window.onload = function() {
+        setTimeout(() => UI.loader.classList.add('hidden'), 500);
+        startSystem();
+    };
 
-    document.addEventListener('click', () => {
-        if (!sys.longitude) startLocationService();
-    }, { once: true });
+    document.addEventListener('click', () => {
+        if (!sys.longitude) startLocationService();
+    }, { once: true });
 
-    function startSystem() {
-        startLocationService();
-        runGreedyProgressiveSync();
-        requestAnimationFrame(renderLoop);
-        window.addEventListener('online', () => {
-            if (!sys.isNetSynced || sys.bestLatency > TARGET_LATENCY) runGreedyProgressiveSync();
-        });
-    }
+    function startSystem() {
+        startLocationService();
+        runGreedyProgressiveSync();
+        requestAnimationFrame(renderLoop);
+        window.addEventListener('online', () => {
+            if (!sys.isNetSynced || sys.bestLatency > TARGET_LATENCY) runGreedyProgressiveSync();
+        });
+    }
 
-    function startLocationService() {
-        if (!navigator.geolocation) {
-            setGpsStatus('error', TEXT.gpsNo);
-            return;
-        }
-        setGpsStatus('active', TEXT.gpsLocating);
-        navigator.geolocation.watchPosition(
-            (pos) => {
-                const isFirstLock = sys.longitude === null;
-                sys.longitude = pos.coords.longitude;
-                sys.latitude = pos.coords.latitude;
-                setGpsStatus('success', TEXT.gpsLocked);
-                
-                if (isFirstLock) {
-                    fetchRealTimeZone(sys.latitude, sys.longitude);
-                }
-            },
-            (err) => {
-                setGpsStatus('error', TEXT.gpsError);
-            },
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-        );
-    }
+    function startLocationService() {
+        if (!navigator.geolocation) {
+            setGpsStatus('error', TEXT.gpsNo);
+            return;
+        }
+        setGpsStatus('active', TEXT.gpsLocating);
+        navigator.geolocation.watchPosition(
+            (pos) => {
+                const isFirstLock = sys.longitude === null;
+                sys.longitude = pos.coords.longitude;
+                sys.latitude = pos.coords.latitude;
+                setGpsStatus('success', TEXT.gpsLocked);
+                
+                if (isFirstLock) {
+                    fetchRealTimeZone(sys.latitude, sys.longitude);
+                }
+            },
+            (err) => {
+                setGpsStatus('error', TEXT.gpsError);
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+    }
 
-    async function fetchRealTimeZone(lat, lon) {
-        try {
-            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
-            if (!res.ok) throw new Error("API Fail");
-            const data = await res.json();
-            
-            if (data && data.timezone) {
-                sys.detectedTimeZone = data.timezone; 
-                UI.tzBadge.innerText = data.timezone;
-                UI.tzBadge.style.background = "rgba(109, 213, 140, 0.2)";
-                UI.tzBadge.style.color = "#6dd58c";
-            } else {
-                throw new Error("No timezone");
-            }
-        } catch (e) {
-            console.log("TZ Lookup failed:", e);
-            sys.fallbackMode = true;
-            sys.detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            UI.tzBadge.innerText = TEXT.tzSystem;
-        }
-    }
+    async function fetchRealTimeZone(lat, lon) {
+        try {
+            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
+            if (!res.ok) throw new Error("API Fail");
+            const data = await res.json();
+            
+            if (data && data.timezone) {
+                sys.detectedTimeZone = data.timezone; 
+                UI.tzBadge.innerText = data.timezone;
+                UI.tzBadge.style.background = "rgba(109, 213, 140, 0.2)";
+                UI.tzBadge.style.color = "#6dd58c";
+            } else {
+                throw new Error("No timezone");
+            }
+        } catch (e) {
+            console.log("TZ Lookup failed:", e);
+            sys.fallbackMode = true;
+            sys.detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            UI.tzBadge.innerText = TEXT.tzSystem;
+        }
+    }
 
-    function setGpsStatus(state, text) {
-        UI.chipGps.className = `chip ${state}`;
-        UI.textGps.innerText = text;
-    }
+    function setGpsStatus(state, text) {
+        UI.chipGps.className = `chip ${state}`;
+        UI.textGps.innerText = text;
+    }
 
-    function setNetStatus(state, text) {
-        UI.chipNet.className = `chip ${state}`;
-        UI.textNet.innerText = text;
-    }
+    function setNetStatus(state, text) {
+        UI.chipNet.className = `chip ${state}`;
+        UI.textNet.innerText = text;
+    }
 
-    async function runGreedyProgressiveSync() {
-        let retryCount = 0;
+    async function runGreedyProgressiveSync() {
+        let retryCount = 0;
 
-        while (true) {
-            if (!navigator.onLine) {
-                setNetStatus('error', TEXT.netOffline);
-                await new Promise(r => setTimeout(r, 1000));
-                continue;
-            }
+        while (true) {
+            if (!navigator.onLine) {
+                setNetStatus('error', TEXT.netOffline);
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
+            }
 
-            if (!sys.isNetSynced) {
-                setNetStatus('active', `${TEXT.netSyncing}`);
-            } else {
-                setNetStatus('warning', `${TEXT.netSampling} (${sys.bestLatency.toFixed(0)}ms)`);
-            }
+            if (!sys.isNetSynced) {
+                setNetStatus('active', `${TEXT.netSyncing}`);
+            } else {
+                setNetStatus('warning', `${TEXT.netSampling} (${sys.bestLatency.toFixed(0)}ms)`);
+            }
 
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1500);
-                
-                const tStart = performance.now();
-                const res = await fetch(CLOUDFLARE_URL, { 
-                    cache: "no-store", 
-                    signal: controller.signal 
-                });
-                clearTimeout(timeoutId);
-                const tEnd = performance.now();
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1500);
+                
+                const tStart = performance.now();
+                const res = await fetch(CLOUDFLARE_URL, { 
+                    cache: "no-store", 
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+                const tEnd = performance.now();
 
-                if (!res.ok) throw new Error("Status " + res.status);
-                
-                const text = await res.text();
-                const match = text.match(/ts=([0-9]+\.[0-9]+)/);
-                if (!match) throw new Error("Parse Error");
-                const serverTime = parseFloat(match[1]) * 1000;
+                if (!res.ok) throw new Error("Status " + res.status);
+                
+                const text = await res.text();
+                const match = text.match(/ts=([0-9]+\.[0-9]+)/);
+                if (!match) throw new Error("Parse Error");
+                const serverTime = parseFloat(match[1]) * 1000;
 
-                const latency = (tEnd - tStart) / 2;
-                
-                if (latency < sys.bestLatency) {
-                    sys.bestLatency = latency;
-                    sys.timeOffset = (serverTime + latency) - Date.now();
-                    sys.isNetSynced = true; 
-                    
-                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
-                    const sign = sys.timeOffset >= 0 ? '+' : '';
-                    setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
-                }
+                const latency = (tEnd - tStart) / 2;
+                
+                if (latency < sys.bestLatency) {
+                    sys.bestLatency = latency;
+                    sys.timeOffset = (serverTime + latency) - Date.now();
+                    sys.isNetSynced = true; 
+                    
+                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
+                    const sign = sys.timeOffset >= 0 ? '+' : '';
+                    setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
+                }
 
-                if (sys.bestLatency <= TARGET_LATENCY) {
-                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
-                    const sign = sys.timeOffset >= 0 ? '+' : '';
-                    setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
-                    return;
-                }
+                if (sys.bestLatency <= TARGET_LATENCY) {
+                    const driftSec = (sys.timeOffset / 1000).toFixed(3);
+                    const sign = sys.timeOffset >= 0 ? '+' : '';
+                    setNetStatus('success', `${TEXT.offset} ${sign}${driftSec}s`);
+                    return;
+                }
 
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 500));
 
-            } catch (e) {
-                retryCount++;
-                if(!sys.isNetSynced) setNetStatus('active', `${TEXT.retry} (${retryCount})...`);
-                await new Promise(r => requestAnimationFrame(r));
-            }
-        }
-    }
+            } catch (e) {
+                retryCount++;
+                if(!sys.isNetSynced) setNetStatus('active', `${TEXT.retry} (${retryCount})...`);
+                await new Promise(r => requestAnimationFrame(r));
+            }
+        }
+    }
 
-    function getEoT(d) {
-        const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0));
-        const diff = d - start;
-        const B = (360 * (Math.floor(diff / 86400000) - 81) / 365) * (Math.PI / 180);
-        return (9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)) * 60000;
-    }
+    function getEoT(d) {
+        const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0));
+        const diff = d - start;
+        const B = (360 * (Math.floor(diff / 86400000) - 81) / 365) * (Math.PI / 180);
+        return (9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)) * 60000;
+    }
 
-    function format(date, tz) {
-        let h, m, s, ms, y, mo, d, w;
+    function format(date, tz) {
+        let h, m, s, ms, y, mo, d, w;
 
-        if (tz) {
-            const options = { 
-                timeZone: tz, hour12: false,
-                year: 'numeric', month: 'numeric', day: 'numeric', 
-                hour: 'numeric', minute: 'numeric', second: 'numeric',
-                weekday: 'short'
-            };
-            const parts = new Intl.DateTimeFormat(isCN ? 'zh-CN' : 'en-US', options).formatToParts(date);
-            const getPart = (type) => parts.find(p => p.type === type)?.value;
-            h = getPart('hour').padStart(2, '0');
-            m = getPart('minute').padStart(2, '0');
-            s = getPart('second').padStart(2, '0');
-            y = getPart('year');
-            mo = getPart('month');
-            d = getPart('day');
-            w = getPart('weekday');
-            ms = Math.floor(date.getMilliseconds() / 10).toString().padStart(2, '0');
-        } else {
-            h = date.getUTCHours().toString().padStart(2, '0');
-            m = date.getUTCMinutes().toString().padStart(2, '0');
-            s = date.getUTCSeconds().toString().padStart(2, '0');
-            ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
-            y = date.getUTCFullYear();
-            mo = date.getUTCMonth() + 1;
-            d = date.getUTCDate();
-            w = TEXT.weekdays[date.getUTCDay()];
-        }
-        
-        const ms3 = date.getMilliseconds().toString().padStart(3, '0');
+        if (tz) {
+            const options = { 
+                timeZone: tz, hour12: false,
+                year: 'numeric', month: 'numeric', day: 'numeric', 
+                hour: 'numeric', minute: 'numeric', second: 'numeric',
+                weekday: 'short'
+            };
+            const parts = new Intl.DateTimeFormat(isCN ? 'zh-CN' : 'en-US', options).formatToParts(date);
+            const getPart = (type) => parts.find(p => p.type === type)?.value;
+            h = getPart('hour').padStart(2, '0');
+            m = getPart('minute').padStart(2, '0');
+            s = getPart('second').padStart(2, '0');
+            y = getPart('year');
+            mo = getPart('month');
+            d = getPart('day');
+            w = getPart('weekday');
+            ms = Math.floor(date.getMilliseconds() / 10).toString().padStart(2, '0');
+        } else {
+            h = date.getUTCHours().toString().padStart(2, '0');
+            m = date.getUTCMinutes().toString().padStart(2, '0');
+            s = date.getUTCSeconds().toString().padStart(2, '0');
+            ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+            y = date.getUTCFullYear();
+            mo = date.getUTCMonth() + 1;
+            d = date.getUTCDate();
+            w = TEXT.weekdays[date.getUTCDay()];
+        }
+        
+        const ms3 = date.getMilliseconds().toString().padStart(3, '0');
 
-        let dStr;
-        if (isCN) {
-            dStr = `${y} 年 ${mo} 月 ${d} 日   ${w}`;
-            if (tz && sys.fallbackMode) dStr += `   (系统)`; 
-        } else {
-            dStr = `${mo}/${d}/${y}   ${w}`;
-            if (tz && sys.fallbackMode) dStr += `   (System)`; 
-        }
+        let dStr;
+        if (isCN) {
+            dStr = `${y} 年 ${mo} 月 ${d} 日   ${w}`;
+            if (tz && sys.fallbackMode) dStr += `   (系统)`; 
+        } else {
+            dStr = `${mo}/${d}/${y}   ${w}`;
+            if (tz && sys.fallbackMode) dStr += `   (System)`; 
+        }
 
-        return { t: `${h}:${m}:${s}`, m: `.${ms3}`, d: dStr };
-    }
+        return { t: `${h}:${m}:${s}`, m: `.${ms3}`, d: dStr };
+    }
 
-    function formatDiff(solarObj, stdObj) {
-        const [sh, sm, ss] = solarObj.t.split(':').map(Number);
-        const sms = parseInt(solarObj.m.substring(1));
-        
-        const [th, tm, ts] = stdObj.t.split(':').map(Number);
-        const tms = parseInt(stdObj.m.substring(1));
+    function formatDiff(solarObj, stdObj) {
+        const [sh, sm, ss] = solarObj.t.split(':').map(Number);
+        const sms = parseInt(solarObj.m.substring(1));
+        
+        const [th, tm, ts] = stdObj.t.split(':').map(Number);
+        const tms = parseInt(stdObj.m.substring(1));
 
-        const solarTotalMs = (sh * 3600000) + (sm * 60000) + (ss * 1000) + sms;
-        const stdTotalMs = (th * 3600000) + (tm * 60000) + (ts * 1000) + tms;
+        const solarTotalMs = (sh * 3600000) + (sm * 60000) + (ss * 1000) + sms;
+        const stdTotalMs = (th * 3600000) + (tm * 60000) + (ts * 1000) + tms;
 
-        let diff = solarTotalMs - stdTotalMs;
+        let diff = solarTotalMs - stdTotalMs;
 
-        const day = 86400000;
-        if (diff > day/2) diff -= day;
-        if (diff < -day/2) diff += day;
+        const day = 86400000;
+        if (diff > day/2) diff -= day;
+        if (diff < -day/2) diff += day;
 
-        const sign = diff >= 0 ? '+' : '-';
-        diff = Math.abs(diff);
+        const sign = diff >= 0 ? '+' : '-';
+        diff = Math.abs(diff);
 
-        const h = Math.floor(diff / 3600000);
-        diff %= 3600000;
-        const m = Math.floor(diff / 60000);
-        diff %= 60000;
-        const s = Math.floor(diff / 1000);
-        const ms = diff % 1000;
+        const h = Math.floor(diff / 3600000);
+        diff %= 3600000;
+        const m = Math.floor(diff / 60000);
+        diff %= 60000;
+        const s = Math.floor(diff / 1000);
+        const ms = diff % 1000;
 
-        let str = sign;
-        if (h > 0) str += `${h} ${TEXT.units.h} `;
-        if (m > 0 || h > 0) str += `${m} ${TEXT.units.m} `;
-        str += `${s}.${ms.toString().padStart(3, '0')} ${TEXT.units.s}`;
+        let str = sign;
+        if (h > 0) str += `${h} ${TEXT.units.h} `;
+        if (m > 0 || h > 0) str += `${m} ${TEXT.units.m} `;
+        str += `${s}.${ms.toString().padStart(3, '0')} ${TEXT.units.s}`;
 
-        return TEXT.diffPrefix + str;
-    }
+        return TEXT.diffPrefix + str;
+    }
 
-    function renderLoop() {
-        if (sys.longitude !== null && sys.isNetSynced) {
-            const nowMs = Date.now() + sys.timeOffset;
-            const now = new Date(nowMs);
+    function renderLoop() {
+        if (sys.longitude !== null && sys.isNetSynced) {
+            const nowMs = Date.now() + sys.timeOffset;
+            const now = new Date(nowMs);
 
-            let stdObj = { t: "--:--:--" };
-            if (sys.detectedTimeZone) {
-                stdObj = format(now, sys.detectedTimeZone);
-                if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
-                UI.mStd.innerText = stdObj.m;
-                if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
-            }
+            let stdObj = { t: "--:--:--" };
+            if (sys.detectedTimeZone) {
+                stdObj = format(now, sys.detectedTimeZone);
+                if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
+                UI.mStd.innerText = stdObj.m;
+                if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
+            }
 
-            const lmtMs = nowMs + (sys.longitude * 4 * 60000);
-            const lmtObj = format(new Date(lmtMs), null);
+            const lmtMs = nowMs + (sys.longitude * 4 * 60000);
+            const lmtObj = format(new Date(lmtMs), null);
 
-            const eotMs = getEoT(new Date(nowMs));
-            const solarObj = format(new Date(lmtMs + eotMs), null);
+            const eotMs = getEoT(new Date(nowMs));
+            const solarObj = format(new Date(lmtMs + eotMs), null);
 
-            if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
-            UI.mSolar.innerText = solarObj.m;
-            if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
+            if (UI.tSolar.innerText !== solarObj.t) UI.tSolar.innerText = solarObj.t;
+            UI.mSolar.innerText = solarObj.m;
+            if (UI.dSolar.innerText !== solarObj.d) UI.dSolar.innerText = solarObj.d;
 
-            if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
-            UI.mLmt.innerText = lmtObj.m;
-            if (UI.dLmt.innerText !== lmtObj.d) UI.dLmt.innerText = lmtObj.d;
+            if (UI.tLmt.innerText !== lmtObj.t) UI.tLmt.innerText = lmtObj.t;
+            UI.mLmt.innerText = lmtObj.m;
+            if (UI.dLmt.innerText !== lmtObj.d) UI.dLmt.innerText = lmtObj.d;
 
-            if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
-            UI.mStd.innerText = stdObj.m;
-            if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
-            
-            if (sys.detectedTimeZone && stdObj.t !== "--:--:--") {
-                UI.diffSolar.innerText = formatDiff(solarObj, stdObj);
-            }
-        }
-        requestAnimationFrame(renderLoop);
-    }
+            if (UI.tStd.innerText !== stdObj.t) UI.tStd.innerText = stdObj.t;
+            UI.mStd.innerText = stdObj.m;
+            if (UI.dStd.innerText !== stdObj.d) UI.dStd.innerText = stdObj.d;
+            
+            if (sys.detectedTimeZone && stdObj.t !== "--:--:--") {
+                UI.diffSolar.innerText = formatDiff(solarObj, stdObj);
+            }
+        }
+        requestAnimationFrame(renderLoop);
+    }
 </script>
 </body>
 </html>
