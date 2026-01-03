@@ -157,396 +157,331 @@
     </div>
 
     <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { TDSLoader } from 'three/addons/loaders/TDSLoader.js'; 
-        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'; 
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TDSLoader } from 'three/addons/loaders/TDSLoader.js'; 
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'; 
 
-        // State
-        let currentMode = 'normal';
-        const slots = { hull: null, turret: null, scene: null };
-        const pools = { hull: [], turret: [] };
-        
-        // Scene Lib (From File 96)
-        const sceneLib = {
-            tex: new Map(), // name -> texture
-            meshes: []      // array of meshes inside scene
-        };
-        const logBox = document.getElementById('scene-log');
+    // State
+    let currentMode = 'normal';
+    const slots = { hull: null, turret: null, scene: null };
+    const pools = { hull: [], turret: [] };
+    
+    // Scene Lib
+    const sceneLib = { tex: new Map(), meshes: [] };
+    const logBox = document.getElementById('scene-log');
 
-        let normalMeshes = [], normalTextures = [];
+    let normalMeshes = [], normalTextures = [];
 
-        // Helpers
-        const mountHelper = new THREE.Mesh(new THREE.SphereGeometry(3,8,8), new THREE.MeshBasicMaterial({color:0xff0000}));
-        mountHelper.visible = false;
-        let mountPos = null;
+    // Helpers
+    const mountHelper = new THREE.Mesh(new THREE.SphereGeometry(3,8,8), new THREE.MeshBasicMaterial({color:0xff0000}));
+    mountHelper.visible = false;
+    let mountPos = null;
 
-        // Scene
-        const scene = new THREE.Scene(); scene.background = new THREE.Color(0x111111);
-        const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 1e7); camera.position.set(150,150,150);
-        const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); 
-        renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio); 
-        renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
-        const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping=true;
-        
-        const root = new THREE.Group(); root.rotation.set(-Math.PI/2, 0, 0); scene.add(root);
-        root.add(mountHelper);
+    // Scene
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x111111);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 1e7); camera.position.set(150,150,150);
+    const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); 
+    renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio); 
+    renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping=true;
+    
+    const root = new THREE.Group(); root.rotation.set(-Math.PI/2, 0, 0); scene.add(root);
+    root.add(mountHelper);
 
-        const lg = new THREE.Group(); scene.add(lg);
-        lg.add(new THREE.AmbientLight(0xffffff, 1.2));
-        const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun);
-        lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
+    const lg = new THREE.Group(); scene.add(lg);
+    lg.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun);
+    lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
-        window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
-        function animate(){requestAnimationFrame(animate);lg.quaternion.copy(camera.quaternion);controls.update();renderer.render(scene,camera)}
-        animate();
+    window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
+    function animate(){requestAnimationFrame(animate);lg.quaternion.copy(camera.quaternion);controls.update();renderer.render(scene,camera)}
+    animate();
 
-        // UI Helpers
-        const drawer=document.getElementById('drawer'), fab=document.getElementById('fab');
-        let open=true; fab.onclick=()=>{open=!open;drawer.classList.toggle('open',open)};
-        function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
-        
-        function log(msg) {
-            const div = document.createElement('div');
-            div.className = `log-line log-ok`;
-            div.innerText = msg;
-            logBox.appendChild(div);
-            logBox.scrollTop = logBox.scrollHeight;
-        }
+    // UI Helpers
+    const drawer=document.getElementById('drawer'), fab=document.getElementById('fab');
+    let open=true; fab.onclick=()=>{open=!open;drawer.classList.toggle('open',open)};
+    function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
+    
+    function log(msg) {
+        const div = document.createElement('div');
+        div.className = `log-line log-ok`;
+        div.innerText = msg;
+        logBox.appendChild(div);
+        logBox.scrollTop = logBox.scrollHeight;
+    }
 
-        window.switchMode = function(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.tab-btn').forEach((el,i) => {
-                el.classList.toggle('active', ['normal','assembly'][i] === mode);
-            });
-            ['normal','assembly'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
-            clearScene();
-            document.getElementById('mount-status').style.display = mode==='assembly' ? 'flex' : 'none';
-        }
-
-        // --- Core: Loader Interceptor (Upgraded to File 96 Logic) ---
-        const loadingManager = new THREE.LoadingManager();
-        loadingManager.setURLModifier((url) => {
-            if (url.startsWith('blob:') || url.startsWith('data:')) return url;
-            
-            // 尝试从 URL 中提取文件名 (File 96 Strategy)
-            const fname = url.split('/').pop().toLowerCase().split('.')[0];
-            
-            // 在 Scene Lib 纹理库里找
-            for (const [name, tex] of sceneLib.tex) {
-                if (name.toLowerCase().includes(fname)) {
-                    // console.log(`⚡ 拦截请求: ${fname} -> ${name}`);
-                    return tex.image.src; // 返回 blob URL
-                }
-            }
-            return url;
+    window.switchMode = function(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tab-btn').forEach((el,i) => {
+            el.classList.toggle('active', ['normal','assembly'][i] === mode);
         });
+        ['normal','assembly'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
+        clearScene();
+        document.getElementById('mount-status').style.display = mode==='assembly' ? 'flex' : 'none';
+    }
 
-        // --- Core: Export GLB ---
-        document.getElementById('btn-export').onclick = () => {
-            if(root.children.length <= 1) { msg("场景为空"); return; }
-            const exporter = new GLTFExporter();
-            const wasVisible = mountHelper.visible; mountHelper.visible = false;
-            
-            // 临时还原 Root 旋转，以便导出标准方向
-            const oldRot = root.rotation.x;
-            root.rotation.x = 0; 
-            root.rotation.x = oldRot; 
+    const loadingManager = new THREE.LoadingManager();
+    loadingManager.setURLModifier((url) => {
+        if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+        const fname = url.split('/').pop().toLowerCase().split('.')[0];
+        for (const [name, tex] of sceneLib.tex) {
+            if (name.toLowerCase().includes(fname)) return tex.image.src;
+        }
+        return url;
+    });
 
-            exporter.parse(root, (result) => {
+    // ---------------------------------------------------------
+    // 修复 1：绑定清空按钮事件
+    // ---------------------------------------------------------
+    document.getElementById('btn-clear').onclick = clearScene;
+
+    // ---------------------------------------------------------
+    // 修复 2：修正导出逻辑参数顺序
+    // ---------------------------------------------------------
+    document.getElementById('btn-export').onclick = () => {
+        if(root.children.length <= 1) { msg("场景为空"); return; }
+        
+        const exporter = new GLTFExporter();
+        const wasVisible = mountHelper.visible; mountHelper.visible = false;
+        
+        // 临时旋转回正，让导出的模型 Y 轴朝上（符合通用标准）
+        const oldRot = root.rotation.x;
+        root.rotation.x = 0; 
+        root.updateMatrixWorld(); // 强制更新矩阵确保导出正确
+
+        exporter.parse(
+            root, 
+            (result) => {
+                // 成功回调
                 const blob = new Blob([result], { type: 'application/octet-stream' });
                 const link = document.createElement('a'); 
                 link.href = URL.createObjectURL(blob); 
                 link.download = 'tanki_project.glb'; 
                 link.click();
                 msg("导出成功"); 
+                
+                // 恢复现场
+                root.rotation.x = oldRot;
                 mountHelper.visible = wasVisible;
-            }, { binary: true });
-        };
+            }, 
+            (err) => {
+                // 错误回调
+                console.error(err);
+                msg("导出出错，请查看控制台");
+                root.rotation.x = oldRot;
+                mountHelper.visible = wasVisible;
+            },
+            { binary: true } // 选项作为第4个参数传入
+        );
+    };
 
-        // --- Handlers ---
-        document.getElementById('in-normal').onchange = async e => {
-            const arr = Array.from(e.target.files);
-            const models = arr.filter(f=>f.name.match(/\.(a3d|3ds)$/i));
-            const images = arr.filter(f=>f.type.startsWith('image/'));
+    // --- Handlers ---
+    document.getElementById('in-normal').onchange = async e => {
+        const arr = Array.from(e.target.files);
+        const models = arr.filter(f=>f.name.match(/\.(a3d|3ds)$/i));
+        const images = arr.filter(f=>f.type.startsWith('image/'));
+        for(let f of models) {
+            try {
+                const grp = await loadModel(f); 
+                root.add(grp);
+                grp.traverse(o=>{ if(o.isMesh) normalMeshes.push(o); });
+                addUI('list-normal', f.name);
+            } catch(e){}
+        }
+        for(let f of images) {
+            const url = URL.createObjectURL(f);
+            new THREE.TextureLoader().load(url, t => {
+                setupTex(t); t.name = f.name;
+                normalTextures.push(t);
+                applyNormalTexture(t);
+                addUI('list-normal', f.name);
+            });
+        }
+        fitCamera(); e.target.value='';
+    };
 
-            for(let f of models) {
-                try {
-                    const grp = await loadModel(f); 
-                    root.add(grp);
-                    grp.traverse(o=>{ if(o.isMesh) normalMeshes.push(o); });
-                    addUI('list-normal', f.name);
-                } catch(e){}
+    document.getElementById('in-hull').onchange = e => handleAssembly(e.target.files, 'hull');
+    document.getElementById('in-turret').onchange = e => handleAssembly(e.target.files, 'turret');
+    
+    document.getElementById('in-scene').onchange = async e => {
+        const files = Array.from(e.target.files);
+        if(!files.length) return;
+        if(slots.scene) { root.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
+        sceneLib.meshes = [];
+        logBox.style.display = 'block'; logBox.innerHTML='';
+        const models = files.filter(f=>f.name.match(/\.3ds$/i)); 
+        const images = files.filter(f=>f.type.startsWith('image/'));
+        msg(`缓存 ${images.length} 纹理...`);
+        for(let f of images) {
+            const url = URL.createObjectURL(f);
+            const tex = await new THREE.TextureLoader().loadAsync(url);
+            tex.name = f.name; setupTex(tex); sceneLib.tex.set(f.name, tex);
+        }
+        msg(`加载 ${models.length} 模型...`);
+        for(let f of models) {
+            try {
+                const loader = new TDSLoader(loadingManager);
+                loader.setResourcePath(''); 
+                const grp = await loader.loadAsync(URL.createObjectURL(f));
+                grp.traverse(o => { if (o.isMesh) { if (o.parent) o.userData.parentName = o.parent.name; sceneLib.meshes.push(o); } });
+                slots.scene = grp; root.add(grp);
+                document.getElementById('name-scene').innerText = f.name;
+            } catch(e) { console.error(e); msg("场景模型加载失败"); }
+        }
+        runSceneInjector(); fitCamera(); e.target.value=''; msg(`场景加载完成`);
+    };
+
+    function runSceneInjector() {
+        let count = 0; log(">>> 开始纹理注入...");
+        sceneLib.meshes.forEach(mesh => {
+            const candidates = [];
+            if (mesh.material && mesh.material.name) candidates.push(mesh.material.name);
+            if (mesh.name) candidates.push(mesh.name);
+            if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
+            let bestTex = null;
+            for (const [texName, texObj] of sceneLib.tex) {
+                const cleanTexName = texName.toLowerCase().split('.')[0];
+                for (const cand of candidates) {
+                    const cleanCand = cand.toLowerCase();
+                    if (cleanCand.includes(cleanTexName)) { bestTex = texObj; break; }
+                    if (cleanTexName.includes(cleanCand) && cleanCand.length > 3) { bestTex = texObj; break; }
+                }
+                if (bestTex) break;
             }
-            for(let f of images) {
-                const url = URL.createObjectURL(f);
-                new THREE.TextureLoader().load(url, t => {
-                    setupTex(t); t.name = f.name;
-                    normalTextures.push(t);
-                    applyNormalTexture(t);
-                    addUI('list-normal', f.name);
+            if (bestTex) {
+                mesh.material = new THREE.MeshStandardMaterial({
+                    map: bestTex, emissiveMap: bestTex, emissive: new THREE.Color(0x888888), 
+                    color: 0xffffff, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 
                 });
+                mesh.material.needsUpdate = true; log(`✔ [${mesh.name}] -> ${bestTex.name}`); count++;
             }
-            fitCamera(); e.target.value='';
-        };
+        });
+        if(count > 0) msg(`匹配了 ${count} 个材质`); else log("⚠ 未找到匹配");
+    }
 
-        // Assembly: Hull/Turret
-        document.getElementById('in-hull').onchange = e => handleAssembly(e.target.files, 'hull');
-        document.getElementById('in-turret').onchange = e => handleAssembly(e.target.files, 'turret');
-        
-        // --- Assembly: Scene (Ported from File 96) ---
-        document.getElementById('in-scene').onchange = async e => {
-            const files = Array.from(e.target.files);
-            if(!files.length) return;
-            
-            // 1. Cleanup old scene
-            if(slots.scene) { root.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
-            sceneLib.meshes = [];
-            logBox.style.display = 'block'; logBox.innerHTML='';
+    document.getElementById('btn-clear-scene').onclick = () => {
+         if(slots.scene) { root.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
+         sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear();
+         sceneLib.meshes = [];
+         logBox.innerHTML = ''; logBox.style.display = 'none';
+         document.getElementById('name-scene').innerText = "未加载";
+         msg("环境已移除");
+    };
 
-            const models = files.filter(f=>f.name.match(/\.3ds$/i)); 
-            const images = files.filter(f=>f.type.startsWith('image/'));
-
-            msg(`缓存 ${images.length} 纹理...`);
-            
-            // 2. Preload Textures into SceneLib
-            for(let f of images) {
-                const url = URL.createObjectURL(f);
-                // 使用 loadAsync 确保纹理就绪
-                const tex = await new THREE.TextureLoader().loadAsync(url);
-                tex.name = f.name;
-                setupTex(tex);
-                sceneLib.tex.set(f.name, tex);
-            }
-
-            // 3. Load Models
-            msg(`加载 ${models.length} 模型...`);
-            for(let f of models) {
-                try {
-                    const loader = new TDSLoader(loadingManager);
-                    loader.setResourcePath(''); 
-                    const grp = await loader.loadAsync(URL.createObjectURL(f));
-                    
-                    // 收集 Mesh 并保存父级名字 (关键步骤：File 96 的逻辑)
-                    grp.traverse(o => {
-                        if (o.isMesh) {
-                            if (o.parent) o.userData.parentName = o.parent.name;
-                            sceneLib.meshes.push(o);
-                        }
-                    });
-                    
-                    slots.scene = grp;
-                    root.add(grp);
-                    document.getElementById('name-scene').innerText = f.name;
-                } catch(e) { console.error(e); msg("场景模型加载失败"); }
-            }
-
-            // 4. Run Injector
-            runSceneInjector();
-            
-            fitCamera(); 
-            e.target.value='';
-            msg(`场景加载完成`);
-        };
-
-        // --- Core: Scene Injector Logic (From File 96) ---
-        function runSceneInjector() {
-            let count = 0;
-            log(">>> 开始纹理注入...");
-
-            sceneLib.meshes.forEach(mesh => {
-                // 1. 收集所有可能的名字线索
-                const candidates = [];
-                // 材质名 (3DS通常在这里藏着真名，比如 'flr1.png')
-                if (mesh.material && mesh.material.name) candidates.push(mesh.material.name);
-                // 物体名 (比如 'flr1_Shape')
-                if (mesh.name) candidates.push(mesh.name);
-                // 父级名 (比如 'Group_flr1')
-                if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
-
-                // 2. 在纹理库里找匹配
-                let bestTex = null;
-
-                for (const [texName, texObj] of sceneLib.tex) {
-                    const cleanTexName = texName.toLowerCase().split('.')[0]; // flr1.webp -> flr1
-                    for (const cand of candidates) {
-                        const cleanCand = cand.toLowerCase();
-                        // 规则 A: 包含匹配 (最常用)
-                        if (cleanCand.includes(cleanTexName)) {
-                            bestTex = texObj;
-                            break;
-                        }
-                        // 规则 B: 反向包含 (Texture name contains mesh name)
-                        if (cleanTexName.includes(cleanCand) && cleanCand.length > 3) {
-                            bestTex = texObj;
-                            break;
-                        }
-                    }
-                    if (bestTex) break;
-                }
-
-                // 3. 应用纹理
-                if (bestTex) {
-                    // 修复材质属性
-                    mesh.material = new THREE.MeshStandardMaterial({
-                        map: bestTex,
-                        emissiveMap: bestTex,
-                        emissive: new THREE.Color(0x888888), 
-                        color: 0xffffff,
-                        side: THREE.DoubleSide,
-                        transparent: true,
-                        alphaTest: 0.5 
-                    });
-                    mesh.material.needsUpdate = true;
-                    log(`✔ [${mesh.name}] -> ${bestTex.name}`);
-                    count++;
-                }
-            });
-            
-            if(count > 0) msg(`匹配了 ${count} 个材质`);
-            else log("⚠ 未找到匹配");
+    async function handleAssembly(files, type) {
+        const arr = Array.from(files);
+        const models = arr.filter(f=>f.name.match(/\.(a3d|3ds)$/i));
+        const images = arr.filter(f=>f.type.startsWith('image/'));
+        if (slots[type]) { root.remove(slots[type].group); dispose(slots[type].group); slots[type]=null; }
+        pools[type] = []; document.getElementById('list-'+type).innerHTML="";
+        for(let f of models) {
+            try { const grp = await loadModel(f); equipAssembly(grp, f.name, type); } catch(e) { console.error(e); msg("解析失败"); }
         }
-
-
-        document.getElementById('btn-clear-scene').onclick = () => {
-             if(slots.scene) { root.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
-             sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear();
-             sceneLib.meshes = [];
-             logBox.innerHTML = ''; logBox.style.display = 'none';
-             document.getElementById('name-scene').innerText = "未加载";
-             msg("环境已移除");
-        };
-
-        async function handleAssembly(files, type) {
-            const arr = Array.from(files);
-            const models = arr.filter(f=>f.name.match(/\.(a3d|3ds)$/i));
-            const images = arr.filter(f=>f.type.startsWith('image/'));
-
-            if (slots[type]) { root.remove(slots[type].group); dispose(slots[type].group); slots[type]=null; }
-            pools[type] = []; document.getElementById('list-'+type).innerHTML="";
-
-            for(let f of models) {
-                try {
-                    const grp = await loadModel(f);
-                    equipAssembly(grp, f.name, type);
-                } catch(e) { console.error(e); msg("解析失败"); }
-            }
-            for(let f of images) {
-                const url = URL.createObjectURL(f);
-                new THREE.TextureLoader().load(url, t => {
-                    setupTex(t); pools[type].push({name:f.name, tex:t});
-                    addUI('list-'+type, f.name);
-                    applyAssemblyTexture(type);
-                });
-            }
-            document.getElementById(type==='hull'?'in-hull':'in-turret').value='';
-        }
-
-        async function loadModel(file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            if (ext === 'a3d') {
-                return parseA3D(await file.arrayBuffer(), file.name);
-            } else if (ext === '3ds') {
-                const loader = new TDSLoader(); loader.setResourcePath('');
-                const g = await loader.loadAsync(URL.createObjectURL(file));
-                g.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }});
-                return g;
-            }
-        }
-
-        // --- Logic: Assembly ---
-        function equipAssembly(grp, fname, type) {
-            slots[type] = { group: grp, name: fname };
-            root.add(grp);
-            document.getElementById('name-'+type).innerText = fname;
-            if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
-            applyAssemblyTexture(type);
-            fitCamera();
-        }
-        function scanMount(grp) {
-            let found = false;
-            grp.updateMatrixWorld(true);
-            grp.traverse(o => {
-                if(found) return;
-                if(o.name && o.name.toLowerCase().includes("mount")) {
-                    const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos);
-                    mountPos = root.worldToLocal(worldPos.clone());
-                    updateMount(mountPos); found = true;
-                }
-            });
-            if(!found) updateMount(null);
-        }
-        function snapTurret() {
-            if(slots.turret) {
-                if(slots.hull && mountPos) slots.turret.group.position.copy(mountPos);
-                else slots.turret.group.position.set(0,0,0);
-            }
-        }
-        function applyAssemblyTexture(type) {
-            const slot = slots[type];
-            const pool = pools[type];
-            if(!slot || !pool.length) return;
-            slot.group.traverse(m => {
-                if(!m.isMesh) return;
-                const part = (m.userData.originalName||m.name).toLowerCase();
-                let target = pool[pool.length-1].tex;
-                if(part.includes('track')||part.includes('chain')) target = pool.find(x=>x.name.includes('track'))?.tex || target;
-                else if(part.includes('wheel')) target = pool.find(x=>x.name.includes('wheel'))?.tex || target;
-                else target = pool.find(x=>x.name.includes('lightmap')||x.name.includes('map'))?.tex || target;
-                setMat(m, target);
+        for(let f of images) {
+            const url = URL.createObjectURL(f);
+            new THREE.TextureLoader().load(url, t => {
+                setupTex(t); pools[type].push({name:f.name, tex:t});
+                addUI('list-'+type, f.name); applyAssemblyTexture(type);
             });
         }
+        document.getElementById(type==='hull'?'in-hull':'in-turret').value='';
+    }
 
-        // --- Logic: Normal ---
-        function applyNormalTexture(tex) {
-            const base = tex.name.toLowerCase().split('.')[0];
-            normalMeshes.forEach(m => {
-                const part = (m.userData.originalName||m.name).toLowerCase();
-                let match = false;
-                if(part.includes(base)) match=true;
-                else if(base.includes('track') && (part.includes('track')||part.includes('chain'))) match=true;
-                else if(base.includes('wheel') && part.includes('wheel')) match=true;
-                else if((base.includes('lightmap')||base.includes('map')) && !part.includes('track') && !part.includes('wheel')) match=true;
-                if(match) setMat(m, tex);
-            });
+    async function loadModel(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'a3d') return parseA3D(await file.arrayBuffer(), file.name);
+        else if (ext === '3ds') {
+            const loader = new TDSLoader(); loader.setResourcePath('');
+            const g = await loader.loadAsync(URL.createObjectURL(file));
+            g.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }});
+            return g;
         }
+    }
 
-        // --- Utils ---
-        function addUI(id, text) {
-            const div = document.createElement('div'); div.className = 'tex-item';
-            div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>${text}`;
-            document.getElementById(id).appendChild(div);
+    function equipAssembly(grp, fname, type) {
+        slots[type] = { group: grp, name: fname }; root.add(grp);
+        document.getElementById('name-'+type).innerText = fname;
+        if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
+        applyAssemblyTexture(type); fitCamera();
+    }
+    function scanMount(grp) {
+        let found = false; grp.updateMatrixWorld(true);
+        grp.traverse(o => {
+            if(found) return;
+            if(o.name && o.name.toLowerCase().includes("mount")) {
+                const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos);
+                mountPos = root.worldToLocal(worldPos.clone()); updateMount(mountPos); found = true;
+            }
+        });
+        if(!found) updateMount(null);
+    }
+    function snapTurret() {
+        if(slots.turret) {
+            if(slots.hull && mountPos) slots.turret.group.position.copy(mountPos);
+            else slots.turret.group.position.set(0,0,0);
         }
-        function updateMount(pos) {
-            const el=document.getElementById('mount-status'), txt=document.getElementById('mount-txt');
-            if(pos){mountHelper.position.copy(pos); mountHelper.visible=true; el.classList.add('active'); txt.innerText="挂载点已锁定";}
-            else{mountHelper.visible=false; el.classList.remove('active'); txt.innerText="无挂载点";}
-        }
-        function clearScene() {
-            if(slots.hull) dispose(slots.hull.group); if(slots.turret) dispose(slots.turret.group); if(slots.scene) dispose(slots.scene);
-            slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
-            normalMeshes.forEach(m=>{m.geometry.dispose();m.material.dispose();root.remove(m)});
-            for(let i=root.children.length-1; i>=0; i--) if(root.children[i]!==mountHelper) root.remove(root.children[i]);
-            normalMeshes=[]; normalTextures.forEach(t=>t.dispose()); normalTextures=[];
-            sceneLib.tex.clear(); sceneLib.meshes=[];
-            ['list-hull','list-turret','list-normal'].forEach(id=>document.getElementById(id).innerHTML="");
-            document.getElementById('name-hull').innerText="未装备"; document.getElementById('name-turret').innerText="未装备"; document.getElementById('name-scene').innerText="未加载";
-            logBox.style.display='none';
-            updateMount(null); msg("已清空");
-        }
-        function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
-        function setMat(m, t) { m.material.map=t; m.material.emissiveMap=t; m.material.emissive=new THREE.Color(0xffffff); m.material.emissiveIntensity=0.5; m.material.needsUpdate=true; }
-        function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material)o.material.dispose()}})}
-        function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.z+s);camera.lookAt(c);controls.update()}
+    }
+    function applyAssemblyTexture(type) {
+        const slot = slots[type], pool = pools[type];
+        if(!slot || !pool.length) return;
+        slot.group.traverse(m => {
+            if(!m.isMesh) return;
+            const part = (m.userData.originalName||m.name).toLowerCase();
+            let target = pool[pool.length-1].tex;
+            if(part.includes('track')||part.includes('chain')) target = pool.find(x=>x.name.includes('track'))?.tex || target;
+            else if(part.includes('wheel')) target = pool.find(x=>x.name.includes('wheel'))?.tex || target;
+            else target = pool.find(x=>x.name.includes('lightmap')||x.name.includes('map'))?.tex || target;
+            setMat(m, target);
+        });
+    }
+    function applyNormalTexture(tex) {
+        const base = tex.name.toLowerCase().split('.')[0];
+        normalMeshes.forEach(m => {
+            const part = (m.userData.originalName||m.name).toLowerCase();
+            let match = false;
+            if(part.includes(base)) match=true;
+            else if(base.includes('track') && (part.includes('track')||part.includes('chain'))) match=true;
+            else if(base.includes('wheel') && part.includes('wheel')) match=true;
+            else if((base.includes('lightmap')||base.includes('map')) && !part.includes('track') && !part.includes('wheel')) match=true;
+            if(match) setMat(m, tex);
+        });
+    }
 
-        // --- Parser ---
-        class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
-        function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw "Err"; r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); }
-        function readC(r){r.u32();r.u32();return r.u32()}
-        function pV3(r,n){ r.u32();r.u32(); const mc=readC(r); for(let i=0;i<mc;i++){r.str();r.sk(12);r.str()} const mdc=readC(r); let md=[]; for(let i=0;i<mdc;i++){let m={n:r.str()};r.sk(28);m.vc=r.u32();const c=r.u32();m.vb=[];for(let j=0;j<c;j++){const k=r.u32(),s=(k===5?4:(k<7&&k!==2?3:2)),d=new Float32Array(m.vc*s);for(let l=0;l<m.vc*s;l++)d[l]=r.f32();m.vb.push({t:k,d})}const sc=r.u32();m.sm=[];for(let j=0;j<sc;j++){const ic=r.u32(),x=new Uint16Array(ic);for(let k=0;k<ic;k++)x[k]=r.u16();r.sk((((ic*2+3)>>2)*4)-(ic*2));m.sm.push({x})}md.push(m)} const tc=readC(r); let td=[],tp=[]; for(let i=0;i<tc;i++){td.push({n:r.str(),p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]})} for(let i=0;i<tc;i++)tp.push(r.i32()); const oc=readC(r); let od=[]; for(let i=0;i<oc;i++){const o={mi:r.u32(),ti:r.u32()},cc=r.u32();for(let k=0;k<cc;k++)r.sk(4);od.push(o)} return build(md,{t:td,p:tp},od,n); }
-        function pV2(r,n){ r.u32();r.u32(); const mc=readC(r); for(let i=0;i<mc;i++){r.str0();r.sk(12);r.str0()} const mdc=readC(r); let md=[]; for(let i=0;i<mdc;i++){let m={n:"M"+i};m.vc=r.u32();const c=r.u32();m.vb=[];for(let j=0;j<c;j++){const k=r.u32(),s=(k===5?4:(k<7&&k!==2?3:2)),d=new Float32Array(m.vc*s);for(let l=0;l<m.vc*s;l++)d[l]=r.f32();m.vb.push({t:k,d})}const sc=r.u32();m.sm=[];for(let j=0;j<sc;j++){const fc=r.u32(),x=new Uint16Array(fc*3);for(let k=0;k<fc*3;k++)x[k]=r.u16();for(let k=0;k<fc;k++)r.sk(4);r.sk(2);m.sm.push({x})}md.push(m)} const tc=readC(r); let td=[],tp=[]; for(let i=0;i<tc;i++){td.push({n:"",p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]})} for(let i=0;i<tc;i++)tp.push(r.i32()-1); const oc=readC(r); let od=[]; for(let i=0;i<oc;i++){const s=r.str0(),mi=r.u32(),ti=r.u32(); if(td[ti])td[ti].n=s; od.push({mi,ti})} return build(md,{t:td,p:tp},od,n); }
-        function build(gd,td,od,fname){const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});const geos=gd.map(d=>{const g=new THREE.BufferGeometry();g.userData={n:d.n};d.vb.forEach(v=>{if(v.t===1)g.setAttribute('position',new THREE.BufferAttribute(v.d,3));if(v.t===3)g.setAttribute('normal',new THREE.BufferAttribute(v.d,3));if(v.t===2){for(let i=1;i<v.d.length;i+=2)v.d[i]=1.0-v.d[i];g.setAttribute('uv',new THREE.BufferAttribute(v.d,2))}});let i=[],o=0;d.sm.forEach(s=>{for(let k=0;k<s.x.length;k++)i.push(s.x[k]);g.addGroup(o,s.x.length,0);o+=s.x.length});g.setIndex(i);return g});const grp=new THREE.Group();const nds=td.t.map(t=>{const o=new THREE.Object3D();o.position.set(...t.p);o.quaternion.set(...t.q);o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1);o.name=t.n;return o});td.p.forEach((pid,i)=>{if(pid>=0)nds[pid].add(nds[i]);else grp.add(nds[i])});od.forEach(o=>{if(!geos[o.mi]||!nds[o.ti])return;const nm=nds[o.ti].name||geos[o.mi].userData.n;const m=new THREE.Mesh(geos[o.mi],mat.clone());if(nm.toLowerCase().match(/box|bound|col|shape/))m.visible=false;m.userData.originalName=nm;nds[o.ti].add(m)});return grp}
-    </script>
+    function addUI(id, text) {
+        const div = document.createElement('div'); div.className = 'tex-item';
+        div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>${text}`;
+        document.getElementById(id).appendChild(div);
+    }
+    function updateMount(pos) {
+        const el=document.getElementById('mount-status'), txt=document.getElementById('mount-txt');
+        if(pos){mountHelper.position.copy(pos); mountHelper.visible=true; el.classList.add('active'); txt.innerText="挂载点已锁定";}
+        else{mountHelper.visible=false; el.classList.remove('active'); txt.innerText="无挂载点";}
+    }
+    function clearScene() {
+        if(slots.hull) dispose(slots.hull.group); if(slots.turret) dispose(slots.turret.group); if(slots.scene) dispose(slots.scene);
+        slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
+        normalMeshes.forEach(m=>{m.geometry.dispose();m.material.dispose();root.remove(m)});
+        for(let i=root.children.length-1; i>=0; i--) if(root.children[i]!==mountHelper) root.remove(root.children[i]);
+        normalMeshes=[]; normalTextures.forEach(t=>t.dispose()); normalTextures=[];
+        sceneLib.tex.clear(); sceneLib.meshes=[];
+        ['list-hull','list-turret','list-normal'].forEach(id=>document.getElementById(id).innerHTML="");
+        document.getElementById('name-hull').innerText="未装备"; document.getElementById('name-turret').innerText="未装备"; document.getElementById('name-scene').innerText="未加载";
+        logBox.style.display='none';
+        updateMount(null); msg("已清空");
+    }
+    function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
+    function setMat(m, t) { m.material.map=t; m.material.emissiveMap=t; m.material.emissive=new THREE.Color(0xffffff); m.material.emissiveIntensity=0.5; m.material.needsUpdate=true; }
+    function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material)o.material.dispose()}})}
+    function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.z+s);camera.lookAt(c);controls.update()}
+
+    class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
+    function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw "Err"; r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); }
+    function readC(r){r.u32();r.u32();return r.u32()}
+    function pV3(r,n){ r.u32();r.u32(); const mc=readC(r); for(let i=0;i<mc;i++){r.str();r.sk(12);r.str()} const mdc=readC(r); let md=[]; for(let i=0;i<mdc;i++){let m={n:r.str()};r.sk(28);m.vc=r.u32();const c=r.u32();m.vb=[];for(let j=0;j<c;j++){const k=r.u32(),s=(k===5?4:(k<7&&k!==2?3:2)),d=new Float32Array(m.vc*s);for(let l=0;l<m.vc*s;l++)d[l]=r.f32();m.vb.push({t:k,d})}const sc=r.u32();m.sm=[];for(let j=0;j<sc;j++){const ic=r.u32(),x=new Uint16Array(ic);for(let k=0;k<ic;k++)x[k]=r.u16();r.sk((((ic*2+3)>>2)*4)-(ic*2));m.sm.push({x})}md.push(m)} const tc=readC(r); let td=[],tp=[]; for(let i=0;i<tc;i++){td.push({n:r.str(),p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]})} for(let i=0;i<tc;i++)tp.push(r.i32()); const oc=readC(r); let od=[]; for(let i=0;i<oc;i++){const o={mi:r.u32(),ti:r.u32()},cc=r.u32();for(let k=0;k<cc;k++)r.sk(4);od.push(o)} return build(md,{t:td,p:tp},od,n); }
+    function pV2(r,n){ r.u32();r.u32(); const mc=readC(r); for(let i=0;i<mc;i++){r.str0();r.sk(12);r.str0()} const mdc=readC(r); let md=[]; for(let i=0;i<mdc;i++){let m={n:"M"+i};m.vc=r.u32();const c=r.u32();m.vb=[];for(let j=0;j<c;j++){const k=r.u32(),s=(k===5?4:(k<7&&k!==2?3:2)),d=new Float32Array(m.vc*s);for(let l=0;l<m.vc*s;l++)d[l]=r.f32();m.vb.push({t:k,d})}const sc=r.u32();m.sm=[];for(let j=0;j<sc;j++){const fc=r.u32(),x=new Uint16Array(fc*3);for(let k=0;k<fc*3;k++)x[k]=r.u16();for(let k=0;k<fc;k++)r.sk(4);r.sk(2);m.sm.push({x})}md.push(m)} const tc=readC(r); let td=[],tp=[]; for(let i=0;i<tc;i++){td.push({n:"",p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]})} for(let i=0;i<tc;i++)tp.push(r.i32()-1); const oc=readC(r); let od=[]; for(let i=0;i<oc;i++){const s=r.str0(),mi=r.u32(),ti=r.u32(); if(td[ti])td[ti].n=s; od.push({mi,ti})} return build(md,{t:td,p:tp},od,n); }
+    function build(gd,td,od,fname){const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});const geos=gd.map(d=>{const g=new THREE.BufferGeometry();g.userData={n:d.n};d.vb.forEach(v=>{if(v.t===1)g.setAttribute('position',new THREE.BufferAttribute(v.d,3));if(v.t===3)g.setAttribute('normal',new THREE.BufferAttribute(v.d,3));if(v.t===2){for(let i=1;i<v.d.length;i+=2)v.d[i]=1.0-v.d[i];g.setAttribute('uv',new THREE.BufferAttribute(v.d,2))}});let i=[],o=0;d.sm.forEach(s=>{for(let k=0;k<s.x.length;k++)i.push(s.x[k]);g.addGroup(o,s.x.length,0);o+=s.x.length});g.setIndex(i);return g});const grp=new THREE.Group();const nds=td.t.map(t=>{const o=new THREE.Object3D();o.position.set(...t.p);o.quaternion.set(...t.q);o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1);o.name=t.n;return o});td.p.forEach((pid,i)=>{if(pid>=0)nds[pid].add(nds[i]);else grp.add(nds[i])});od.forEach(o=>{if(!geos[o.mi]||!nds[o.ti])return;const nm=nds[o.ti].name||geos[o.mi].userData.n;const m=new THREE.Mesh(geos[o.mi],mat.clone());if(nm.toLowerCase().match(/box|bound|col|shape/))m.visible=false;m.userData.originalName=nm;nds[o.ti].add(m)});return grp}
+</script>
 </body>
 </html>
