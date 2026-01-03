@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tanki Assembly Studio (Pro Injector)</title>
+    <title>Tanki Model Viewer</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
-        /* M3 Expressive Variables */
+        /* Theme Variables - Neon Green & Deep Blue */
         :root {
-            --md-sys-color-background: #141218;
-            --md-sys-color-surface: #1D1B20;
-            --md-sys-color-surface-container: #211F26;
-            --md-sys-color-surface-variant: #49454F;
-            --md-sys-color-primary: #D0BCFF;
-            --md-sys-color-on-primary: #381E72;
-            --md-sys-color-primary-container: #4F378B;
-            --md-sys-color-on-primary-container: #EADDFF;
-            --md-sys-color-secondary: #CCC2DC;
-            --md-sys-color-outline: #938F99;
-            --md-sys-color-outline-variant: #49454F;
+            --md-sys-color-background: #001926;
+            --md-sys-color-surface: #001E2E;
+            --md-sys-color-surface-container: #002b40;
+            --md-sys-color-surface-variant: #004d66;
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-on-primary: #001926;
+            --md-sys-color-primary-container: #004D1A;
+            --md-sys-color-on-primary-container: #76FF33;
+            --md-sys-color-secondary: #4DD0E1;
+            --md-sys-color-outline: #546E7A;
+            --md-sys-color-outline-variant: #263238;
             
             --radius-l: 28px;
             --radius-m: 16px;
@@ -32,35 +32,36 @@
 
         body { 
             margin: 0; overflow: hidden; font-family: 'Roboto', sans-serif; 
-            background: var(--md-sys-color-background); color: #E6E1E5; 
+            background: var(--md-sys-color-background); color: #E0F2F1; 
             touch-action: none; 
         }
         
-        #top-bar { position: absolute; top: 0; left: 0; right: 0; padding: 24px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); pointer-events: none; z-index: 10; display:flex; flex-direction:column; gap:4px; }
-        .app-title { font-weight: 500; font-size: 22px; color: #E6E1E5; letter-spacing: -0.5px; }
-        .app-subtitle { font-size: 12px; color: #CAC4D0; opacity: 0.8; }
+        #top-bar { position: absolute; top: 0; left: 0; right: 0; padding: 24px; background: linear-gradient(to bottom, rgba(0,25,38,0.9), transparent); pointer-events: none; z-index: 10; display:flex; flex-direction:column; gap:4px; }
+        .app-title { font-weight: 500; font-size: 22px; color: #E0F2F1; letter-spacing: -0.5px; }
+        .app-subtitle { font-size: 12px; color: #B0BEC5; opacity: 0.8; }
 
-        #toast { position: absolute; top: 24px; left: 50%; transform: translateX(-50%) translateY(-20px); background: #313033; padding: 14px 24px; border-radius: 50px; opacity: 0; transition: 0.4s cubic-bezier(0.2,0,0,1); pointer-events: none; z-index: 200; box-shadow: 0 4px 8px rgba(0,0,0,0.3); font-size: 14px; color: #F4EFF4; display:flex; align-items:center; gap:8px; }
+        #toast { position: absolute; top: 24px; left: 50%; transform: translateX(-50%) translateY(-20px); background: #263238; padding: 14px 24px; border-radius: 50px; opacity: 0; transition: 0.4s cubic-bezier(0.2,0,0,1); pointer-events: none; z-index: 200; box-shadow: 0 4px 8px rgba(0,0,0,0.3); font-size: 14px; color: #ECEFF1; display:flex; align-items:center; gap:8px; border: 1px solid var(--md-sys-color-outline-variant); }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        #fab { position: absolute; bottom: 32px; right: 32px; width: 64px; height: 64px; border-radius: 20px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; transition: 0.3s cubic-bezier(0.2,0,0,1); }
-        #fab:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.5); }
+        #fab { position: absolute; bottom: 32px; right: 32px; width: 64px; height: 64px; border-radius: 20px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; transition: 0.3s cubic-bezier(0.2,0,0,1); }
+        #fab:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.5); filter: brightness(1.1); }
         #fab svg { width: 28px; fill: currentColor; }
 
-        /* M3 Drawer / Side Sheet */
+        /* M3 Drawer */
         #drawer { 
             position: absolute; top: 0; right: 0; bottom: 0; width: 360px; max-width: 95vw; 
             background: var(--md-sys-color-surface-container); 
             border-top-left-radius: var(--radius-l); border-bottom-left-radius: var(--radius-l);
-            transform: translateX(110%); transition: 0.4s cubic-bezier(0.2,0,0,1); z-index: 90; 
-            display: flex; flex-direction: column; box-shadow: -8px 0 24px rgba(0,0,0,0.3);
+            display: none; z-index: 90; 
+            flex-direction: column; box-shadow: -8px 0 24px rgba(0,0,0,0.3);
+            border-left: 1px solid rgba(118, 255, 51, 0.1);
         }
-        #drawer.open { transform: translateX(0); }
+        #drawer.open { display: flex; }
         
         /* M3 Tabs */
         .tab-group { display: flex; padding: 16px 16px 8px; gap: 8px; }
-        .tab-btn { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; color: #CAC4D0; border-radius: 50px; transition: 0.2s; border: 1px solid transparent; }
-        .tab-btn.active { background: var(--md-sys-color-secondary); color: #332D41; font-weight: 600; }
+        .tab-btn { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; color: #90A4AE; border-radius: 50px; transition: 0.2s; border: 1px solid transparent; }
+        .tab-btn.active { background: rgba(118, 255, 51, 0.15); color: var(--md-sys-color-primary); font-weight: 600; border-color: rgba(118, 255, 51, 0.3); }
         .tab-btn:hover:not(.active) { background: rgba(255,255,255,0.05); }
         
         .drawer-content { flex: 1; overflow-y: auto; padding: 0 20px 20px; display: none; }
@@ -68,28 +69,29 @@
 
         /* M3 Cards */
         .m3-card { 
-            background: rgba(255,255,255,0.03); border-radius: var(--radius-m); padding: 16px; 
-            margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); transition: 0.2s;
+            background: rgba(0, 0, 0, 0.2); border-radius: var(--radius-m); padding: 16px; 
+            margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;
         }
-        .m3-card:hover { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); }
+        .m3-card:hover { border-color: rgba(118, 255, 51, 0.2); background: rgba(0,0,0,0.3); }
         .card-title { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; display:flex; align-items:center; gap:8px; }
         
         .slot-display { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-        .slot-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(208, 188, 255, 0.08); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-primary); }
+        .slot-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; color: #B0BEC5; transition: 0.3s; }
+        .m3-card:hover .slot-icon { color: var(--md-sys-color-primary); background: rgba(118, 255, 51, 0.1); }
         .slot-icon svg { width: 24px; fill: currentColor; }
-        .slot-text h3 { margin: 0; font-size: 16px; font-weight: 500; color: #E6E1E5; }
-        .slot-text p { margin: 2px 0 0; font-size: 12px; color: #CAC4D0; }
+        .slot-text h3 { margin: 0; font-size: 16px; font-weight: 500; color: #E0F2F1; }
+        .slot-text p { margin: 2px 0 0; font-size: 12px; color: #90A4AE; }
 
         /* M3 Inputs */
         .control-col { display: flex; flex-direction: column; gap: 12px; }
-        .m3-select-container { position: relative; background: rgba(0,0,0,0.2); border-radius: 8px; border-bottom: 1px solid #938F99; transition: 0.2s; }
-        .m3-select-container:focus-within { background: rgba(208, 188, 255, 0.08); border-bottom: 2px solid var(--md-sys-color-primary); }
-        .m3-select-label { position: absolute; top: 4px; left: 12px; font-size: 10px; color: var(--md-sys-color-primary); pointer-events: none; }
+        .m3-select-container { position: relative; background: rgba(0,0,0,0.2); border-radius: 8px; border-bottom: 1px solid #546E7A; transition: 0.2s; }
+        .m3-select-container:focus-within { background: rgba(118, 255, 51, 0.05); border-bottom: 2px solid var(--md-sys-color-primary); }
+        .m3-select-label { position: absolute; top: 4px; left: 12px; font-size: 10px; color: var(--md-sys-color-primary); pointer-events: none; opacity: 0.8; }
         .m3-select { 
-            width: 100%; background: transparent; border: none; color: #E6E1E5; padding: 20px 12px 6px; 
+            width: 100%; background: transparent; border: none; color: #E0F2F1; padding: 20px 12px 6px; 
             font-size: 14px; outline: none; cursor: pointer; appearance: none;
         }
-        .m3-select option { background: #2B2930; color: #E6E1E5; padding: 10px; }
+        .m3-select option { background: #002b40; color: #E0F2F1; padding: 10px; }
 
         /* Loading Spinner inside Select */
         .spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--md-sys-color-primary); border-radius: 50%; animation: spin 1s linear infinite; position: absolute; right: 12px; top: 16px; display: none; }
@@ -98,35 +100,35 @@
 
         /* Beta Toggle */
         .beta-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px; cursor: pointer; user-select: none; }
-        .beta-label { font-size: 14px; font-weight: 500; color: #E6E1E5; }
+        .beta-label { font-size: 14px; font-weight: 500; color: #B0BEC5; }
         .beta-switch { 
-            width: 44px; height: 24px; background: #36343B; border-radius: 100px; position: relative; transition: 0.2s; border: 2px solid #938F99;
+            width: 44px; height: 24px; background: #001926; border-radius: 100px; position: relative; transition: 0.2s; border: 2px solid #546E7A;
         }
         .beta-switch::after { 
             content: ''; position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; 
-            background: #938F99; border-radius: 50%; transition: 0.2s; 
+            background: #546E7A; border-radius: 50%; transition: 0.2s; 
         }
-        .beta-toggle.active .beta-switch { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); }
-        .beta-toggle.active .beta-switch::after { background: var(--md-sys-color-on-primary); transform: translateX(20px); width: 20px; height: 20px; top: 2px; left: 0; }
+        .beta-toggle.active .beta-switch { background: rgba(118, 255, 51, 0.15); border-color: var(--md-sys-color-primary); }
+        .beta-toggle.active .beta-switch::after { background: var(--md-sys-color-primary); transform: translateX(20px); width: 20px; height: 20px; top: 2px; left: 0; }
         
-        #group-scene { display: none; margin-top: 10px; border: 1px dashed var(--scene); }
+        #group-scene { display: none; margin-top: 10px; border: 1px dashed var(--md-sys-color-outline); }
         #group-scene.visible { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
 
         /* Footer */
-        .footer { padding: 24px; background: rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 12px; }
+        .footer { padding: 24px; background: rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 12px; border-top: 1px solid rgba(255,255,255,0.05); }
         
         .btn-filled { 
             width: 100%; padding: 14px; border: none; border-radius: 100px; 
             background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); 
-            font-weight: 500; font-size: 14px; cursor: pointer; display: flex; justify-content: center; align-items: center; 
+            font-weight: 600; font-size: 14px; cursor: pointer; display: flex; justify-content: center; align-items: center; 
             transition: 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
-        .btn-filled:hover { background: #E8DEF8; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn-filled:hover { background: #9eff6b; box-shadow: 0 4px 12px rgba(118, 255, 51, 0.3); }
         .btn-filled svg { width: 20px; margin-right: 8px; fill: currentColor; }
         
-        .btn-text { background: transparent; color: #E6E1E5; border: 1px solid #938F99; padding: 10px; border-radius: 100px; cursor: pointer; font-size: 12px; }
-        .btn-text:hover { background: rgba(255,255,255,0.05); }
+        .btn-text { background: transparent; color: #B0BEC5; border: 1px solid #546E7A; padding: 10px; border-radius: 100px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+        .btn-text:hover { background: rgba(255,255,255,0.05); color: #E0F2F1; border-color: #78909C; }
 
         /* Legacy support for Normal Mode List */
         .file-list { border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; margin-top:10px; }
@@ -134,31 +136,31 @@
         
         /* Add File Button */
         .btn-add-file { 
-            position: relative; width: 100%; padding: 12px; border: 1px dashed #938F99; border-radius: 12px;
-            color: #E6E1E5; text-align: center; font-size: 13px; cursor: pointer; 
+            position: relative; width: 100%; padding: 12px; border: 1px dashed #546E7A; border-radius: 12px;
+            color: #90A4AE; text-align: center; font-size: 13px; cursor: pointer; 
             display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
             transition: 0.2s; box-sizing: border-box;
         }
-        .btn-add-file:hover { background: rgba(208, 188, 255, 0.05); border-color: var(--md-sys-color-primary); }
+        .btn-add-file:hover { background: rgba(118, 255, 51, 0.05); border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
         .btn-add-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
         /* Log Box */
         .log-box { 
-            font-family: 'Consolas', monospace; font-size: 10px; color: #aaa; 
-            background: #000; padding: 10px; border-radius: 8px; border: 1px solid #333;
+            font-family: 'Consolas', monospace; font-size: 10px; color: #78909C; 
+            background: #00151f; padding: 10px; border-radius: 8px; border: 1px solid #263238;
             height: 100px; overflow-y: auto; margin-bottom: 10px; display:none;
         }
-        .log-line { margin-bottom: 2px; border-bottom: 1px solid #111; padding-bottom: 2px; }
-        .log-ok { color: #81c784; }
+        .log-line { margin-bottom: 2px; border-bottom: 1px solid #1c262b; padding-bottom: 2px; }
+        .log-ok { color: #76FF33; }
 
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; } 
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #49454F; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #37474F; border-radius: 3px; }
 
-        #mount-status { font-size: 12px; color: #938F99; text-align: center; display: none; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
-        #mount-status.active { color: #A5D6A7; }
-        .status-badge { padding: 2px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; }
+        #mount-status { font-size: 12px; color: #78909C; text-align: center; display: none; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+        #mount-status.active { color: #76FF33; }
+        .status-badge { padding: 2px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; font-weight: 700; font-size: 10px; }
     </style>
     <script type="importmap">
         { 
@@ -172,16 +174,15 @@
 <body>
 
     <div id="top-bar">
-        <div class="app-title">Tanki Architect</div>
-        <div class="app-subtitle">M3 Expressive Pro Injector</div>
+        <div class="app-title" id="t-app-title">Tanki Model Viewer</div>
     </div>
     <div id="toast"><span>Ready</span></div>
     <button id="fab"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
 
     <div id="drawer" class="open">
         <div class="tab-group">
-            <div class="tab-btn active" onclick="switchMode('normal')">Local File</div>
-            <div class="tab-btn" onclick="switchMode('assembly')">Assembly</div>
+            <div class="tab-btn active" onclick="switchMode('normal')" id="t-tab-normal">Local File</div>
+            <div class="tab-btn" onclick="switchMode('assembly')" id="t-tab-assembly">Assembly</div>
         </div>
 
         <!-- Normal Mode -->
@@ -189,11 +190,11 @@
             <div style="margin: 24px 0 16px;">
                 <label class="btn-add-file">
                     <svg viewBox="0 0 24 24" style="width:18px;margin-right:8px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    Import .a3d / .3ds files
+                    <span id="t-import-btn">Import .a3d / .3ds files</span>
                     <input type="file" id="in-normal" multiple>
                 </label>
             </div>
-            <div class="card-title">IMPORTED RESOURCES</div>
+            <div class="card-title" id="t-res-title">IMPORTED RESOURCES</div>
             <div id="list-normal" class="file-list"></div>
         </div>
 
@@ -203,24 +204,27 @@
 
             <!-- Hull Card -->
             <div class="m3-card">
-                <div class="card-title" style="color:var(--hull)"><svg viewBox="0 0 24 24" width="16" fill="currentColor"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg> Hull Configuration</div>
+                <div class="card-title" style="color:var(--hull)">
+                    <svg viewBox="0 0 24 24" width="16" fill="currentColor"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg> 
+                    <span id="t-hull-title">Hull Configuration</span>
+                </div>
                 <div class="slot-display">
-                    <div class="slot-icon" style="background:rgba(128, 203, 196, 0.1);color:var(--hull)">
+                    <div class="slot-icon" style="color:var(--hull)">
                         <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.66 0-3 1.34-3 3 0 .35.07.69.18 1H11.82C11.93 5.69 12 5.35 12 5c0-1.66-1.34-3-3-3-1.66 0-3 1.34-3 3 0 .35.07.69.18 1H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
                     </div>
                     <div class="slot-text">
                         <h3 id="display-hull">None</h3>
-                        <p id="sub-hull">Select a hull to equip</p>
+                        <p id="sub-hull" class="t-hull-sub">Select a hull to equip</p>
                     </div>
                 </div>
                 <div class="control-col">
                     <div class="m3-select-container" id="box-hull">
-                        <span class="m3-select-label">Model</span>
+                        <span class="m3-select-label t-lbl-model">Model</span>
                         <div class="spinner"></div>
                         <select id="sel-hull-name" class="m3-select"><option>Loading...</option></select>
                     </div>
                     <div class="m3-select-container">
-                        <span class="m3-select-label">Skin</span>
+                        <span class="m3-select-label t-lbl-skin">Skin</span>
                         <select id="sel-hull-skin" class="m3-select"><option>-</option></select>
                     </div>
                 </div>
@@ -228,24 +232,27 @@
 
             <!-- Turret Card -->
             <div class="m3-card">
-                <div class="card-title" style="color:var(--turret)"><svg viewBox="0 0 24 24" width="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-4-41-8-4.41-8 8-8 8 4.41 0 8 4 8 4z"/><circle cx="12" cy="12" r="3"/></svg> Turret Configuration</div>
+                <div class="card-title" style="color:var(--turret)">
+                    <svg viewBox="0 0 24 24" width="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-4-41-8-4.41-8 8-8 8 4.41 0 8 4 8 4z"/><circle cx="12" cy="12" r="3"/></svg> 
+                    <span id="t-turret-title">Turret Configuration</span>
+                </div>
                 <div class="slot-display">
-                    <div class="slot-icon" style="background:rgba(255, 204, 128, 0.1);color:var(--turret)">
+                    <div class="slot-icon" style="color:var(--turret)">
                         <svg viewBox="0 0 24 24"><path d="M14.5 13.5h2v-3h-2v3zm-4-3h2v3h-2v-3zm7.5 1.5v-6h-13v6h-2v-8h17v8h-2zM5 15h14v1H5z"/></svg>
                     </div>
                     <div class="slot-text">
                         <h3 id="display-turret">None</h3>
-                        <p id="sub-turret">Select a turret to equip</p>
+                        <p id="sub-turret" class="t-turret-sub">Select a turret to equip</p>
                     </div>
                 </div>
                 <div class="control-col">
                     <div class="m3-select-container" id="box-turret">
-                        <span class="m3-select-label">Model</span>
+                        <span class="m3-select-label t-lbl-model">Model</span>
                         <div class="spinner"></div>
                         <select id="sel-turret-name" class="m3-select"><option>Loading...</option></select>
                     </div>
                     <div class="m3-select-container">
-                        <span class="m3-select-label">Skin</span>
+                        <span class="m3-select-label t-lbl-skin">Skin</span>
                         <select id="sel-turret-skin" class="m3-select"><option>-</option></select>
                     </div>
                 </div>
@@ -253,38 +260,38 @@
 
             <!-- Beta Toggle -->
             <div class="beta-toggle" onclick="toggleScene()">
-                <div class="beta-label">Show Environment (Beta)</div>
+                <div class="beta-label" id="t-beta-label">Show Environment (Beta)</div>
                 <div class="beta-switch" id="scene-sw"></div>
             </div>
 
             <!-- Hidden Scene Card -->
             <div class="m3-card" id="group-scene">
-                <div class="card-title" style="color:var(--scene)">Map / Garage</div>
+                <div class="card-title" style="color:var(--scene)" id="t-scene-title">Map / Garage</div>
                 <div class="slot-display">
                     <div class="slot-text">
-                        <h3 id="display-scene">No Environment</h3>
+                        <h3 id="display-scene" class="t-scene-display">No Environment</h3>
                     </div>
                 </div>
                 <div id="scene-log" class="log-box"></div>
                 <div class="control-col">
                     <div class="m3-select-container" id="box-scene">
-                        <span class="m3-select-label">Environment</span>
+                        <span class="m3-select-label t-lbl-env">Environment</span>
                         <div class="spinner"></div>
                         <select id="sel-scene-var" class="m3-select"><option>Loading...</option></select>
                     </div>
                 </div>
-                <button class="btn-text" id="btn-clear-scene" style="width:100%;margin-top:12px;color:#ef9a9a;border-color:#ef9a9a">Remove Environment</button>
+                <button class="btn-text t-remove-env" id="btn-clear-scene" style="width:100%;margin-top:12px;color:#ef9a9a;border-color:#ef9a9a">Remove Environment</button>
             </div>
 
         </div>
 
         <div class="footer">
-            <div id="mount-status"><span class="status-badge">MOUNT POINT</span> <span id="mount-txt">Not Detected</span></div>
+            <div id="mount-status"><span class="status-badge t-mount-status">MOUNT POINT</span> <span id="mount-txt" class="t-mount-none">Not Detected</span></div>
             <button class="btn-filled" id="btn-export">
                 <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                Export GLB
+                <span id="t-export">Export GLB</span>
             </button>
-            <button class="btn-text" id="btn-clear">Clear All Objects</button>
+            <button class="btn-text t-clear" id="btn-clear">Clear All Objects</button>
         </div>
     </div>
 
@@ -296,7 +303,101 @@
 
     // Constants
     const ASSETS_INDEX_URL = "https://testanki1.github.io/models/assets.json";
-    const RES_BASE = "https://res.3dtank.com";
+
+    // --- I18n System ---
+    const userLang = navigator.language.startsWith('zh') ? 'zh' : 'en';
+    const RES_BASE = userLang === 'zh' ? "https://res.3dtank.com" : "https://s.eu.tankionline.com";
+    const Dict = {
+        zh: {
+            appTitle: "Tanki 模型展示",
+            tabNormal: "本地文件",
+            tabAssembly: "在线组装",
+            importBtn: "导入 .a3d / .3ds 文件",
+            resTitle: "已导入资源",
+            hullTitle: "底盘配置",
+            hullSub: "选择底盘以装备",
+            turretTitle: "炮塔配置",
+            turretSub: "选择炮塔以装备",
+            lblModel: "模型",
+            lblSkin: "皮肤",
+            lblEnv: "环境",
+            betaLabel: "显示环境 (Beta)",
+            sceneTitle: "地图 / 车库",
+            sceneDisplay: "无环境",
+            removeEnv: "移除环境",
+            mountStatus: "挂载点",
+            mountActive: "已锁定",
+            mountNone: "未检测",
+            export: "导出 GLB",
+            clear: "清空场景",
+            loading: "加载中..."
+        },
+        en: {
+            appTitle: "Tanki Model Viewer",
+            tabNormal: "Local File",
+            tabAssembly: "Assembly",
+            importBtn: "Import .a3d / .3ds files",
+            resTitle: "IMPORTED RESOURCES",
+            hullTitle: "Hull Configuration",
+            hullSub: "Select a hull to equip",
+            turretTitle: "Turret Configuration",
+            turretSub: "Select a turret to equip",
+            lblModel: "Model",
+            lblSkin: "Skin",
+            lblEnv: "Environment",
+            betaLabel: "Show Environment (Beta)",
+            sceneTitle: "Map / Garage",
+            sceneDisplay: "No Environment",
+            removeEnv: "Remove Environment",
+            mountStatus: "MOUNT POINT",
+            mountActive: "Active",
+            mountNone: "Not Detected",
+            export: "Export GLB",
+            clear: "Clear All Objects",
+            loading: "Loading..."
+        }
+    };
+    const T = Dict[userLang];
+
+    // Apply Static Translations
+    function applyI18n() {
+        document.getElementById('t-app-title').innerText = T.appTitle;
+        document.getElementById('t-tab-normal').innerText = T.tabNormal;
+        document.getElementById('t-tab-assembly').innerText = T.tabAssembly;
+        document.getElementById('t-import-btn').innerText = T.importBtn;
+        document.getElementById('t-res-title').innerText = T.resTitle;
+        document.getElementById('t-hull-title').innerText = T.hullTitle;
+        document.getElementById('t-turret-title').innerText = T.turretTitle;
+        document.getElementById('t-beta-label').innerText = T.betaLabel;
+        document.getElementById('t-scene-title').innerText = T.sceneTitle;
+        document.getElementById('t-export').innerText = T.export;
+        
+        document.querySelectorAll('.t-lbl-model').forEach(el => el.innerText = T.lblModel);
+        document.querySelectorAll('.t-lbl-skin').forEach(el => el.innerText = T.lblSkin);
+        document.querySelectorAll('.t-lbl-env').forEach(el => el.innerText = T.lblEnv);
+        document.querySelectorAll('.t-hull-sub').forEach(el => el.innerText = T.hullSub);
+        document.querySelectorAll('.t-turret-sub').forEach(el => el.innerText = T.turretSub);
+        document.querySelectorAll('.t-scene-display').forEach(el => el.innerText = T.sceneDisplay);
+        document.querySelectorAll('.t-remove-env').forEach(el => el.innerText = T.removeEnv);
+        document.querySelectorAll('.t-mount-status').forEach(el => el.innerText = T.mountStatus);
+        document.querySelectorAll('.t-mount-none').forEach(el => el.innerText = T.mountNone);
+        document.querySelectorAll('.t-clear').forEach(el => el.innerText = T.clear);
+    }
+
+    // Dynamic Data Translation
+    function translateDataKey(key) {
+        if (userLang === 'zh') return key;
+        let k = key;
+        k = k.replace(/万圣节/g, "Halloween");
+        k = k.replace(/新年/g, "New Year");
+        k = k.replace(/生日/g, "Birthday");
+        k = k.replace(/UFO 日/g, "UFO Day");
+        k = k.replace(/雪人/g, "Snowman");
+        k = k.replace(/番茄炮/g, "Tomato");
+        k = k.replace(/螯/g, "Claw");
+        k = k.replace(/蜘蛛/g, "Spider");
+        return k;
+    }
 
     // State
     let currentMode = 'normal';
@@ -311,12 +412,12 @@
     let normalMeshes = [], normalTextures = [];
 
     // Helpers
-    const mountHelper = new THREE.Mesh(new THREE.SphereGeometry(3,8,8), new THREE.MeshBasicMaterial({color:0xff0000}));
+    const mountHelper = new THREE.Mesh(new THREE.SphereGeometry(3,8,8), new THREE.MeshBasicMaterial({color:0x76FF33}));
     mountHelper.visible = false;
     let mountPos = null;
 
     // Scene
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x141218);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x001926);
     const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 1e7); camera.position.set(150,150,150);
     const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); 
     renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio); 
@@ -325,7 +426,14 @@
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping=true;
     
     const root = new THREE.Group(); root.rotation.set(-Math.PI/2, 0, 0); scene.add(root);
-    root.add(mountHelper);
+    // Sub-groups for mode persistence
+    const groupNormal = new THREE.Group();
+    const groupAssembly = new THREE.Group();
+    groupAssembly.visible = false; // Default starts in normal mode
+    root.add(groupNormal);
+    root.add(groupAssembly);
+    
+    root.add(mountHelper); // Helper stays in root but visibility managed
 
     const lg = new THREE.Group(); scene.add(lg);
     lg.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -338,7 +446,7 @@
 
     // UI Helpers
     const drawer=document.getElementById('drawer'), fab=document.getElementById('fab');
-    let open=true; fab.onclick=()=>{open=!open;drawer.classList.toggle('open',open)};
+    let open=true; fab.onclick=()=>{open=!open;if(open)drawer.style.display='flex';else drawer.style.display='none'};
     function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
     
     function log(msg) {
@@ -351,8 +459,9 @@
 
     // Initialize
     (async function init() {
+        applyI18n();
         try {
-            msg("Initializing...");
+            msg(T.loading);
             const resp = await fetch(ASSETS_INDEX_URL);
             if(!resp.ok) throw "Fetch failed";
             assetsData = await resp.json();
@@ -384,35 +493,51 @@
         const selHull = document.getElementById('sel-hull-name');
         const selHullSkin = document.getElementById('sel-hull-skin');
         selHull.innerHTML = "";
-        Object.keys(assetsData.hulls || {}).forEach(k => selHull.add(new Option(k.toUpperCase(), k)));
+        Object.keys(assetsData.hulls || {}).forEach(k => {
+            const opt = new Option(k.toUpperCase(), k);
+            selHull.add(opt);
+        });
         
         selHull.onchange = () => {
             updateSkinSelect('hull', selHull.value);
-            triggerLoad('hull');
+            if(currentMode==='assembly') triggerLoad('hull');
         };
-        selHullSkin.onchange = () => triggerLoad('hull');
+        selHullSkin.onchange = () => { if(currentMode==='assembly') triggerLoad('hull'); };
         
         // Setup Turret
         const selTurret = document.getElementById('sel-turret-name');
         const selTurretSkin = document.getElementById('sel-turret-skin');
         selTurret.innerHTML = "";
-        Object.keys(assetsData.turrets || {}).forEach(k => selTurret.add(new Option(k.toUpperCase(), k)));
+        Object.keys(assetsData.turrets || {}).forEach(k => {
+            const opt = new Option(k.toUpperCase(), k);
+            selTurret.add(opt);
+        });
         
         selTurret.onchange = () => {
             updateSkinSelect('turret', selTurret.value);
-            triggerLoad('turret');
+            if(currentMode==='assembly') triggerLoad('turret');
         };
-        selTurretSkin.onchange = () => triggerLoad('turret');
+        selTurretSkin.onchange = () => { if(currentMode==='assembly') triggerLoad('turret'); };
 
         // Setup Scene
         const selScene = document.getElementById('sel-scene-var');
         selScene.innerHTML = "";
         const garageData = assetsData.festivals?.garage || {};
-        Object.keys(garageData).forEach(k => selScene.add(new Option(k, k)));
+        Object.keys(garageData).forEach(k => {
+            const opt = new Option(translateDataKey(k), k);
+            selScene.add(opt);
+        });
         selScene.onchange = () => triggerSceneLoad();
 
+        // Initial setup for skins
         if(selHull.options.length) updateSkinSelect('hull', selHull.value);
         if(selTurret.options.length) updateSkinSelect('turret', selTurret.value);
+
+        // If user is already in assembly mode (unlikely on load, but safe), trigger load
+        if(currentMode === 'assembly') {
+             triggerLoad('hull');
+             triggerLoad('turret');
+        }
     }
 
     function updateSkinSelect(type, name) {
@@ -420,7 +545,8 @@
         selSkin.innerHTML = "";
         const skins = assetsData[`${type}s`][name] || {};
         Object.keys(skins).forEach(k => {
-            selSkin.add(new Option(k, k));
+            const opt = new Option(translateDataKey(k), k);
+            selSkin.add(opt);
         });
         let defIdx = 0;
         Array.from(selSkin.options).forEach((opt,i) => { if(opt.value==='default') defIdx=i; });
@@ -456,7 +582,7 @@
         loadingState[type] = false;
         
         document.getElementById(`display-${type}`).innerText = name.toUpperCase();
-        document.getElementById(`sub-${type}`).innerText = skin;
+        document.getElementById(`sub-${type}`).innerText = translateDataKey(skin);
     }
 
     async function triggerSceneLoad() {
@@ -474,12 +600,12 @@
         box.classList.remove('loading');
         loadingState.scene = false;
         
-        document.getElementById(`display-scene`).innerText = `Garage: ${variant}`;
+        document.getElementById(`display-scene`).innerText = `Garage: ${translateDataKey(variant)}`;
     }
 
     async function loadRemoteAsset(pathStr, type) {
         try {
-            msg(`Loading ${type}...`);
+            msg(`${T.loading} ${type}...`);
             const meta = await fetchMeta(pathStr);
             
             let modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d'));
@@ -487,6 +613,7 @@
             
             if(!modelEntry) throw "Model file not found";
 
+            // Find all textures
             const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx'));
             
             const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
@@ -548,12 +675,12 @@
     }
 
     async function loadRemoteScene(path, variant) {
-        if(slots.scene) { root.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
+        if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
         sceneLib.meshes = []; sceneLib.tex.clear();
         logBox.style.display = 'block'; logBox.innerHTML='';
         
         try {
-            msg("Parsing Scene...");
+            msg(T.loading);
             const meta = await fetchMeta(path);
             
             const models = meta.filter(f => f.name.match(/\.(a3d|3ds)$/i));
@@ -591,7 +718,7 @@
             }
 
             slots.scene = combinedGroup; 
-            root.add(combinedGroup);
+            groupAssembly.add(combinedGroup);
             
             runSceneInjector();
             fitCamera();
@@ -606,13 +733,29 @@
     // --- Standard Functions ---
 
     window.switchMode = function(mode) {
+        if(currentMode === mode) return;
         currentMode = mode;
+        
         document.querySelectorAll('.tab-btn').forEach((el,i) => {
             el.classList.toggle('active', ['normal','assembly'][i] === mode);
         });
         ['normal','assembly'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
-        clearScene();
-        document.getElementById('mount-status').style.display = mode==='assembly' ? 'flex' : 'none';
+        
+        // Visibility Toggle
+        groupNormal.visible = (mode === 'normal');
+        groupAssembly.visible = (mode === 'assembly');
+        
+        if (mode === 'assembly') {
+             document.getElementById('mount-status').style.display = 'flex';
+             if(mountPos) mountHelper.visible = true;
+
+             // Auto-load if empty but selected
+             if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
+             if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
+        } else {
+             document.getElementById('mount-status').style.display = 'none';
+             mountHelper.visible = false;
+        }
     }
 
     const loadingManager = new THREE.LoadingManager();
@@ -620,21 +763,30 @@
     document.getElementById('btn-clear').onclick = clearScene;
 
     document.getElementById('btn-export').onclick = () => {
-        if(root.children.length <= 1) { msg("场景为空"); return; }
+        // Export only visible parts
+        const toExport = currentMode === 'normal' ? groupNormal : groupAssembly;
+        if(toExport.children.length === 0) { msg("Empty Scene"); return; }
+        
         const exporter = new GLTFExporter();
         const wasVisible = mountHelper.visible; mountHelper.visible = false;
-        const oldRot = root.rotation.x;
-        root.rotation.x = 0; 
-        root.updateMatrixWorld();
+        
+        // Temporarily detach the group to export it as root, or export 'root' but with onlyVisible option
+        // To preserve the root rotation (-90 x), we export 'root'.
+        // GLTFExporter has options { onlyVisible: true }
+        
         exporter.parse(root, (result) => {
                 const blob = new Blob([result], { type: 'application/octet-stream' });
                 const link = document.createElement('a'); 
                 link.href = URL.createObjectURL(blob); 
-                link.download = 'tanki_project.glb'; 
+                link.download = 'tanki_model.glb'; 
                 link.click();
-                msg("导出成功"); 
-                root.rotation.x = oldRot; mountHelper.visible = wasVisible;
-            }, (err) => { console.error(err); msg("导出出错"); root.rotation.x = oldRot; mountHelper.visible = wasVisible; }, { binary: true }
+                msg(T.export + " OK"); 
+                mountHelper.visible = wasVisible;
+            }, (err) => { 
+                console.error(err); 
+                msg("Export Failed"); 
+                mountHelper.visible = wasVisible;
+            }, { binary: true, onlyVisible: true }
         );
     };
 
@@ -646,7 +798,7 @@
         for(let f of models) {
             try {
                 const grp = await loadModelFile(f); 
-                root.add(grp);
+                groupNormal.add(grp);
                 grp.traverse(o=>{ if(o.isMesh) normalMeshes.push(o); });
                 addUI('list-normal', f.name);
             } catch(e){}
@@ -664,7 +816,7 @@
     };
 
     function runSceneInjector() {
-        let count = 0; log(">>> 开始纹理注入...");
+        let count = 0; log(">>> Injecting Textures...");
         sceneLib.meshes.forEach(mesh => {
             const candidates = [];
             if (mesh.material && mesh.material.name) candidates.push(mesh.material.name);
@@ -688,16 +840,16 @@
                 mesh.material.needsUpdate = true; log(`✔ [${mesh.name}] -> ${bestTex.name}`); count++;
             }
         });
-        if(count > 0) msg(`匹配了 ${count} 个材质`); else log("⚠ 未找到匹配");
+        if(count > 0) msg(`Matched ${count} materials`); else log("⚠ No matches found");
     }
 
     document.getElementById('btn-clear-scene').onclick = () => {
-         if(slots.scene) { root.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
+         if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
          sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear();
          sceneLib.meshes = [];
          logBox.innerHTML = ''; logBox.style.display = 'none';
-         document.getElementById('display-scene').innerText = "No Environment";
-         msg("Environment Removed");
+         document.getElementById('display-scene').innerText = T.sceneDisplay;
+         msg(T.removeEnv);
     };
 
     async function loadModelFile(file) {
@@ -712,8 +864,8 @@
     }
 
     function equipAssembly(grp, fname, type) {
-        if(slots[type]) { root.remove(slots[type].group); dispose(slots[type].group); }
-        slots[type] = { group: grp, name: fname }; root.add(grp);
+        if(slots[type]) { groupAssembly.remove(slots[type].group); dispose(slots[type].group); }
+        slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
         // Texture is applied during load now
         fitCamera();
@@ -725,7 +877,11 @@
             if(found) return;
             if(o.name && o.name.toLowerCase().includes("mount")) {
                 const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos);
-                mountPos = root.worldToLocal(worldPos.clone()); updateMount(mountPos); found = true;
+                // Convert world position to root local space (ignoring the groupAssembly wrapper since it's identity transform usually)
+                // Actually, groupAssembly is child of root. 
+                mountPos = root.worldToLocal(worldPos.clone()); 
+                updateMount(mountPos); 
+                found = true;
             }
         });
         if(!found) updateMount(null);
@@ -752,39 +908,53 @@
     }
 
     function addUI(id, text) {
-        const div = document.createElement('div'); div.className = 'tex-item';
-        div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>${text}`;
+        const div = document.createElement('div'); div.className = 'file-item';
+        div.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;fill:#90A4AE"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><span style="margin-left:8px">${text}</span>`;
         document.getElementById(id).appendChild(div);
     }
     function updateMount(pos) {
         const el=document.getElementById('mount-status'), txt=document.getElementById('mount-txt');
-        if(pos){mountHelper.position.copy(pos); mountHelper.visible=true; el.classList.add('active'); txt.innerText="Active";}
-        else{mountHelper.visible=false; el.classList.remove('active'); txt.innerText="Not Detected";}
+        if(pos){
+            mountHelper.position.copy(pos); 
+            if(currentMode==='assembly') mountHelper.visible=true; 
+            el.classList.add('active'); txt.innerText=T.mountActive;
+        }
+        else{
+            mountHelper.visible=false; 
+            el.classList.remove('active'); txt.innerText=T.mountNone;
+        }
     }
     function clearScene() {
-        if(slots.hull) dispose(slots.hull.group); if(slots.turret) dispose(slots.turret.group); if(slots.scene) dispose(slots.scene);
-        slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
-        normalMeshes.forEach(m=>{m.geometry.dispose();m.material.dispose();root.remove(m)});
-        for(let i=root.children.length-1; i>=0; i--) if(root.children[i]!==mountHelper) root.remove(root.children[i]);
-        normalMeshes=[]; normalTextures.forEach(t=>t.dispose()); normalTextures=[];
+        if(currentMode === 'normal') {
+            while(groupNormal.children.length > 0){
+                const c = groupNormal.children[0];
+                dispose(c); groupNormal.remove(c);
+            }
+            normalMeshes = []; normalTextures.forEach(t=>t.dispose()); normalTextures = [];
+            document.getElementById('list-normal').innerHTML="";
+        } else {
+            if(slots.hull) { groupAssembly.remove(slots.hull.group); dispose(slots.hull.group); }
+            if(slots.turret) { groupAssembly.remove(slots.turret.group); dispose(slots.turret.group); }
+            if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); }
+            slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
+            
+            // Reset Displays
+            document.getElementById('display-hull').innerText = "None";
+            document.getElementById('sub-hull').innerText = T.hullSub;
+            document.getElementById('display-turret').innerText = "None";
+            document.getElementById('sub-turret').innerText = T.turretSub;
+            document.getElementById('display-scene').innerText = T.sceneDisplay;
+            logBox.style.display='none';
+            updateMount(null);
+        }
+        
         sceneLib.tex.clear(); sceneLib.meshes=[];
-        
-        document.getElementById('list-normal').innerHTML="";
-        
-        // Reset Displays
-        document.getElementById('display-hull').innerText = "None";
-        document.getElementById('sub-hull').innerText = "Select a hull to equip";
-        document.getElementById('display-turret').innerText = "None";
-        document.getElementById('sub-turret').innerText = "Select a turret to equip";
-        document.getElementById('display-scene').innerText = "No Environment";
-        
-        logBox.style.display='none';
-        updateMount(null); msg("Scene Cleared");
+        msg(T.clear);
     }
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
     function setMat(m, t) { m.material.map=t; m.material.emissiveMap=t; m.material.emissive=new THREE.Color(0xffffff); m.material.emissiveIntensity=0.5; m.material.needsUpdate=true; }
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material)o.material.dispose()}})}
-    function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.z+s);camera.lookAt(c);controls.update()}
+    function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.y+s);camera.lookAt(c);controls.update()}
 
     class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
     function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw "Err"; r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); }
