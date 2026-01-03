@@ -180,7 +180,7 @@
 <body class="fouc-loading">
 
     <div id="top-bar">
-        <div class="app-title" id="t-app-title">Tanki Model Showcase</div>
+        <div class="app-title" id="t-app-title">Tanki Model showcase</div>
     </div>
     <div id="toast"><span>Ready</span></div>
     <button id="fab"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
@@ -323,7 +323,7 @@
     const RES_BASE = userLang === 'zh' ? "https://res.3dtank.com" : "https://s.eu.tankionline.com";
     
     const CNDict = {
-        'default': '默认', 'firebird': '火焰炮', 'freeze': '冰风暴', 'isida': '磁力炮', 'tesla': '特斯拉', 'hammer': '滑膛炮',
+        'firebird': '火焰炮', 'freeze': '冰风暴', 'isida': '磁力炮', 'tesla': '特斯拉', 'hammer': '滑膛炮',
         'twins': '离子炮', 'ricochet': '火龙珠', 'smoky': '轰天炮', 'striker': '火箭炮', 'vulcan': '极速炮',
         'thunder': '雷暴炮', 'scorpion': '蝎子', 'railgun': '激光炮', 'magnum': '马格南', 'gauss': '电磁炮', 'shaft': '镭射炮',
         'wasp': '黄蜂轻甲', 'hornet': '蜂王', 'hopper': '霍珀', 'paladin': '圣骑士', 'hunter': '猎人中甲',
@@ -331,7 +331,7 @@
         'brutus': '布鲁特斯', 'mechanic': '机械师', 'trickster': '魔术师', 'saboteur': '破坏者', 'booster': '助推器',
         'defender': '守卫者', 'hyperion': '亥伯龙神', 'crisis': '危机', 'supply': '道具', 'ut': '超高', 'pr': '青春',
         'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT（跑车）', 'hd': 'HD（高清）', 'rf': 'RF（复古未来）', 'se': 'SE（秘密）', 'vt': 'VT（老兵）',
-        'dk': 'DK（暗黑）', 'sp': 'SP（蒸汽朋克）', 'ic': 'IC（冰）', 'old': '旧'
+        'dk': 'DK（黑暗）', 'sp': 'SP（蒸汽朋克）', 'ic': 'IC（冰）', 'old': '旧'
     };
 
     const Dict = {
@@ -412,6 +412,12 @@
     }
 
     // Dynamic Data Translation
+    const EN_ACRO = new Set(['XT', 'LC', 'DC', 'GT', 'HD', 'RF', 'SE', 'VT', 'DK', 'SP', 'IC', 'UT', 'PR', 'UFO']);
+    const EN_TERMS = {
+        '万圣节': 'Halloween', '新年': 'New Year', '生日': 'Birthday', 'UFO 日': 'UFO Day',
+        '雪人': 'Snowman', '番茄炮': 'Tomato', '螯': 'Claw', '蜘蛛': 'Spider'
+    };
+
     function formatName(name) {
         let text = name.replace(/_/g, ' ');
         if(userLang === 'zh') {
@@ -420,22 +426,22 @@
                 return CNDict[lc] || part;
             }).join(' ');
         } else {
-            return text.toLowerCase().split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+            // English Logic
+            Object.entries(EN_TERMS).forEach(([zh, en]) => {
+                text = text.replace(new RegExp(zh, 'g'), en);
+            });
+            
+            return text.split(' ').map(s => {
+                const upper = s.toUpperCase();
+                // Handle version numbers or single letters usually uppercase?
+                if(EN_ACRO.has(upper)) return upper;
+                return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+            }).join(' ');
         }
     }
 
     function translateDataKey(key) {
-        if (userLang === 'zh') return key;
-        let k = key;
-        k = k.replace(/万圣节/g, "Halloween");
-        k = k.replace(/新年/g, "New Year");
-        k = k.replace(/生日/g, "Birthday");
-        k = k.replace(/UFO 日/g, "UFO Day");
-        k = k.replace(/雪人/g, "Snowman");
-        k = k.replace(/番茄炮/g, "Tomato");
-        k = k.replace(/螯/g, "Claw");
-        k = k.replace(/蜘蛛/g, "Spider");
-        return k;
+        return formatName(key);
     }
 
     // State
