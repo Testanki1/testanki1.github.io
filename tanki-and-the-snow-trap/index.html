@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tanki and The Snow Trap</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Material Symbols -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
+    
+    <!-- Google Fonts: Rubik & M PLUS 1p -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700;800&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* M3 Dark Theme Token Palette - Custom Green/DarkBlue */
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-on-primary: #001926;
+            --md-sys-color-primary-container: rgba(118, 255, 51, 0.2);
+            --md-sys-color-on-primary-container: #76FF33;
+            --md-sys-color-secondary: #CCC2DC;
+            --md-sys-color-on-secondary: #332D41;
+            --md-sys-color-secondary-container: #4A4458;
+            --md-sys-color-on-secondary-container: #E8DEF8;
+            --md-sys-color-tertiary: #FF6666;
+            --md-sys-color-on-tertiary: #492532;
+            --md-sys-color-tertiary-container: #633B48;
+            --md-sys-color-on-tertiary-container: #FFD8E4;
+            --md-sys-color-surface: #001926;
+            --md-sys-color-on-surface: #E6E0E9;
+            --md-sys-color-surface-variant: rgba(255, 255, 255, 0.1);
+            --md-sys-color-on-surface-variant: #CAC4D0;
+            --md-sys-color-outline: #938F99;
+            --md-sys-color-surface-container: #1D1B20;
+            --md-sys-color-surface-container-high: rgba(0, 25, 38, 0.5);
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        
+        .pointer-events-auto { pointer-events: auto; }
+        .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        /* M3 Cards */
+        .m3-card {
+            background-color: rgba(0, 25, 38, 0.6);
+            color: var(--md-sys-color-on-surface);
+            border-radius: 28px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1);
+            padding: 24px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        
+        .m3-card.compact {
+            border-radius: 16px;
+            padding: 12px 24px;
+            background-color: rgba(0, 25, 38, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* M3 Buttons */
+        .m3-btn-primary {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border-radius: 100px;
+            height: 40px;
+            padding: 0 24px;
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 0.1px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s cubic-bezier(0.2, 0.0, 0, 1.0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            text-transform: uppercase;
+            border: none;
+            cursor: pointer;
+        }
+        .m3-btn-primary:active {
+            transform: scale(0.98);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            background-color: var(--md-sys-color-on-primary-container);
+            color: var(--md-sys-color-primary-container);
+        }
+        .m3-btn-primary:disabled {
+            background-color: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-on-surface-variant);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .m3-btn-large {
+            height: 56px;
+            font-size: 16px;
+            padding: 0 32px;
+            border-radius: 100px;
+            width: 100%;
+        }
+
+        /* Virtual Joystick */
+        #joystick-zone {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            width: 160px;
+            height: 160px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            pointer-events: auto;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s;
+        }
+        #joystick-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 64px;
+            height: 64px;
+            background: var(--md-sys-color-primary);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        
+        /* Jump Button */
+        #jump-btn {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 96px;
+            height: 96px;
+            border-radius: 28px;
+            background-color: rgba(0, 25, 38, 0.6);
+            color: var(--md-sys-color-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: auto;
+            transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+        }
+        #jump-btn:active {
+            transform: scale(0.95);
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+        }
+        
+        .hidden { display: none !important; }
+
+        #loading-bar-container {
+            width: 100%;
+            height: 4px;
+            background: var(--md-sys-color-surface-variant);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--md-sys-color-primary);
+            transition: width 0.3s ease;
+        }
+        
+        /* Score Popup Animation */
+        .score-popup {
+            position: absolute;
+            font-weight: bold;
+            font-size: 24px;
+            color: var(--md-sys-color-primary);
+            pointer-events: none;
+            animation: popupFade 1s forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+        
+        @keyframes popupFade {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -100%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -200%) scale(1.0); opacity: 0; }
+        }
+
+        .animate-scaleIn {
+            animation: scaleIn 0.3s cubic-bezier(0.2, 0.0, 0, 1.0);
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <!-- UI Layer -->
+    <div id="ui-layer" class="flex flex-col justify-between p-4 pointer-events-none">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-start w-full pointer-events-auto">
+            <!-- Score Card -->
+            <div class="m3-card compact flex items-center gap-4 min-w-[140px]">
+                <div class="w-10 h-10 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center">
+                     <span class="material-symbols-rounded text-[#76FF33]">flag</span>
+                </div>
+                <div>
+                    <p class="text-[11px] font-medium opacity-70 uppercase tracking-wider" id="lap-display">Lap 1/6</p>
+                    <div class="flex items-baseline gap-2">
+                        <h2 class="text-xl font-bold" id="score-display">0</h2>
+                        <span class="text-xs opacity-50 font-medium" id="range-display">0-17</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help Button -->
+             <button id="about-btn" class="m3-card compact flex items-center justify-center w-12 h-12 p-0 cursor-pointer hover:bg-[var(--md-sys-color-surface-variant)] transition-colors">
+                <span class="material-symbols-rounded">question_mark</span>
+            </button>
+        </div>
+
+        <!-- Start/Loading Screen (Initial Overlay) -->
+        <div id="start-screen" class="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-40 pointer-events-auto transition-opacity duration-500">
+             <div class="flex flex-col items-center">
+                <div id="loading-container" class="w-64">
+                    <div id="loading-bar-container" class="mb-2">
+                        <div id="loading-bar"></div>
+                    </div>
+                    <p id="loading-text" class="text-center text-xs text-white/70">Loading 0%</p>
+                </div>
+                
+                <button id="start-btn" class="m3-btn-primary m3-btn-large scale-110 shadow-xl hidden" style="width: auto; padding: 0 48px;">
+                    <span class="material-symbols-rounded">play_arrow</span>
+                    <span>TAP TO START</span>
+                </button>
+             </div>
+        </div>
+
+        <!-- Win/Reset Screen -->
+        <div id="win-screen" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 pointer-events-auto hidden">
+            <div class="m3-card flex flex-col items-center text-center max-w-sm mx-4 animate-scaleIn">
+                <div class="w-16 h-16 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center mb-4 shadow-lg">
+                    <span class="material-symbols-rounded text-3xl text-[var(--md-sys-color-on-primary-container)]">emoji_events</span>
+                </div>
+                <h1 class="text-2xl font-bold mb-2">Course Completed!</h1>
+                <p class="text-white/70 mb-6 text-sm">You've reached 102 points and finished all 6 laps.</p>
+                
+                <button id="reset-btn" class="m3-btn-primary m3-btn-large">
+                    <span class="material-symbols-rounded">replay</span>
+                    <span>RESET PROGRESS</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- About Modal (Hidden) -->
+        <div id="about-modal" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-50 hidden pointer-events-auto">
+            <div class="m3-card flex flex-col items-center text-center max-w-sm mx-4 relative animate-scaleIn">
+                <button id="close-about-btn" class="absolute top-4 right-4 p-2 text-[var(--md-sys-color-on-surface-variant)] hover:bg-white/10 rounded-full transition-colors">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+
+                <div class="w-16 h-16 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center mb-6 shadow-lg">
+                    <span class="material-symbols-rounded text-3xl text-[var(--md-sys-color-on-primary-container)]">sports_esports</span>
+                </div>
+                <h1 class="text-3xl font-bold mb-2 text-[var(--md-sys-color-on-surface)]">Tanki Jump</h1>
+                <p class="text-[var(--md-sys-color-on-surface-variant)] mb-6 leading-relaxed text-sm">
+                    Use Joystick or WASD to move.<br>
+                    <strong>Counter-Clockwise</strong> jumps score points.<br>
+                    Backward jumps deduct points.<br>
+                    Double jumps = +2 points!
+                </p>
+                <div class="text-xs text-white/30 mt-4">
+                    Tip: Tap screen to enter Fullscreen
+                </div>
+            </div>
+        </div>
+
+        <!-- Touch Controls (Visible on all touch devices) -->
+        <div class="w-full h-full absolute top-0 left-0 pointer-events-none" id="touch-ui" style="display: none;">
+            <!-- Joystick -->
+            <div id="joystick-zone">
+                <div id="joystick-knob">
+                    <span class="material-symbols-rounded text-[#001926] text-3xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">drag_pan</span>
+                </div>
+            </div>
+
+            <!-- Jump Button -->
+            <button id="jump-btn">
+                <span class="material-symbols-rounded" style="font-size: 48px;">arrow_upward</span>
+            </button>
+        </div>
+
+        <!-- Desktop Hint -->
+        <div class="hidden lg:block absolute bottom-8 right-8 text-right opacity-50 m3-card compact pointer-events-auto">
+            <p class="text-sm font-medium">WASD to Move • SPACE to Jump • Drag to Look</p>
+        </div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="bg-music" loop>
+        <source src="static/media/main.a5574efb.mp3" type="audio/mpeg">
+    </audio>
+    <!-- Was move.mp3 (Jump), now for Score Increase -->
+    <audio id="sfx-score-plus">
+        <source src="static/media/move.046bd221.mp3" type="audio/mpeg">
+    </audio>
+    <!-- Was checkpoint.mp3 (Score), now for Lap Change -->
+    <audio id="sfx-lap">
+        <source src="static/media/checkpoint.d152b838.mp3" type="audio/mpeg">
+    </audio>
+    <!-- Was roll.mp3 (Engine), now for Score Decrease -->
+    <audio id="sfx-score-minus">
+        <source src="static/media/roll.0da23fa7.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Import Maps -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import * as CANNON from 'cannon-es';
+
+        // --- Config ---
+        const ASSETS = {
+            islands: 'https://web-cdn.tankionline.com/new-year/models/islands/islands.glb',
+            tank: 'https://web-cdn.tankionline.com/new-year/models/tank/tank.glb',
+            sky: 'https://web-cdn.tankionline.com/new-year/sky.png',
+            hdr: 'https://web-cdn.tankionline.com/new-year/forest.hdr'
+        };
+
+        const PHYSICS = {
+            gravity: -60,
+            moveSpeed: 60,
+            acceleration: 3.0, 
+            deceleration: 3.0,
+            turnSpeed: 6.0,
+            jumpImpulse: 60,
+            tankMass: 30,
+            tankRadius: 1.5
+        };
+
+        const GAME_CONFIG = {
+            maxScore: 102,
+            pointsPerLap: 17,
+            maxLaps: 6
+        };
+
+        let gameState = {
+            score: 0,
+            isPlaying: false,
+            isFinished: false,
+            lastScorePos: new THREE.Vector3(0, 15, 167),
+            assetsLoaded: false
+        };
+
+        // --- Init ---
+        const container = document.getElementById('game-container');
+        
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Scene
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0c1221, 0.002);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 40, 50);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enablePan = false;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05; // Looser damping for smoother lag
+        controls.minDistance = 10;
+        controls.maxDistance = 200;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+        
+        // Physics World
+        const world = new CANNON.World();
+        world.gravity.set(0, PHYSICS.gravity, 0);
+        world.solver.iterations = 10;
+        
+        const defaultMaterial = new CANNON.Material('default');
+        const defaultContactMaterial = new CANNON.ContactMaterial(defaultMaterial, defaultMaterial, {
+            friction: 0.1,
+            restitution: 0.0,
+            contactEquationStiffness: 1e8,
+            contactEquationRelaxation: 3
+        });
+        world.addContactMaterial(defaultContactMaterial);
+
+        // --- Lights ---
+        const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.bias = -0.0005;
+
+        // Enhanced Shadow Camera Coverage
+        const d = 300;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 500;
+        
+        scene.add(dirLight);
+
+        // --- Loading Manager ---
+        const loadingManager = new THREE.LoadingManager();
+        const startBtn = document.getElementById('start-btn');
+        const loadingContainer = document.getElementById('loading-container');
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingText = document.getElementById('loading-text');
+
+        loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+            const progress = (itemsLoaded / itemsTotal) * 100;
+            loadingBar.style.width = progress + '%';
+            loadingText.innerText = 'Loading ' + Math.round(progress) + '%';
+        };
+
+        loadingManager.onLoad = () => {
+            gameState.assetsLoaded = true;
+            loadingContainer.classList.add('hidden');
+            startBtn.classList.remove('hidden');
+            startBtn.classList.add('flex');
+        };
+
+        const textureLoader = new THREE.TextureLoader(loadingManager);
+        const gltfLoader = new GLTFLoader(loadingManager);
+        const rgbeLoader = new RGBELoader(loadingManager);
+
+        // --- Environment ---
+        textureLoader.load(ASSETS.sky, (texture) => {
+            const geometry = new THREE.SphereGeometry(800, 60, 40);
+            const material = new THREE.MeshBasicMaterial({ 
+                map: texture, 
+                side: THREE.BackSide,
+                fog: false 
+            });
+            const skybox = new THREE.Mesh(geometry, material);
+            skybox.rotation.set(-Math.PI/6, Math.PI/2, 0);
+            scene.add(skybox);
+        });
+
+        rgbeLoader.load(ASSETS.hdr, (texture) => {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            scene.environment = texture;
+        });
+
+        // --- Physics Helpers ---
+        const collidableMeshes = [];
+
+        function createTrimeshBody(mesh) {
+            const geometry = mesh.geometry;
+            const vertices = [];
+            const indices = [];
+
+            mesh.updateMatrixWorld(true);
+            const matrix = mesh.matrixWorld;
+            const v = new THREE.Vector3();
+
+            if (geometry.index) {
+                for (let i = 0; i < geometry.index.count; i++) {
+                    indices.push(geometry.index.array[i]);
+                }
+                for (let i = 0; i < geometry.attributes.position.count; i++) {
+                    v.fromBufferAttribute(geometry.attributes.position, i);
+                    v.applyMatrix4(matrix);
+                    vertices.push(v.x, v.y, v.z);
+                }
+            } else {
+                for (let i = 0; i < geometry.attributes.position.count; i++) {
+                    v.fromBufferAttribute(geometry.attributes.position, i);
+                    v.applyMatrix4(matrix);
+                    vertices.push(v.x, v.y, v.z);
+                    indices.push(i);
+                }
+            }
+
+            const shape = new CANNON.Trimesh(vertices, indices);
+            const body = new CANNON.Body({ mass: 0, material: defaultMaterial });
+            body.addShape(shape);
+            body.position.set(0,0,0); 
+            return body;
+        }
+
+        // --- Objects ---
+        let tankBody, tankMesh;
+        const input = { x: 0, y: 0, jump: false };
+        let canJump = false;
+        let isJumping = false;
+        let lastGroundedTime = 0;
+        const COYOTE_TIME = 0.2; // Increased slightly for raycast forgiveness
+
+        // Load Islands
+        gltfLoader.load(ASSETS.islands, (gltf) => {
+            const model = gltf.scene;
+            scene.add(model);
+            
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.receiveShadow = true;
+                    child.castShadow = true;
+                    if(child.material) child.material.envMapIntensity = 0.5;
+
+                    collidableMeshes.push(child);
+
+                    child.geometry.computeBoundingSphere();
+                    const radius = child.geometry.boundingSphere.radius;
+                    
+                    if(radius > 3) {
+                        const body = createTrimeshBody(child);
+                        body.idStr = 'island_' + child.uuid;
+                        world.addBody(body);
+                    }
+                }
+            });
+        });
+
+        // Helper to show floating text
+        function showFloatingText(text, pos, isBad = false) {
+            const div = document.createElement('div');
+            div.className = 'score-popup';
+            div.innerText = text;
+            if (isBad) div.style.color = '#FF6666';
+            
+            // Project 3D pos to 2D screen
+            const vec = pos.clone();
+            vec.y += 3;
+            vec.project(camera);
+            
+            const x = (vec.x * .5 + .5) * window.innerWidth;
+            const y = (-(vec.y * .5) + .5) * window.innerHeight;
+            
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 1000);
+        }
+
+        // Scoring Logic Function
+        function checkScoring() {
+            if (!tankBody || !gameState.isPlaying) return;
+
+            const currentPos = new THREE.Vector3(tankBody.position.x, tankBody.position.y, tankBody.position.z);
+            const dist = currentPos.distanceTo(gameState.lastScorePos);
+            
+            if (dist > 40) {
+                const lastAngle = Math.atan2(gameState.lastScorePos.z, gameState.lastScorePos.x);
+                const currentAngle = Math.atan2(currentPos.z, currentPos.x);
+                
+                let diff = currentAngle - lastAngle;
+                while (diff > Math.PI) diff -= 2 * Math.PI;
+                while (diff < -Math.PI) diff += 2 * Math.PI;
+                
+                let points = 1;
+                if (dist > 75) points = 2;
+                
+                const oldDisplayScore = Math.max(0, gameState.score);
+                
+                if (diff < 0) {
+                    if (gameState.score < GAME_CONFIG.maxScore) {
+                        gameState.score += points;
+                        if (gameState.score > GAME_CONFIG.maxScore) gameState.score = GAME_CONFIG.maxScore;
+                    }
+                } else {
+                    gameState.score -= points;
+                }
+                
+                const newDisplayScore = Math.max(0, gameState.score);
+                const scoreDiff = newDisplayScore - oldDisplayScore;
+                
+                updateScoreDisplay();
+                gameState.lastScorePos.copy(currentPos);
+                
+                if (scoreDiff !== 0) {
+                    // Check for lap change
+                     const oldLap = Math.floor(oldDisplayScore / GAME_CONFIG.pointsPerLap) + 1;
+                     const newLap = Math.floor(newDisplayScore / GAME_CONFIG.pointsPerLap) + 1;
+                     
+                     if ((newLap > oldLap && newLap <= GAME_CONFIG.maxLaps) || newDisplayScore === GAME_CONFIG.maxScore) {
+                         playSound('sfx-lap'); // checkpoint.mp3
+                     }
+
+                    if (scoreDiff > 0) {
+                        playSound('sfx-score-plus'); // move.mp3
+                        showFloatingText(scoreDiff > 1 ? "+" + scoreDiff + " Double!" : "+" + scoreDiff, currentPos);
+                    } else {
+                        playSound('sfx-score-minus'); // roll.mp3
+                        showFloatingText(scoreDiff + " Back!", currentPos, true);
+                    }
+                }
+            }
+        }
+
+        // Load Tank
+        gltfLoader.load(ASSETS.tank, (gltf) => {
+            tankMesh = gltf.scene;
+            scene.add(tankMesh);
+            tankMesh.traverse(c => { if(c.isMesh) { c.castShadow=true; c.receiveShadow=true; } });
+
+            const shape = new CANNON.Sphere(PHYSICS.tankRadius);
+            tankBody = new CANNON.Body({
+                mass: PHYSICS.tankMass,
+                material: defaultMaterial,
+                shape: shape,
+                angularDamping: 0.9,
+                linearDamping: 0.2 
+            });
+            tankBody.position.set(0, 10, 167); 
+            world.addBody(tankBody);
+            
+            tankBody.addEventListener('collide', (e) => {
+                const contactNormal = new CANNON.Vec3();
+                e.contact.ni.negate(contactNormal); 
+                
+                // Physical collision is one way to be grounded
+                if (contactNormal.dot(new CANNON.Vec3(0, 1, 0)) > 0.5) {
+                    canJump = true;
+                    lastGroundedTime = clock.getElapsedTime();
+                    checkScoring();
+                }
+            });
+        });
+
+        // --- Controls ---
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+        let joystickActive = false;
+        let joystickOrigin = { x: 0, y: 0 };
+        let joystickId = null;
+
+        // Touch Joystick
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation(); 
+            const touch = e.changedTouches[0];
+            joystickId = touch.identifier;
+            joystickActive = true;
+            const rect = joystickZone.getBoundingClientRect();
+            joystickOrigin = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+            updateJoystick(touch.clientX, touch.clientY);
+        });
+
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if(!joystickActive) return;
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joystickId) {
+                    updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                    break;
+                }
+            }
+        });
+
+        const endJoystick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if(!joystickActive) return;
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joystickId) {
+                    joystickActive = false;
+                    input.x = 0; 
+                    input.y = 0;
+                    joystickKnob.style.transform = `translate(-50%, -50%)`;
+                    break;
+                }
+            }
+        };
+        joystickZone.addEventListener('touchend', endJoystick);
+        joystickZone.addEventListener('touchcancel', endJoystick);
+
+        function updateJoystick(clientX, clientY) {
+            const maxDist = 45; 
+            let dx = clientX - joystickOrigin.x;
+            let dy = clientY - joystickOrigin.y;
+            
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if(dist > maxDist) {
+                const ratio = maxDist / dist;
+                dx *= ratio;
+                dy *= ratio;
+            }
+            
+            joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            
+            input.x = dx / maxDist;
+            input.y = dy / maxDist;
+        }
+
+        // Touch Jump
+        const jumpBtn = document.getElementById('jump-btn');
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            input.jump = true;
+        });
+        jumpBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            input.jump = false;
+        });
+
+        // Keyboard
+        window.addEventListener('keydown', (e) => {
+            if(!gameState.isPlaying) return;
+            switch(e.code) {
+                case 'KeyW': case 'ArrowUp': input.y = -1; break;
+                case 'KeyS': case 'ArrowDown': input.y = 1; break;
+                case 'KeyA': case 'ArrowLeft': input.x = -1; break;
+                case 'KeyD': case 'ArrowRight': input.x = 1; break;
+                case 'Space': input.jump = true; break;
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'KeyW': case 'ArrowUp': if(input.y < 0) input.y = 0; break;
+                case 'KeyS': case 'ArrowDown': if(input.y > 0) input.y = 0; break;
+                case 'KeyA': case 'ArrowLeft': if(input.x < 0) input.x = 0; break;
+                case 'KeyD': case 'ArrowRight': if(input.x > 0) input.x = 0; break;
+                case 'Space': input.jump = false; break;
+            }
+        });
+
+        // --- Game Logic ---
+        const clock = new THREE.Clock();
+        const raycaster = new THREE.Raycaster();
+        const downVector = new THREE.Vector3(0, -1, 0);
+        
+        function updateScoreDisplay() {
+            const displayScore = Math.max(0, gameState.score);
+            document.getElementById('score-display').innerText = displayScore;
+
+            // Lap Calculation
+            let currentLap = Math.floor(displayScore / GAME_CONFIG.pointsPerLap) + 1;
+            if (currentLap > GAME_CONFIG.maxLaps) currentLap = GAME_CONFIG.maxLaps;
+            if (displayScore === GAME_CONFIG.maxScore) currentLap = GAME_CONFIG.maxLaps; // Ensure max is displayed
+
+            // Range Calculation
+            const rangeStart = (currentLap - 1) * GAME_CONFIG.pointsPerLap;
+            const rangeEnd = currentLap * GAME_CONFIG.pointsPerLap;
+            
+            document.getElementById('lap-display').innerText = `LAP ${currentLap}/${GAME_CONFIG.maxLaps}`;
+            document.getElementById('range-display').innerText = `${rangeStart}-${rangeEnd}`;
+
+            // Check Win Condition
+            if (gameState.score >= GAME_CONFIG.maxScore && !gameState.isFinished) {
+                gameState.isFinished = true;
+                document.getElementById('win-screen').classList.remove('hidden');
+                document.getElementById('ui-layer').classList.remove('pointer-events-none'); // Ensure clicks pass
+            }
+        }
+
+        function respawn() {
+            if(!tankBody) return;
+            tankBody.position.set(0, 15, 167); 
+            tankBody.velocity.set(0,0,0);
+            tankBody.angularVelocity.set(0,0,0);
+            
+            gameState.lastScorePos.set(0, 15, 167);
+            
+            // Checkpoint Logic: Reset to floor of current lap
+            if (gameState.score > 0 && gameState.score < GAME_CONFIG.maxScore) {
+                gameState.score = Math.floor(gameState.score / GAME_CONFIG.pointsPerLap) * GAME_CONFIG.pointsPerLap;
+            } else if (gameState.score < 0) {
+                gameState.score = 0;
+            }
+            // If max score reached, keep it there unless reset
+            
+            updateScoreDisplay();
+        }
+
+        // Camera smoothing variables
+        const smoothedCameraTarget = new THREE.Vector3();
+        let cameraInitialized = false;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const dt = Math.min(clock.getDelta(), 0.05);
+            const now = clock.getElapsedTime();
+            
+            if(gameState.isPlaying && tankBody && tankMesh) {
+                // Raycast Ground Check to fix "airborne on slopes" issue
+                const rayOrigin = tankMesh.position.clone();
+                rayOrigin.y += 0.5; // Start slightly above center
+                raycaster.set(rayOrigin, downVector);
+                // Check intersect with islands
+                const intersects = raycaster.intersectObjects(collidableMeshes);
+                
+                // 1.5 (radius) + 1.0 (buffer)
+                if (intersects.length > 0 && intersects[0].distance < 2.5) {
+                    canJump = true;
+                    lastGroundedTime = now;
+                    checkScoring();
+                } else {
+                    // We rely on 'collide' event or previous frame's grounded state
+                    // If no raycast hit, canJump becomes false after coyote time
+                }
+
+                world.step(1/60, dt, 10);
+
+                // Sync Visuals
+                tankMesh.position.copy(tankBody.position);
+                tankMesh.position.y -= 1.5; 
+                
+                // Calculate movement direction relative to camera
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+                camDir.y = 0;
+                camDir.normalize();
+                
+                const camRight = new THREE.Vector3(-camDir.z, 0, camDir.x);
+                
+                const moveVec = new THREE.Vector3();
+                moveVec.addScaledVector(camDir, -input.y);
+                moveVec.addScaledVector(camRight, input.x);
+                
+                // --- Acceleration & Movement ---
+                const currentVel = new THREE.Vector3(tankBody.velocity.x, 0, tankBody.velocity.z);
+                let targetVel = new THREE.Vector3(0,0,0);
+                const hasInput = moveVec.length() > 0.1;
+
+                if(hasInput) {
+                    moveVec.normalize();
+                    targetVel.copy(moveVec).multiplyScalar(PHYSICS.moveSpeed);
+                    
+                    // Acceleration
+                    currentVel.lerp(targetVel, PHYSICS.acceleration * dt);
+                } else {
+                    // Deceleration
+                    currentVel.lerp(new THREE.Vector3(0,0,0), PHYSICS.deceleration * dt);
+                }
+                
+                tankBody.velocity.x = currentVel.x;
+                tankBody.velocity.z = currentVel.z;
+
+                // --- Turning ---
+                if(hasInput) {
+                    const targetAngle = Math.atan2(targetVel.x, targetVel.z) - Math.PI / 2;
+                    let curRot = tankMesh.rotation.y;
+                    
+                    let diff = targetAngle - curRot;
+                    while(diff > Math.PI) diff -= Math.PI*2;
+                    while(diff < -Math.PI) diff += Math.PI*2;
+                    
+                    const maxTurn = PHYSICS.turnSpeed * dt;
+                    const turnAmount = Math.max(-maxTurn, Math.min(maxTurn, diff));
+                    
+                    tankMesh.rotation.y += turnAmount;
+                }
+                
+                // --- Jumping ---
+                // Check if we can jump (either raycast or collision set canJump recently)
+                const isGrounded = (now - lastGroundedTime < COYOTE_TIME);
+
+                if(input.jump && isGrounded && !isJumping) {
+                    isJumping = true;
+                    tankBody.velocity.y = PHYSICS.jumpImpulse;
+                    lastGroundedTime = -10.0; // Consume coyote time
+                    canJump = false; 
+                    // Jump sound was requested to be removed/repurposed, so no sound here.
+                }
+
+                // Variable Jump Height
+                if(!input.jump && isJumping) {
+                    if(tankBody.velocity.y > 0) {
+                        tankBody.velocity.y *= 0.5;
+                    }
+                    isJumping = false;
+                }
+
+                if(tankBody.velocity.y < 0) isJumping = false;
+
+                // --- Camera Follow ---
+                if(!cameraInitialized) {
+                    smoothedCameraTarget.copy(tankMesh.position);
+                    cameraInitialized = true;
+                }
+
+                const camLerpSpeed = hasInput ? 3.0 : 3.0;
+                smoothedCameraTarget.lerp(tankMesh.position, camLerpSpeed * dt);
+                
+                const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+                
+                camera.position.copy(smoothedCameraTarget).add(offset);
+                controls.target.copy(smoothedCameraTarget);
+                
+                controls.update();
+
+                // Fall Check
+                if(tankBody.position.y < -50) {
+                    respawn();
+                }
+            } else if ((!gameState.isPlaying || gameState.isFinished) && tankBody && tankMesh) {
+                 // Idle rotation
+                 const t = Date.now() * 0.0005;
+                 camera.position.x = Math.sin(t) * 200;
+                 camera.position.z = Math.cos(t) * 200;
+                 camera.position.y = 100;
+                 camera.lookAt(0, 0, 0);
+            } else {
+                controls.update();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Sound ---
+        function playSound(id) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.currentTime = 0;
+                el.play().catch(()=>{});
+            }
+        }
+
+        // --- Interaction ---
+        // UI Logic
+        const aboutBtn = document.getElementById('about-btn');
+        const closeAboutBtn = document.getElementById('close-about-btn');
+        const aboutModal = document.getElementById('about-modal');
+        const startScreen = document.getElementById('start-screen');
+        
+        // Add click listener for global fullscreen and orientation lock
+        document.addEventListener('click', () => {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen()
+                    .then(() => {
+                        if (screen.orientation && screen.orientation.lock) {
+                            screen.orientation.lock('landscape').catch(() => {});
+                        }
+                    })
+                    .catch(() => {});
+            }
+        });
+
+        aboutBtn.addEventListener('click', () => {
+            aboutModal.classList.remove('hidden');
+        });
+
+        closeAboutBtn.addEventListener('click', () => {
+            aboutModal.classList.add('hidden');
+        });
+
+        const resetBtn = document.getElementById('reset-btn');
+        resetBtn.addEventListener('click', () => {
+            gameState.score = 0;
+            gameState.isFinished = false;
+            document.getElementById('win-screen').classList.add('hidden');
+            respawn();
+            updateScoreDisplay();
+        });
+
+        startBtn.addEventListener('click', () => {
+            if(!gameState.assetsLoaded) return;
+            
+            // Fullscreen & Orientation
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            if(screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+            
+            if(window.matchMedia("(pointer: coarse)").matches) {
+                document.getElementById('touch-ui').style.display = 'block';
+            }
+
+            gameState.isPlaying = true;
+            startScreen.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => startScreen.classList.add('hidden'), 500);
+            
+            const bgMusic = document.getElementById('bg-music');
+            bgMusic.volume = 0.4;
+            bgMusic.play().catch(()=>{});
+            
+            // Initial score check
+            updateScoreDisplay();
+            respawn();
+            
+            // Reset camera to behind tank
+            camera.position.set(0, 40, 200);
+            controls.target.set(0, 10, 167);
+            smoothedCameraTarget.set(0, 10, 167);
+            cameraInitialized = false;
+            controls.update();
+        });
+
+        // Ensure UI layer doesn't block clicks when win screen is up
+        const winScreen = document.getElementById('win-screen');
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if(mutation.target.classList.contains('hidden')) {
+                   document.getElementById('ui-layer').classList.add('pointer-events-none');
+                   document.querySelector('.pointer-events-auto').classList.add('pointer-events-auto'); // Re-enable header
+                } else {
+                   document.getElementById('ui-layer').classList.remove('pointer-events-none');
+                }
+            });
+        });
+        observer.observe(winScreen, { attributes: true, attributeFilter: ['class'] });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+
+    </script>
+</body>
+</html>
