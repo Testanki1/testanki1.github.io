@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tanki and The Snow Trap</title>
+    <title>3D坦克与雪陷阱（自制修改版）（Rework）</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -47,6 +47,8 @@
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
+            opacity: 0; /* Hidden initially for font loading */
+            transition: opacity 0.5s ease-in-out;
         }
 
         #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
@@ -253,7 +255,7 @@
                 
                 <button id="start-btn" class="m3-btn-primary m3-btn-large scale-110 shadow-xl hidden" style="width: auto; padding: 0 48px;">
                     <span class="material-symbols-rounded">play_arrow</span>
-                    <span>TAP TO START</span>
+                    <span id="start-btn-text">TAP TO START</span>
                 </button>
              </div>
         </div>
@@ -264,12 +266,12 @@
                 <div class="w-16 h-16 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center mb-4 shadow-lg">
                     <span class="material-symbols-rounded text-3xl text-[var(--md-sys-color-on-primary-container)]">emoji_events</span>
                 </div>
-                <h1 class="text-2xl font-bold mb-2">Course Completed!</h1>
-                <p class="text-white/70 mb-6 text-sm">You've reached 102 points and finished all 6 laps.</p>
+                <h1 id="win-title" class="text-2xl font-bold mb-2">Course Completed!</h1>
+                <p id="win-desc" class="text-white/70 mb-6 text-sm">You've reached 102 points and finished all 6 laps.</p>
                 
                 <button id="reset-btn" class="m3-btn-primary m3-btn-large">
                     <span class="material-symbols-rounded">replay</span>
-                    <span>RESET PROGRESS</span>
+                    <span id="reset-btn-text">RESET PROGRESS</span>
                 </button>
             </div>
         </div>
@@ -284,14 +286,14 @@
                 <div class="w-16 h-16 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center mb-6 shadow-lg">
                     <span class="material-symbols-rounded text-3xl text-[var(--md-sys-color-on-primary-container)]">sports_esports</span>
                 </div>
-                <h1 class="text-3xl font-bold mb-2 text-[var(--md-sys-color-on-surface)]">Tanki Jump</h1>
-                <p class="text-[var(--md-sys-color-on-surface-variant)] mb-6 leading-relaxed text-sm">
+                <h1 id="about-title" class="text-3xl font-bold mb-2 text-[var(--md-sys-color-on-surface)]">Tanki Jump</h1>
+                <p id="about-desc" class="text-[var(--md-sys-color-on-surface-variant)] mb-6 leading-relaxed text-sm">
                     Use Joystick or WASD to move.<br>
                     <strong>Counter-Clockwise</strong> jumps score points.<br>
                     Backward jumps deduct points.<br>
                     Double jumps = +2 points!
                 </p>
-                <div class="text-xs text-white/30 mt-4">
+                <div id="about-tip" class="text-xs text-white/30 mt-4">
                     Tip: Tap screen to enter Fullscreen
                 </div>
             </div>
@@ -314,25 +316,22 @@
 
         <!-- Desktop Hint -->
         <div class="hidden lg:block absolute bottom-8 right-8 text-right opacity-50 m3-card compact pointer-events-auto">
-            <p class="text-sm font-medium">WASD to Move • SPACE to Jump • Drag to Look</p>
+            <p id="desktop-hint-text" class="text-sm font-medium">WASD to Move • SPACE to Jump • Drag to Look</p>
         </div>
     </div>
 
     <!-- Audio Elements -->
     <audio id="bg-music" loop>
-        <source src="static/media/main.a5574efb.mp3" type="audio/mpeg">
+        <source src="https://web-cdn.tankionline.com/new-year/audio/main.mp3" type="audio/mpeg">
     </audio>
-    <!-- Was move.mp3 (Jump), now for Score Increase -->
     <audio id="sfx-score-plus">
-        <source src="static/media/move.046bd221.mp3" type="audio/mpeg">
+        <source src="https://web-cdn.tankionline.com/new-year/audio/move.mp3" type="audio/mpeg">
     </audio>
-    <!-- Was checkpoint.mp3 (Score), now for Lap Change -->
     <audio id="sfx-lap">
-        <source src="static/media/checkpoint.d152b838.mp3" type="audio/mpeg">
+        <source src="https://web-cdn.tankionline.com/new-year/audio/checkpoint.mp3" type="audio/mpeg">
     </audio>
-    <!-- Was roll.mp3 (Engine), now for Score Decrease -->
     <audio id="sfx-score-minus">
-        <source src="static/media/roll.0da23fa7.mp3" type="audio/mpeg">
+        <source src="https://web-cdn.tankionline.com/new-year/audio/roll.mp3" type="audio/mpeg">
     </audio>
 
     <!-- Import Maps -->
@@ -353,6 +352,58 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import * as CANNON from 'cannon-es';
 
+        // --- Font Loading Wait ---
+        document.fonts.ready.then(() => {
+            document.body.style.opacity = '1';
+        });
+
+        // --- Localization ---
+        const userLang = navigator.language || navigator.userLanguage; 
+        const lang = userLang.startsWith('zh') ? 'zh' : 'en';
+
+        const TEXTS = {
+            en: {
+                lap: "Lap",
+                loading: "Loading",
+                start: "TAP TO START",
+                winTitle: "Course Completed!",
+                winDesc: "You've reached 102 points and finished all 6 laps.",
+                reset: "RESET PROGRESS",
+                aboutTitle: "Tanki and The Snow Trap (Rework)",
+                aboutDesc: "Use Joystick or WASD to move.<br><strong>Counter-Clockwise</strong> jumps score points.<br>Backward jumps deduct points.<br>Double jumps = +2 points!",
+                aboutTip: "Tip: Tap screen to enter Fullscreen",
+                hint: "WASD to Move • SPACE to Jump • Drag to Look",
+                double: "Double!",
+                back: "Back!"
+            },
+            zh: {
+                lap: "圈数",
+                loading: "加载中",
+                start: "点击开始",
+                winTitle: "恭喜通关！",
+                winDesc: "你已获得102分并完成了全部6圈挑战。",
+                reset: "重置进度",
+                aboutTitle: "3D坦克与雪陷阱（玩法重构）",
+                aboutDesc: "使用摇杆或 WASD 移动。<br><strong>逆时针</strong>跳跃得分。<br>后退跳跃扣分。<br>连跳 = +2 分！",
+                aboutTip: "提示：点击屏幕进入全屏",
+                hint: "WASD 移动 • 空格 跳跃 • 拖动 视角",
+                double: "双倍！",
+                back: "倒退！"
+            }
+        };
+
+        const t = TEXTS[lang];
+
+        // Apply translations
+        document.getElementById('start-btn-text').innerText = t.start;
+        document.getElementById('win-title').innerText = t.winTitle;
+        document.getElementById('win-desc').innerText = t.winDesc;
+        document.getElementById('reset-btn-text').innerText = t.reset;
+        document.getElementById('about-title').innerText = t.aboutTitle;
+        document.getElementById('about-desc').innerHTML = t.aboutDesc;
+        document.getElementById('about-tip').innerText = t.aboutTip;
+        document.getElementById('desktop-hint-text').innerText = t.hint;
+
         // --- Config ---
         const ASSETS = {
             islands: 'https://web-cdn.tankionline.com/new-year/models/islands/islands.glb',
@@ -363,9 +414,9 @@
 
         const PHYSICS = {
             gravity: -60,
-            moveSpeed: 60,
+            moveSpeed: 55,
             acceleration: 3.0, 
-            deceleration: 3.0,
+            deceleration: 1.0, // Reduced for ice sliding feel
             turnSpeed: 6.0,
             jumpImpulse: 60,
             tankMass: 30,
@@ -412,7 +463,7 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enablePan = false;
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05; // Looser damping for smoother lag
+        controls.dampingFactor = 0.05; 
         controls.minDistance = 10;
         controls.maxDistance = 200;
         controls.maxPolarAngle = Math.PI / 2 - 0.05;
@@ -422,9 +473,10 @@
         world.gravity.set(0, PHYSICS.gravity, 0);
         world.solver.iterations = 10;
         
+        // Ice Material - Very Low Friction
         const defaultMaterial = new CANNON.Material('default');
         const defaultContactMaterial = new CANNON.ContactMaterial(defaultMaterial, defaultMaterial, {
-            friction: 0.1,
+            friction: 0.001, // ICE!
             restitution: 0.0,
             contactEquationStiffness: 1e8,
             contactEquationRelaxation: 3
@@ -463,7 +515,7 @@
         loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
             const progress = (itemsLoaded / itemsTotal) * 100;
             loadingBar.style.width = progress + '%';
-            loadingText.innerText = 'Loading ' + Math.round(progress) + '%';
+            loadingText.innerText = t.loading + ' ' + Math.round(progress) + '%';
         };
 
         loadingManager.onLoad = () => {
@@ -538,7 +590,7 @@
         let canJump = false;
         let isJumping = false;
         let lastGroundedTime = 0;
-        const COYOTE_TIME = 0.2; // Increased slightly for raycast forgiveness
+        const COYOTE_TIME = 0.2;
 
         // Load Islands
         gltfLoader.load(ASSETS.islands, (gltf) => {
@@ -633,10 +685,10 @@
 
                     if (scoreDiff > 0) {
                         playSound('sfx-score-plus'); // move.mp3
-                        showFloatingText(scoreDiff > 1 ? "+" + scoreDiff + " Double!" : "+" + scoreDiff, currentPos);
+                        showFloatingText(scoreDiff > 1 ? "+" + scoreDiff + " " + t.double : "+" + scoreDiff, currentPos);
                     } else {
                         playSound('sfx-score-minus'); // roll.mp3
-                        showFloatingText(scoreDiff + " Back!", currentPos, true);
+                        showFloatingText(scoreDiff + " " + t.back, currentPos, true);
                     }
                 }
             }
@@ -654,7 +706,7 @@
                 material: defaultMaterial,
                 shape: shape,
                 angularDamping: 0.9,
-                linearDamping: 0.2 
+                linearDamping: 0.05 // Very low for sliding
             });
             tankBody.position.set(0, 10, 167); 
             world.addBody(tankBody);
@@ -663,7 +715,6 @@
                 const contactNormal = new CANNON.Vec3();
                 e.contact.ni.negate(contactNormal); 
                 
-                // Physical collision is one way to be grounded
                 if (contactNormal.dot(new CANNON.Vec3(0, 1, 0)) > 0.5) {
                     canJump = true;
                     lastGroundedTime = clock.getElapsedTime();
@@ -784,20 +835,20 @@
             // Lap Calculation
             let currentLap = Math.floor(displayScore / GAME_CONFIG.pointsPerLap) + 1;
             if (currentLap > GAME_CONFIG.maxLaps) currentLap = GAME_CONFIG.maxLaps;
-            if (displayScore === GAME_CONFIG.maxScore) currentLap = GAME_CONFIG.maxLaps; // Ensure max is displayed
+            if (displayScore === GAME_CONFIG.maxScore) currentLap = GAME_CONFIG.maxLaps;
 
             // Range Calculation
             const rangeStart = (currentLap - 1) * GAME_CONFIG.pointsPerLap;
             const rangeEnd = currentLap * GAME_CONFIG.pointsPerLap;
             
-            document.getElementById('lap-display').innerText = `LAP ${currentLap}/${GAME_CONFIG.maxLaps}`;
+            document.getElementById('lap-display').innerText = `${t.lap} ${currentLap}/${GAME_CONFIG.maxLaps}`;
             document.getElementById('range-display').innerText = `${rangeStart}-${rangeEnd}`;
 
             // Check Win Condition
             if (gameState.score >= GAME_CONFIG.maxScore && !gameState.isFinished) {
                 gameState.isFinished = true;
                 document.getElementById('win-screen').classList.remove('hidden');
-                document.getElementById('ui-layer').classList.remove('pointer-events-none'); // Ensure clicks pass
+                document.getElementById('ui-layer').classList.remove('pointer-events-none');
             }
         }
 
@@ -809,13 +860,11 @@
             
             gameState.lastScorePos.set(0, 15, 167);
             
-            // Checkpoint Logic: Reset to floor of current lap
             if (gameState.score > 0 && gameState.score < GAME_CONFIG.maxScore) {
                 gameState.score = Math.floor(gameState.score / GAME_CONFIG.pointsPerLap) * GAME_CONFIG.pointsPerLap;
             } else if (gameState.score < 0) {
                 gameState.score = 0;
             }
-            // If max score reached, keep it there unless reset
             
             updateScoreDisplay();
         }
@@ -831,21 +880,16 @@
             const now = clock.getElapsedTime();
             
             if(gameState.isPlaying && tankBody && tankMesh) {
-                // Raycast Ground Check to fix "airborne on slopes" issue
+                // Raycast Ground Check
                 const rayOrigin = tankMesh.position.clone();
-                rayOrigin.y += 0.5; // Start slightly above center
+                rayOrigin.y += 0.5;
                 raycaster.set(rayOrigin, downVector);
-                // Check intersect with islands
                 const intersects = raycaster.intersectObjects(collidableMeshes);
                 
-                // 1.5 (radius) + 1.0 (buffer)
                 if (intersects.length > 0 && intersects[0].distance < 2.5) {
                     canJump = true;
                     lastGroundedTime = now;
                     checkScoring();
-                } else {
-                    // We rely on 'collide' event or previous frame's grounded state
-                    // If no raycast hit, canJump becomes false after coyote time
                 }
 
                 world.step(1/60, dt, 10);
@@ -878,7 +922,7 @@
                     // Acceleration
                     currentVel.lerp(targetVel, PHYSICS.acceleration * dt);
                 } else {
-                    // Deceleration
+                    // Deceleration (Very low for ice)
                     currentVel.lerp(new THREE.Vector3(0,0,0), PHYSICS.deceleration * dt);
                 }
                 
@@ -901,15 +945,13 @@
                 }
                 
                 // --- Jumping ---
-                // Check if we can jump (either raycast or collision set canJump recently)
                 const isGrounded = (now - lastGroundedTime < COYOTE_TIME);
 
                 if(input.jump && isGrounded && !isJumping) {
                     isJumping = true;
                     tankBody.velocity.y = PHYSICS.jumpImpulse;
-                    lastGroundedTime = -10.0; // Consume coyote time
+                    lastGroundedTime = -10.0;
                     canJump = false; 
-                    // Jump sound was requested to be removed/repurposed, so no sound here.
                 }
 
                 // Variable Jump Height
@@ -972,7 +1014,6 @@
         const aboutModal = document.getElementById('about-modal');
         const startScreen = document.getElementById('start-screen');
         
-        // Add click listener for global fullscreen and orientation lock
         document.addEventListener('click', () => {
             if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen()
@@ -1005,7 +1046,6 @@
         startBtn.addEventListener('click', () => {
             if(!gameState.assetsLoaded) return;
             
-            // Fullscreen & Orientation
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(() => {});
             }
@@ -1025,11 +1065,9 @@
             bgMusic.volume = 0.4;
             bgMusic.play().catch(()=>{});
             
-            // Initial score check
             updateScoreDisplay();
             respawn();
             
-            // Reset camera to behind tank
             camera.position.set(0, 40, 200);
             controls.target.set(0, 10, 167);
             smoothedCameraTarget.set(0, 10, 167);
@@ -1037,13 +1075,12 @@
             controls.update();
         });
 
-        // Ensure UI layer doesn't block clicks when win screen is up
         const winScreen = document.getElementById('win-screen');
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if(mutation.target.classList.contains('hidden')) {
                    document.getElementById('ui-layer').classList.add('pointer-events-none');
-                   document.querySelector('.pointer-events-auto').classList.add('pointer-events-auto'); // Re-enable header
+                   document.querySelector('.pointer-events-auto').classList.add('pointer-events-auto');
                 } else {
                    document.getElementById('ui-layer').classList.remove('pointer-events-none');
                 }
