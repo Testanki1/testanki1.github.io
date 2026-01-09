@@ -637,7 +637,8 @@
             islands: 'https://web-cdn.tankionline.com/new-year/models/islands/islands.glb',
             tank: 'https://web-cdn.tankionline.com/new-year/models/tank/tank.glb',
             sky: 'https://web-cdn.tankionline.com/new-year/sky.png',
-            hdr: 'https://web-cdn.tankionline.com/new-year/forest.hdr'
+            hdr: 'https://web-cdn.tankionline.com/new-year/forest.hdr',
+            lightmap: 'https://web-cdn.tankionline.com/new-year/models/islands/lightmap.png'
         };
 
         const PHYSICS = {
@@ -929,7 +930,11 @@
         let lastGroundedTime = 0;
         const COYOTE_TIME = 0.2;
 
-        // Load Islands
+        // Load Lightmap & Islands
+        const islandLightmap = textureLoader.load(ASSETS.lightmap);
+        islandLightmap.flipY = false;
+        islandLightmap.colorSpace = THREE.SRGBColorSpace;
+
         gltfLoader.load(ASSETS.islands, (gltf) => {
             const model = gltf.scene;
             scene.add(model);
@@ -938,7 +943,11 @@
                 if (child.isMesh) {
                     child.receiveShadow = true;
                     child.castShadow = true;
-                    if(child.material) child.material.envMapIntensity = 0.5;
+                    if(child.material) {
+                        child.material.envMapIntensity = 0.5;
+                        child.material.lightMap = islandLightmap;
+                        child.material.lightMapIntensity = 1.0;
+                    }
 
                     collidableMeshes.push(child);
 
