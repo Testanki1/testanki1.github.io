@@ -395,6 +395,9 @@
                             <span class="lap-info" id="lap-display" style="margin: 0;">Lap 1/6</span>
                             <span class="lap-info" style="margin: 0; opacity: 0.4;">•</span>
                             <span class="lap-info" id="game-timer" style="margin: 0; font-variant-numeric: tabular-nums;">00:00</span>
+                            <button id="restart-game-btn" style="background: none; border: none; padding: 0 4px; color: var(--md-sys-color-on-surface); cursor: pointer; display: flex; align-items: center; opacity: 0.7; margin-left: 4px;" title="Restart">
+                                <span class="material-symbols-rounded" style="font-size: 16px;">refresh</span>
+                            </button>
                         </div>
                         <div id="hud-best-container" class="hidden" style="display: flex; align-items: center; gap: 4px; margin-top: 0px;">
                             <span id="best-label" class="lap-info" style="color: #FFD700; opacity: 1;">Best</span>
@@ -579,6 +582,7 @@
                 time: "Time: ",
                 newRecord: "New Record!",
                 deleteConfirm: "Delete Best Record?",
+                restartConfirm: "Restart Game?",
                 yes: "YES",
                 no: "NO"
             },
@@ -602,6 +606,7 @@
                 time: "用时: ",
                 newRecord: "新纪录！",
                 deleteConfirm: "确定删除记录？",
+                restartConfirm: "确定重新开始？",
                 yes: "确定",
                 no: "取消"
             }
@@ -625,6 +630,7 @@
         document.getElementById('confirm-text').innerText = t.deleteConfirm;
         document.getElementById('confirm-yes').innerText = t.yes;
         document.getElementById('confirm-cancel').innerText = t.no;
+        document.getElementById('restart-game-btn').title = lang === 'zh' ? '重新开始' : 'Restart Game';
 
         // --- Config ---
         const ASSETS = {
@@ -717,22 +723,48 @@
         const confirmYes = document.getElementById('confirm-yes');
         const confirmNo = document.getElementById('confirm-cancel');
         const confirmText = document.getElementById('confirm-text');
+        
+        let currentConfirmAction = null;
 
-        document.getElementById('hud-delete-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            // Text is already set by t.deleteConfirm, but we ensure it here just in case dynamic changing is needed later
-            confirmText.innerText = t.deleteConfirm;
-            confirmModal.classList.remove('hidden');
+        // General confirmation handler
+        confirmYes.addEventListener('click', () => {
+             if (currentConfirmAction) currentConfirmAction();
+             confirmModal.classList.add('hidden');
         });
 
         confirmNo.addEventListener('click', () => {
             confirmModal.classList.add('hidden');
         });
 
-        confirmYes.addEventListener('click', () => {
-             deleteBestTime();
-             confirmModal.classList.add('hidden');
+        // Delete Record Button
+        document.getElementById('hud-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmText.innerText = t.deleteConfirm;
+            currentConfirmAction = deleteBestTime;
+            confirmModal.classList.remove('hidden');
         });
+        
+        // Restart Game Button
+        document.getElementById('restart-game-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmText.innerText = t.restartConfirm;
+            currentConfirmAction = resetGameLogic;
+            confirmModal.classList.remove('hidden');
+        });
+        
+        // Game Reset Logic (Extracted)
+        function resetGameLogic() {
+            gameState.score = 0;
+            gameState.isFinished = false;
+            document.getElementById('win-screen').classList.add('hidden');
+            
+            // Start game logic again
+            gameState.gameStartTime = clock.getElapsedTime();
+            gameState.elapsedTime = 0;
+            
+            respawn('full');
+            updateScoreDisplay();
+        }
 
         // Initialize UI
         updateBestTimeUI();
@@ -1570,18 +1602,7 @@
 
 
         const resetBtn = document.getElementById('reset-btn');
-        resetBtn.addEventListener('click', () => {
-            gameState.score = 0;
-            gameState.isFinished = false;
-            document.getElementById('win-screen').classList.add('hidden');
-            
-            // Start game logic again
-            gameState.gameStartTime = clock.getElapsedTime();
-            gameState.elapsedTime = 0;
-            
-            respawn('full');
-            updateScoreDisplay();
-        });
+        resetBtn.addEventListener('click', resetGameLogic);
 
         startBtn.addEventListener('click', () => {
             if(!gameState.assetsLoaded) return;
