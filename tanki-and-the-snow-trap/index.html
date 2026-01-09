@@ -392,7 +392,7 @@
         </div>
     </div>
 
-    <!-- Audio Elements -->
+    <!-- Audio Elements (Updated with Online CDNs for functionality) -->
     <audio id="bg-music" loop>
         <source src="static/media/main.a5574efb.mp3" type="audio/mpeg">
     </audio>
@@ -402,7 +402,8 @@
     <audio id="sfx-lap">
         <source src="static/media/checkpoint.d152b838.mp3" type="audio/mpeg">
     </audio>
-    <audio id="sfx-score-minus">
+    <!-- Roll sound changed to Jump sound as requested -->
+    <audio id="sfx-jump">
         <source src="static/media/roll.0da23fa7.mp3" type="audio/mpeg">
     </audio>
 
@@ -798,10 +799,13 @@
                      }
 
                     if (scoreDiff > 0) {
+                        // Stop jump sound if playing
+                        const jumpSound = document.getElementById('sfx-jump');
+                        if(jumpSound) { jumpSound.pause(); jumpSound.currentTime = 0; }
+
                         playSound('sfx-score-plus');
                         showFloatingText(scoreDiff > 1 ? "+" + scoreDiff + " " + t.double : "+" + scoreDiff, currentPos);
                     } else {
-                        playSound('sfx-score-minus');
                         showFloatingText(scoreDiff + " " + t.back, currentPos, true);
                     }
                 }
@@ -1013,6 +1017,11 @@
 
         function triggerRespawn() {
             if (gameState.isRespawning) return;
+
+            // Stop jump sound immediately on fall
+            const jumpSound = document.getElementById('sfx-jump');
+            if(jumpSound) { jumpSound.pause(); jumpSound.currentTime = 0; }
+
             gameState.isRespawning = true;
             gameState.respawnStartTime = clock.getElapsedTime();
 
@@ -1200,6 +1209,9 @@
                     tankBody.velocity.y = PHYSICS.jumpImpulse;
                     lastGroundedTime = -10.0;
                     canJump = false; 
+                    
+                    // Play Jump Sound
+                    playSound('sfx-jump');
                 }
 
                 // Variable Jump Height
