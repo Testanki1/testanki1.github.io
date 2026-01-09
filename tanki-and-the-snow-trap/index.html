@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>3D坦克与雪陷阱（玩法重构）</title>
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
     <!-- Material Symbols -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
     
@@ -15,6 +12,9 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700;800&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 
     <style>
+        * {
+        -webkit-tap-highlight-color: transparent;
+        }
         :root {
             /* M3 Dark Theme Token Palette - Custom Green/DarkBlue */
             --md-sys-color-primary: #76FF33;
@@ -51,13 +51,13 @@
             transition: opacity 0.5s ease-in-out;
         }
 
-        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-        
-        .pointer-events-auto { pointer-events: auto; }
+        h1, h2, h3, p { margin: 0; }
+
+        /* --- M3 Expressive Components --- */
+
         .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
-        /* M3 Cards */
+        /* Cards */
         .m3-card {
             background-color: rgba(0, 25, 38, 0.6);
             color: var(--md-sys-color-on-surface);
@@ -77,7 +77,7 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* M3 Buttons */
+        /* Buttons */
         .m3-btn-primary {
             background-color: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
@@ -123,6 +123,7 @@
             cursor: pointer;
             transition: all 0.2s;
             backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
         .m3-btn-icon:hover {
             background-color: var(--md-sys-color-surface-variant);
@@ -142,86 +143,158 @@
             width: 100%;
         }
 
-        /* Virtual Joystick */
-        #joystick-zone {
-            position: absolute;
-            bottom: 40px;
-            left: 40px;
-            width: 160px;
-            height: 160px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-            pointer-events: auto;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(4px);
-            transition: opacity 0.3s;
-        }
-        #joystick-knob {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 64px;
-            height: 64px;
-            background: var(--md-sys-color-primary);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        /* --- Layout & Utilities (Replaces Tailwind) --- */
+        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        .ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
             pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 16px;
+            box-sizing: border-box;
         }
         
-        /* Jump Button */
-        #jump-btn {
-            position: absolute;
-            bottom: 40px;
-            right: 40px;
-            width: 96px;
-            height: 96px;
-            border-radius: 28px;
-            background-color: rgba(0, 25, 38, 0.6);
-            color: var(--md-sys-color-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.1);
+        .pointer-events-auto { pointer-events: auto; }
+        .pointer-events-none { pointer-events: none; }
+        
+        .header-row {
+            display: flex; justify-content: space-between; align-items: flex-start; width: 100%;
+        }
+        
+        .score-card {
+            display: flex; align-items: center; gap: 16px; min-width: 140px;
+        }
+        
+        .icon-circle {
+            width: 40px; height: 40px; border-radius: 50%;
+            background-color: var(--md-sys-color-primary-container);
+            display: flex; align-items: center; justify-content: center;
+        }
+        
+        .text-primary { color: var(--md-sys-color-on-primary-container); }
+        
+        .lap-info {
+            font-size: 11px; font-weight: 500; opacity: 0.7; 
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;
+        }
+        
+        .score-container { display: flex; align-items: baseline; gap: 8px; }
+        
+        .score-val { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+        .score-range { font-size: 0.75rem; opacity: 0.5; font-weight: 500; }
+        
+        .controls-row { display: flex; gap: 12px; }
+        
+        /* Overlays */
+        .fullscreen-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             pointer-events: auto;
-            transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
-            cursor: pointer;
-            backdrop-filter: blur(12px);
-        }
-        #jump-btn:active {
-            transform: scale(0.95);
-            background-color: var(--md-sys-color-primary);
-            color: var(--md-sys-color-on-primary);
-            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+            transition: opacity 0.5s ease;
         }
         
-        .hidden { display: none !important; }
-
+        .overlay-bg-dark {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 40;
+        }
+        
+        .overlay-bg-medium {
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 50;
+        }
+        
+        .loading-container { width: 256px; display: flex; flex-direction: column; margin-bottom: 24px; }
         #loading-bar-container {
-            width: 100%;
-            height: 4px;
-            background: var(--md-sys-color-surface-variant);
-            border-radius: 2px;
-            overflow: hidden;
+            width: 100%; height: 4px; background: var(--md-sys-color-surface-variant);
+            border-radius: 2px; overflow: hidden; margin-bottom: 8px;
         }
         #loading-bar {
-            width: 0%;
-            height: 100%;
-            background: var(--md-sys-color-primary);
+            width: 0%; height: 100%; background: var(--md-sys-color-primary);
             transition: width 0.3s ease;
         }
+        .loading-text { text-align: center; font-size: 0.75rem; color: rgba(255,255,255,0.7); }
         
-        /* Score Popup Animation */
-        .score-popup {
-            position: absolute;
-            font-weight: bold;
-            font-size: 24px;
-            color: var(--md-sys-color-primary);
+        .start-btn-custom { transform: scale(1.1); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: auto !important; padding: 0 48px !important; }
+
+        /* Modal Content */
+        .modal-content {
+            display: flex; flex-direction: column; items-center; text-align: center;
+            max-width: 24rem; margin: 0 16px; position: relative;
+        }
+        
+        .modal-icon {
+            width: 64px; height: 64px; border-radius: 50%;
+            background-color: var(--md-sys-color-primary-container);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 16px; margin-left: auto; margin-right: auto;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .modal-icon span { font-size: 32px; color: var(--md-sys-color-on-primary-container); }
+        
+        .modal-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+        .modal-desc { font-size: 0.875rem; color: rgba(255,255,255,0.7); margin-bottom: 24px; line-height: 1.5; }
+        
+        .close-btn {
+            position: absolute; top: 16px; right: 16px; padding: 8px;
+            color: var(--md-sys-color-on-surface-variant);
+            background: transparent; border: none; cursor: pointer; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .close-btn:hover { background-color: rgba(255,255,255,0.1); }
+        
+        /* Joystick & Controls */
+        #joystick-zone {
+            position: absolute; bottom: 40px; left: 40px; width: 160px; height: 160px;
+            background: rgba(255, 255, 255, 0.05); border-radius: 50%;
+            pointer-events: auto; border: 2px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px); transition: opacity 0.3s;
+        }
+        #joystick-knob {
+            position: absolute; top: 50%; left: 50%; width: 64px; height: 64px;
+            background: var(--md-sys-color-primary); border-radius: 50%;
+            transform: translate(-50%, -50%); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             pointer-events: none;
+        }
+        
+        #jump-btn {
+            position: absolute; bottom: 40px; right: 40px; width: 96px; height: 96px;
+            border-radius: 28px; background-color: rgba(0, 25, 38, 0.6);
+            color: var(--md-sys-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: auto; transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
+            cursor: pointer; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        #jump-btn:active {
+            transform: scale(0.95); background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary); box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+        }
+
+        .desktop-hint {
+            display: none; position: absolute; bottom: 32px; right: 32px;
+            opacity: 0.5; text-align: right; pointer-events: auto;
+        }
+        .desktop-hint p { font-size: 0.875rem; font-weight: 500; }
+
+        @media (min-width: 1024px) {
+            .desktop-hint { display: block; }
+        }
+
+        /* Animations */
+        .hidden { display: none !important; }
+        .opacity-0 { opacity: 0; }
+        
+        .score-popup {
+            position: absolute; font-weight: bold; font-size: 24px;
+            color: var(--md-sys-color-primary); pointer-events: none;
             animation: popupFade 1s forwards;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            z-index: 20;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 20;
         }
         
         @keyframes popupFade {
@@ -230,22 +303,14 @@
             100% { transform: translate(-50%, -200%) scale(1.0); opacity: 0; }
         }
 
-        /* Lap Notification */
         .lap-notification {
-            position: absolute;
-            top: 35%;
-            left: 50%;
+            position: absolute; top: 35%; left: 50%;
             transform: translate(-50%, -50%) scale(0.5);
-            font-size: 4rem;
-            font-weight: 900;
+            font-size: 4rem; font-weight: 900;
             color: var(--md-sys-color-primary);
             text-shadow: 0 0 30px rgba(118, 255, 51, 0.6);
-            pointer-events: none;
-            white-space: nowrap;
-            z-index: 35;
-            opacity: 0;
-            font-style: italic;
-            letter-spacing: -1px;
+            pointer-events: none; white-space: nowrap; z-index: 35;
+            opacity: 0; font-style: italic; letter-spacing: -1px;
         }
         
         .lap-animate {
@@ -267,79 +332,70 @@
             from { transform: scale(0.9); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
         }
-
-
     </style>
 </head>
 <body>
     <div id="game-container"></div>
     
     <!-- UI Layer -->
-    <div id="ui-layer" class="flex flex-col justify-between p-4 pointer-events-none">
+    <div id="ui-layer" class="ui-layer">
         
         <!-- Header -->
-        <div class="flex justify-between items-start w-full pointer-events-auto">
+        <div class="header-row pointer-events-auto">
             <!-- Score Card -->
-            <div class="m3-card compact flex items-center gap-4 min-w-[140px]">
-                <div class="w-10 h-10 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center">
-                     <span class="material-symbols-rounded text-[#76FF33]">flag</span>
+            <div class="m3-card compact score-card">
+                <div class="icon-circle">
+                     <span class="material-symbols-rounded text-primary">flag</span>
                 </div>
                 <div>
-                    <p class="text-[11px] font-medium opacity-70 uppercase tracking-wider" id="lap-display">Lap 1/6</p>
-                    <div class="flex items-baseline gap-2">
-                        <h2 class="text-xl font-bold" id="score-display">0</h2>
-                        <span class="text-xs opacity-50 font-medium" id="range-display">0-17</span>
+                    <p class="lap-info" id="lap-display">Lap 1/6</p>
+                    <div class="score-container">
+                        <h2 class="score-val" id="score-display">0</h2>
+                        <span class="score-range" id="range-display">0-17</span>
                     </div>
                 </div>
             </div>
 
             <!-- Top Right Buttons -->
-             <div class="flex gap-3">
-                 <!-- Auto Camera Toggle -->
+             <div class="controls-row">
                  <button id="cam-toggle-btn" class="m3-btn-icon active" title="Auto Camera">
                      <span class="material-symbols-rounded">center_focus_weak</span>
                  </button>
-                 <!-- Sound Toggle -->
                  <button id="sound-btn" class="m3-btn-icon" title="Sound On/Off">
                      <span class="material-symbols-rounded">volume_off</span>
                  </button>
-                 <!-- Help Button -->
                  <button id="about-btn" class="m3-btn-icon">
                     <span class="material-symbols-rounded">question_mark</span>
                 </button>
             </div>
         </div>
 
-        <!-- Start/Loading Screen (Initial Overlay) -->
-        <div id="start-screen" class="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-40 pointer-events-auto transition-opacity duration-500">
-             <div class="flex flex-col items-center">
-                <div id="loading-container" class="w-64">
-                    <div id="loading-bar-container" class="mb-2">
-                        <div id="loading-bar"></div>
-                    </div>
-                    <p id="loading-text" class="text-center text-xs text-white/70">Loading 0%</p>
+        <!-- Start/Loading Screen -->
+        <div id="start-screen" class="fullscreen-overlay overlay-bg-dark">
+             <div class="loading-container">
+                <div id="loading-bar-container">
+                    <div id="loading-bar"></div>
                 </div>
-                
-                <button id="start-btn" class="m3-btn-primary m3-btn-large scale-110 shadow-xl hidden" style="width: auto; padding: 0 48px;">
-                    <span class="material-symbols-rounded">play_arrow</span>
-                    <span id="start-btn-text">TAP TO START</span>
-                </button>
+                <p id="loading-text" class="loading-text">Loading 0%</p>
              </div>
+             
+             <button id="start-btn" class="m3-btn-primary m3-btn-large start-btn-custom hidden">
+                 <span class="material-symbols-rounded">play_arrow</span>
+                 <span id="start-btn-text">TAP TO START</span>
+             </button>
         </div>
 
         <!-- Lap Notification Overlay -->
         <div id="lap-notification" class="lap-notification"></div>
 
-
-
         <!-- Win/Reset Screen -->
-        <div id="win-screen" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 pointer-events-auto hidden">
-            <div class="m3-card flex flex-col items-center text-center max-w-sm mx-4 animate-scaleIn">
-                <div class="w-16 h-16 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center mb-4 shadow-lg">
-                    <span class="material-symbols-rounded text-3xl text-[var(--md-sys-color-on-primary-container)]">emoji_events</span>
+        <div id="win-screen" class="fullscreen-overlay overlay-bg-medium hidden">
+            <div class="m3-card modal-content animate-scaleIn">
+                <div class="modal-icon">
+                    <span class="material-symbols-rounded">emoji_events</span>
                 </div>
-                <h1 id="win-title" class="text-2xl font-bold mb-2">Course Completed!</h1>
-                <p id="win-desc" class="text-white/70 mb-6 text-sm">You've reached 102 points and finished all 6 laps.</p>
+                <h1 id="win-title" class="modal-title">Course Completed!</h1>
+                <p id="win-desc" class="modal-desc">You've reached 102 points and finished all 6 laps.</p>
                 
                 <button id="reset-btn" class="m3-btn-primary m3-btn-large">
                     <span class="material-symbols-rounded">replay</span>
@@ -348,51 +404,48 @@
             </div>
         </div>
 
-        <!-- About Modal (Hidden) -->
-        <div id="about-modal" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-50 hidden pointer-events-auto">
-            <div class="m3-card flex flex-col items-center text-center max-w-sm mx-4 relative animate-scaleIn">
-                <button id="close-about-btn" class="absolute top-4 right-4 p-2 text-[var(--md-sys-color-on-surface-variant)] hover:bg-white/10 rounded-full transition-colors">
+        <!-- About Modal -->
+        <div id="about-modal" class="fullscreen-overlay overlay-bg-medium hidden">
+            <div class="m3-card modal-content animate-scaleIn">
+                <button id="close-about-btn" class="close-btn">
                     <span class="material-symbols-rounded">close</span>
                 </button>
 
-                <div class="w-16 h-16 rounded-full bg-[var(--md-sys-color-primary-container)] flex items-center justify-center mb-6 shadow-lg">
-                    <span class="material-symbols-rounded text-3xl text-[var(--md-sys-color-on-primary-container)]">sports_esports</span>
+                <div class="modal-icon">
+                    <span class="material-symbols-rounded">sports_esports</span>
                 </div>
-                <h1 id="about-title" class="text-3xl font-bold mb-2 text-[var(--md-sys-color-on-surface)]">Tanki Jump</h1>
-                <p id="about-desc" class="text-[var(--md-sys-color-on-surface-variant)] mb-6 leading-relaxed text-sm">
+                <h1 id="about-title" class="modal-title">Tanki Jump</h1>
+                <p id="about-desc" class="modal-desc">
                     Use Joystick or WASD to move.<br>
                     <strong>Counter-Clockwise</strong> jumps score points.<br>
                     Backward jumps deduct points.<br>
                     Double jumps = +2 points!
                 </p>
-                <div id="about-tip" class="text-xs text-white/30 mt-4">
+                <div id="about-tip" class="score-range" style="margin-top: 16px;">
                     Tip: Tap screen to enter Fullscreen
                 </div>
             </div>
         </div>
 
-        <!-- Touch Controls (Visible on all touch devices) -->
-        <div class="w-full h-full absolute top-0 left-0 pointer-events-none" id="touch-ui" style="display: none;">
-            <!-- Joystick -->
+        <!-- Touch Controls -->
+        <div style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; display: none;" id="touch-ui">
             <div id="joystick-zone">
                 <div id="joystick-knob">
-                    <span class="material-symbols-rounded text-[#001926] text-3xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">drag_pan</span>
+                    <span class="material-symbols-rounded" style="color:#001926; font-size: 32px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">drag_pan</span>
                 </div>
             </div>
-
-            <!-- Jump Button -->
             <button id="jump-btn">
                 <span class="material-symbols-rounded" style="font-size: 48px;">arrow_upward</span>
             </button>
         </div>
 
         <!-- Desktop Hint -->
-        <div class="hidden lg:block absolute bottom-8 right-8 text-right opacity-50 m3-card compact pointer-events-auto">
-            <p id="desktop-hint-text" class="text-sm font-medium">WASD to Move • SPACE to Jump • Drag to Look</p>
+        <div class="m3-card compact desktop-hint">
+            <p id="desktop-hint-text">WASD to Move • SPACE to Jump • Drag to Look</p>
         </div>
     </div>
 
-    <!-- Audio Elements (Updated with Online CDNs for functionality) -->
+    <!-- Audio Elements -->
     <audio id="bg-music" loop>
         <source src="static/media/main.a5574efb.mp3" type="audio/mpeg">
     </audio>
@@ -493,6 +546,9 @@
             sky: 'https://web-cdn.tankionline.com/new-year/sky.png',
             hdr: 'https://web-cdn.tankionline.com/new-year/forest.hdr'
         };
+
+        // Note: Used web-cdn.tankionline.com links which should be stable as they are from the original event/inspiration.
+        // Fallback or local paths from prompt were: static/media/... which won't work here.
 
         const PHYSICS = {
             gravity: -60,
@@ -600,7 +656,7 @@
         // --- Loading Manager ---
         const loadingManager = new THREE.LoadingManager();
         const startBtn = document.getElementById('start-btn');
-        const loadingContainer = document.getElementById('loading-container');
+        const loadingContainer = document.querySelector('.loading-container'); // updated class selector
         const loadingBar = document.getElementById('loading-bar');
         const loadingText = document.getElementById('loading-text');
 
@@ -614,7 +670,8 @@
             gameState.assetsLoaded = true;
             loadingContainer.classList.add('hidden');
             startBtn.classList.remove('hidden');
-            startBtn.classList.add('flex');
+            startBtn.classList.add('m3-btn-primary'); // Ensure display flex equivalent if needed, but flex is default in css
+            startBtn.style.display = 'inline-flex';
         };
 
         const textureLoader = new THREE.TextureLoader(loadingManager);
@@ -792,7 +849,6 @@
                      
                      if ((newLap > oldLap && newLap <= GAME_CONFIG.maxLaps) || newDisplayScore === GAME_CONFIG.maxScore) {
                          playSound('sfx-lap');
-                         // Show lap effect if entering a new lap and not finished
                          if (newLap <= GAME_CONFIG.maxLaps && newLap > oldLap) {
                              showLapEffect(newLap);
                          }
@@ -1367,7 +1423,8 @@
             }
 
             gameState.isPlaying = true;
-            startScreen.classList.add('opacity-0', 'pointer-events-none');
+            startScreen.classList.add('opacity-0');
+            startScreen.classList.add('pointer-events-none');
             setTimeout(() => startScreen.classList.add('hidden'), 500);
             
             const bgMusic = document.getElementById('bg-music');
@@ -1383,7 +1440,7 @@
             mutations.forEach((mutation) => {
                 if(mutation.target.classList.contains('hidden')) {
                    document.getElementById('ui-layer').classList.add('pointer-events-none');
-                   document.querySelector('.pointer-events-auto').classList.add('pointer-events-auto');
+                   document.querySelector('.header-row').classList.add('pointer-events-auto');
                 } else {
                    document.getElementById('ui-layer').classList.remove('pointer-events-none');
                 }
