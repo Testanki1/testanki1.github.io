@@ -268,16 +268,7 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Respawn Overlay */
-        #respawn-overlay {
-            position: absolute;
-            inset: 0;
-            background-color: black;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease-in-out;
-            z-index: 60;
-        }
+
     </style>
 </head>
 <body>
@@ -335,8 +326,7 @@
         <!-- Lap Notification Overlay -->
         <div id="lap-notification" class="lap-notification"></div>
 
-        <!-- Respawn Overlay -->
-        <div id="respawn-overlay"></div>
+
 
         <!-- Win/Reset Screen -->
         <div id="win-screen" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 pointer-events-auto hidden">
@@ -522,7 +512,13 @@
             assetsLoaded: false,
             autoCamera: true, // Default enabled
             lastTankMapAngle: 0,
-            isRespawning: false
+            isRespawning: false,
+            respawnStartTime: 0,
+            respawnDuration: 1.5,
+            respawnStartPos: new THREE.Vector3(),
+            respawnEndPos: new THREE.Vector3(),
+            respawnStartTarget: new THREE.Vector3(),
+            respawnEndTarget: new THREE.Vector3()
         };
 
         // --- Init ---
@@ -965,7 +961,7 @@
             }
         }
 
-        function respawn(keepCameraConfig = false) {
+        function respawn(mode = 'full') {
             if(!tankBody) return;
             
             // 1. Reset Tank Physics and Position
@@ -973,6 +969,12 @@
             tankBody.velocity.set(0,0,0);
             tankBody.angularVelocity.set(0,0,0);
             if(tankMesh) tankMesh.rotation.set(0, 0, 0); // Face +X
+            
+            // Safety: Ensure tank is visible and animation flag is cleared if we force a full respawn
+            if (mode === 'full') {
+                gameState.isRespawning = false;
+                if(tankMesh) tankMesh.visible = true;
+            }
             
             // 2. Reset Game Logic
             gameState.lastScorePos.set(0, 15, 167);
@@ -984,27 +986,13 @@
             gameState.lastTankMapAngle = 0;
             updateScoreDisplay();
 
-            // 3. Reset Camera
+            if (mode === 'silent') return;
+
+            // 3. Reset Camera (Only for full reset)
             const restartTarget = new THREE.Vector3(0, 10, 167);
 
-            if (keepCameraConfig) {
-                // Calculate current Zoom (Horizontal Dist) and Height (Vertical Dist)
-                const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
-                const height = offset.y;
-                const distXZ = Math.sqrt(offset.x * offset.x + offset.z * offset.z);
-                
-                // Reset Horizontal Angle to "Behind View" (-X axis relative to tank)
-                // We want to be behind the tank (X < Target.X)
-                camera.position.set(
-                    restartTarget.x - distXZ, 
-                    restartTarget.y + height, 
-                    restartTarget.z
-                );
-            } else {
-                // Default Start Position: Behind View (-X axis)
-                // Target (0, 10, 167). We want camera behind.
-                camera.position.set(restartTarget.x - 40, 45, restartTarget.z);
-            }
+            // Default Start Position: Behind View (-X axis)
+            camera.position.set(restartTarget.x - 40, 45, restartTarget.z);
 
             // Apply Target
             controls.target.copy(restartTarget);
@@ -1015,24 +1003,42 @@
             controls.update();
         }
 
-        const respawnOverlay = document.getElementById('respawn-overlay');
-
         function triggerRespawn() {
             if (gameState.isRespawning) return;
             gameState.isRespawning = true;
+            gameState.respawnStartTime = clock.getElapsedTime();
 
-            // Fade to black
-            respawnOverlay.style.opacity = '1';
+            // Store start state
+            gameState.respawnStartPos.copy(camera.position);
+            gameState.respawnStartTarget.copy(controls.target);
 
-            // Wait for fade out
-            setTimeout(() => {
-                respawn(true); // Keep height/zoom
-                // Wait a bit before fading back in
-                setTimeout(() => {
-                    respawnOverlay.style.opacity = '0';
-                    gameState.isRespawning = false;
-                }, 200);
-            }, 500);
+            // Calculate end state (Spawn Point)
+            gameState.respawnEndTarget.set(0, 10, 167);
+
+            // Calculate End Camera Position (Preserving Zoom/Height, enforcing -X angle)
+            const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+            const height = offset.y;
+            const distXZ = Math.sqrt(offset.x * offset.x + offset.z * offset.z);
+
+            // Set to -X direction relative to target
+            gameState.respawnEndPos.set(
+                gameState.respawnEndTarget.x - distXZ,
+                gameState.respawnEndTarget.y + height,
+                gameState.respawnEndTarget.z
+            );
+
+            // Reset Physics Immediately (Tank teleports to start)
+            respawn('silent');
+            
+            // Hide tank and move mesh away to prevent "hovering" ghost
+            if(tankMesh) {
+                tankMesh.visible = false;
+                tankMesh.position.set(0, -10000, 0); 
+            }
+        }
+
+        function easeInOutCubic(x) {
+            return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
         }
 
         // Camera smoothing variables
@@ -1045,6 +1051,29 @@
             const dt = Math.min(clock.getDelta(), 0.05);
             const now = clock.getElapsedTime();
             
+            if (gameState.isRespawning) {
+                // Respawn Animation Mode
+                const elapsed = now - gameState.respawnStartTime;
+                let t = elapsed / gameState.respawnDuration;
+                
+                if (t >= 1.0) {
+                    t = 1.0;
+                    gameState.isRespawning = false;
+                    // Ensure final snap
+                    camera.position.copy(gameState.respawnEndPos);
+                    controls.target.copy(gameState.respawnEndTarget);
+                    smoothedCameraTarget.copy(gameState.respawnEndTarget);
+                    if(tankMesh) tankMesh.visible = true; // Show tank after animation
+                } else {
+                    t = easeInOutCubic(t);
+                    camera.position.lerpVectors(gameState.respawnStartPos, gameState.respawnEndPos, t);
+                    controls.target.lerpVectors(gameState.respawnStartTarget, gameState.respawnEndTarget, t);
+                }
+                controls.update();
+                renderer.render(scene, camera);
+                return; // Skip other logic
+            }
+
             if(gameState.isPlaying && tankBody && tankMesh) {
                 // Raycast Ground Check
                 const rayOrigin = tankMesh.position.clone();
@@ -1261,7 +1290,7 @@
             gameState.score = 0;
             gameState.isFinished = false;
             document.getElementById('win-screen').classList.add('hidden');
-            respawn(false);
+            respawn('full');
             updateScoreDisplay();
         });
 
@@ -1288,7 +1317,7 @@
             bgMusic.play().catch(()=>{});
             
             updateScoreDisplay();
-            respawn(false);
+            respawn('full');
         });
 
         const winScreen = document.getElementById('win-screen');
