@@ -332,6 +332,48 @@
             from { transform: scale(0.9); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
         }
+
+        /* Timer Styles */
+        .header-left {
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        .timer-display {
+            background-color: rgba(0, 25, 38, 0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 100px;
+            padding: 8px 20px;
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--md-sys-color-on-surface);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: flex; align-items: center; gap: 8px;
+            height: 50px;
+            box-sizing: border-box;
+        }
+        
+        .best-record-container {
+            margin-top: 24px;
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(255,255,255,0.05);
+            padding: 8px 16px;
+            border-radius: 100px;
+        }
+        .best-record-text {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.8);
+            font-variant-numeric: tabular-nums;
+        }
+        .delete-record-btn {
+            background: transparent; border: none; cursor: pointer;
+            padding: 4px; border-radius: 50%; color: var(--md-sys-color-tertiary);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .delete-record-btn:hover { background: rgba(255, 102, 102, 0.1); }
     </style>
 </head>
 <body>
@@ -340,24 +382,37 @@
     <!-- UI Layer -->
     <div id="ui-layer" class="ui-layer">
         
-        <!-- Header -->
-        <div class="header-row pointer-events-auto">
+        <!-- Header & Controls (Top Right) -->
+        <div class="header-row pointer-events-auto" style="justify-content: flex-end; flex-direction: column; align-items: flex-end; gap: 12px;">
             <!-- Score Card -->
             <div class="m3-card compact score-card">
                 <div class="icon-circle">
-                     <span class="material-symbols-rounded text-primary">flag</span>
+                    <span class="material-symbols-rounded text-primary">flag</span>
                 </div>
                 <div>
-                    <p class="lap-info" id="lap-display">Lap 1/6</p>
-                    <div class="score-container">
+                    <div style="display: flex; flex-direction: column;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="lap-info" id="lap-display" style="margin: 0;">Lap 1/6</span>
+                            <span class="lap-info" style="margin: 0; opacity: 0.4;">•</span>
+                            <span class="lap-info" id="game-timer" style="margin: 0; font-variant-numeric: tabular-nums;">00:00</span>
+                        </div>
+                        <div id="hud-best-container" class="hidden" style="display: flex; align-items: center; gap: 4px; margin-top: 0px;">
+                            <span id="best-label" class="lap-info" style="color: #FFD700; opacity: 1;">Best</span>
+                            <span class="lap-info" id="hud-best-time" style="opacity: 1; font-variant-numeric: tabular-nums;">00:00</span>
+                            <button id="hud-delete-btn" style="background: none; border: none; padding: 0 4px; color: var(--md-sys-color-tertiary); cursor: pointer; display: flex; align-items: center; opacity: 0.7;">
+                                <span class="material-symbols-rounded" style="font-size: 14px;">close</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="score-container" style="margin-top: 2px;">
                         <h2 class="score-val" id="score-display">0</h2>
                         <span class="score-range" id="range-display">0-17</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Top Right Buttons -->
-             <div class="controls-row">
+            <!-- Controls -->
+            <div class="controls-row">
                  <button id="cam-toggle-btn" class="m3-btn-icon active" title="Auto Camera">
                      <span class="material-symbols-rounded">center_focus_weak</span>
                  </button>
@@ -385,6 +440,21 @@
              </button>
         </div>
 
+        <!-- Custom Confirmation Modal -->
+        <div id="confirm-modal" class="fullscreen-overlay overlay-bg-dark hidden" style="z-index: 100;">
+            <div class="m3-card compact" style="display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 240px; text-align: center;">
+                <div style="font-weight: 700; font-size: 1rem;" id="confirm-text">Delete Best Record?</div>
+                <div style="display: flex; gap: 12px; width: 100%; justify-content: center;">
+                    <button id="confirm-cancel" class="m3-btn-primary" style="background-color: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface); height: 36px; padding: 0 20px;">
+                        NO
+                    </button>
+                    <button id="confirm-yes" class="m3-btn-primary" style="background-color: var(--md-sys-color-tertiary); color: var(--md-sys-color-on-tertiary); height: 36px; padding: 0 20px;">
+                        YES
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Lap Notification Overlay -->
         <div id="lap-notification" class="lap-notification"></div>
 
@@ -396,6 +466,7 @@
                 </div>
                 <h1 id="win-title" class="modal-title">Course Completed!</h1>
                 <p id="win-desc" class="modal-desc">You've reached 102 points and finished all 6 laps.</p>
+                <p id="win-time" class="modal-desc" style="font-weight: 700; font-size: 1.25rem; color: var(--md-sys-color-primary); margin-top: -12px;">Time: 00:00</p>
                 
                 <button id="reset-btn" class="m3-btn-primary m3-btn-large">
                     <span class="material-symbols-rounded">replay</span>
@@ -503,7 +574,13 @@
                 double: "Double!",
                 back: "Back!",
                 autoCam: "Auto Camera",
-                sound: "Sound On/Off"
+                sound: "Sound On/Off",
+                best: "Best: ",
+                time: "Time: ",
+                newRecord: "New Record!",
+                deleteConfirm: "Delete Best Record?",
+                yes: "YES",
+                no: "NO"
             },
             zh: {
                 title: "3D坦克与雪陷阱（玩法重构）",
@@ -520,7 +597,13 @@
                 double: "双倍！",
                 back: "倒退！",
                 autoCam: "自动镜头",
-                sound: "声音开关"
+                sound: "声音开关",
+                best: "最佳记录: ",
+                time: "用时: ",
+                newRecord: "新纪录！",
+                deleteConfirm: "确定删除记录？",
+                yes: "确定",
+                no: "取消"
             }
         };
 
@@ -538,6 +621,10 @@
         document.getElementById('desktop-hint-text').innerText = t.hint;
         document.getElementById('cam-toggle-btn').title = t.autoCam;
         document.getElementById('sound-btn').title = t.sound;
+        document.getElementById('best-label').innerText = lang === 'zh' ? '最佳' : 'Best';
+        document.getElementById('confirm-text').innerText = t.deleteConfirm;
+        document.getElementById('confirm-yes').innerText = t.yes;
+        document.getElementById('confirm-cancel').innerText = t.no;
 
         // --- Config ---
         const ASSETS = {
@@ -546,9 +633,6 @@
             sky: 'https://web-cdn.tankionline.com/new-year/sky.png',
             hdr: 'https://web-cdn.tankionline.com/new-year/forest.hdr'
         };
-
-        // Note: Used web-cdn.tankionline.com links which should be stable as they are from the original event/inspiration.
-        // Fallback or local paths from prompt were: static/media/... which won't work here.
 
         const PHYSICS = {
             gravity: -60,
@@ -574,8 +658,8 @@
             isFinished: false,
             lastScorePos: new THREE.Vector3(0, 15, 167),
             assetsLoaded: false,
-            autoCamera: true, // Default enabled
-            soundEnabled: false, // Default disabled
+            autoCamera: true, 
+            soundEnabled: false, 
             lastTankMapAngle: 0,
             isRespawning: false,
             respawnStartTime: 0,
@@ -583,8 +667,76 @@
             respawnStartPos: new THREE.Vector3(),
             respawnEndPos: new THREE.Vector3(),
             respawnStartTarget: new THREE.Vector3(),
-            respawnEndTarget: new THREE.Vector3()
+            respawnEndTarget: new THREE.Vector3(),
+            gameStartTime: 0,
+            elapsedTime: 0
         };
+
+        // --- Helper: Time Formatting ---
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // --- Local Storage Management ---
+        const LS_KEY = 'tanki_best_time_v1';
+        
+        function getBestTime() {
+            const stored = localStorage.getItem(LS_KEY);
+            return stored ? parseFloat(stored) : null;
+        }
+        
+        function saveBestTime(time) {
+            localStorage.setItem(LS_KEY, time);
+            updateBestTimeUI();
+        }
+        
+        function deleteBestTime() {
+            localStorage.removeItem(LS_KEY);
+            updateBestTimeUI();
+        }
+
+        function updateBestTimeUI() {
+            const best = getBestTime();
+            const container = document.getElementById('hud-best-container');
+            const text = document.getElementById('hud-best-time');
+            
+            if (best !== null) {
+                container.classList.remove('hidden');
+                text.innerText = formatTime(best);
+                container.style.display = 'flex';
+            } else {
+                container.classList.add('hidden');
+                container.style.display = 'none';
+            }
+        }
+        
+        // Modal Logic
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmYes = document.getElementById('confirm-yes');
+        const confirmNo = document.getElementById('confirm-cancel');
+        const confirmText = document.getElementById('confirm-text');
+
+        document.getElementById('hud-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Text is already set by t.deleteConfirm, but we ensure it here just in case dynamic changing is needed later
+            confirmText.innerText = t.deleteConfirm;
+            confirmModal.classList.remove('hidden');
+        });
+
+        confirmNo.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+        });
+
+        confirmYes.addEventListener('click', () => {
+             deleteBestTime();
+             confirmModal.classList.add('hidden');
+        });
+
+        // Initialize UI
+        updateBestTimeUI();
+
 
         // --- Init ---
         const container = document.getElementById('game-container');
@@ -1025,6 +1177,18 @@
             // Check Win Condition
             if (gameState.score >= GAME_CONFIG.maxScore && !gameState.isFinished) {
                 gameState.isFinished = true;
+                
+                // Final Time Logic
+                const finalTime = gameState.elapsedTime;
+                document.getElementById('win-time').innerText = t.time + formatTime(finalTime);
+                
+                // Check Best Record
+                const currentBest = getBestTime();
+                if (currentBest === null || finalTime < currentBest) {
+                    saveBestTime(finalTime);
+                    document.getElementById('win-time').innerText += ` (${t.newRecord})`;
+                }
+                
                 document.getElementById('win-screen').classList.remove('hidden');
                 document.getElementById('ui-layer').classList.remove('pointer-events-none');
             }
@@ -1124,6 +1288,12 @@
             
             const dt = Math.min(clock.getDelta(), 0.05);
             const now = clock.getElapsedTime();
+            
+            // Update Timer
+            if (gameState.isPlaying && !gameState.isFinished && !document.hidden) {
+                gameState.elapsedTime = now - gameState.gameStartTime;
+                document.getElementById('game-timer').innerText = formatTime(gameState.elapsedTime);
+            }
             
             if (gameState.isRespawning) {
                 // Respawn Animation Mode
@@ -1404,6 +1574,11 @@
             gameState.score = 0;
             gameState.isFinished = false;
             document.getElementById('win-screen').classList.add('hidden');
+            
+            // Start game logic again
+            gameState.gameStartTime = clock.getElapsedTime();
+            gameState.elapsedTime = 0;
+            
             respawn('full');
             updateScoreDisplay();
         });
@@ -1423,6 +1598,9 @@
             }
 
             gameState.isPlaying = true;
+            // Set start time for timer
+            gameState.gameStartTime = clock.getElapsedTime();
+            
             startScreen.classList.add('opacity-0');
             startScreen.classList.add('pointer-events-none');
             setTimeout(() => startScreen.classList.add('hidden'), 500);
