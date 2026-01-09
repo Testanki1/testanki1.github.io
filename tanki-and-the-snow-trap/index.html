@@ -299,6 +299,10 @@
                  <button id="cam-toggle-btn" class="m3-btn-icon active" title="Auto Camera">
                      <span class="material-symbols-rounded">center_focus_weak</span>
                  </button>
+                 <!-- Sound Toggle -->
+                 <button id="sound-btn" class="m3-btn-icon" title="Sound On/Off">
+                     <span class="material-symbols-rounded">volume_off</span>
+                 </button>
                  <!-- Help Button -->
                  <button id="about-btn" class="m3-btn-icon">
                     <span class="material-symbols-rounded">question_mark</span>
@@ -444,7 +448,8 @@
                 hint: "WASD to Move • SPACE to Jump • Drag to Look",
                 double: "Double!",
                 back: "Back!",
-                autoCam: "Auto Camera"
+                autoCam: "Auto Camera",
+                sound: "Sound On/Off"
             },
             zh: {
                 title: "3D坦克与雪陷阱（玩法重构）",
@@ -460,7 +465,8 @@
                 hint: "WASD 移动 • 空格 跳跃 • 拖动 视角",
                 double: "双倍！",
                 back: "倒退！",
-                autoCam: "自动镜头"
+                autoCam: "自动镜头",
+                sound: "声音开关"
             }
         };
 
@@ -477,6 +483,7 @@
         document.getElementById('about-tip').innerText = t.aboutTip;
         document.getElementById('desktop-hint-text').innerText = t.hint;
         document.getElementById('cam-toggle-btn').title = t.autoCam;
+        document.getElementById('sound-btn').title = t.sound;
 
         // --- Config ---
         const ASSETS = {
@@ -511,6 +518,7 @@
             lastScorePos: new THREE.Vector3(0, 15, 167),
             assetsLoaded: false,
             autoCamera: true, // Default enabled
+            soundEnabled: false, // Default disabled
             lastTankMapAngle: 0,
             isRespawning: false,
             respawnStartTime: 0,
@@ -1251,9 +1259,11 @@
         // UI Logic
         const aboutBtn = document.getElementById('about-btn');
         const camToggleBtn = document.getElementById('cam-toggle-btn');
+        const soundBtn = document.getElementById('sound-btn');
         const closeAboutBtn = document.getElementById('close-about-btn');
         const aboutModal = document.getElementById('about-modal');
         const startScreen = document.getElementById('start-screen');
+        const audioElements = document.querySelectorAll('audio');
         
         document.addEventListener('click', () => {
             if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -1284,6 +1294,36 @@
                 camToggleBtn.classList.remove('active');
             }
         });
+
+        // Toggle Sound
+        function updateSoundState() {
+            const icon = soundBtn.querySelector('.material-symbols-rounded');
+            if (gameState.soundEnabled) {
+                soundBtn.classList.add('active');
+                icon.innerText = 'volume_up';
+                audioElements.forEach(el => {
+                    el.muted = false;
+                    // Ensure bg music is playing if game is active
+                    if (el.id === 'bg-music' && gameState.isPlaying) {
+                        el.play().catch(()=>{});
+                    }
+                });
+            } else {
+                soundBtn.classList.remove('active');
+                icon.innerText = 'volume_off';
+                audioElements.forEach(el => el.muted = true);
+            }
+        }
+
+        soundBtn.addEventListener('click', () => {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            updateSoundState();
+        });
+
+        // Initialize Sound State (Default Off)
+        gameState.soundEnabled = false;
+        updateSoundState();
+
 
         const resetBtn = document.getElementById('reset-btn');
         resetBtn.addEventListener('click', () => {
