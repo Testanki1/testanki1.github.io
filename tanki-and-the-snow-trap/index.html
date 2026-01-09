@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D坦克与雪陷阱（自制修改版）（Rework）</title>
+    <title>3D坦克与雪陷阱（玩法重构）</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -110,6 +110,30 @@
             box-shadow: none;
         }
         
+        .m3-btn-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 25, 38, 0.6);
+            color: var(--md-sys-color-on-surface-variant);
+            border: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(12px);
+        }
+        .m3-btn-icon:hover {
+            background-color: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-on-surface);
+        }
+        .m3-btn-icon.active {
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            border-color: var(--md-sys-color-primary);
+        }
+        
         .m3-btn-large {
             height: 56px;
             font-size: 16px;
@@ -206,6 +230,36 @@
             100% { transform: translate(-50%, -200%) scale(1.0); opacity: 0; }
         }
 
+        /* Lap Notification */
+        .lap-notification {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            font-size: 4rem;
+            font-weight: 900;
+            color: var(--md-sys-color-primary);
+            text-shadow: 0 0 30px rgba(118, 255, 51, 0.6);
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 35;
+            opacity: 0;
+            font-style: italic;
+            letter-spacing: -1px;
+        }
+        
+        .lap-animate {
+            animation: lapFlash 2.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+        }
+
+        @keyframes lapFlash {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; filter: blur(10px); }
+            15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: blur(0px); }
+            25% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+            80% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; filter: blur(5px); }
+        }
+
         .animate-scaleIn {
             animation: scaleIn 0.3s cubic-bezier(0.2, 0.0, 0, 1.0);
         }
@@ -237,10 +291,17 @@
                 </div>
             </div>
 
-            <!-- Help Button -->
-             <button id="about-btn" class="m3-card compact flex items-center justify-center w-12 h-12 p-0 cursor-pointer hover:bg-[var(--md-sys-color-surface-variant)] transition-colors">
-                <span class="material-symbols-rounded">question_mark</span>
-            </button>
+            <!-- Top Right Buttons -->
+             <div class="flex gap-3">
+                 <!-- Auto Camera Toggle -->
+                 <button id="cam-toggle-btn" class="m3-btn-icon active" title="Auto Camera">
+                     <span class="material-symbols-rounded">videocam</span>
+                 </button>
+                 <!-- Help Button -->
+                 <button id="about-btn" class="m3-btn-icon">
+                    <span class="material-symbols-rounded">question_mark</span>
+                </button>
+            </div>
         </div>
 
         <!-- Start/Loading Screen (Initial Overlay) -->
@@ -259,6 +320,9 @@
                 </button>
              </div>
         </div>
+
+        <!-- Lap Notification Overlay -->
+        <div id="lap-notification" class="lap-notification"></div>
 
         <!-- Win/Reset Screen -->
         <div id="win-screen" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 pointer-events-auto hidden">
@@ -363,38 +427,43 @@
 
         const TEXTS = {
             en: {
+                title: "Tanki and The Snow Trap (Rework)",
                 lap: "Lap",
                 loading: "Loading",
                 start: "TAP TO START",
-                winTitle: "Course Completed!",
+                winTitle: "Challenge Completed!",
                 winDesc: "You've reached 102 points and finished all 6 laps.",
-                reset: "RESET PROGRESS",
+                reset: "PLAY AGAIN",
                 aboutTitle: "Tanki and The Snow Trap (Rework)",
                 aboutDesc: "Use Joystick or WASD to move.<br><strong>Counter-Clockwise</strong> jumps score points.<br>Backward jumps deduct points.<br>Double jumps = +2 points!",
                 aboutTip: "Tip: Tap screen to enter Fullscreen",
                 hint: "WASD to Move • SPACE to Jump • Drag to Look",
                 double: "Double!",
-                back: "Back!"
+                back: "Back!",
+                autoCam: "Auto Camera"
             },
             zh: {
+                title: "3D坦克与雪陷阱（玩法重构）",
                 lap: "圈数",
                 loading: "加载中",
                 start: "点击开始",
                 winTitle: "恭喜通关！",
-                winDesc: "你已获得102分并完成了全部6圈挑战。",
-                reset: "重置进度",
+                winDesc: "你已获得 102 分并完成了全部 6 圈挑战。",
+                reset: "再来一次",
                 aboutTitle: "3D坦克与雪陷阱（玩法重构）",
                 aboutDesc: "使用摇杆或 WASD 移动。<br><strong>逆时针</strong>跳跃得分。<br>后退跳跃扣分。<br>连跳 = +2 分！",
                 aboutTip: "提示：点击屏幕进入全屏",
                 hint: "WASD 移动 • 空格 跳跃 • 拖动 视角",
                 double: "双倍！",
-                back: "倒退！"
+                back: "倒退！",
+                autoCam: "自动镜头"
             }
         };
 
         const t = TEXTS[lang];
 
         // Apply translations
+        document.title = t.title;
         document.getElementById('start-btn-text').innerText = t.start;
         document.getElementById('win-title').innerText = t.winTitle;
         document.getElementById('win-desc').innerText = t.winDesc;
@@ -403,6 +472,7 @@
         document.getElementById('about-desc').innerHTML = t.aboutDesc;
         document.getElementById('about-tip').innerText = t.aboutTip;
         document.getElementById('desktop-hint-text').innerText = t.hint;
+        document.getElementById('cam-toggle-btn').title = t.autoCam;
 
         // --- Config ---
         const ASSETS = {
@@ -416,8 +486,9 @@
             gravity: -60,
             moveSpeed: 55,
             acceleration: 3.0, 
-            deceleration: 1.0, // Reduced for ice sliding feel
-            turnSpeed: 6.0,
+            deceleration: 1.0, 
+            turnSpeed: 6.0,   
+            tankTurnSpeed: 2.0, 
             jumpImpulse: 60,
             tankMass: 30,
             tankRadius: 1.5
@@ -434,7 +505,9 @@
             isPlaying: false,
             isFinished: false,
             lastScorePos: new THREE.Vector3(0, 15, 167),
-            assetsLoaded: false
+            assetsLoaded: false,
+            autoCamera: true, // Default enabled
+            lastTankMapAngle: 0
         };
 
         // --- Init ---
@@ -494,7 +567,6 @@
         dirLight.shadow.mapSize.height = 2048;
         dirLight.shadow.bias = -0.0005;
 
-        // Enhanced Shadow Camera Coverage
         const d = 300;
         dirLight.shadow.camera.left = -d;
         dirLight.shadow.camera.right = d;
@@ -586,7 +658,11 @@
 
         // --- Objects ---
         let tankBody, tankMesh;
-        const input = { x: 0, y: 0, jump: false };
+        const input = { 
+            joyX: 0, joyY: 0, 
+            keyForward: 0, keyTurn: 0,
+            jump: false 
+        };
         let canJump = false;
         let isJumping = false;
         let lastGroundedTime = 0;
@@ -639,6 +715,22 @@
             setTimeout(() => div.remove(), 1000);
         }
 
+        function showLapEffect(lapNum) {
+            const el = document.getElementById('lap-notification');
+            let lapText;
+            if (lang === 'zh') {
+                lapText = `第 ${lapNum} 圈`;
+            } else {
+                lapText = `LAP ${lapNum}`;
+            }
+            el.innerText = lapText;
+            
+            // Reset animation
+            el.classList.remove('lap-animate');
+            void el.offsetWidth; // trigger reflow
+            el.classList.add('lap-animate');
+        }
+
         // Scoring Logic Function
         function checkScoring() {
             if (!tankBody || !gameState.isPlaying) return;
@@ -675,19 +767,22 @@
                 gameState.lastScorePos.copy(currentPos);
                 
                 if (scoreDiff !== 0) {
-                    // Check for lap change
                      const oldLap = Math.floor(oldDisplayScore / GAME_CONFIG.pointsPerLap) + 1;
                      const newLap = Math.floor(newDisplayScore / GAME_CONFIG.pointsPerLap) + 1;
                      
                      if ((newLap > oldLap && newLap <= GAME_CONFIG.maxLaps) || newDisplayScore === GAME_CONFIG.maxScore) {
-                         playSound('sfx-lap'); // checkpoint.mp3
+                         playSound('sfx-lap');
+                         // Show lap effect if entering a new lap and not finished
+                         if (newLap <= GAME_CONFIG.maxLaps && newLap > oldLap) {
+                             showLapEffect(newLap);
+                         }
                      }
 
                     if (scoreDiff > 0) {
-                        playSound('sfx-score-plus'); // move.mp3
+                        playSound('sfx-score-plus');
                         showFloatingText(scoreDiff > 1 ? "+" + scoreDiff + " " + t.double : "+" + scoreDiff, currentPos);
                     } else {
-                        playSound('sfx-score-minus'); // roll.mp3
+                        playSound('sfx-score-minus');
                         showFloatingText(scoreDiff + " " + t.back, currentPos, true);
                     }
                 }
@@ -721,6 +816,9 @@
                     checkScoring();
                 }
             });
+            
+            // Initial angle calculation
+            gameState.lastTankMapAngle = Math.atan2(tankBody.position.x, tankBody.position.z);
         });
 
         // --- Controls ---
@@ -761,8 +859,8 @@
             for(let i=0; i<e.changedTouches.length; i++) {
                 if(e.changedTouches[i].identifier === joystickId) {
                     joystickActive = false;
-                    input.x = 0; 
-                    input.y = 0;
+                    input.joyX = 0; 
+                    input.joyY = 0;
                     joystickKnob.style.transform = `translate(-50%, -50%)`;
                     break;
                 }
@@ -785,8 +883,8 @@
             
             joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
             
-            input.x = dx / maxDist;
-            input.y = dy / maxDist;
+            input.joyX = dx / maxDist;
+            input.joyY = dy / maxDist;
         }
 
         // Touch Jump
@@ -806,19 +904,19 @@
         window.addEventListener('keydown', (e) => {
             if(!gameState.isPlaying) return;
             switch(e.code) {
-                case 'KeyW': case 'ArrowUp': input.y = -1; break;
-                case 'KeyS': case 'ArrowDown': input.y = 1; break;
-                case 'KeyA': case 'ArrowLeft': input.x = -1; break;
-                case 'KeyD': case 'ArrowRight': input.x = 1; break;
+                case 'KeyW': case 'ArrowUp': input.keyForward = 1; break;
+                case 'KeyS': case 'ArrowDown': input.keyForward = -1; break;
+                case 'KeyA': case 'ArrowLeft': input.keyTurn = 1; break;
+                case 'KeyD': case 'ArrowRight': input.keyTurn = -1; break;
                 case 'Space': input.jump = true; break;
             }
         });
         window.addEventListener('keyup', (e) => {
             switch(e.code) {
-                case 'KeyW': case 'ArrowUp': if(input.y < 0) input.y = 0; break;
-                case 'KeyS': case 'ArrowDown': if(input.y > 0) input.y = 0; break;
-                case 'KeyA': case 'ArrowLeft': if(input.x < 0) input.x = 0; break;
-                case 'KeyD': case 'ArrowRight': if(input.x > 0) input.x = 0; break;
+                case 'KeyW': case 'ArrowUp': if(input.keyForward > 0) input.keyForward = 0; break;
+                case 'KeyS': case 'ArrowDown': if(input.keyForward < 0) input.keyForward = 0; break;
+                case 'KeyA': case 'ArrowLeft': if(input.keyTurn > 0) input.keyTurn = 0; break;
+                case 'KeyD': case 'ArrowRight': if(input.keyTurn < 0) input.keyTurn = 0; break;
                 case 'Space': input.jump = false; break;
             }
         });
@@ -866,6 +964,9 @@
                 gameState.score = 0;
             }
             
+            // Reset angles
+            gameState.lastTankMapAngle = Math.atan2(167, 0); // approx
+            
             updateScoreDisplay();
         }
 
@@ -898,52 +999,97 @@
                 tankMesh.position.copy(tankBody.position);
                 tankMesh.position.y -= 1.5; 
                 
-                // Calculate movement direction relative to camera
-                const camDir = new THREE.Vector3();
-                camera.getWorldDirection(camDir);
-                camDir.y = 0;
-                camDir.normalize();
+                // Auto Camera Rotation Logic
+                const currentMapAngle = Math.atan2(tankMesh.position.x, tankMesh.position.z);
                 
-                const camRight = new THREE.Vector3(-camDir.z, 0, camDir.x);
+                if (gameState.autoCamera) {
+                    let angleDiff = currentMapAngle - gameState.lastTankMapAngle;
+                    // Normalize -PI to PI
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    
+                    if (Math.abs(angleDiff) > 0.0001 && Math.abs(angleDiff) < 1.0) {
+                        // Rotate camera position around target (tank) by same amount
+                        // Camera offset from target
+                        const camOffset = camera.position.clone().sub(controls.target);
+                        
+                        // Rotate vector around Y axis
+                        camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleDiff);
+                        
+                        // Update camera position
+                        camera.position.copy(controls.target).add(camOffset);
+                    }
+                }
+                gameState.lastTankMapAngle = currentMapAngle;
+
+
+                // Determine Input Mode
+                const usingJoystick = (Math.abs(input.joyX) > 0.01 || Math.abs(input.joyY) > 0.01);
                 
-                const moveVec = new THREE.Vector3();
-                moveVec.addScaledVector(camDir, -input.y);
-                moveVec.addScaledVector(camRight, input.x);
+                // Target Velocity Calculation
+                let targetVel = new THREE.Vector3(0,0,0);
+                let isMoving = false;
+
+                if (usingJoystick) {
+                    // --- Joystick (Directional Relative to Camera) ---
+                    
+                    // Camera direction
+                    const camDir = new THREE.Vector3();
+                    camera.getWorldDirection(camDir);
+                    camDir.y = 0;
+                    camDir.normalize();
+                    const camRight = new THREE.Vector3(-camDir.z, 0, camDir.x);
+                    
+                    // Calculate Move Vector
+                    const moveVec = new THREE.Vector3();
+                    moveVec.addScaledVector(camDir, -input.joyY); 
+                    moveVec.addScaledVector(camRight, input.joyX);
+                    
+                    if(moveVec.length() > 0.1) {
+                        isMoving = true;
+                        moveVec.normalize();
+                        targetVel.copy(moveVec).multiplyScalar(PHYSICS.moveSpeed);
+                        
+                        // Rotate Tank towards movement
+                        const targetAngle = Math.atan2(targetVel.x, targetVel.z) - Math.PI / 2;
+                        let curRot = tankMesh.rotation.y;
+                        let diff = targetAngle - curRot;
+                        while(diff > Math.PI) diff -= Math.PI*2;
+                        while(diff < -Math.PI) diff += Math.PI*2;
+                        const maxTurn = PHYSICS.turnSpeed * dt;
+                        tankMesh.rotation.y += Math.max(-maxTurn, Math.min(maxTurn, diff));
+                    }
+                } else {
+                    // --- Keyboard (Tank Controls) ---
+                    
+                    // Rotation (A/D)
+                    if(input.keyTurn !== 0) {
+                        tankMesh.rotation.y += input.keyTurn * PHYSICS.tankTurnSpeed * dt;
+                    }
+                    
+                    // Movement (W/S)
+                    if(input.keyForward !== 0) {
+                        isMoving = true;
+                        // Tank faces +X when rotation is 0
+                        const forwardDir = new THREE.Vector3(1, 0, 0); 
+                        forwardDir.applyEuler(tankMesh.rotation);
+                        targetVel.copy(forwardDir).multiplyScalar(input.keyForward * PHYSICS.moveSpeed);
+                    }
+                }
                 
                 // --- Acceleration & Movement ---
                 const currentVel = new THREE.Vector3(tankBody.velocity.x, 0, tankBody.velocity.z);
-                let targetVel = new THREE.Vector3(0,0,0);
-                const hasInput = moveVec.length() > 0.1;
-
-                if(hasInput) {
-                    moveVec.normalize();
-                    targetVel.copy(moveVec).multiplyScalar(PHYSICS.moveSpeed);
-                    
-                    // Acceleration
+                
+                if(isMoving) {
                     currentVel.lerp(targetVel, PHYSICS.acceleration * dt);
                 } else {
-                    // Deceleration (Very low for ice)
+                    // Deceleration
                     currentVel.lerp(new THREE.Vector3(0,0,0), PHYSICS.deceleration * dt);
                 }
                 
                 tankBody.velocity.x = currentVel.x;
                 tankBody.velocity.z = currentVel.z;
 
-                // --- Turning ---
-                if(hasInput) {
-                    const targetAngle = Math.atan2(targetVel.x, targetVel.z) - Math.PI / 2;
-                    let curRot = tankMesh.rotation.y;
-                    
-                    let diff = targetAngle - curRot;
-                    while(diff > Math.PI) diff -= Math.PI*2;
-                    while(diff < -Math.PI) diff += Math.PI*2;
-                    
-                    const maxTurn = PHYSICS.turnSpeed * dt;
-                    const turnAmount = Math.max(-maxTurn, Math.min(maxTurn, diff));
-                    
-                    tankMesh.rotation.y += turnAmount;
-                }
-                
                 // --- Jumping ---
                 const isGrounded = (now - lastGroundedTime < COYOTE_TIME);
 
@@ -970,7 +1116,7 @@
                     cameraInitialized = true;
                 }
 
-                const camLerpSpeed = hasInput ? 3.0 : 3.0;
+                const camLerpSpeed = 3.0;
                 smoothedCameraTarget.lerp(tankMesh.position, camLerpSpeed * dt);
                 
                 const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
@@ -1010,6 +1156,7 @@
         // --- Interaction ---
         // UI Logic
         const aboutBtn = document.getElementById('about-btn');
+        const camToggleBtn = document.getElementById('cam-toggle-btn');
         const closeAboutBtn = document.getElementById('close-about-btn');
         const aboutModal = document.getElementById('about-modal');
         const startScreen = document.getElementById('start-screen');
@@ -1032,6 +1179,16 @@
 
         closeAboutBtn.addEventListener('click', () => {
             aboutModal.classList.add('hidden');
+        });
+
+        // Toggle Auto Camera
+        camToggleBtn.addEventListener('click', () => {
+            gameState.autoCamera = !gameState.autoCamera;
+            if (gameState.autoCamera) {
+                camToggleBtn.classList.add('active');
+            } else {
+                camToggleBtn.classList.remove('active');
+            }
         });
 
         const resetBtn = document.getElementById('reset-btn');
