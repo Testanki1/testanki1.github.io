@@ -799,10 +799,6 @@
                      }
 
                     if (scoreDiff > 0) {
-                        // Stop jump sound if playing
-                        const jumpSound = document.getElementById('sfx-jump');
-                        if(jumpSound) { jumpSound.pause(); jumpSound.currentTime = 0; }
-
                         playSound('sfx-score-plus');
                         showFloatingText(scoreDiff > 1 ? "+" + scoreDiff + " " + t.double : "+" + scoreDiff, currentPos);
                     } else {
@@ -834,6 +830,11 @@
                 e.contact.ni.negate(contactNormal); 
                 
                 if (contactNormal.dot(new CANNON.Vec3(0, 1, 0)) > 0.5) {
+                    if (tankBody.velocity.y < 20) {
+                        const jumpSound = document.getElementById('sfx-jump');
+                        if(jumpSound) { jumpSound.pause(); jumpSound.currentTime = 0; }
+                    }
+
                     canJump = true;
                     lastGroundedTime = clock.getElapsedTime();
                     checkScoring();
@@ -1099,6 +1100,11 @@
                 const intersects = raycaster.intersectObjects(collidableMeshes);
                 
                 if (intersects.length > 0 && intersects[0].distance < 2.5) {
+                    if (tankBody.velocity.y < 20) {
+                        const jumpSound = document.getElementById('sfx-jump');
+                        if(jumpSound) { jumpSound.pause(); jumpSound.currentTime = 0; }
+                    }
+
                     canJump = true;
                     lastGroundedTime = now;
                     checkScoring();
