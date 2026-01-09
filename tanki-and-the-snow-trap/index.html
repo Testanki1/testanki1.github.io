@@ -570,7 +570,7 @@
                 winTitle: "Challenge Completed!",
                 winDesc: "You've reached 102 points and finished all 6 laps.",
                 reset: "PLAY AGAIN",
-                aboutTitle: "Tanki and The Snow Trap (Rework)",
+                aboutTitle: "Tanki and The Snow Trap (Remaster)",
                 aboutDesc: "Use Joystick or WASD to move.<br><strong>Counter-Clockwise</strong> jumps score points.<br>Backward jumps deduct points.<br>Double jumps = +2 points!",
                 aboutTip: "Tip: Tap screen to enter Fullscreen",
                 hint: "WASD to Move • SPACE to Jump • Drag to Look",
@@ -587,14 +587,14 @@
                 no: "NO"
             },
             zh: {
-                title: "3D坦克与雪陷阱（玩法重构）",
+                title: "3D坦克与雪陷阱（最高画质版）",
                 lap: "圈数",
                 loading: "加载中",
                 start: "点击开始",
                 winTitle: "恭喜通关！",
                 winDesc: "你已获得 102 分并完成了全部 6 圈挑战。",
                 reset: "再来一次",
-                aboutTitle: "3D坦克与雪陷阱（玩法重构）",
+                aboutTitle: "3D坦克与雪陷阱（最高画质版）",
                 aboutDesc: "使用摇杆或 WASD 移动。<br><strong>逆时针</strong>跳跃得分。<br>后退跳跃扣分。<br>连跳 = +2 分！",
                 aboutTip: "提示：点击屏幕进入全屏",
                 hint: "WASD 移动 • 空格 跳跃 • 拖动 视角",
@@ -774,16 +774,25 @@
         // --- Init ---
         const container = document.getElementById('game-container');
         
-        // Renderer
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        // Renderer - MAX QUALITY SETTINGS
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true, 
+            alpha: false,
+            powerPreference: "high-performance",
+            stencil: false,
+            depth: true
+        });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(window.devicePixelRatio); // Use native resolution
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.0;
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Good balance, high res map used below
         container.appendChild(renderer.domElement);
+
+        // Capabilities
+        const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
 
         // Scene
         const scene = new THREE.Scene();
@@ -824,9 +833,12 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
         dirLight.position.set(50, 100, 50);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.bias = -0.0005;
+        
+        // Ultra High Quality Shadows
+        dirLight.shadow.mapSize.width = 4096;
+        dirLight.shadow.mapSize.height = 4096;
+        dirLight.shadow.bias = -0.0001;
+        dirLight.shadow.normalBias = 0.05;
 
         const d = 300;
         dirLight.shadow.camera.left = -d;
@@ -865,6 +877,8 @@
 
         // --- Environment ---
         textureLoader.load(ASSETS.sky, (texture) => {
+            texture.anisotropy = maxAnisotropy;
+            texture.colorSpace = THREE.SRGBColorSpace;
             const geometry = new THREE.SphereGeometry(800, 60, 40);
             const material = new THREE.MeshBasicMaterial({ 
                 map: texture, 
@@ -879,6 +893,7 @@
         rgbeLoader.load(ASSETS.hdr, (texture) => {
             texture.mapping = THREE.EquirectangularReflectionMapping;
             scene.environment = texture;
+            scene.environmentIntensity = 1.0; // Ensure good lighting level
         });
 
         // --- Physics Helpers ---
@@ -934,6 +949,7 @@
         const islandLightmap = textureLoader.load(ASSETS.lightmap);
         islandLightmap.flipY = false;
         islandLightmap.colorSpace = THREE.SRGBColorSpace;
+        islandLightmap.anisotropy = maxAnisotropy; // High Quality Texture Filtering
 
         gltfLoader.load(ASSETS.islands, (gltf) => {
             const model = gltf.scene;
@@ -944,7 +960,11 @@
                     child.receiveShadow = true;
                     child.castShadow = true;
                     if(child.material) {
-                        child.material.envMapIntensity = 0.5;
+                        child.material.envMapIntensity = 0.8; // Increased slightly for punchy reflections
+                        
+                        // Force High Quality Texture Filtering
+                        if (child.material.map) child.material.map.anisotropy = maxAnisotropy;
+                        
                         child.material.lightMap = islandLightmap;
                         child.material.lightMapIntensity = 1.0;
                     }
@@ -1061,7 +1081,14 @@
         gltfLoader.load(ASSETS.tank, (gltf) => {
             tankMesh = gltf.scene;
             scene.add(tankMesh);
-            tankMesh.traverse(c => { if(c.isMesh) { c.castShadow=true; c.receiveShadow=true; } });
+            
+            tankMesh.traverse(c => { 
+                if(c.isMesh) { 
+                    c.castShadow=true; 
+                    c.receiveShadow=true; 
+                    if(c.material && c.material.map) c.material.map.anisotropy = maxAnisotropy; // High Quality
+                } 
+            });
 
             const shape = new CANNON.Sphere(PHYSICS.tankRadius);
             tankBody = new CANNON.Body({
