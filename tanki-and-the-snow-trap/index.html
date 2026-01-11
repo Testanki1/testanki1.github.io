@@ -17,10 +17,10 @@
         }
         :root {
             /* M3 Dark Theme Token Palette - Custom Green/DarkBlue */
-            --md-sys-color-primary: #76FF33;
+            --md-sys-color-primary: #00D4FF;
             --md-sys-color-on-primary: #001926;
-            --md-sys-color-primary-container: rgba(118, 255, 51, 0.2);
-            --md-sys-color-on-primary-container: #76FF33;
+            --md-sys-color-primary-container: rgba(0, 212, 255, 0.2);
+            --md-sys-color-on-primary-container: #00D4FF;
             --md-sys-color-secondary: #CCC2DC;
             --md-sys-color-on-secondary: #332D41;
             --md-sys-color-secondary-container: #4A4458;
@@ -30,7 +30,7 @@
             --md-sys-color-tertiary-container: #633B48;
             --md-sys-color-on-tertiary-container: #FFD8E4;
             --md-sys-color-surface: #001926;
-            --md-sys-color-on-surface: #E6E0E9;
+            --md-sys-color-on-surface: #BFD5FF;
             --md-sys-color-surface-variant: rgba(255, 255, 255, 0.1);
             --md-sys-color-on-surface-variant: #CAC4D0;
             --md-sys-color-outline: #938F99;
@@ -218,7 +218,22 @@
         }
         .loading-text { text-align: center; font-size: 0.75rem; color: rgba(255,255,255,0.7); }
         
-        .start-btn-custom { transform: scale(1.1); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: auto !important; padding: 0 48px !important; }
+        /* New Start Prompt Style */
+        .start-prompt {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            color: var(--md-sys-color-primary);
+            animation: pulse 1.5s infinite ease-in-out;
+            cursor: pointer;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
 
         /* Modal Content */
         .modal-content {
@@ -292,7 +307,7 @@
         
         .score-popup {
             position: absolute; font-weight: bold; font-size: 24px;
-            color: var(--md-sys-color-primary); pointer-events: none;
+            color: #76FF33; pointer-events: none;
             animation: popupFade 1s forwards;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 20;
         }
@@ -308,7 +323,7 @@
             transform: translate(-50%, -50%) scale(0.5);
             font-size: 4rem; font-weight: 900;
             color: var(--md-sys-color-primary);
-            text-shadow: 0 0 30px rgba(118, 255, 51, 0.6);
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.6);
             pointer-events: none; white-space: nowrap; z-index: 35;
             opacity: 0; font-style: italic; letter-spacing: -1px;
         }
@@ -437,10 +452,11 @@
                 <p id="loading-text" class="loading-text">Loading 0%</p>
              </div>
              
-             <button id="start-btn" class="m3-btn-primary m3-btn-large start-btn-custom hidden">
-                 <span class="material-symbols-rounded">play_arrow</span>
-                 <span id="start-btn-text">TAP TO START</span>
-             </button>
+             <!-- Replaced Button with Simple Text Prompt -->
+             <div id="start-btn" class="start-prompt hidden">
+                 <span class="material-symbols-rounded" style="font-size: 64px;">play_arrow</span>
+                 <span id="start-btn-text" style="font-size: 24px; font-weight: 700; letter-spacing: 2px;">TAP TO START</span>
+             </div>
         </div>
 
         <!-- Custom Confirmation Modal -->
@@ -867,8 +883,6 @@
             gameState.assetsLoaded = true;
             loadingContainer.classList.add('hidden');
             startBtn.classList.remove('hidden');
-            startBtn.classList.add('m3-btn-primary'); // Ensure display flex equivalent if needed, but flex is default in css
-            startBtn.style.display = 'inline-flex';
         };
 
         const textureLoader = new THREE.TextureLoader(loadingManager);
@@ -1640,8 +1654,8 @@
         const resetBtn = document.getElementById('reset-btn');
         resetBtn.addEventListener('click', resetGameLogic);
 
-        startBtn.addEventListener('click', () => {
-            if(!gameState.assetsLoaded) return;
+        const startGame = () => {
+            if(!gameState.assetsLoaded || gameState.isPlaying) return;
             
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(() => {});
@@ -1668,6 +1682,20 @@
             
             updateScoreDisplay();
             respawn('full');
+        };
+
+        // startBtn is now a div, but can still trigger start
+        startBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startGame();
+        });
+
+        startScreen.addEventListener('click', startGame);
+        
+        window.addEventListener('keydown', (e) => {
+            if (!gameState.isPlaying && gameState.assetsLoaded && !startScreen.classList.contains('hidden')) {
+                startGame();
+            }
         });
 
         const winScreen = document.getElementById('win-screen');
