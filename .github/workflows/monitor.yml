@@ -1,15 +1,12 @@
-name: 3D坦克测试服务器监测器
+name: 3D坦克测试服务器常驻监测器
 
 on:
   schedule:
-    # 改为每 5 小时启动一次
-    # 时间点(北京): 05:00, 10:00, 15:00, 20:00, 01:00 ...
+    # 每 5 小时启动一次新任务 (配合 5.8 小时运行时间，实现无缝接力)
     - cron: '0 */5 * * *'
   workflow_dispatch:
 
-# --- 核心修改：并发控制 ---
-# 当新的任务启动时，自动杀掉正在运行的旧任务
-# 实现了无缝接力，不用担心时间对不上
+# 并发控制：新任务启动时，自动杀掉旧任务，防止重叠
 concurrency: 
   group: server-monitor-lock
   cancel-in-progress: true
@@ -30,8 +27,9 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
+        # 【修复点 1】指定安装 p-limit@3 版本，兼容 require 语法
         run: |
-          npm i playwright nodemailer p-limit
+          npm i playwright nodemailer p-limit@3
           npx playwright install --with-deps chromium
 
       - name: Run Persistent Monitor
@@ -52,8 +50,10 @@ jobs:
           // --- 配置 ---
           const STATE_FILE = 'server_status.json';
           const CHECK_INTERVAL = 5 * 60 * 1000; // 5分钟
-          // 改为 4.9 小时 (配合每5小时的 Cron，留6分钟缓冲让GitHub调度新任务)
-          const MAX_RUNTIME = 4.9 * 60 * 60 * 1000; 
+          
+          // 【修复点 2】改为 5.8 小时，配合每 5 小时的 Cron，确保新任务来接力时旧任务还活着
+          const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; 
+          
           const START_TIME = Date.now();
           const BROWSER_CONCURRENCY = 5; 
           
