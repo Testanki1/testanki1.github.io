@@ -2,16 +2,16 @@ name: 3D坦克测试服务器监测器
 
 on:
   schedule:
-    # 每 5 分钟执行一次
-    - cron: '*/5 * * * *'
+    # 每 6 小时启动一次新的监测循环（为了接力）
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
-  check-servers:
+  continuous-monitor:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,235 +21,289 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Playwright and dependencies
+      - name: Install dependencies
         run: |
-          npm i -D playwright
+          npm i playwright nodemailer
           npx playwright install --with-deps chromium
 
-      - name: Run server check script
-        id: check_script
+      - name: Run Persistent Monitor
+        env:
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: |
-          # --- 动态创建浏览器检查脚本 (check_browser.js) ---
-          cat << 'EOF' > check_browser.js
+          # 创建常驻监控脚本
+          cat << 'EOF' > monitor.js
           const { chromium } = require('playwright');
-          (async () => {
-            const url = process.argv[2];
-            if (!url) process.exit(1);
+          const fs = require('fs');
+          const https = require('https');
+          const crypto = require('crypto');
+          const { execSync } = require('child_process');
+          const nodemailer = require('nodemailer');
 
-            let targetUrl = url;
-            if (targetUrl.includes('?')) {
-              targetUrl += '&skipEntranceAnyKey';
-            } else {
-              targetUrl += '?skipEntranceAnyKey';
+          // --- 配置 ---
+          const STATE_FILE = 'server_status.json';
+          const CHECK_INTERVAL = 5 * 60 * 1000; // 5分钟
+          const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // 5.8小时 (留点缓冲时间给GitHub)
+          const START_TIME = Date.now();
+          
+          // 邮件传输配置
+          const transporter = nodemailer.createTransport({
+            host: "smtp.qq.com",
+            port: 465,
+            secure: true,
+            auth: {
+              user: process.env.MAIL_USERNAME,
+              pass: process.env.MAIL_PASSWORD
             }
+          });
 
-            let browser;
+          // --- 工具函数 ---
+          
+          // 获取当前时间字符串
+          function getTime() {
+            return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+          }
+
+          // 发送 CURL 请求获取状态码和内容 Hash
+          function checkCurl(url) {
+            return new Promise((resolve) => {
+              const req = https.get(url, { rejectUnauthorized: false, timeout: 15000 }, (res) => {
+                const { statusCode } = res;
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                  const hash = crypto.createHash('sha256').update(data).digest('hex');
+                  resolve({ statusCode, hash });
+                });
+              });
+              req.on('error', () => resolve({ statusCode: 0, hash: '' }));
+              req.on('timeout', () => { req.destroy(); resolve({ statusCode: 0, hash: '' }); });
+            });
+          }
+
+          // 使用 Playwright 检测页面交互状态
+          async function checkBrowser(url) {
+            let browser = null;
             try {
+              let targetUrl = url.includes('?') ? url + '&skipEntranceAnyKey' : url + '?skipEntranceAnyKey';
               browser = await chromium.launch();
               const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
               const page = await context.newPage();
-              
-              await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-              await page.waitForTimeout(15000);
-              await page.waitForTimeout(5000);
+              await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+              await page.waitForTimeout(10000); // 等待加载
               const content = await page.content();
               
-              if (/invite/i.test(content)) {
-                console.log(JSON.stringify({ url: url, interactive_status: 'Closed' }));
-              } else {
-                console.log(JSON.stringify({ url: url, interactive_status: 'Open' }));
-              }
-            } catch (error) {
-              console.log(JSON.stringify({ url: url, interactive_status: 'Offline' }));
+              if (/invite/i.test(content)) return 'Closed';
+              return 'Open';
+            } catch (e) {
+              return 'Offline'; // 浏览器加载失败通常也是 Offline
             } finally {
               if (browser) await browser.close();
             }
+          }
+
+          // Git 提交函数
+          function commitAndPush() {
+            try {
+              execSync('git config --global user.name "github-actions[bot]"');
+              execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
+              execSync(`git add ${STATE_FILE}`);
+              
+              // 只有当有变更时才提交
+              const status = execSync('git status --porcelain').toString();
+              if (status) {
+                execSync('git commit -m "chore: 更新服务器状态文件 [自动监测]"');
+                execSync('git push');
+                console.log(`[${getTime()}] Git 状态已更新并推送。`);
+              }
+            } catch (e) {
+              console.error(`[${getTime()}] Git 提交失败:`, e.message);
+            }
+          }
+
+          // 发送邮件函数
+          async function sendEmail(body) {
+            try {
+              await transporter.sendMail({
+                from: `"3D坦克监测器" <${process.env.MAIL_USERNAME}>`,
+                to: process.env.MAIL_TO,
+                subject: "3D坦克测试服务器状态更新",
+                html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
+              });
+              console.log(`[${getTime()}] 邮件已发送。`);
+            } catch (error) {
+              console.error(`[${getTime()}] 邮件发送失败:`, error);
+            }
+          }
+
+          // --- 主逻辑 ---
+          async function main() {
+            console.log(`[${getTime()}] 监测循环开始...`);
+
+            // 1. 构建 URL 列表
+            let urls = [];
+            for (let i = 1; i <= 10; i++) {
+              urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
+              urls.push(`https://client-review-${i}-public.test-ru.tankionline.com/`);
+            }
+            urls.push("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com");
+            urls.push("https://tankiclassic.com/play/");
+
+            // 2. 读取旧状态
+            let oldStatusJson = {};
+            if (fs.existsSync(STATE_FILE)) {
+              try {
+                oldStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+              } catch (e) {}
+            }
+            let newStatusJson = { ...oldStatusJson }; // 复制一份，基于旧数据修改
+
+            let notifications = [];
+            let availableServers = [];
+
+            // 3. 遍历检查 (为了节省资源，即使Nodejs也建议控制并发，这里简单串行或小批次)
+            // 第一步：CURL 快速筛选
+            let candidates = [];
+            for (const url of urls) {
+              const { statusCode, hash } = await checkCurl(url);
+              // 状态码非 404/403/502/0 视为可能在线
+              if (statusCode !== 404 && statusCode !== 403 && statusCode !== 502 && statusCode !== 0) {
+                candidates.push({ url, hash });
+              } else {
+                // 确认为 Offline
+                const oldEntry = oldStatusJson[url] || {};
+                const oldHash = oldEntry.hash || "";
+                
+                // 保持旧 Hash (如果之前有)
+                const hashToSave = oldHash ? oldHash : hash; 
+                
+                newStatusJson[url] = { status: "Offline", hash: hashToSave };
+                
+                // 检查状态变化: Online -> Offline
+                if (oldEntry.status && oldEntry.status !== "Offline") {
+                   let oldDisplay = oldEntry.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                   notifications.push(`- <a href="${url}">${url}</a>: 服务器已下线 (原状态: ${oldDisplay})`);
+                }
+              }
+            }
+
+            // 第二步：Playwright 深度检查 (只检查 CURL 通过的)
+            for (const item of candidates) {
+              const { url, hash } = item;
+              const interactiveStatus = await checkBrowser(url);
+              
+              const finalStatus = (interactiveStatus === 'Offline') ? 'Offline' : interactiveStatus;
+              
+              // 准备数据
+              const oldEntry = oldStatusJson[url] || {};
+              const oldStatus = oldEntry.status || null;
+              const oldHash = oldEntry.hash || null;
+              
+              // 决定保存的 Hash
+              let hashToSave = hash;
+              if (finalStatus === 'Offline' && oldHash) {
+                 hashToSave = oldHash; // 离线了保持旧 Hash
+              }
+
+              // 记录到新 JSON
+              newStatusJson[url] = { status: finalStatus, hash: hashToSave };
+
+              // 显示状态
+              let displayStatus = "";
+              let displayStatusBold = "";
+              if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
+              if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+
+              if (finalStatus !== "Offline") {
+                availableServers.push(`<a href="${url}">${url}</a> (状态: <b>${displayStatus}</b>)`);
+              }
+
+              // --- 核心比较逻辑 ---
+              let message = "";
+              
+              // 1. 首次发现
+              if (!oldStatus && finalStatus !== "Offline") {
+                message = `首次发现服务器 (状态: ${displayStatusBold})`;
+              }
+              // 2. 状态变化
+              else if (oldStatus && finalStatus !== oldStatus) {
+                if (oldStatus === "Offline") {
+                  // Offline -> Online
+                  let baseMsg = "";
+                  if (finalStatus === "Open") baseMsg = "服务器已上线并<b>开放</b>";
+                  if (finalStatus === "Closed") baseMsg = "服务器已上线，当前为<b>封闭</b>状态";
+                  
+                  // Hash 对比
+                  let hashMsg = "";
+                  if (hash !== oldHash) {
+                    hashMsg = "，且检测到<b>更新</b>";
+                  } else {
+                    hashMsg = "，且<b>无更新</b>";
+                  }
+                  message = baseMsg + hashMsg;
+                } 
+                else if (finalStatus === "Offline") {
+                  // Online -> Offline (这步其实在上面 CURL 部分可能已经被处理，但如果 CURL 通了 Playwright 挂了会走这里)
+                  let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                  message = `服务器已下线 (原状态: ${oldDisplay})`;
+                }
+                else {
+                  // Open <-> Closed
+                  let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                  message = `服务器状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
+                }
+              }
+              // 3. 热更新 (在线且 Hash 变了)
+              else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+                 message = `网页代码已更新 (状态: ${displayStatusBold})`;
+              }
+
+              if (message) {
+                notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
+              }
+            }
+
+            // 4. 后处理：发送通知与保存
+            if (notifications.length > 0) {
+              console.log(`[${getTime()}] 检测到变化，正在处理通知和保存...`);
+              
+              // 写入文件
+              fs.writeFileSync(STATE_FILE, JSON.stringify(newStatusJson, null, 2));
+              
+              // 提交 Git
+              commitAndPush(); // 需要先提交，保证 git 记录最新
+
+              // 构建邮件内容
+              let changeDetails = notifications.join('<br>');
+              let availableListHeader = `<br><hr><b>当前已上线的服务器列表 (${availableServers.length} 个):</b><br>`;
+              let availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
+              let fullBody = `检测到以下服务器状态发生变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
+              
+              // 发送邮件
+              await sendEmail(fullBody);
+            } else {
+              console.log(`[${getTime()}] 无状态变化。`);
+            }
+          }
+
+          // --- 循环控制器 ---
+          (async () => {
+             // 立即执行一次
+             await main();
+
+             const intervalId = setInterval(async () => {
+               // 检查是否超时
+               if (Date.now() - START_TIME > MAX_RUNTIME) {
+                 console.log(`[${getTime()}] 运行时间接近 GitHub 限制，准备退出以重新调度...`);
+                 clearInterval(intervalId);
+                 process.exit(0); // 正常退出，等待 GitHub 下一次 Schedule
+               }
+               
+               await main();
+             }, CHECK_INTERVAL);
           })();
           EOF
 
-          # --- 配置 ---
-          URL_EU_TEMPLATE="https://public-deploy{i}.test-eu.tankionline.com/browser-public/index.html"
-          URL_RU_TEMPLATE="https://client-review-{i}-public.test-ru.tankionline.com/"
-          STATE_FILE="server_status.json"
-          RESULTS_DIR=$(mktemp -d)
-          notifications=()
-          available_servers=()
-          new_status_json="{}"
-          
-          # --- 准备 URL 列表 ---
-          urls=()
-          for i in {1..10}; do
-            urls+=("${URL_EU_TEMPLATE//\{i\}/$i}")
-            urls+=("${URL_RU_TEMPLATE//\{i\}/$i}")
-          done
-          urls+=("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com")
-          urls+=("https://tankiclassic.com/play/")
-
-          # --- 读取旧状态 ---
-          old_status_json=$(cat "$STATE_FILE" 2>/dev/null || echo "{}")
-          
-          # --- 第一阶段: 并行 CURL 检查 ---
-          pids=()
-          online_urls_for_browser_check=()
-          echo "阶段 1: 开始并行 CURL 检查 ${#urls[@]} 个服务器..."
-          for url in "${urls[@]}"; do
-            (
-              response=$(curl --insecure --silent --location --write-out "HTTP_CODE:%{http_code}" --max-time 15 "$url" || echo "HTTP_CODE:000")
-              http_code=$(echo "$response" | sed -n 's/.*HTTP_CODE:\([0-9]\{3\}\)/\1/p')
-              body=$(echo "$response" | sed 's/HTTP_CODE:[0-9]\{3\}$//')
-              current_hash=$(echo "$body" | sha256sum | awk '{print $1}')
-              filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-              echo "{\"http_code\": \"$http_code\", \"hash\": \"$current_hash\"}" > "$RESULTS_DIR/$filename.curl.json"
-            ) &
-            pids+=($!)
-          done
-          wait "${pids[@]}"
-          echo "CURL 检查完成。"
-
-          # --- 第二阶段: 并行 Playwright 检查 ---
-          pids=()
-          for url in "${urls[@]}"; do
-            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            http_code=$(jq -r '.http_code' "$RESULTS_DIR/$filename.curl.json")
-            if [[ "$http_code" != "404" && "$http_code" != "403" && "$http_code" != "502" && "$http_code" != "000" ]]; then
-              online_urls_for_browser_check+=("$url")
-            fi
-          done
-          echo "阶段 2: 开始并行 Playwright 检查 ${#online_urls_for_browser_check[@]} 个已上线的服务器..."
-          for url in "${online_urls_for_browser_check[@]}"; do
-            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            node check_browser.js "$url" > "$RESULTS_DIR/$filename.browser.json" &
-            pids+=($!)
-          done
-          wait "${pids[@]}"
-          echo "Playwright 检查完成。"
-
-          # --- 第三阶段: 汇总结果并生成通知 ---
-          echo "阶段 3: 汇总结果并比较状态..."
-          for url in "${urls[@]}"; do
-            filename=$(echo -n "$url" | md5sum | awk '{print $1}')
-            curl_result=$(cat "$RESULTS_DIR/$filename.curl.json")
-            http_code=$(echo "$curl_result" | jq -r '.http_code')
-            current_hash=$(echo "$curl_result" | jq -r '.hash')
-            interactive_status=""
-            if [ -f "$RESULTS_DIR/$filename.browser.json" ]; then
-              interactive_status=$(jq -r '.interactive_status' "$RESULTS_DIR/$filename.browser.json")
-            fi
-            
-            final_status=""
-            if [[ "$http_code" == "404" ||  "$http_code" == "403" || "$http_code" == "502" || "$http_code" == "000" ]]; then
-              final_status="Offline"
-            else
-              final_status="$interactive_status"
-            fi
-            
-            display_status=""
-            if [ "$final_status" == "Open" ]; then display_status="开放"; fi
-            if [ "$final_status" == "Closed" ]; then display_status="封闭"; fi
-
-            if [ "$final_status" != "Offline" ]; then
-              available_servers+=("<a href=\"$url\">$url</a> (状态: <b>$display_status</b>)")
-            fi
-
-            old_entry=$(echo "$old_status_json" | jq -r ".[\"$url\"] // \"null\"")
-            old_status=$(echo "$old_entry" | jq -r ".status // \"null\"")
-            old_hash=$(echo "$old_entry" | jq -r ".hash // \"null\"")
-            message=""
-
-            # 【修复】移除了所有 'local' 关键字
-            display_status_bold=""
-            if [ "$final_status" == "Open" ]; then display_status_bold="<b>开放</b>"; fi
-            if [ "$final_status" == "Closed" ]; then display_status_bold="<b>封闭</b>"; fi
-            
-            # 第一部分：处理状态变化
-            if [ "$old_status" == "null" ] && [ "$final_status" != "Offline" ]; then
-              message="首次发现服务器 (状态: $display_status_bold)"
-            elif [ "$final_status" != "$old_status" ] && [ "$old_status" != "null" ]; then
-              if [ "$old_status" == "Offline" ]; then
-                if [ "$final_status" == "Open" ]; then message="服务器已上线并<b>开放</b>"; fi
-                if [ "$final_status" == "Closed" ]; then message="服务器已上线，当前为<b>封闭</b>状态"; fi
-              elif [ "$final_status" == "Offline" ]; then
-                old_display_status_bold=""
-                if [ "$old_status" == "Open" ]; then old_display_status_bold="<b>开放</b>"; fi
-                if [ "$old_status" == "Closed" ]; then old_display_status_bold="<b>封闭</b>"; fi
-                message="服务器已下线 (原状态: $old_display_status_bold)"
-              else # Open <-> Closed
-                old_display_status_bold=""
-                if [ "$old_status" == "Open" ]; then old_display_status_bold="<b>开放</b>"; fi
-                if [ "$old_status" == "Closed" ]; then old_display_status_bold="<b>封闭</b>"; fi
-                message="服务器状态已从 $old_display_status_bold 变为 $display_status_bold"
-              fi
-            fi
-
-            # 第二部分：独立处理代码更新
-            if [ "$old_status" != "Offline" ] && [ "$final_status" != "Offline" ] && [ "$old_hash" != "null" ] && [ "$current_hash" != "$old_hash" ]; then
-              if [ -n "$message" ]; then
-                message+=", 且网页代码已更新"
-              else
-                message="网页代码已更新 (状态: $display_status_bold)"
-              fi
-            fi
-            
-            if [ -n "$message" ]; then
-                notifications+=("- <a href=\"$url\">$url</a>: $message")
-            fi
-            
-            new_status_json=$(echo "$new_status_json" | jq ". + {\"$url\": {\"status\": \"$final_status\", \"hash\": \"$current_hash\"}}")
-          done
-
-          rm -rf "$RESULTS_DIR"
-
-          # --- 判断是否有变化并设置输出 ---
-          if [ ${#notifications[@]} -gt 0 ]; then
-            echo "发现服务器状态变化。"
-            change_details=$(printf "%s<br>" "${notifications[@]}")
-            available_list_header="<br><hr><b>当前已上线的服务器列表 (${#available_servers[@]} 个):</b><br>"
-            if [ ${#available_servers[@]} -gt 0 ]; then
-              available_list_body=$(printf "%s<br>" "${available_servers[@]}")
-            else
-              available_list_body="目前没有已上线的服务器。"
-            fi
-            full_notification_body="检测到以下服务器状态发生变化：<br>$change_details$available_list_header$available_list_body"
-
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-            echo "notification_body<<$EOF" >> $GITHUB_OUTPUT
-            echo "$full_notification_body" >> $GITHUB_OUTPUT
-            echo "$EOF" >> $GITHUB_OUTPUT
-            
-            echo "$new_status_json" | jq '.' > "$STATE_FILE"
-          else
-            echo "所有服务器状态无变化。"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-          
-      - name: Send notification email
-        if: steps.check_script.outputs.has_changes == 'true'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.qq.com
-          server_port: 465
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "3D坦克测试服务器状态更新"
-          to: ${{ secrets.MAIL_TO }}
-          from: GitHub Actions 监测器 <${{ secrets.MAIL_USERNAME }}>
-          html_body: |
-            你好，
-            <br><br>
-            ${{ steps.check_script.outputs.notification_body }}
-            <br><br>
-            此邮件由 GitHub Actions 自动发送。
-            
-      - name: Commit status file
-        if: steps.check_script.outputs.has_changes == 'true'
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add server_status.json
-          if git diff --staged --quiet; then
-            echo "状态文件无变化，无需提交。"
-          else
-            git commit -m "chore: 更新服务器状态文件"
-            git push
-          fi
+          # 运行脚本
+          node monitor.js
