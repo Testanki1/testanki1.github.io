@@ -2,7 +2,7 @@ name: 3D坦克测试服务器监测器
 
 on:
   schedule:
-    # 每 6 小时启动一次新的监测循环（为了接力）
+    # 每 6 小时启动一次新的监测
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
@@ -22,8 +22,9 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
+        # 增加 p-limit 用于控制并发
         run: |
-          npm i playwright nodemailer
+          npm i playwright nodemailer p-limit
           npx playwright install --with-deps chromium
 
       - name: Run Persistent Monitor
@@ -40,12 +41,14 @@ jobs:
           const crypto = require('crypto');
           const { execSync } = require('child_process');
           const nodemailer = require('nodemailer');
+          const pLimit = require('p-limit');
 
           // --- 配置 ---
           const STATE_FILE = 'server_status.json';
           const CHECK_INTERVAL = 5 * 60 * 1000; // 5分钟
-          const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // 5.8小时 (留点缓冲时间给GitHub)
+          const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // 5.8小时
           const START_TIME = Date.now();
+          const BROWSER_CONCURRENCY = 5; // 浏览器同时检测的标签页数量
           
           // 邮件传输配置
           const transporter = nodemailer.createTransport({
@@ -60,46 +63,45 @@ jobs:
 
           // --- 工具函数 ---
           
-          // 获取当前时间字符串
           function getTime() {
             return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
           }
 
-          // 发送 CURL 请求获取状态码和内容 Hash
+          // 发送 CURL 请求 (Promise化)
           function checkCurl(url) {
             return new Promise((resolve) => {
-              const req = https.get(url, { rejectUnauthorized: false, timeout: 15000 }, (res) => {
+              const req = https.get(url, { rejectUnauthorized: false, timeout: 10000 }, (res) => {
                 const { statusCode } = res;
                 let data = '';
                 res.on('data', (chunk) => data += chunk);
                 res.on('end', () => {
                   const hash = crypto.createHash('sha256').update(data).digest('hex');
-                  resolve({ statusCode, hash });
+                  resolve({ url, statusCode, hash });
                 });
               });
-              req.on('error', () => resolve({ statusCode: 0, hash: '' }));
-              req.on('timeout', () => { req.destroy(); resolve({ statusCode: 0, hash: '' }); });
+              req.on('error', () => resolve({ url, statusCode: 0, hash: '' }));
+              req.on('timeout', () => { req.destroy(); resolve({ url, statusCode: 0, hash: '' }); });
             });
           }
 
-          // 使用 Playwright 检测页面交互状态
-          async function checkBrowser(url) {
-            let browser = null;
+          // Playwright 检测 (复用浏览器实例)
+          async function checkBrowserPage(context, url) {
+            let page = null;
             try {
               let targetUrl = url.includes('?') ? url + '&skipEntranceAnyKey' : url + '?skipEntranceAnyKey';
-              browser = await chromium.launch();
-              const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
-              const page = await context.newPage();
-              await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-              await page.waitForTimeout(10000); // 等待加载
-              const content = await page.content();
+              page = await context.newPage();
               
-              if (/invite/i.test(content)) return 'Closed';
-              return 'Open';
+              // 缩短超时时间，提高效率
+              await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await page.waitForTimeout(8000); // 等待 8 秒加载脚本
+              
+              const content = await page.content();
+              if (/invite/i.test(content)) return { url, status: 'Closed' };
+              return { url, status: 'Open' };
             } catch (e) {
-              return 'Offline'; // 浏览器加载失败通常也是 Offline
+              return { url, status: 'Offline' };
             } finally {
-              if (browser) await browser.close();
+              if (page) await page.close().catch(() => {});
             }
           }
 
@@ -110,7 +112,6 @@ jobs:
               execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
               execSync(`git add ${STATE_FILE}`);
               
-              // 只有当有变更时才提交
               const status = execSync('git status --porcelain').toString();
               if (status) {
                 execSync('git commit -m "chore: 更新服务器状态文件 [自动监测]"');
@@ -122,7 +123,6 @@ jobs:
             }
           }
 
-          // 发送邮件函数
           async function sendEmail(body) {
             try {
               await transporter.sendMail({
@@ -139,6 +139,7 @@ jobs:
 
           // --- 主逻辑 ---
           async function main() {
+            const loopStart = Date.now();
             console.log(`[${getTime()}] 监测循环开始...`);
 
             // 1. 构建 URL 列表
@@ -153,34 +154,33 @@ jobs:
             // 2. 读取旧状态
             let oldStatusJson = {};
             if (fs.existsSync(STATE_FILE)) {
-              try {
-                oldStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-              } catch (e) {}
+              try { oldStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) {}
             }
-            let newStatusJson = { ...oldStatusJson }; // 复制一份，基于旧数据修改
-
+            let newStatusJson = { ...oldStatusJson };
             let notifications = [];
             let availableServers = [];
 
-            // 3. 遍历检查 (为了节省资源，即使Nodejs也建议控制并发，这里简单串行或小批次)
-            // 第一步：CURL 快速筛选
+            // 3. 并行 CURL 检查 (Phase 1)
+            // console.log(`[${getTime()}] 正在并行 CURL 检测 ${urls.length} 个地址...`);
+            const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
+            
             let candidates = [];
-            for (const url of urls) {
-              const { statusCode, hash } = await checkCurl(url);
-              // 状态码非 404/403/502/0 视为可能在线
+            
+            // 处理 CURL 结果
+            for (const res of curlResults) {
+              const { url, statusCode, hash } = res;
+              
               if (statusCode !== 404 && statusCode !== 403 && statusCode !== 502 && statusCode !== 0) {
+                // 可能是活的，加入候选列表
                 candidates.push({ url, hash });
               } else {
                 // 确认为 Offline
                 const oldEntry = oldStatusJson[url] || {};
                 const oldHash = oldEntry.hash || "";
-                
-                // 保持旧 Hash (如果之前有)
-                const hashToSave = oldHash ? oldHash : hash; 
+                const hashToSave = oldHash ? oldHash : hash; // 离线时保留旧 Hash
                 
                 newStatusJson[url] = { status: "Offline", hash: hashToSave };
                 
-                // 检查状态变化: Online -> Offline
                 if (oldEntry.status && oldEntry.status !== "Offline") {
                    let oldDisplay = oldEntry.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
                    notifications.push(`- <a href="${url}">${url}</a>: 服务器已下线 (原状态: ${oldDisplay})`);
@@ -188,118 +188,116 @@ jobs:
               }
             }
 
-            // 第二步：Playwright 深度检查 (只检查 CURL 通过的)
-            for (const item of candidates) {
-              const { url, hash } = item;
-              const interactiveStatus = await checkBrowser(url);
-              
-              const finalStatus = (interactiveStatus === 'Offline') ? 'Offline' : interactiveStatus;
-              
-              // 准备数据
-              const oldEntry = oldStatusJson[url] || {};
-              const oldStatus = oldEntry.status || null;
-              const oldHash = oldEntry.hash || null;
-              
-              // 决定保存的 Hash
-              let hashToSave = hash;
-              if (finalStatus === 'Offline' && oldHash) {
-                 hashToSave = oldHash; // 离线了保持旧 Hash
-              }
+            // 4. 并行 Playwright 检查 (Phase 2)
+            if (candidates.length > 0) {
+              // console.log(`[${getTime()}] 正在检测 ${candidates.length} 个潜在在线服务器...`);
+              let browser = null;
+              try {
+                // 只启动一次浏览器
+                browser = await chromium.launch();
+                const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
+                
+                // 使用 p-limit 限制并发，防止卡死
+                const limit = pLimit(BROWSER_CONCURRENCY);
+                
+                const browserPromises = candidates.map(candidate => {
+                  return limit(() => checkBrowserPage(context, candidate.url).then(res => ({ ...res, hash: candidate.hash })));
+                });
 
-              // 记录到新 JSON
-              newStatusJson[url] = { status: finalStatus, hash: hashToSave };
+                const browserResults = await Promise.all(browserPromises);
 
-              // 显示状态
-              let displayStatus = "";
-              let displayStatusBold = "";
-              if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
-              if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
-
-              if (finalStatus !== "Offline") {
-                availableServers.push(`<a href="${url}">${url}</a> (状态: <b>${displayStatus}</b>)`);
-              }
-
-              // --- 核心比较逻辑 ---
-              let message = "";
-              
-              // 1. 首次发现
-              if (!oldStatus && finalStatus !== "Offline") {
-                message = `首次发现服务器 (状态: ${displayStatusBold})`;
-              }
-              // 2. 状态变化
-              else if (oldStatus && finalStatus !== oldStatus) {
-                if (oldStatus === "Offline") {
-                  // Offline -> Online
-                  let baseMsg = "";
-                  if (finalStatus === "Open") baseMsg = "服务器已上线并<b>开放</b>";
-                  if (finalStatus === "Closed") baseMsg = "服务器已上线，当前为<b>封闭</b>状态";
+                // 处理浏览器检测结果
+                for (const res of browserResults) {
+                  const { url, status: finalStatus, hash } = res;
                   
-                  // Hash 对比
-                  let hashMsg = "";
-                  if (hash !== oldHash) {
-                    hashMsg = "，且检测到<b>更新</b>";
-                  } else {
-                    hashMsg = "，且<b>无更新</b>";
+                  const oldEntry = oldStatusJson[url] || {};
+                  const oldStatus = oldEntry.status || null;
+                  const oldHash = oldEntry.hash || null;
+                  
+                  let hashToSave = hash;
+                  if (finalStatus === 'Offline' && oldHash) {
+                     hashToSave = oldHash;
                   }
-                  message = baseMsg + hashMsg;
-                } 
-                else if (finalStatus === "Offline") {
-                  // Online -> Offline (这步其实在上面 CURL 部分可能已经被处理，但如果 CURL 通了 Playwright 挂了会走这里)
-                  let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
-                  message = `服务器已下线 (原状态: ${oldDisplay})`;
-                }
-                else {
-                  // Open <-> Closed
-                  let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
-                  message = `服务器状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
-                }
-              }
-              // 3. 热更新 (在线且 Hash 变了)
-              else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
-                 message = `网页代码已更新 (状态: ${displayStatusBold})`;
-              }
 
-              if (message) {
-                notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
+                  newStatusJson[url] = { status: finalStatus, hash: hashToSave };
+
+                  let displayStatus = "";
+                  let displayStatusBold = "";
+                  if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
+                  if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+
+                  if (finalStatus !== "Offline") {
+                    availableServers.push(`<a href="${url}">${url}</a> (状态: <b>${displayStatus}</b>)`);
+                  }
+
+                  // 比较逻辑
+                  let message = "";
+                  if (!oldStatus && finalStatus !== "Offline") {
+                    message = `首次发现服务器 (状态: ${displayStatusBold})`;
+                  }
+                  else if (oldStatus && finalStatus !== oldStatus) {
+                    if (oldStatus === "Offline") {
+                      let baseMsg = "";
+                      if (finalStatus === "Open") baseMsg = "服务器已上线并<b>开放</b>";
+                      if (finalStatus === "Closed") baseMsg = "服务器已上线，当前为<b>封闭</b>状态";
+                      
+                      let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
+                      message = baseMsg + hashMsg;
+                    } 
+                    else if (finalStatus === "Offline") {
+                      // 理论上不会走到这，因为 Offline 在 CURL 阶段通常就被拦截了，除非 CURL 200 但页面加载崩了
+                      let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                      message = `服务器已下线 (原状态: ${oldDisplay})`;
+                    }
+                    else {
+                      let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                      message = `服务器状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
+                    }
+                  }
+                  else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+                     message = `网页代码已更新 (状态: ${displayStatusBold})`;
+                  }
+
+                  if (message) {
+                    notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
+                  }
+                }
+
+              } catch (err) {
+                console.error("浏览器检测阶段出错:", err);
+              } finally {
+                if (browser) await browser.close();
               }
             }
 
-            // 4. 后处理：发送通知与保存
+            // 5. 结果处理
             if (notifications.length > 0) {
               console.log(`[${getTime()}] 检测到变化，正在处理通知和保存...`);
-              
-              // 写入文件
               fs.writeFileSync(STATE_FILE, JSON.stringify(newStatusJson, null, 2));
+              commitAndPush();
               
-              // 提交 Git
-              commitAndPush(); // 需要先提交，保证 git 记录最新
-
-              // 构建邮件内容
               let changeDetails = notifications.join('<br>');
               let availableListHeader = `<br><hr><b>当前已上线的服务器列表 (${availableServers.length} 个):</b><br>`;
               let availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
               let fullBody = `检测到以下服务器状态发生变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
               
-              // 发送邮件
               await sendEmail(fullBody);
             } else {
-              console.log(`[${getTime()}] 无状态变化。`);
+              const duration = ((Date.now() - loopStart) / 1000).toFixed(1);
+              console.log(`[${getTime()}] 无状态变化。 (耗时: ${duration}秒)`);
             }
           }
 
           // --- 循环控制器 ---
           (async () => {
-             // 立即执行一次
-             await main();
+             await main(); // 立即执行一次
 
              const intervalId = setInterval(async () => {
-               // 检查是否超时
                if (Date.now() - START_TIME > MAX_RUNTIME) {
-                 console.log(`[${getTime()}] 运行时间接近 GitHub 限制，准备退出以重新调度...`);
+                 console.log(`[${getTime()}] 运行时间接近限制，退出...`);
                  clearInterval(intervalId);
-                 process.exit(0); // 正常退出，等待 GitHub 下一次 Schedule
+                 process.exit(0);
                }
-               
                await main();
              }, CHECK_INTERVAL);
           })();
