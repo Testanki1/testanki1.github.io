@@ -1,347 +1,655 @@
 <!DOCTYPE html>
-<!-- lang attribute will be set dynamically by JS -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Title will be set dynamically by JS -->
-    <title>JS 字符串比较工具</title>
+    <title>JS 字符串比对工具</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500&family=Rubik:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        * {
-            -webkit-tap-highlight-color: transparent;
+        :root {
+            /* 核心配色 (用户指定) */
+            --color-bg: #001926;
+            --color-surface: rgba(0, 43, 64, 0.6);
+            --color-surface-hover: rgba(0, 56, 84, 0.8);
+            
+            --color-primary: #76FF33;
+            --color-primary-dim: rgba(118, 255, 51, 0.15);
+            --color-primary-glow: rgba(118, 255, 51, 0.4);
+            
+            --color-error: #FF6666;
+            --color-error-dim: rgba(255, 102, 102, 0.15);
+            
+            --color-text-main: #e0e6ed;
+            --color-text-sub: #BFD5FF;
+            --color-border: rgba(191, 213, 255, 0.1);
+
+            --radius-xl: 28px;
+            --radius-l: 20px;
+            --radius-m: 12px;
+            --radius-pill: 100px;
+            
+            --font-ui: 'Rubik', sans-serif;
+            --font-code: 'M PLUS 1p', monospace;
+            
+            --motion-spring: cubic-bezier(0.2, 0.8, 0.2, 1);
         }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        
         body {
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-            margin: 2em;
-            background-color: #001926;
-            color: #e0e0e0;
-            transition: background-color 0.3s;
+            font-family: var(--font-ui);
+            background-color: var(--color-bg);
+            color: var(--color-text-main);
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            background-image: radial-gradient(circle at 10% 10%, rgba(118, 255, 51, 0.03) 0%, transparent 40%),
+                              radial-gradient(circle at 90% 90%, rgba(255, 102, 102, 0.03) 0%, transparent 40%);
         }
 
-        h1, h2, h3 { color: #ffffff; font-weight: 400; }
-        h1 { color: #76FF33; border-bottom: 2px solid #004b6e; padding-bottom: 0.5em; font-weight: 500; }
-        h2 { font-weight: 400; border-bottom: 1px solid #00334d; padding-bottom: 0.3em; margin-top: 0; }
-        h3 { color: #a0c8e8; font-weight: 400; }
-
-        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 2em; margin-bottom: 2em; }
-        .input-group { background-color: #002538; padding: 2em; border-radius: 8px; border: 1px solid #004b6e; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); transition: all 0.3s ease; }
-        .input-group:hover { border-color: #0072a8; transform: translateY(-2px); }
-
-        #results { margin-top: 2em; }
-        .result-box {
-            background-color: #002538;
-            padding: 1em;
-            border: 1px solid #004b6e;
-            border-radius: 8px;
-            min-height: 80px;
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: inherit;
-            box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+        /* 头部设计 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--color-border);
         }
-        .result-line { padding: 0.4em 0.8em; border-bottom: 1px solid #00334d; white-space: pre-wrap; word-break: break-all; color: #f5f5f5; transition: background-color 0.2s; }
-        .result-line:hover { background-color: #00334d; }
-        .result-line:last-child { border-bottom: none; }
-        .no-results { color: #88a1b5; font-style: italic; padding: 0.4em 0.8em; }
 
-        .button-style {
-            display: inline-block;
-            padding: 0.6em 1.2em;
-            font-size: 0.9em;
-            font-weight: bold;
-            background-color: #76FF33;
-            color: #001926;
-            border: none;
-            border-radius: 5px;
+        h1 {
+            font-size: 2rem;
+            margin: 0;
+            color: var(--color-text-main);
+            font-weight: 500;
+            letter-spacing: -0.02em;
+        }
+        
+        h1 span { color: var(--color-primary); }
+
+        .meta-info {
+            font-family: var(--font-code);
+            color: var(--color-text-sub);
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        /* 布局容器 */
+        main {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        .controls-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto; /* 左文件，右文件，按钮 */
+            gap: 1.5rem;
+            align-items: stretch;
+        }
+
+        /* 卡片通用样式 (Glassmorphism) */
+        .glass-panel {
+            background: var(--color-surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-xl);
+            transition: transform 0.3s var(--motion-spring), border-color 0.3s, background 0.3s;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 文件上传卡片 */
+        .file-card {
+            position: relative;
+            padding: 1.5rem;
             cursor: pointer;
-            transition: all 0.2s ease-in-out;
+            group: file-input;
+        }
+
+        .file-card:hover {
+            background: var(--color-surface-hover);
+            border-color: rgba(118, 255, 51, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .file-card input {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 2;
+        }
+
+        .card-label {
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-family: inherit;
-            text-align: center;
-        }
-        .button-style:hover {
-            background-color: #8cff5b;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(118, 255, 51, 0.25);
-        }
-        #compare-btn {
-            padding: 0.8em 2em;
-            font-size: 1.1em;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
         }
 
-        .file-upload-wrapper {
-            margin-bottom: 1em;
-        }
-        .file-upload-wrapper input[type="file"] {
-            display: none;
-        }
-        .file-name-display {
-            display: inline-block;
-            margin-left: 1em;
-            font-style: italic;
-            color: #a0c8e8;
-            max-width: 200px;
+        .file-status {
+            font-family: var(--font-code);
+            font-size: 1.1rem;
+            color: var(--color-text-main);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            vertical-align: middle;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .icon-placeholder {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--color-text-sub);
+            opacity: 0.3;
+            transition: 0.3s;
+        }
+
+        .file-card:hover .icon-placeholder, 
+        .file-card.has-file .icon-placeholder {
+            border-color: var(--color-primary);
+            background: var(--color-primary);
+            opacity: 1;
+            box-shadow: 0 0 10px var(--color-primary-glow);
+        }
+
+        /* 主按钮 */
+        #compare-btn {
+            background: var(--color-primary);
+            color: var(--color-bg);
+            border: none;
+            border-radius: var(--radius-xl);
+            padding: 0 3rem;
+            font-family: var(--font-ui);
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s var(--motion-spring);
+            box-shadow: 0 4px 20px var(--color-primary-dim);
+            min-width: 160px;
+        }
+
+        #compare-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px var(--color-primary-glow);
+            background: #8cff5b;
+        }
+
+        #compare-btn:disabled {
+            background: #4a6642;
+            color: rgba(0, 25, 38, 0.5);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 结果区域 */
+        .results-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            flex: 1;
+            min-height: 400px;
+        }
+
+        .result-column {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+            background: rgba(0,0,0,0.2);
+        }
+
+        .col-title {
+            font-weight: 500;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .counter {
+            font-family: var(--font-code);
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .list-viewport {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        /* 列表项样式 */
+        .list-item {
+            font-family: var(--font-code);
+            font-size: 0.9rem;
+            padding: 0.6rem 1rem;
+            margin-bottom: 4px;
+            border-radius: var(--radius-m);
+            word-break: break-all;
+            color: #fff;
+            animation: fadeIn 0.3s ease forwards;
+            opacity: 0;
+            transition: background 0.1s;
         }
         
-        label { display: block; margin-bottom: 0.5em; font-weight: 500; color: #c0d0e0; }
-        
-        #error-message { color: #ff6b6b; background-color: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.5); padding: 0.8em; border-radius: 4px; margin-top: 1.5em; font-weight: bold; display: none; }
+        @keyframes fadeIn { to { opacity: 1; } }
 
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: #002538; }
-        ::-webkit-scrollbar-thumb { background: #004b6e; border-radius: 5px; }
-        ::-webkit-scrollbar-thumb:hover { background: #0072a8; }
-        @media (max-width: 768px) {
-            body { margin: 1em; }
-            .container { grid-template-columns: 1fr; }
-            .input-group { padding: 1.5em; }
+        .list-item:hover { background: rgba(255,255,255,0.05); }
+
+        /* 特定颜色逻辑 */
+        .col-added .col-title { color: var(--color-primary); }
+        .col-added .counter { color: var(--color-primary); text-shadow: 0 0 20px var(--color-primary-dim); }
+        .col-added .list-item { color: #ccffb3; border-left: 2px solid transparent; }
+        .col-added .list-item:hover { border-left-color: var(--color-primary); }
+
+        .col-removed .col-title { color: var(--color-error); }
+        .col-removed .counter { color: var(--color-error); text-shadow: 0 0 20px var(--color-error-dim); }
+        .col-removed .list-item { color: #ffcccc; border-left: 2px solid transparent; }
+        .col-removed .list-item:hover { border-left-color: var(--color-error); }
+
+        .empty-state {
+            padding: 3rem;
+            text-align: center;
+            color: var(--color-text-sub);
+            opacity: 0.5;
+            font-style: italic;
+        }
+
+        /* 加载动画 */
+        #loading {
+            position: fixed; inset: 0;
+            background: rgba(0, 25, 38, 0.9);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: none;
+            justify-content: center; align-items: center;
+            flex-direction: column; gap: 1rem;
+        }
+        
+        .spinner {
+            width: 50px; height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .loading-text { color: var(--color-primary); font-weight: 500; letter-spacing: 1px; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(191, 213, 255, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(191, 213, 255, 0.4); }
+
+        /* 移动端适配 */
+        @media (max-width: 900px) {
+            body { padding: 1rem; gap: 1.5rem; }
+            .controls-area { grid-template-columns: 1fr; }
+            #compare-btn { padding: 1rem; width: 100%; }
+            .results-area { grid-template-columns: 1fr; }
+            .result-column { max-height: 500px; }
         }
     </style>
 </head>
 <body>
 
-    <h1 data-translate-key="mainHeader"></h1>
-    <p data-translate-key="description"></p>
-
-    <div class="container">
-        <div class="input-group">
-            <h2 data-translate-key="originalFileHeader"></h2>
-            <div class="file-upload-wrapper">
-                <label for="original-file" class="button-style" data-translate-key="chooseFile"></label>
-                <input type="file" id="original-file" accept=".js,text/javascript">
-                <span class="file-name-display" id="original-file-name"></span>
-            </div>
-        </div>
-        <div class="input-group">
-            <h2 data-translate-key="newFileHeader"></h2>
-            <div class="file-upload-wrapper">
-                <label for="new-file" class="button-style" data-translate-key="chooseFile"></label>
-                <input type="file" id="new-file" accept=".js,text/javascript">
-                <span class="file-name-display" id="new-file-name"></span>
-            </div>
-        </div>
+    <!-- Loading Screen -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">深度解析中...</div>
     </div>
 
-    <button id="compare-btn" class="button-style" data-translate-key="compareButton"></button>
-    <div id="error-message"></div>
+    <header>
+        <h1>JS <span>Diff</span> Tool</h1>
+        <div class="meta-info">String Comparison</div>
+    </header>
 
-    <div id="results">
-        <h2 data-translate-key="resultsHeader"></h2>
-        <h3 data-translate-key="addedStringsHeader"></h3>
-        <div id="added" class="result-box"></div>
+    <main>
+        <!-- 控制区 -->
+        <section class="controls-area">
+            <!-- 旧文件 -->
+            <div class="glass-panel file-card" id="card-old">
+                <div class="card-label">原始文件 (Old)</div>
+                <div class="file-status">
+                    <div class="icon-placeholder"></div>
+                    <span id="name-old">点击选择文件...</span>
+                </div>
+                <input type="file" id="file-old" accept=".js,.txt,.json">
+            </div>
 
-        <h3 data-translate-key="removedStringsHeader"></h3>
-        <div id="removed" class="result-box"></div>
-    </div>
+            <!-- 新文件 -->
+            <div class="glass-panel file-card" id="card-new">
+                <div class="card-label">新文件 (New)</div>
+                <div class="file-status">
+                    <div class="icon-placeholder"></div>
+                    <span id="name-new">点击选择文件...</span>
+                </div>
+                <input type="file" id="file-new" accept=".js,.txt,.json">
+            </div>
+
+            <!-- 按钮 -->
+            <button id="compare-btn">开始比对</button>
+        </section>
+
+        <!-- 结果区 -->
+        <section class="results-area">
+            <!-- 新增 -->
+            <div class="glass-panel result-column col-added">
+                <div class="column-header">
+                    <div class="col-title">新增内容 (+)</div>
+                    <div id="count-added" class="counter">0</div>
+                </div>
+                <div id="list-added" class="list-viewport">
+                    <div class="empty-state">等待数据...</div>
+                </div>
+            </div>
+
+            <!-- 删除 -->
+            <div class="glass-panel result-column col-removed">
+                <div class="column-header">
+                    <div class="col-title">移除内容 (-)</div>
+                    <div id="count-removed" class="counter">0</div>
+                </div>
+                <div id="list-removed" class="list-viewport">
+                    <div class="empty-state">等待数据...</div>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <script>
-        const translations = {
-            zh: {
-                title: "JS 字符串比较工具",
-                mainHeader: "JS 字符串比较工具",
-                description: "上传两个 JavaScript 文件，工具将提取其中由**单引号或双引号**包围的字符串，并比较新旧版本的差异。",
-                originalFileHeader: "原始 JS 文件 (Old)",
-                newFileHeader: "新 JS 文件 (New)",
-                chooseFile: "选择文件",
-                compareButton: "开始比较",
-                resultsHeader: "比较结果",
-                addedStringsHeader: "新增的字符串（新文件中有，旧文件中没有）",
-                removedStringsHeader: "删除的字符串（旧文件中有，新文件中没有）",
-                noResults: "无",
-                errorPrefix: "发生错误：",
-                errorNoFile: "错误：请至少为“原始文件”或“新文件”选择一个文件。",
-                errorReadFile: "读取本地文件失败"
-            },
-            en: {
-                title: "JS String Comparison Tool",
-                mainHeader: "JS String Comparison Tool",
-                description: "Upload two JavaScript files. The tool will extract strings enclosed in **single or double quotes** and compare the differences between the old and new versions.",
-                originalFileHeader: "Original JS File (Old)",
-                newFileHeader: "New JS File (New)",
-                chooseFile: "Choose File",
-                compareButton: "Compare",
-                resultsHeader: "Comparison Results",
-                addedStringsHeader: "Added Strings (in new file, not in old)",
-                removedStringsHeader: "Removed Strings (in old file, not in new)",
-                noResults: "None",
-                errorPrefix: "An error occurred: ",
-                errorNoFile: "Error: Please select a file for either 'Original File' or 'New File'.",
-                errorReadFile: "Failed to read local file"
-            }
-        };
+        const nextTick = () => new Promise(r => setTimeout(r, 0));
 
-        let currentLang = 'en';
+        // UI 交互绑定
+        const bindInput = (inputId, nameId, cardId) => {
+            const input = document.getElementById(inputId);
+            const nameEl = document.getElementById(nameId);
+            const cardEl = document.getElementById(cardId);
 
-        function applyTranslations(lang) {
-            document.documentElement.lang = lang.startsWith('zh') ? 'zh-CN' : 'en';
-            currentLang = lang;
-
-            document.title = translations[lang].title;
-
-            document.querySelectorAll('[data-translate-key]').forEach(el => {
-                const key = el.dataset.translateKey;
-                if (translations[lang][key]) {
-                    el.innerHTML = translations[lang][key];
+            input.addEventListener('change', () => {
+                if (input.files[0]) {
+                    nameEl.textContent = input.files[0].name;
+                    nameEl.style.opacity = '1';
+                    cardEl.classList.add('has-file');
+                } else {
+                    nameEl.textContent = '点击选择文件...';
+                    cardEl.classList.remove('has-file');
                 }
             });
-        }
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            const userLang = (navigator.language || navigator.userLanguage).toLowerCase();
-            const lang = userLang.startsWith('zh') ? 'zh' : 'en';
-            applyTranslations(lang);
+        };
+        bindInput('file-old', 'name-old', 'card-old');
+        bindInput('file-new', 'name-new', 'card-new');
+
+        const readFile = (file) => new Promise((resolve) => {
+            if (!file) return resolve('');
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsText(file);
         });
 
-        function setupFileNameDisplay(inputId, displayId) {
-            const fileInput = document.getElementById(inputId);
-            const fileNameDisplay = document.getElementById(displayId);
-            fileInput.addEventListener('change', () => {
-                if (fileInput.files.length > 0) {
-                    fileNameDisplay.textContent = fileInput.files[0].name;
-                } else {
-                    fileNameDisplay.textContent = '';
-                }
-            });
-        }
-        setupFileNameDisplay('original-file', 'original-file-name');
-        setupFileNameDisplay('new-file', 'new-file-name');
-
-        const getFileContent = (fileInput) => {
-            return new Promise((resolve, reject) => {
-                const file = fileInput.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => resolve(event.target.result);
-                    reader.onerror = (error) => reject(new Error(translations[currentLang].errorReadFile));
-                    reader.readAsText(file);
-                } else {
-                    resolve('');
-                }
-            });
-        };
-        
-        const extractStrings = (content) => {
+        // ---------------------------------------------------------
+        // 核心解析器：上下文感知 (Context-Aware) & 路径修复版
+        // ---------------------------------------------------------
+        async function extractStrings(content) {
             if (!content) return new Set();
-            const stringRegex = /(["'])(?:\\.|(?!\1).)*\1/g;
-            const matches = content.match(stringRegex);
 
-            if (!matches) return new Set();
+            const strings = new Set();
+            const len = content.length;
+            const CHUNK = 50000;
 
-            const finalStrings = new Set();
-            for (const match of matches) {
-                const innerString = match.slice(1, -1);
-                const unescaped = innerString
-                    .replace(/\\'/g, "'")
-                    .replace(/\\"/g, '"')
-                    .replace(/\\n/g, '\n')
-                    .replace(/\\r/g, '\r')
-                    .replace(/\\t/g, '\t')
-                    .replace(/\\\\/g, '\\');
-                finalStrings.add(unescaped.trim());
+            const S_CODE = 0;
+            const S_STR_DOUBLE = 1;
+            const S_STR_SINGLE = 2;
+            const S_STR_BACK = 3;
+            const S_REGEX = 4;
+            const S_COMMENT_LINE = 5;
+            const S_COMMENT_BLOCK = 6;
+
+            let mode = S_CODE;
+            let buffer = '';
+            let isEscaped = false;
+            let lastSignificantChar = ';'; 
+            let lastWord = '';
+
+            for (let i = 0; i < len; i++) {
+                if (i % CHUNK === 0) await nextTick();
+
+                const char = content[i];
+                const next = content[i+1] || '';
+
+                if (mode === S_CODE) {
+                    if (char === '"') { mode = S_STR_DOUBLE; buffer = ''; isEscaped = false; }
+                    else if (char === "'") { mode = S_STR_SINGLE; buffer = ''; isEscaped = false; }
+                    else if (char === '`') { mode = S_STR_BACK;   buffer = ''; isEscaped = false; }
+                    else if (char === '/' && next === '/') { mode = S_COMMENT_LINE; i++; }
+                    else if (char === '/' && next === '*') { mode = S_COMMENT_BLOCK; i++; }
+                    else if (char === '/') {
+                        if (isRegexStart(lastSignificantChar, lastWord)) {
+                            mode = S_REGEX;
+                            isEscaped = false;
+                        } else {
+                            lastSignificantChar = '/';
+                            lastWord = '';
+                        }
+                    }
+                    else {
+                        if (char > ' ') { 
+                            lastSignificantChar = char;
+                            if (isAlpha(char)) lastWord += char;
+                            else lastWord = '';
+                        }
+                    }
+                }
+                else if (mode === S_STR_DOUBLE || mode === S_STR_SINGLE || mode === S_STR_BACK) {
+                    let endChar = '"';
+                    if (mode === S_STR_SINGLE) endChar = "'";
+                    if (mode === S_STR_BACK) endChar = '`';
+
+                    if (isEscaped) {
+                        buffer += '\\' + char;
+                        isEscaped = false;
+                    } else if (char === '\\') {
+                        isEscaped = true;
+                    } else if (char === endChar) {
+                        addString(strings, buffer);
+                        mode = S_CODE;
+                        lastSignificantChar = 's';
+                        lastWord = '';
+                    } else {
+                        buffer += char;
+                    }
+                }
+                else if (mode === S_REGEX) {
+                    if (isEscaped) isEscaped = false;
+                    else if (char === '\\') isEscaped = true;
+                    else if (char === '/') {
+                        mode = S_CODE;
+                        lastSignificantChar = 'r';
+                        lastWord = '';
+                    }
+                }
+                else if (mode === S_COMMENT_LINE) {
+                    if (char === '\n' || char === '\r') mode = S_CODE;
+                }
+                else if (mode === S_COMMENT_BLOCK) {
+                    if (char === '*' && next === '/') { mode = S_CODE; i++; }
+                }
             }
-            return finalStrings;
-        };
-        
-        const filterMeaningfulStrings = (stringSet) => {
-            const meaningfulStrings = new Set();
+            return strings;
+        }
 
-            const codeKeywordsRegex = /\b(function|var|let|const|return|typeof|null|undefined|if|else|for|while|switch|case|break|new|this|true|false)\b/;
-            const codeStructureRegex = /=>|\|\||&&|===|!==|\+\+|--/;
-
-            for (const str of stringSet) {
-                if (str.length < 2) continue;
-                if (!/[a-zA-Z]/.test(str) && !/[\u4e00-\u9fa5]/.test(str)) continue;
-
-                if (codeKeywordsRegex.test(str)) continue;
-                if (codeStructureRegex.test(str)) continue;
-
-                const specialChars = str.replace(/[a-zA-Z0-9\s\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/g, '');
-                const ratio = str.length > 0 ? specialChars.length / str.length : 0;
-                
-                if (ratio > 0.3) continue;
-
-                const openBrackets = (str.match(/\(/g) || []).length;
-                const closeBrackets = (str.match(/\)/g) || []).length;
-                
-                if (openBrackets !== closeBrackets || openBrackets > 3) continue;
-
-                meaningfulStrings.add(str);
+        // 判断是否为正则表达式开始
+        function isRegexStart(prevChar, prevWord) {
+            const regexStarters = new Set([
+                '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';',
+                '+', '-', '*', '%', '^', '~', '<', '>'
+            ]);
+            if (regexStarters.has(prevChar)) return true;
+            if (prevWord) {
+                const keywords = new Set(['return', 'throw', 'case', 'delete', 'typeof', 'void', 'await', 'yield', 'else']);
+                if (keywords.has(prevWord)) return true;
             }
-            return meaningfulStrings;
-        };
+            return false;
+        }
 
+        function isAlpha(char) {
+            return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z');
+        }
 
-        const renderResults = (container, stringArray) => {
-            container.innerHTML = ''; 
-            if (stringArray.length > 0) {
-                const sortedArray = [...stringArray].sort();
-                sortedArray.forEach(str => {
-                    const lineDiv = document.createElement('div');
-                    lineDiv.className = 'result-line';
-                    lineDiv.textContent = str;
-                    container.appendChild(lineDiv);
-                });
-            } else {
-                const noResultDiv = document.createElement('div');
-                noResultDiv.className = 'no-results';
-                noResultDiv.textContent = translations[currentLang].noResults;
-                container.appendChild(noResultDiv);
-            }
-        };
-
-        document.getElementById('compare-btn').addEventListener('click', async () => {
-            const addedDiv = document.getElementById('added');
-            const removedDiv = document.getElementById('removed');
-            const errorDiv = document.getElementById('error-message');
-            addedDiv.innerHTML = '<div class="no-results">...</div>';
-            removedDiv.innerHTML = '<div class="no-results">...</div>';
-            errorDiv.style.display = 'none';
-            errorDiv.textContent = '';
-            
+        // 字符串清洗与标准化
+        function addString(set, raw) {
             try {
-                const originalContentPromise = getFileContent(document.getElementById('original-file'));
-                const newContentPromise = getFileContent(document.getElementById('new-file'));
+                let clean = raw
+                    .replace(/\\\\/g, '\\')
+                    .replace(/\\"/g, '"')
+                    .replace(/\\'/g, "'")
+                    .replace(/\\`/g, '`')
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\t/g, '\t')
+                    .replace(/\\\//g, '/'); // 路径标准化
+
+                clean = clean.trim();
+                if (isUseful(clean)) set.add(clean);
+            } catch (e) {}
+        }
+
+        // 智能过滤：保留路径，排除代码噪音
+        function isUseful(str) {
+            if (str.length < 2) return false;
+            
+            // 特权：文件路径豁免 (spark.webp 问题修复点)
+            if (str.includes('/') && str.includes('.')) {
+                return str.length < 300;
+            }
+            
+            // 基础校验
+            if (!/[a-zA-Z0-9\u4e00-\u9fa5]/.test(str)) return false;
+            
+            const keywords = /^(var|const|let|function|return|import|export|from|true|false|null|undefined|if|else|switch|case|break|try|catch|class|typeof|void|delete|new|this|window|document|Math|Object|Array|String|Date|Error|Promise|JSON|console|=>|===|!==|==|!=|\+=|\-=|\+\+|\-\-)$/;
+            if (keywords.test(str)) return false;
+
+            const open = (str.match(/\(/g)||[]).length;
+            const close = (str.match(/\)/g)||[]).length;
+            if (open !== close) return false;
+
+            return true;
+        }
+
+        // 主逻辑
+        document.getElementById('compare-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('compare-btn');
+            const loading = document.getElementById('loading');
+            const fileOld = document.getElementById('file-old').files[0];
+            const fileNew = document.getElementById('file-new').files[0];
+
+            if (!fileOld || !fileNew) {
+                alert("请先选择两个文件！");
+                return;
+            }
+
+            btn.disabled = true;
+            loading.style.display = 'flex';
+            
+            // 清空列表
+            renderList('list-added', [], 'count-added');
+            renderList('list-removed', [], 'count-removed');
+
+            try {
+                await nextTick();
+
+                const [txtOld, txtNew] = await Promise.all([readFile(fileOld), readFile(fileNew)]);
                 
-                const [rawOriginalStrings, rawNewStrings] = await Promise.all([
-                   originalContentPromise.then(extractStrings),
-                   newContentPromise.then(extractStrings)
+                const [setOld, setNew] = await Promise.all([
+                    extractStrings(txtOld), 
+                    extractStrings(txtNew)
                 ]);
 
-                // Apply the filter to get only meaningful strings
-                const originalStrings = filterMeaningfulStrings(rawOriginalStrings);
-                const newStrings = filterMeaningfulStrings(rawNewStrings);
+                const added = [];
+                const removed = [];
 
-                if (originalStrings.size === 0 && newStrings.size === 0 && 
-                    !document.getElementById('original-file').files[0] &&
-                    !document.getElementById('new-file').files[0]) {
-                     errorDiv.textContent = translations[currentLang].errorNoFile;
-                     errorDiv.style.display = 'block';
-                     renderResults(addedDiv, []);
-                     renderResults(removedDiv, []);
-                     return;
+                // 分片比对
+                let i = 0;
+                for (const s of setNew) {
+                    if (!setOld.has(s)) added.push(s);
+                    if (++i % 5000 === 0) await nextTick();
                 }
 
-                const added = [...newStrings].filter(str => !originalStrings.has(str));
-                const removed = [...originalStrings].filter(str => !newStrings.has(str));
-                
-                renderResults(addedDiv, added);
-                renderResults(removedDiv, removed);
+                i = 0;
+                for (const s of setOld) {
+                    if (!setNew.has(s)) removed.push(s);
+                    if (++i % 5000 === 0) await nextTick();
+                }
 
-            } catch (error) {
-                errorDiv.textContent = `${translations[currentLang].errorPrefix}${error.message}`;
-                errorDiv.style.display = 'block';
+                added.sort();
+                removed.sort();
+
+                renderList('list-added', added, 'count-added');
+                renderList('list-removed', removed, 'count-removed');
+
+            } catch (err) {
+                console.error(err);
+                alert("发生错误: " + err.message);
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
             }
         });
+
+        // 渲染列表 (带数量限制)
+        function renderList(containerId, list, countId) {
+            const container = document.getElementById(containerId);
+            document.getElementById(countId).textContent = list.length;
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                container.innerHTML = '<div class="empty-state">无内容</div>';
+                return;
+            }
+
+            const LIMIT = 2000;
+            const frag = document.createDocumentFragment();
+            
+            // 使用 setTimeout 分批渲染动画，或者直接渲染前2000条
+            for (let i = 0; i < Math.min(list.length, LIMIT); i++) {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.textContent = list[i];
+                // 交错动画延迟
+                if (i < 20) div.style.animationDelay = `${i * 0.03}s`;
+                frag.appendChild(div);
+            }
+            
+            if (list.length > LIMIT) {
+                const more = document.createElement('div');
+                more.className = 'empty-state';
+                more.textContent = `... 还有 ${list.length - LIMIT} 条数据已隐藏`;
+                frag.appendChild(more);
+            }
+            
+            container.appendChild(frag);
+        }
     </script>
 </body>
 </html>
