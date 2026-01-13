@@ -319,7 +319,7 @@
         
         #fullScreenImage {
             max-width: 95vw; max-height: 90vh; object-fit: contain;
-            border-radius: 0; /* No rounded corners for fullscreen */
+            border-radius: 0; /* No rounded corners */
             box-shadow: 0 0 30px rgba(0,0,0,0.8);
             pointer-events: auto;
             transition: opacity 0.1s;
@@ -357,7 +357,7 @@
     </div>
 
     <footer>
-        <span id="sourceInfo">Data Source: ...</span>
+        <span id="sourceInfo"></span>
     </footer>
 
     <!-- Full Screen Image Viewer -->
@@ -378,24 +378,25 @@
             return `<span class="material-symbols-rounded ${isFilled ? 'icon-filled' : ''}">${name}</span>`;
         }
 
-        const isChinese = navigator.language.toLowerCase().startsWith('zh');
+        // 界面语言依然由浏览器决定
+        const isBrowserChinese = navigator.language.toLowerCase().startsWith('zh');
         
-        const CONFIG = {
-            baseUrl: isChinese ? 'https://3dtank.com/play/' : 'https://tankionline.com/play/',
+        let CONFIG = {
+            // baseUrl 将由 IP 检测决定
+            baseUrl: '', 
             labels: {
-                title: isChinese ? '3D坦克网页图标浏览' : 'Tanki Online Icon Viewer',
-                step1: isChinese ? '加载中... (1/4)' : 'Loading... (1/4)',
-                step2: isChinese ? '加载中... (2/4)' : 'Loading... (2/4)',
-                step3: isChinese ? '加载中... (3/4)' : 'Loading... (3/4)',
-                step4: isChinese ? '加载中... (4/4)' : 'Loading... (4/4)',
-                done: isChinese ? '加载完成' : 'Done', 
-                error: isChinese ? '加载失败' : 'Failed to load',
-                source: isChinese ? '数据源: ' : 'Data Source: '
+                title: isBrowserChinese ? '3D坦克网页图标浏览' : 'Tanki Online Icon Viewer',
+                step1: isBrowserChinese ? '加载中... (1/4)' : 'Loading... (1/4)',
+                step2: isBrowserChinese ? '加载中... (2/4)' : 'Loading... (2/4)',
+                step3: isBrowserChinese ? '加载中... (3/4)' : 'Loading... (3/4)',
+                step4: isBrowserChinese ? '加载中... (4/4)' : 'Loading... (4/4)',
+                done: isBrowserChinese ? '加载完成' : 'Done', 
+                error: isBrowserChinese ? '加载失败' : 'Failed to load',
+                source: isBrowserChinese ? '数据源: ' : 'Data Source: '
             }
         };
 
         document.getElementById('pageTitle').textContent = CONFIG.labels.title;
-        document.getElementById('sourceInfo').textContent = CONFIG.labels.source + new URL(CONFIG.baseUrl).hostname;
 
         let resources = {};
 
@@ -424,7 +425,6 @@
             container.innerHTML = `<div class="loading-wrapper"><div class="error-msg">${msg}</div></div>`;
         }
 
-        // 工具：格式化字节
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
@@ -433,7 +433,31 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // 带进度回调的流式下载
+        // 检测是否在中国大陆 (直连 Cloudflare)
+        async function checkIsChina() {
+            try {
+                // 必须直连，不能走代理，否则检测到的是代理服务器的 IP
+                const response = await fetch('https://www.cloudflare.com/cdn-cgi/trace', {
+                    cache: 'no-cache'
+                });
+                if (!response.ok) return false; 
+                const text = await response.text();
+                
+                // 解析 loc=CN
+                const lines = text.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('loc=')) {
+                        const loc = line.split('=')[1];
+                        console.log("Detected Region:", loc);
+                        return loc === 'CN';
+                    }
+                }
+            } catch (e) {
+                console.warn("Cloudflare trace failed, defaulting to Global logic.", e);
+            }
+            return false;
+        }
+
         async function downloadWithProgress(url, onProgress) {
             const proxyBase = 'https://api.codetabs.com/v1/proxy?quest=';
             const target = proxyBase + encodeURIComponent(url);
@@ -470,7 +494,6 @@
             return new TextDecoder("utf-8").decode(allChunks);
         }
 
-        // 普通 Fetch (用于 HTML)
         async function fetchSimple(url) {
             const proxyBase = 'https://api.codetabs.com/v1/proxy?quest=';
             const target = proxyBase + encodeURIComponent(url);
@@ -485,7 +508,24 @@
             renderProgressUI();
 
             try {
-                // Step 1: 获取 HTML (25%)
+                // Step 1: 包含 IP 检测和获取 HTML
+                // 不显示单独的检测提示，直接从 Step 1 开始
+                updateProgress(5, CONFIG.labels.step1);
+                
+                // 静默执行 IP 检测
+                const isChina = await checkIsChina();
+                
+                // 根据 IP 设定数据源
+                if (isChina) {
+                    CONFIG.baseUrl = 'https://3dtank.com/play/';
+                } else {
+                    CONFIG.baseUrl = 'https://tankionline.com/play/';
+                }
+                
+                // 更新页脚显示数据源
+                document.getElementById('sourceInfo').textContent = CONFIG.labels.source + new URL(CONFIG.baseUrl).hostname;
+
+                // 继续 Step 1: 获取 HTML
                 updateProgress(10, CONFIG.labels.step1); 
                 const html = await fetchSimple(CONFIG.baseUrl);
                 updateProgress(25, CONFIG.labels.step2);
@@ -503,17 +543,14 @@
                 const jsContent = await downloadWithProgress(fullScriptUrl, (loaded, total) => {
                     const loadedStr = formatBytes(loaded);
                     let progressText = `${CONFIG.labels.step3} - ${loadedStr}`;
-                    let percent = 25; // 基础进度
+                    let percent = 25; 
 
                     if (total > 0) {
                         const totalStr = formatBytes(total);
                         progressText += ` / ${totalStr}`;
-                        // 将 0-100% 的下载进度映射到 总进度条的 25%-85%
                         const downloadRatio = loaded / total;
                         percent = 25 + (downloadRatio * 60); 
                     } else {
-                        // 如果没有 total，只显示已下载大小，不显示假百分比
-                        // 进度条固定在中间位置以示“正在处理”
                         percent = 55;
                     }
                     
