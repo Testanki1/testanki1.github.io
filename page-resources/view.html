@@ -15,7 +15,7 @@
 
         :root {
             --color-primary: #76FF33;      /* 荧光绿 */
-            --color-background: #001926;   /* 深海蓝（页面背景） */
+            --color-background: #001926;   /* 深海蓝 */
             --color-text: #BFD5FF;         /* 淡蓝 */
             
             --color-surface: #002233;      /* 卡片背景 */
@@ -59,9 +59,11 @@
             gap: 24px;
             padding: 0 20px;
             box-sizing: border-box;
+            /* Footer 沉底关键属性 */
+            flex: 1; 
         }
 
-        header { text-align: center; margin-bottom: 0px; }
+        header { text-align: center; margin-bottom: 0px; flex-shrink: 0; }
         h1 { font-weight: 400; color: var(--color-primary); margin: 0; }
 
         /* Filter Chips */
@@ -73,6 +75,8 @@
             background: linear-gradient(180deg, var(--color-background) 80%, transparent);
             padding-bottom: 10px;
             margin-bottom: 10px;
+            min-height: 50px;
+            flex-shrink: 0;
         }
 
         .filter-scroll {
@@ -118,6 +122,52 @@
             padding: 2px 6px; border-radius: 4px;
         }
 
+        /* --- Loading Progress Bar --- */
+        .loading-wrapper {
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 46px; 
+        }
+
+        .progress-track {
+            width: 100%;
+            max-width: 400px;
+            height: 4px;
+            background-color: var(--color-surface);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary);
+            transition: width 0.1s linear; 
+        }
+
+        .loading-text {
+            font-size: 0.75rem;
+            color: var(--color-text);
+            margin-top: 8px;
+            opacity: 0.8;
+            font-family: monospace;
+        }
+
+        .error-msg {
+            color: #ffb4ab;
+            font-size: 0.9rem;
+            background: rgba(255, 180, 171, 0.1);
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+
         /* Grid */
         #resources {
             display: grid;
@@ -156,7 +206,7 @@
             overflow: hidden;
         }
 
-        /* Image (GIF/PNG/SVG): Fixed height */
+        /* Image */
         .preview-area.type-image {
             height: 180px; 
             padding: 16px;
@@ -169,16 +219,14 @@
             pointer-events: none;
         }
 
-        /* Audio: Native Player Style - 仅水平居中 */
+        /* Audio */
         .preview-area.type-audio {
             padding: 16px;
             height: 120px;
             background: radial-gradient(circle at center, #003045 0%, #002233 100%);
             flex-direction: column;
             gap: 15px;
-            
-            /* 关键修改：仅使用 align-items: center (水平居中)，去掉 justify-content: center (垂直居中) */
-            justify-content: center; /* 保持适度的垂直居中，否则会贴顶，如果不想要可以删掉这行 */
+            justify-content: center;
             align-items: center; 
         }
         
@@ -187,11 +235,10 @@
             height: 32px;
             filter: invert(1) hue-rotate(180deg);
             opacity: 0.9;
-            /* 确保元素本身不浮动 */
             display: block;
         }
 
-        /* Video: Auto height */
+        /* Video */
         .preview-area:has(.custom-player) { 
             padding: 0; 
             background-color: var(--color-surface);
@@ -208,7 +255,7 @@
             overflow: hidden;
         }
 
-        /* --- 视频播放器 (自定义 UI) --- */
+        /* --- Custom Video Player --- */
         .custom-player {
             width: 100%; height: auto; display: flex; flex-direction: column; 
             background: transparent;
@@ -218,7 +265,7 @@
             width: 100%; height: auto; display: block; 
             background: transparent;
             object-fit: contain; 
-            pointer-events: auto; /* 允许右键 */
+            pointer-events: auto;
         }
 
         .player-controls {
@@ -292,8 +339,7 @@
         }
         .close-fullscreen-btn:hover { background: rgba(255,255,255,0.1); }
 
-        footer { text-align: center; color: var(--color-text); font-size: 0.8rem; margin-top: 40px; opacity: 0.6; }
-        .loading-chip { pointer-events: none; opacity: 0.7; font-style: italic; }
+        footer { text-align: center; color: var(--color-text); font-size: 0.8rem; margin-top: 40px; opacity: 0.6; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -302,10 +348,8 @@
         <h1 id="pageTitle">Tanki Online Icon Viewer</h1>
     </header>
 
-    <div class="filter-container-wrapper">
-        <div class="filter-scroll" id="filterScroll">
-            <div class="filter-chip loading-chip">Loading...</div>
-        </div>
+    <div class="filter-container-wrapper" id="topControlArea">
+        <!-- Progress Bar or Filter Chips will be rendered here -->
     </div>
 
     <div class="container">
@@ -326,14 +370,8 @@
 
     <script>
         const ICONS = {
-            play: 'play_arrow',
-            pause: 'pause',
-            c_gif: 'gif',               
-            c_video: 'video_file',      
-            c_svg: 'gesture',           
-            c_img: 'image',             
-            c_aud: 'audio_file',        
-            c_file: 'draft'             
+            play: 'play_arrow', pause: 'pause', c_gif: 'gif', c_video: 'video_file',
+            c_svg: 'gesture', c_img: 'image', c_aud: 'audio_file', c_file: 'draft'
         };
 
         function getIcon(name, isFilled = false) {
@@ -344,13 +382,14 @@
         
         const CONFIG = {
             baseUrl: isChinese ? 'https://3dtank.com/play/' : 'https://tankionline.com/play/',
-            scriptUrl: isChinese 
-                ? 'https://3dtank.com/play/static/js/main.82e50545.js' 
-                : 'https://tankionline.com/play/static/js/main.1f7f3327.js',
             labels: {
                 title: isChinese ? '3D坦克网页图标浏览' : 'Tanki Online Icon Viewer',
-                loading: isChinese ? '加载中...' : 'Loading...',
-                error: isChinese ? '加载失败' : 'Failed',
+                step1: isChinese ? '加载中... (1/4)' : 'Loading... (1/4)',
+                step2: isChinese ? '加载中... (2/4)' : 'Loading... (2/4)',
+                step3: isChinese ? '加载中... (3/4)' : 'Loading... (3/4)',
+                step4: isChinese ? '加载中... (4/4)' : 'Loading... (4/4)',
+                done: isChinese ? '加载完成' : 'Done', 
+                error: isChinese ? '加载失败' : 'Failed to load',
                 source: isChinese ? '数据源: ' : 'Data Source: '
             }
         };
@@ -360,39 +399,170 @@
 
         let resources = {};
 
+        // 渲染进度条
+        function renderProgressUI() {
+            const container = document.getElementById('topControlArea');
+            container.innerHTML = `
+                <div class="loading-wrapper">
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressBarFill"></div>
+                    </div>
+                    <div class="loading-text" id="progressText">${CONFIG.labels.step1}</div>
+                </div>
+            `;
+        }
+
+        function updateProgress(percent, text) {
+            const fill = document.getElementById('progressBarFill');
+            const txt = document.getElementById('progressText');
+            if(fill) fill.style.width = percent + '%';
+            if(txt && text) txt.textContent = text;
+        }
+
+        function showErrorMessage(msg) {
+            const container = document.getElementById('topControlArea');
+            container.innerHTML = `<div class="loading-wrapper"><div class="error-msg">${msg}</div></div>`;
+        }
+
+        // 工具：格式化字节
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 带进度回调的流式下载
+        async function downloadWithProgress(url, onProgress) {
+            const proxyBase = 'https://api.codetabs.com/v1/proxy?quest=';
+            const target = proxyBase + encodeURIComponent(url);
+            
+            const response = await fetch(target);
+            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+
+            const contentLength = response.headers.get('content-length');
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+            let loaded = 0;
+
+            const reader = response.body.getReader();
+            const chunks = [];
+
+            while(true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                
+                chunks.push(value);
+                loaded += value.length;
+                
+                if (onProgress) {
+                    onProgress(loaded, total);
+                }
+            }
+
+            let position = 0;
+            const allChunks = new Uint8Array(loaded);
+            for(const chunk of chunks) {
+                allChunks.set(chunk, position);
+                position += chunk.length;
+            }
+            
+            return new TextDecoder("utf-8").decode(allChunks);
+        }
+
+        // 普通 Fetch (用于 HTML)
+        async function fetchSimple(url) {
+            const proxyBase = 'https://api.codetabs.com/v1/proxy?quest=';
+            const target = proxyBase + encodeURIComponent(url);
+            const response = await fetch(target);
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            return await response.text();
+        }
+
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
         async function init() {
+            renderProgressUI();
+
             try {
-                const response = await fetch(CONFIG.scriptUrl);
-                if (!response.ok) throw new Error("Network Error");
-                const text = await response.text();
-                const regex = /\.p\+"(.*?)"/g;
-                let match;
-                while ((match = regex.exec(text)) !== null) {
-                    let path = match[1].replace('SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED', '');
+                // Step 1: 获取 HTML (25%)
+                updateProgress(10, CONFIG.labels.step1); 
+                const html = await fetchSimple(CONFIG.baseUrl);
+                updateProgress(25, CONFIG.labels.step2);
+
+                // Step 2: 提取 JS 链接 (50%)
+                const scriptRegex = /src="(\/play\/static\/js\/main\.[a-z0-9]+\.js)"/;
+                const match = html.match(scriptRegex);
+
+                if (!match || !match[1]) throw new Error("Version check failed");
+
+                const origin = new URL(CONFIG.baseUrl).origin;
+                const fullScriptUrl = origin + match[1];
+
+                // Step 3: 下载 JS (50% -> 85%)
+                const jsContent = await downloadWithProgress(fullScriptUrl, (loaded, total) => {
+                    const loadedStr = formatBytes(loaded);
+                    let progressText = `${CONFIG.labels.step3} - ${loadedStr}`;
+                    let percent = 25; // 基础进度
+
+                    if (total > 0) {
+                        const totalStr = formatBytes(total);
+                        progressText += ` / ${totalStr}`;
+                        // 将 0-100% 的下载进度映射到 总进度条的 25%-85%
+                        const downloadRatio = loaded / total;
+                        percent = 25 + (downloadRatio * 60); 
+                    } else {
+                        // 如果没有 total，只显示已下载大小，不显示假百分比
+                        // 进度条固定在中间位置以示“正在处理”
+                        percent = 55;
+                    }
+                    
+                    updateProgress(percent, progressText);
+                });
+                
+                // Step 4: 准备开始解析 (100%)
+                updateProgress(85, CONFIG.labels.step4); 
+                await delay(100); 
+
+                const assetRegex = /\.p\+"(.*?)"/g;
+                let assetMatch;
+                let foundCount = 0;
+
+                while ((assetMatch = assetRegex.exec(jsContent)) !== null) {
+                    let path = assetMatch[1].replace('SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED', '');
                     if (!path) continue;
+                    
                     const fullUrl = CONFIG.baseUrl + path;
                     const ext = path.split('.').pop().toLowerCase();
+                    
                     if (!resources[ext]) resources[ext] = [];
-                    if (!resources[ext].includes(fullUrl)) resources[ext].push(fullUrl);
+                    if (!resources[ext].includes(fullUrl)) {
+                        resources[ext].push(fullUrl);
+                        foundCount++;
+                    }
                 }
-                setupFilters();
+
+                if (foundCount === 0) throw new Error("No content found");
+
+                updateProgress(100, CONFIG.labels.done);
+                await delay(300); 
+
+                renderFilters();
+
             } catch (e) {
                 console.error(e);
-                document.getElementById('filterScroll').innerHTML = `<div class="filter-chip loading-chip" style="color:#ffb4ab">${CONFIG.labels.error}</div>`;
-                alert("Resource loading failed. Please check network/CORS.");
+                showErrorMessage(`${CONFIG.labels.error}: ${e.message}`);
             }
         }
 
-        function setupFilters() {
-            const container = document.getElementById('filterScroll');
-            container.innerHTML = ''; 
+        function renderFilters() {
+            const container = document.getElementById('topControlArea');
+            container.innerHTML = '<div class="filter-scroll" id="filterScroll"></div>';
+            const scrollArea = document.getElementById('filterScroll');
 
-            // 排序逻辑：权重越小越靠前
             const typeWeight = {
                 'svg': 10, 'png': 10, 'jpg': 10, 'jpeg': 10, 'webp': 10, 'gif': 10,
-                'webm': 19, // WebM 排在 MP4 前面
-                'mp4': 20,
-                'mp3': 30, 'wav': 30, 'ogg': 30
+                'webm': 19, 'mp4': 20, 'mp3': 30, 'wav': 30, 'ogg': 30
             };
 
             const ignore = ['js', 'css', 'map', 'json', 'txt', 'xml', '3ds'];
@@ -414,7 +584,6 @@
                 const count = resources[ext].length;
                 
                 let iconName = ICONS.c_file;
-                
                 if (ext === 'svg') iconName = ICONS.c_svg;
                 else if (['png','jpg','jpeg','webp'].includes(ext)) iconName = ICONS.c_img;
                 else if (ext === 'gif') iconName = ICONS.c_gif;
@@ -434,7 +603,7 @@
                     renderResources(ext);
                 }
                 
-                container.appendChild(chip);
+                scrollArea.appendChild(chip);
             });
         }
 
@@ -458,7 +627,6 @@
                 const preview = document.createElement('div');
                 preview.className = 'preview-area';
 
-                // --- Images (PNG, JPG, SVG, GIF) ---
                 if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(type)) {
                     preview.classList.add('type-image');
                     const img = document.createElement('img');
@@ -475,10 +643,8 @@
                         document.getElementById('imageViewer').classList.add('active');
                     };
                 } 
-                // --- Audio (Native Player) ---
                 else if (['mp3', 'wav', 'ogg'].includes(type)) {
                     preview.classList.add('type-audio');
-                    
                     const iconDiv = document.createElement('div');
                     iconDiv.innerHTML = getIcon(ICONS.c_aud);
                     iconDiv.style.color = 'var(--color-primary)';
@@ -490,10 +656,8 @@
                     audio.src = url;
                     audio.preload = "none";
                     preview.appendChild(audio);
-
                     item.style.cursor = "default";
                 } 
-                // --- Video (Custom UI but Native Context Menu) ---
                 else if (['mp4', 'webm'].includes(type)) {
                     createCustomVideo(preview, url);
                 } 
@@ -538,20 +702,15 @@
             const fill = wrapper.querySelector('.progress-fill');
             const timeDisplay = wrapper.querySelector('.time-display');
 
-            btn.onclick = (e) => {
-                e.stopPropagation();
+            const togglePlay = () => {
                 if (video.paused) {
                     document.querySelectorAll('video').forEach(m => { if(m !== video) m.pause(); });
                     video.play();
                 } else { video.pause(); }
             };
-            
-            video.onclick = (e) => {
-                if (video.paused) {
-                    document.querySelectorAll('video').forEach(m => { if(m !== video) m.pause(); });
-                    video.play();
-                } else { video.pause(); }
-            };
+
+            btn.onclick = (e) => { e.stopPropagation(); togglePlay(); };
+            video.onclick = (e) => { togglePlay(); };
 
             video.onplay = () => btn.innerHTML = getIcon(ICONS.pause, true);
             video.onpause = () => btn.innerHTML = getIcon(ICONS.play, true);
@@ -610,12 +769,9 @@
         function closeImageViewer() {
             const viewer = document.getElementById('imageViewer');
             viewer.classList.remove('active'); 
-
             setTimeout(() => {
                 const img = document.getElementById('fullScreenImage');
-                if (!viewer.classList.contains('active')) {
-                    img.src = "";
-                }
+                if (!viewer.classList.contains('active')) img.src = "";
             }, 250);
         }
 
