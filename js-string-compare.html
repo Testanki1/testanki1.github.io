@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS 字符串比对工具</title>
+    <title>JS String Diff Tool</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +11,7 @@
 
     <style>
         :root {
-            /* 核心配色 (用户指定) */
+            /* 核心配色 */
             --color-bg: #001926;
             --color-surface: rgba(0, 43, 64, 0.6);
             --color-surface-hover: rgba(0, 56, 84, 0.8);
@@ -30,7 +30,6 @@
             --radius-xl: 28px;
             --radius-l: 20px;
             --radius-m: 12px;
-            --radius-pill: 100px;
             
             --font-ui: 'Rubik', sans-serif;
             --font-code: 'M PLUS 1p', monospace;
@@ -54,7 +53,6 @@
                               radial-gradient(circle at 90% 90%, rgba(255, 102, 102, 0.03) 0%, transparent 40%);
         }
 
-        /* 头部设计 */
         header {
             display: flex;
             justify-content: space-between;
@@ -80,7 +78,6 @@
             opacity: 0.7;
         }
 
-        /* 布局容器 */
         main {
             display: grid;
             grid-template-columns: 1fr;
@@ -90,12 +87,11 @@
 
         .controls-area {
             display: grid;
-            grid-template-columns: 1fr 1fr auto; /* 左文件，右文件，按钮 */
+            grid-template-columns: 1fr 1fr auto;
             gap: 1.5rem;
             align-items: stretch;
         }
 
-        /* 卡片通用样式 (Glassmorphism) */
         .glass-panel {
             background: var(--color-surface);
             backdrop-filter: blur(20px);
@@ -108,12 +104,10 @@
             flex-direction: column;
         }
 
-        /* 文件上传卡片 */
         .file-card {
             position: relative;
             padding: 1.5rem;
             cursor: pointer;
-            group: file-input;
         }
 
         .file-card:hover {
@@ -163,7 +157,6 @@
             box-shadow: 0 0 10px var(--color-primary-glow);
         }
 
-        /* 主按钮 */
         #compare-btn {
             background: var(--color-primary);
             color: var(--color-bg);
@@ -193,18 +186,12 @@
             box-shadow: none;
         }
 
-        /* 结果区域 */
         .results-area {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 2rem;
             flex: 1;
             min-height: 400px;
-        }
-
-        .result-column {
-            display: flex;
-            flex-direction: column;
         }
 
         .column-header {
@@ -237,7 +224,6 @@
             padding: 0.5rem;
         }
 
-        /* 列表项样式 */
         .list-item {
             font-family: var(--font-code);
             font-size: 0.9rem;
@@ -255,7 +241,6 @@
 
         .list-item:hover { background: rgba(255,255,255,0.05); }
 
-        /* 特定颜色逻辑 */
         .col-added .col-title { color: var(--color-primary); }
         .col-added .counter { color: var(--color-primary); text-shadow: 0 0 20px var(--color-primary-dim); }
         .col-added .list-item { color: #ccffb3; border-left: 2px solid transparent; }
@@ -274,7 +259,6 @@
             font-style: italic;
         }
 
-        /* 加载动画 */
         #loading {
             position: fixed; inset: 0;
             background: rgba(0, 25, 38, 0.9);
@@ -297,13 +281,11 @@
         
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* 滚动条美化 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(191, 213, 255, 0.2); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(191, 213, 255, 0.4); }
 
-        /* 移动端适配 */
         @media (max-width: 900px) {
             body { padding: 1rem; gap: 1.5rem; }
             .controls-area { grid-template-columns: 1fr; }
@@ -318,71 +300,123 @@
     <!-- Loading Screen -->
     <div id="loading">
         <div class="spinner"></div>
-        <div class="loading-text">深度解析中...</div>
+        <div class="loading-text" data-i18n="loading">Deep Parsing...</div>
     </div>
 
     <header>
         <h1>JS <span>Diff</span> Tool</h1>
-        <div class="meta-info">String Comparison</div>
+        <div class="meta-info" data-i18n="subtitle">String Comparison Tool</div>
     </header>
 
     <main>
-        <!-- 控制区 -->
+        <!-- Controls -->
         <section class="controls-area">
-            <!-- 旧文件 -->
+            <!-- Old File -->
             <div class="glass-panel file-card" id="card-old">
-                <div class="card-label">原始文件 (Old)</div>
+                <div class="card-label" data-i18n="label_old">Original File (Old)</div>
                 <div class="file-status">
                     <div class="icon-placeholder"></div>
-                    <span id="name-old">点击选择文件...</span>
+                    <span id="name-old" data-i18n="select_file">Click to select...</span>
                 </div>
                 <input type="file" id="file-old" accept=".js,.txt,.json">
             </div>
 
-            <!-- 新文件 -->
+            <!-- New File -->
             <div class="glass-panel file-card" id="card-new">
-                <div class="card-label">新文件 (New)</div>
+                <div class="card-label" data-i18n="label_new">New File (New)</div>
                 <div class="file-status">
                     <div class="icon-placeholder"></div>
-                    <span id="name-new">点击选择文件...</span>
+                    <span id="name-new" data-i18n="select_file">Click to select...</span>
                 </div>
                 <input type="file" id="file-new" accept=".js,.txt,.json">
             </div>
 
-            <!-- 按钮 -->
-            <button id="compare-btn">开始比对</button>
+            <!-- Button -->
+            <button id="compare-btn" data-i18n="btn_compare">Compare</button>
         </section>
 
-        <!-- 结果区 -->
+        <!-- Results -->
         <section class="results-area">
-            <!-- 新增 -->
+            <!-- Added -->
             <div class="glass-panel result-column col-added">
                 <div class="column-header">
-                    <div class="col-title">新增内容 (+)</div>
+                    <div class="col-title" data-i18n="col_added">Added Content (+)</div>
                     <div id="count-added" class="counter">0</div>
                 </div>
                 <div id="list-added" class="list-viewport">
-                    <div class="empty-state">等待数据...</div>
+                    <div class="empty-state" data-i18n="waiting">Waiting for data...</div>
                 </div>
             </div>
 
-            <!-- 删除 -->
+            <!-- Removed -->
             <div class="glass-panel result-column col-removed">
                 <div class="column-header">
-                    <div class="col-title">移除内容 (-)</div>
+                    <div class="col-title" data-i18n="col_removed">Removed Content (-)</div>
                     <div id="count-removed" class="counter">0</div>
                 </div>
                 <div id="list-removed" class="list-viewport">
-                    <div class="empty-state">等待数据...</div>
+                    <div class="empty-state" data-i18n="waiting">Waiting for data...</div>
                 </div>
             </div>
         </section>
     </main>
 
     <script>
+        // --- I18n & Language Detection ---
+        const translations = {
+            zh: {
+                page_title: "JS 字符串比对工具",
+                subtitle: "JS 字符串比对工具",
+                label_old: "原始文件 (Old)",
+                label_new: "新文件 (New)",
+                select_file: "点击选择文件...",
+                btn_compare: "开始比对",
+                col_added: "新增内容 (+)",
+                col_removed: "移除内容 (-)",
+                waiting: "等待数据...",
+                empty: "无内容",
+                loading: "深度解析中...",
+                alert_files: "请先选择两个文件！",
+                alert_error: "发生错误: ",
+                hidden_more: "... 还有 {n} 条数据已隐藏"
+            },
+            en: {
+                page_title: "JS String Diff Tool",
+                subtitle: "String Comparison Tool",
+                label_old: "Original File (Old)",
+                label_new: "New File (New)",
+                select_file: "Click to select...",
+                btn_compare: "Start Compare",
+                col_added: "Added Content (+)",
+                col_removed: "Removed Content (-)",
+                waiting: "Waiting for data...",
+                empty: "No content",
+                loading: "Deep parsing...",
+                alert_files: "Please select two files first!",
+                alert_error: "Error occurred: ",
+                hidden_more: "... {n} more items hidden"
+            }
+        };
+
+        // Detect Language (Default to English unless Chinese)
+        const userLang = navigator.language || navigator.userLanguage;
+        const currentLang = userLang.startsWith('zh') ? 'zh' : 'en';
+        const t = (key) => translations[currentLang][key] || key;
+
+        // Apply Translations
+        function applyTranslations() {
+            document.title = t('page_title');
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = t(key);
+            });
+        }
+        applyTranslations();
+        // ---------------------------------
+
         const nextTick = () => new Promise(r => setTimeout(r, 0));
 
-        // UI 交互绑定
+        // UI Binding with Dynamic Text
         const bindInput = (inputId, nameId, cardId) => {
             const input = document.getElementById(inputId);
             const nameEl = document.getElementById(nameId);
@@ -394,7 +428,7 @@
                     nameEl.style.opacity = '1';
                     cardEl.classList.add('has-file');
                 } else {
-                    nameEl.textContent = '点击选择文件...';
+                    nameEl.textContent = t('select_file');
                     cardEl.classList.remove('has-file');
                 }
             });
@@ -410,7 +444,7 @@
         });
 
         // ---------------------------------------------------------
-        // 核心解析器：上下文感知 (Context-Aware) & 路径修复版
+        // Core Logic
         // ---------------------------------------------------------
         async function extractStrings(content) {
             if (!content) return new Set();
@@ -500,7 +534,6 @@
             return strings;
         }
 
-        // 判断是否为正则表达式开始
         function isRegexStart(prevChar, prevWord) {
             const regexStarters = new Set([
                 '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';',
@@ -518,7 +551,6 @@
             return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z');
         }
 
-        // 字符串清洗与标准化
         function addString(set, raw) {
             try {
                 let clean = raw
@@ -528,23 +560,22 @@
                     .replace(/\\`/g, '`')
                     .replace(/\\n/g, '\n')
                     .replace(/\\t/g, '\t')
-                    .replace(/\\\//g, '/'); // 路径标准化
+                    .replace(/\\\//g, '/');
 
                 clean = clean.trim();
                 if (isUseful(clean)) set.add(clean);
             } catch (e) {}
         }
 
-        // 智能过滤：保留路径，排除代码噪音
         function isUseful(str) {
             if (str.length < 2) return false;
             
-            // 特权：文件路径豁免 (spark.webp 问题修复点)
+            // Allow paths
             if (str.includes('/') && str.includes('.')) {
                 return str.length < 300;
             }
             
-            // 基础校验
+            // Basic check
             if (!/[a-zA-Z0-9\u4e00-\u9fa5]/.test(str)) return false;
             
             const keywords = /^(var|const|let|function|return|import|export|from|true|false|null|undefined|if|else|switch|case|break|try|catch|class|typeof|void|delete|new|this|window|document|Math|Object|Array|String|Date|Error|Promise|JSON|console|=>|===|!==|==|!=|\+=|\-=|\+\+|\-\-)$/;
@@ -557,7 +588,6 @@
             return true;
         }
 
-        // 主逻辑
         document.getElementById('compare-btn').addEventListener('click', async () => {
             const btn = document.getElementById('compare-btn');
             const loading = document.getElementById('loading');
@@ -565,14 +595,13 @@
             const fileNew = document.getElementById('file-new').files[0];
 
             if (!fileOld || !fileNew) {
-                alert("请先选择两个文件！");
+                alert(t('alert_files'));
                 return;
             }
 
             btn.disabled = true;
             loading.style.display = 'flex';
             
-            // 清空列表
             renderList('list-added', [], 'count-added');
             renderList('list-removed', [], 'count-removed');
 
@@ -589,7 +618,6 @@
                 const added = [];
                 const removed = [];
 
-                // 分片比对
                 let i = 0;
                 for (const s of setNew) {
                     if (!setOld.has(s)) added.push(s);
@@ -610,33 +638,30 @@
 
             } catch (err) {
                 console.error(err);
-                alert("发生错误: " + err.message);
+                alert(t('alert_error') + err.message);
             } finally {
                 loading.style.display = 'none';
                 btn.disabled = false;
             }
         });
 
-        // 渲染列表 (带数量限制)
         function renderList(containerId, list, countId) {
             const container = document.getElementById(containerId);
             document.getElementById(countId).textContent = list.length;
             container.innerHTML = '';
 
             if (list.length === 0) {
-                container.innerHTML = '<div class="empty-state">无内容</div>';
+                container.innerHTML = `<div class="empty-state">${t('empty')}</div>`;
                 return;
             }
 
             const LIMIT = 2000;
             const frag = document.createDocumentFragment();
             
-            // 使用 setTimeout 分批渲染动画，或者直接渲染前2000条
             for (let i = 0; i < Math.min(list.length, LIMIT); i++) {
                 const div = document.createElement('div');
                 div.className = 'list-item';
                 div.textContent = list[i];
-                // 交错动画延迟
                 if (i < 20) div.style.animationDelay = `${i * 0.03}s`;
                 frag.appendChild(div);
             }
@@ -644,7 +669,7 @@
             if (list.length > LIMIT) {
                 const more = document.createElement('div');
                 more.className = 'empty-state';
-                more.textContent = `... 还有 ${list.length - LIMIT} 条数据已隐藏`;
+                more.textContent = t('hidden_more').replace('{n}', list.length - LIMIT);
                 frag.appendChild(more);
             }
             
