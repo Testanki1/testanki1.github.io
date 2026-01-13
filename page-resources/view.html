@@ -1,213 +1,631 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克网页资源浏览</title>
+    <title>Tanki Online Icon Viewer</title>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');</style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
-        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        :root {
+            --color-primary: #76FF33;      /* 荧光绿 */
+            --color-background: #001926;   /* 深海蓝（页面背景） */
+            --color-text: #BFD5FF;         /* 淡蓝 */
+            
+            --color-surface: #002233;      /* 卡片背景 */
+            --color-surface-hover: #003045;
+            --color-border: #1a4d66;       
+            
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
         body {
-            background-color: #001926;
-            color: white;
-            font-family: 'Rubik', 'M PLUS 1p';
-            padding: 20px;
-            text-align: center; /* 内容居中 */
+            background-color: var(--color-background);
+            color: var(--color-text);
+            font-family: 'Rubik', sans-serif;
             margin: 0;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            user-select: none;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        .icon-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
 
         .container {
-            max-width: 1000px; /* 最大宽度 */
-            margin: 0 auto; /* 居中容器 */
-        }
-
-        pre {
-            background-color: #002a34;
-            padding: 10px;
-            border-radius: 5px;
-            white-space: pre-wrap; /* 处理长链接换行 */
-        }
-
-        select {
-            padding: 8px;
-            margin: 10px 0;
-            background-color: #76FF33; /* 下拉菜单背景色 */
-            color: black; /* 选项文本颜色 */
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        select:focus {
-            outline: none;
-            border: 2px solid #BFD5FF; /* 聚焦时的边框 */
-        }
-
-        /* 使用 Flexbox 布局来自动换行并控制文件项的排列 */
-        #resources {
+            width: 100%;
+            max-width: 1200px;
             display: flex;
-            flex-wrap: wrap;           /* 自动换行 */
-            justify-content: center;   /* 居中显示资源项 */
-            gap: 20px;                 /* 文件之间的间距 */
-            padding: 10px;             /* 为容器添加内边距 */
+            flex-direction: column;
+            gap: 24px;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        header { text-align: center; margin-bottom: 0px; }
+        h1 { font-weight: 400; color: var(--color-primary); margin: 0; }
+
+        /* Filter Chips */
+        .filter-container-wrapper {
+            width: 100%;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: linear-gradient(180deg, var(--color-background) 80%, transparent);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .filter-scroll {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 20px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .filter-scroll::-webkit-scrollbar { display: none; }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px 16px;
+            height: 36px;
+            border-radius: 8px;
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .filter-chip.active {
+            background-color: var(--color-primary);
+            color: var(--color-background);
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px rgba(118, 255, 51, 0.3);
+        }
+
+        .filter-chip .material-symbols-rounded { font-size: 20px; }
+        .chip-count {
+            font-size: 0.75rem; opacity: 0.7; background: rgba(0,0,0,0.2);
+            padding: 2px 6px; border-radius: 4px;
+        }
+
+        /* Grid */
+        #resources {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+            width: 100%;
+            align-items: start; 
         }
 
         .resource-item {
+            background-color: var(--color-surface);
+            border: 1px solid transparent;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            align-items: center;       /* 居中文本和图片 */
-            text-align: center;        /* 文件名居中 */
-            max-width: 180px;          /* 限制每个资源项的最大宽度 */
-            flex: 1 1 180px;           /* 每个资源项占据最小 180px 的宽度，并且在空间足够时扩展 */
-            box-sizing: border-box;    /* 包含内边距和边框 */
+            position: relative;
+            transition: all 0.2s;
+            cursor: pointer;
+            user-select: none;
         }
 
-        img {
-            max-width: 100%;           /* 限制每个图片的最大宽度 */
-            height: auto;              /* 保持图片比例 */
-            margin-top: 10px;          /* 图片与文件名之间的间距 */
+        .resource-item:active { transform: scale(0.98); }
+        .resource-item:hover { border-color: var(--color-text); }
+        
+        /* --- 预览区域 --- */
+        .preview-area {
+            width: 100%;
+            height: auto;
+            min-height: 120px; 
+            background-color: var(--color-surface);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        video, audio {
-            max-width: 100%;           /* 限制视频和音频最大宽度 */
-            margin-top: 10px;          /* 视频和音频与文件名之间的间距 */
+        /* Image (GIF/PNG/SVG): Fixed height */
+        .preview-area.type-image {
+            height: 180px; 
+            padding: 16px;
+            box-sizing: border-box;
         }
 
-        footer {
-            margin-top: 20px;
-            color: #76FF33; /* 版本信息颜色 */
+        .preview-area.type-image img {
+            width: auto; height: auto;
+            max-width: 100%; max-height: 100%;
+            pointer-events: none;
         }
+
+        /* Audio: Native Player Style - 仅水平居中 */
+        .preview-area.type-audio {
+            padding: 16px;
+            height: 120px;
+            background: radial-gradient(circle at center, #003045 0%, #002233 100%);
+            flex-direction: column;
+            gap: 15px;
+            
+            /* 关键修改：仅使用 align-items: center (水平居中)，去掉 justify-content: center (垂直居中) */
+            justify-content: center; /* 保持适度的垂直居中，否则会贴顶，如果不想要可以删掉这行 */
+            align-items: center; 
+        }
+        
+        audio {
+            width: 90%; 
+            height: 32px;
+            filter: invert(1) hue-rotate(180deg);
+            opacity: 0.9;
+            /* 确保元素本身不浮动 */
+            display: block;
+        }
+
+        /* Video: Auto height */
+        .preview-area:has(.custom-player) { 
+            padding: 0; 
+            background-color: var(--color-surface);
+            height: auto; 
+            min-height: 140px;
+        }
+
+        .info-area { padding: 12px; text-align: center; }
+
+        .file-name {
+            font-size: 0.85rem; color: var(--color-text);
+            word-break: break-all;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* --- 视频播放器 (自定义 UI) --- */
+        .custom-player {
+            width: 100%; height: auto; display: flex; flex-direction: column; 
+            background: transparent;
+        }
+        
+        .custom-player video {
+            width: 100%; height: auto; display: block; 
+            background: transparent;
+            object-fit: contain; 
+            pointer-events: auto; /* 允许右键 */
+        }
+
+        .player-controls {
+            position: relative; z-index: 5; 
+            background: var(--color-surface-hover); 
+            border-top: 1px solid rgba(191, 213, 255, 0.1); 
+            padding: 0 10px; 
+            display: flex; align-items: center; gap: 8px; 
+            height: 40px; flex-shrink: 0;
+        }
+
+        .play-btn {
+            background: none; border: none; padding: 0; cursor: pointer;
+            width: 24px; height: 24px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--color-primary);
+        }
+        .play-btn .material-symbols-rounded { font-size: 24px; }
+
+        .progress-bar-container {
+            flex-grow: 1; height: 20px; display: flex; align-items: center;
+            cursor: pointer; position: relative;
+        }
+        .progress-bar {
+            width: 100%; height: 4px; background: rgba(191, 213, 255, 0.2);
+            border-radius: 2px; position: relative; pointer-events: none;
+        }
+        .progress-fill {
+            height: 100%; background-color: var(--color-primary);
+            width: 0%; border-radius: 2px; position: absolute; top: 0; left: 0;
+        }
+        .progress-thumb {
+            width: 12px; height: 12px; background: var(--color-primary); border-radius: 50%;
+            position: absolute; top: 50%; right: -6px;
+            transform: translateY(-50%) scale(0); transition: transform 0.1s;
+            box-shadow: 0 0 8px rgba(118, 255, 51, 0.5);
+        }
+        .progress-bar-container:hover .progress-thumb { transform: translateY(-50%) scale(1); }
+        .time-display { font-size: 0.7rem; color: var(--color-text); width: 35px; text-align: right; font-family: monospace; }
+
+        /* Fullscreen Image Viewer */
+        .dialog-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 25, 38, 0.95); display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s ease-out; z-index: 1000; backdrop-filter: blur(5px);
+        }
+        .dialog-overlay.active { opacity: 1; pointer-events: auto; }
+
+        #imagePreviewContainer {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;
+        }
+        
+        #fullScreenImage {
+            max-width: 95vw; max-height: 90vh; object-fit: contain;
+            border-radius: var(--radius-sm); box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            pointer-events: auto;
+            transition: opacity 0.1s;
+        }
+
+        #fullScreenImage[src=""],
+        #fullScreenImage:not([src]) {
+            opacity: 0;
+            visibility: hidden;
+            display: none;
+        }
+
+        .close-fullscreen-btn {
+            position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.5); border: none;
+            color: var(--color-primary); width: 40px; height: 40px; border-radius: 50%; font-size: 24px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s; z-index: 10;
+        }
+        .close-fullscreen-btn:hover { background: rgba(255,255,255,0.1); }
+
+        footer { text-align: center; color: var(--color-text); font-size: 0.8rem; margin-top: 40px; opacity: 0.6; }
+        .loading-chip { pointer-events: none; opacity: 0.7; font-style: italic; }
     </style>
 </head>
 <body>
+
+    <header>
+        <h1 id="pageTitle">Tanki Online Icon Viewer</h1>
+    </header>
+
+    <div class="filter-container-wrapper">
+        <div class="filter-scroll" id="filterScroll">
+            <div class="filter-chip loading-chip">Loading...</div>
+        </div>
+    </div>
+
     <div class="container">
-        <h1>3D坦克网页资源浏览</h1>
-        <label for="fileType">选择资源文件类型:</label>
-        <select id="fileType">
-            <option value="" disabled selected>请选择资源文件类型</option> <!-- 默认选项 -->
-        </select>
         <div id="resources"></div>
     </div>
 
     <footer>
-        <p>当前页面版本：813+</p>
+        <span id="sourceInfo">Data Source: ...</span>
     </footer>
 
+    <!-- Full Screen Image Viewer -->
+    <div class="dialog-overlay" id="imageViewer">
+        <div id="imagePreviewContainer">
+            <button class="close-fullscreen-btn" onclick="closeImageViewer()">×</button>
+            <img id="fullScreenImage" src="" alt="Preview">
+        </div>
+    </div>
+
     <script>
+        const ICONS = {
+            play: 'play_arrow',
+            pause: 'pause',
+            c_gif: 'gif',               
+            c_video: 'video_file',      
+            c_svg: 'gesture',           
+            c_img: 'image',             
+            c_aud: 'audio_file',        
+            c_file: 'draft'             
+        };
+
+        function getIcon(name, isFilled = false) {
+            return `<span class="material-symbols-rounded ${isFilled ? 'icon-filled' : ''}">${name}</span>`;
+        }
+
+        const isChinese = navigator.language.toLowerCase().startsWith('zh');
+        
+        const CONFIG = {
+            baseUrl: isChinese ? 'https://3dtank.com/play/' : 'https://tankionline.com/play/',
+            scriptUrl: isChinese 
+                ? 'https://3dtank.com/play/static/js/main.82e50545.js' 
+                : 'https://tankionline.com/play/static/js/main.1f7f3327.js',
+            labels: {
+                title: isChinese ? '3D坦克网页图标浏览' : 'Tanki Online Icon Viewer',
+                loading: isChinese ? '加载中...' : 'Loading...',
+                error: isChinese ? '加载失败' : 'Failed',
+                source: isChinese ? '数据源: ' : 'Data Source: '
+            }
+        };
+
+        document.getElementById('pageTitle').textContent = CONFIG.labels.title;
+        document.getElementById('sourceInfo').textContent = CONFIG.labels.source + new URL(CONFIG.baseUrl).hostname;
+
         let resources = {};
 
-        // 添加空格到每个大写字母前面，但避免在连续大写字母之间添加空格
-        function addSpaceBeforeUppercase(text) {
-            return text.replace(/([a-z])([A-Z])/g, '$1 $2');
-        }
-
-        async function fetchLinks() {
-            const response = await fetch('https://testanki1.github.io/page-resources/source.txt');
-            const text = await response.text();
-            const regex = /"([^"]+\.(\w+))"/g;
-            let match;
-
-            while ((match = regex.exec(text)) !== null) {
-                const link = "https://3dtank.com/play/" + match[1];
-                const extension = match[2];
-
-                if (!resources[extension]) {
-                    resources[extension] = [];
+        async function init() {
+            try {
+                const response = await fetch(CONFIG.scriptUrl);
+                if (!response.ok) throw new Error("Network Error");
+                const text = await response.text();
+                const regex = /\.p\+"(.*?)"/g;
+                let match;
+                while ((match = regex.exec(text)) !== null) {
+                    let path = match[1].replace('SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED', '');
+                    if (!path) continue;
+                    const fullUrl = CONFIG.baseUrl + path;
+                    const ext = path.split('.').pop().toLowerCase();
+                    if (!resources[ext]) resources[ext] = [];
+                    if (!resources[ext].includes(fullUrl)) resources[ext].push(fullUrl);
                 }
-                resources[extension].push(link);
+                setupFilters();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('filterScroll').innerHTML = `<div class="filter-chip loading-chip" style="color:#ffb4ab">${CONFIG.labels.error}</div>`;
+                alert("Resource loading failed. Please check network/CORS.");
             }
-
-            populateFileTypes();
         }
 
-        function populateFileTypes() {
-            const fileTypeSelect = document.getElementById('fileType');
-            const excludedExtensions = ['txt', 'json', '3ds'];
+        function setupFilters() {
+            const container = document.getElementById('filterScroll');
+            container.innerHTML = ''; 
 
-            for (const extension in resources) {
-                if (!excludedExtensions.includes(extension)) {
-                    const option = document.createElement('option');
-                    option.value = extension;
-                    option.textContent = extension;
-                    fileTypeSelect.appendChild(option);
+            // 排序逻辑：权重越小越靠前
+            const typeWeight = {
+                'svg': 10, 'png': 10, 'jpg': 10, 'jpeg': 10, 'webp': 10, 'gif': 10,
+                'webm': 19, // WebM 排在 MP4 前面
+                'mp4': 20,
+                'mp3': 30, 'wav': 30, 'ogg': 30
+            };
+
+            const ignore = ['js', 'css', 'map', 'json', 'txt', 'xml', '3ds'];
+            let extensions = Object.keys(resources).filter(k => !ignore.includes(k));
+
+            extensions.sort((a, b) => {
+                const wA = typeWeight[a] || 50; 
+                const wB = typeWeight[b] || 50;
+                if (wA !== wB) return wA - wB;
+                const countA = resources[a].length;
+                const countB = resources[b].length;
+                if (countA !== countB) return countB - countA;
+                return a.localeCompare(b);
+            });
+            
+            extensions.forEach((ext, index) => {
+                const chip = document.createElement('div');
+                chip.className = 'filter-chip';
+                const count = resources[ext].length;
+                
+                let iconName = ICONS.c_file;
+                
+                if (ext === 'svg') iconName = ICONS.c_svg;
+                else if (['png','jpg','jpeg','webp'].includes(ext)) iconName = ICONS.c_img;
+                else if (ext === 'gif') iconName = ICONS.c_gif;
+                else if (ext === 'mp4' || ext === 'webm') iconName = ICONS.c_video; 
+                else if (['mp3','wav','ogg'].includes(ext)) iconName = ICONS.c_aud;
+
+                chip.innerHTML = `${getIcon(iconName)} <span>${ext.toUpperCase()}</span> <span class="chip-count">${count}</span>`;
+                
+                chip.onclick = () => {
+                    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    renderResources(ext);
+                };
+
+                if (index === 0) {
+                    chip.classList.add('active');
+                    renderResources(ext);
                 }
-            }
+                
+                container.appendChild(chip);
+            });
         }
 
-        function displayResources(selectedExtension) {
-            const resourcesDiv = document.getElementById('resources');
-            resourcesDiv.innerHTML = ''; // 清空之前的内容
-
-            if (resources[selectedExtension]) {
-                resources[selectedExtension].forEach(link => {
-                    const extension = link.split('.').pop().toLowerCase();
-                    const fileNameWithExtension = link.split('/').pop(); // 获取完整的文件名
-                    const fileName = fileNameWithExtension
-                        .replace(/\.[^.]+$/, '') // 去掉后缀名
-                        .slice(0, -9) // 去掉最后8个字符
-                        .replace(/_/g, ' '); // 将下划线替换为空格
-
-                    // 使用 addSpaceBeforeUppercase 函数处理文件名
-                    const formattedFileName = addSpaceBeforeUppercase(fileName);
-
-                    // 创建资源项的容器
-                    const resourceItem = document.createElement('div');
-                    resourceItem.classList.add('resource-item');
-
-                    // 创建一个显示文件名的元素
-                    const fileNameElement = document.createElement('div');
-                    fileNameElement.textContent = formattedFileName; // 显示处理后的文件名
-
-                    resourceItem.appendChild(fileNameElement); // 将文件名添加到资源项中
-
-                    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) {
-                        // 如果是图片，直接创建img标签
-                        const img = document.createElement('img');
-                        img.src = link;
-                        resourceItem.appendChild(img);  // 将图片添加到资源项中
-                    } else if (['mp3'].includes(extension)) {
-                        // 显示为音频播放器
-                        const audio = document.createElement('audio');
-                        audio.controls = true;
-                        audio.src = link;
-                        resourceItem.appendChild(audio); // 将音频播放器添加到资源项中
-                    } else if (['mp4', 'webm'].includes(extension)) {
-                        // 显示为视频播放器
-                        const video = document.createElement('video');
-                        video.controls = true;
-                        video.src = link;
-                        resourceItem.appendChild(video); // 将视频播放器添加到资源项中
-                    } else if (['pdf', 'doc', 'docx'].includes(extension)) {
-                        // 显示为可下载链接
-                        const a = document.createElement('a');
-                        a.href = link;
-                        a.textContent = `下载 ${fileNameWithExtension}`; // 显示原文件名
-                        a.target = '_blank';
-                        resourceItem.appendChild(a); // 将下载链接添加到资源项中
-                    } else {
-                        // 其他文件类型显示为文本链接
-                        const pre = document.createElement('pre');
-                        pre.textContent = link;
-                        resourceItem.appendChild(pre); // 将链接添加到资源项中
-                    }
-
-                    // 将资源项添加到资源列表
-                    resourcesDiv.appendChild(resourceItem);
-                });
-            } else {
-                resourcesDiv.innerHTML = '<pre>没有找到相关资源。</pre>';
-            }
+        function formatName(url) {
+            let name = url.split('/').pop();
+            const parts = name.split('.');
+            if (parts.length > 2) parts.splice(parts.length - 2, 1);
+            name = parts.slice(0, -1).join('.');
+            return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
         }
 
-        document.getElementById('fileType').addEventListener('change', (event) => {
-            if (event.target.value) { // 只有在选中有效选项时才显示资源
-                displayResources(event.target.value);
+        function renderResources(type) {
+            const container = document.getElementById('resources');
+            container.innerHTML = '';
+
+            resources[type].forEach(url => {
+                const item = document.createElement('div');
+                item.className = 'resource-item';
+                const fName = formatName(url);
+
+                const preview = document.createElement('div');
+                preview.className = 'preview-area';
+
+                // --- Images (PNG, JPG, SVG, GIF) ---
+                if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(type)) {
+                    preview.classList.add('type-image');
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.loading = "lazy";
+                    preview.appendChild(img);
+                    
+                    item.onclick = () => {
+                        const fullScreenImg = document.getElementById('fullScreenImage');
+                        fullScreenImg.style.display = 'block'; 
+                        fullScreenImg.style.visibility = 'visible';
+                        fullScreenImg.style.opacity = '1';
+                        fullScreenImg.src = url;
+                        document.getElementById('imageViewer').classList.add('active');
+                    };
+                } 
+                // --- Audio (Native Player) ---
+                else if (['mp3', 'wav', 'ogg'].includes(type)) {
+                    preview.classList.add('type-audio');
+                    
+                    const iconDiv = document.createElement('div');
+                    iconDiv.innerHTML = getIcon(ICONS.c_aud);
+                    iconDiv.style.color = 'var(--color-primary)';
+                    iconDiv.style.fontSize = '32px';
+                    preview.appendChild(iconDiv);
+
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = url;
+                    audio.preload = "none";
+                    preview.appendChild(audio);
+
+                    item.style.cursor = "default";
+                } 
+                // --- Video (Custom UI but Native Context Menu) ---
+                else if (['mp4', 'webm'].includes(type)) {
+                    createCustomVideo(preview, url);
+                } 
+                else {
+                    preview.innerHTML = getIcon(ICONS.c_file);
+                    item.onclick = () => window.open(url, '_blank');
+                }
+
+                const info = document.createElement('div');
+                info.className = 'info-area';
+                const txt = document.createElement('div');
+                txt.className = 'file-name';
+                txt.textContent = fName;
+                info.appendChild(txt);
+
+                item.appendChild(preview);
+                item.appendChild(info);
+                container.appendChild(item);
+            });
+        }
+
+        function createCustomVideo(container, url) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'custom-player';
+            wrapper.innerHTML = `
+                <video src="${url}" playsinline preload="metadata"></video>
+                <div class="player-controls">
+                    <button class="play-btn">${getIcon(ICONS.play, true)}</button>
+                    <div class="progress-bar-container"><div class="progress-bar"><div class="progress-fill"><div class="progress-thumb"></div></div></div></div>
+                    <div class="time-display">00:00</div>
+                </div>`;
+            container.appendChild(wrapper);
+            bindMediaEvents(wrapper);
+        }
+
+        function bindMediaEvents(wrapper) {
+            const video = wrapper.querySelector('video');
+            if(!video) return; 
+
+            const btn = wrapper.querySelector('.play-btn');
+            const barContainer = wrapper.querySelector('.progress-bar-container');
+            const fill = wrapper.querySelector('.progress-fill');
+            const timeDisplay = wrapper.querySelector('.time-display');
+
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                if (video.paused) {
+                    document.querySelectorAll('video').forEach(m => { if(m !== video) m.pause(); });
+                    video.play();
+                } else { video.pause(); }
+            };
+            
+            video.onclick = (e) => {
+                if (video.paused) {
+                    document.querySelectorAll('video').forEach(m => { if(m !== video) m.pause(); });
+                    video.play();
+                } else { video.pause(); }
+            };
+
+            video.onplay = () => btn.innerHTML = getIcon(ICONS.pause, true);
+            video.onpause = () => btn.innerHTML = getIcon(ICONS.play, true);
+            video.onended = () => { btn.innerHTML = getIcon(ICONS.play, true); fill.style.width = '0%'; };
+
+            video.ontimeupdate = () => {
+                if(!video.duration) return;
+                fill.style.width = ((video.currentTime / video.duration) * 100) + '%';
+                timeDisplay.textContent = formatTime(video.currentTime);
+            };
+
+            const seek = (e) => {
+                if(!video.duration) return;
+                const rect = barContainer.getBoundingClientRect();
+                let pos = (e.clientX - rect.left) / rect.width;
+                video.currentTime = Math.max(0, Math.min(1, pos)) * video.duration;
+            };
+
+            barContainer.onclick = (e) => { e.stopPropagation(); seek(e); };
+            
+            let isDragging = false;
+            const startDrag = () => isDragging = true;
+            const doDrag = (e) => {
+                if(isDragging && video.duration) {
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const rect = barContainer.getBoundingClientRect();
+                    let pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    fill.style.width = (pos * 100) + '%';
+                }
+            };
+            const endDrag = (e) => {
+                if(isDragging && video.duration) {
+                    const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+                    const rect = barContainer.getBoundingClientRect();
+                    let pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    video.currentTime = pos * video.duration;
+                    isDragging = false;
+                }
+            };
+
+            barContainer.addEventListener('mousedown', startDrag);
+            barContainer.addEventListener('touchstart', startDrag);
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('touchmove', doDrag);
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+            
+            wrapper.querySelector('.player-controls').onclick = (e) => e.stopPropagation();
+        }
+
+        function formatTime(s) {
+            if(!s) return "00:00";
+            return `${Math.floor(s/60).toString().padStart(2,'0')}:${Math.floor(s%60).toString().padStart(2,'0')}`;
+        }
+
+        function closeImageViewer() {
+            const viewer = document.getElementById('imageViewer');
+            viewer.classList.remove('active'); 
+
+            setTimeout(() => {
+                const img = document.getElementById('fullScreenImage');
+                if (!viewer.classList.contains('active')) {
+                    img.src = "";
+                }
+            }, 250);
+        }
+
+        document.getElementById('imageViewer').addEventListener('click', (e) => { 
+            if(e.target === document.getElementById('imageViewer') || e.target === document.getElementById('imagePreviewContainer')) {
+                closeImageViewer(); 
             }
         });
 
-        fetchLinks();
+        init();
     </script>
 </body>
 </html>
