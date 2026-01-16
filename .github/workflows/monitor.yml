@@ -2,7 +2,7 @@ name: 3D坦克测试服务器监测器
 
 on:
   schedule:
-    # 每 5 小时启动一次新任务 (配合 5.8 小时运行时间，实现无缝接力)
+    # 每 5 小时启动一次新任务 (配合 5.8 小时运行时间)
     - cron: '0 */5 * * *'
   workflow_dispatch:
 
@@ -22,7 +22,6 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        # 【修复点 1】指定安装 p-limit@3 版本，兼容 require 语法
         run: |
           npm i playwright nodemailer p-limit@3
           npx playwright install --with-deps chromium
@@ -44,11 +43,8 @@ jobs:
 
           // --- 配置 ---
           const STATE_FILE = 'server_status.json';
-          const CHECK_INTERVAL = 5 * 60 * 1000; // 5分钟
-          
-          // 【修复点 2】改为 5.8 小时，配合每 5 小时的 Cron，确保新任务来接力时旧任务还活着
+          const CHECK_INTERVAL = 5 * 60 * 1000; // 5分钟一轮
           const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; 
-          
           const START_TIME = Date.now();
           const BROWSER_CONCURRENCY = 5; 
           
@@ -66,6 +62,11 @@ jobs:
             return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
           }
 
+          function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+          }
+
+          // 基础 Curl 检测函数
           function checkCurl(url) {
             return new Promise((resolve) => {
               const req = https.get(url, { rejectUnauthorized: false, timeout: 10000 }, (res) => {
@@ -82,6 +83,7 @@ jobs:
             });
           }
 
+          // 基础 Browser 检测函数
           async function checkBrowserPage(context, url) {
             let page = null;
             try {
@@ -149,19 +151,68 @@ jobs:
             let notifications = [];
             let availableServers = [];
 
-            // Phase 1: Curl
-            const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
+            // --- Phase 1: Curl 检测 (带即时二次确认) ---
+            
+            // 包装 Curl 检测：如果发现变化，立即重试一次
+            const smartCheckCurl = async (url) => {
+              const res1 = await checkCurl(url);
+              const oldEntry = oldStatusJson[url];
+
+              // 判断是否需要二次确认
+              // 1. 如果以前是有效状态，现在变成 0/404/502 (疑似下线)
+              // 2. 如果以前是 Offline，现在变成了有效状态 (疑似上线)
+              // 3. 如果 Hash 变了
+              let needsVerify = false;
+              
+              if (!oldEntry) {
+                 // 首次运行或新URL，不需要二次确认，直接信赖
+                 needsVerify = false; 
+              } else {
+                 const oldCodeValid = (oldEntry.status && oldEntry.status !== 'Offline'); // 这里近似认为 status 不是 Offline 就是 valid
+                 const newCodeValid = (res1.statusCode !== 404 && res1.statusCode !== 403 && res1.statusCode !== 502 && res1.statusCode !== 0);
+                 
+                 // 状态翻转 (上线<->下线)
+                 if (oldCodeValid !== newCodeValid) needsVerify = true;
+                 // 代码更新 (Hash 变化)
+                 if (newCodeValid && oldEntry.hash && res1.hash !== oldEntry.hash) needsVerify = true;
+              }
+
+              if (needsVerify) {
+                console.log(`[${getTime()}] Curl 结果变动 (${url})，等待 2秒后进行二次确认...`);
+                await sleep(2000); // 等待2秒
+                const res2 = await checkCurl(url);
+                
+                // 如果第二次结果与第一次一致，则采纳第一次的结果
+                if (res2.statusCode === res1.statusCode && res2.hash === res1.hash) {
+                   return res1;
+                } else {
+                   console.log(`[${getTime()}] 二次确认失败 (${url})，视为误报，保持旧状态。`);
+                   // 返回伪造的"旧结果"，实际上就是让后续逻辑认为没变化
+                   // 如果旧状态不存在(极罕见)，就只能返回res2了
+                   if (!oldEntry) return res2; 
+                   return { url, statusCode: oldEntry.status === 'Offline' ? 404 : 200, hash: oldEntry.hash || "" }; 
+                   // 注意：这里为了让后面逻辑跑通，简化了 statusCode 的模拟，核心是 hash 和是否为 Offline
+                }
+              }
+
+              return res1;
+            };
+
+            const curlResults = await Promise.all(urls.map(url => smartCheckCurl(url)));
             let candidates = [];
             
             for (const res of curlResults) {
               const { url, statusCode, hash } = res;
+              // 只有非错误状态码才进入浏览器检测
               if (statusCode !== 404 && statusCode !== 403 && statusCode !== 502 && statusCode !== 0) {
                 candidates.push({ url, hash });
               } else {
+                // 确认为离线
                 const oldEntry = oldStatusJson[url] || {};
                 const oldHash = oldEntry.hash || "";
                 const hashToSave = oldHash ? oldHash : hash; 
                 newStatusJson[url] = { status: "Offline", hash: hashToSave };
+                
                 if (oldEntry.status && oldEntry.status !== "Offline") {
                    let oldDisplay = oldEntry.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
                    notifications.push(`- <a href="${url}">${url}</a>: 服务器已下线 (原状态: ${oldDisplay})`);
@@ -169,7 +220,7 @@ jobs:
               }
             }
 
-            // Phase 2: Browser
+            // --- Phase 2: Browser 检测 (带即时二次确认) ---
             if (candidates.length > 0) {
               let browser = null;
               try {
@@ -177,8 +228,40 @@ jobs:
                 const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
                 const limit = pLimit(BROWSER_CONCURRENCY);
                 
+                // 包装 Browser 检测：如果状态变化，立即重试
+                const smartCheckBrowser = async (candidate) => {
+                  const url = candidate.url;
+                  const res1 = await checkBrowserPage(context, url);
+                  
+                  const oldEntry = oldStatusJson[url] || {};
+                  const oldStatus = oldEntry.status || null;
+
+                  // 检查是否变化 (Open <-> Closed <-> Offline)
+                  // 或者是首次发现
+                  let needsVerify = false;
+                  if (oldStatus && res1.status !== oldStatus) {
+                    needsVerify = true;
+                  }
+
+                  if (needsVerify) {
+                    console.log(`[${getTime()}] 浏览器状态变动 (${url}: ${oldStatus} -> ${res1.status})，等待 3秒后二次确认...`);
+                    await sleep(3000); // 浏览器操作稍慢，多等一点
+                    const res2 = await checkBrowserPage(context, url);
+
+                    if (res2.status === res1.status) {
+                       return { ...res1, hash: candidate.hash }; // 确认变化
+                    } else {
+                       console.log(`[${getTime()}] 浏览器二次确认失败 (${url})，结果回退。`);
+                       // 回退到旧状态
+                       return { url, status: oldStatus, hash: candidate.hash };
+                    }
+                  }
+
+                  return { ...res1, hash: candidate.hash };
+                };
+
                 const browserPromises = candidates.map(candidate => {
-                  return limit(() => checkBrowserPage(context, candidate.url).then(res => ({ ...res, hash: candidate.hash })));
+                  return limit(() => smartCheckBrowser(candidate));
                 });
                 const browserResults = await Promise.all(browserPromises);
 
@@ -202,11 +285,13 @@ jobs:
                     availableServers.push(`<a href="${url}">${url}</a> (状态: <b>${displayStatus}</b>)`);
                   }
 
+                  // 生成通知文案
                   let message = "";
                   if (!oldStatus && finalStatus !== "Offline") {
                     message = `首次发现服务器 (状态: ${displayStatusBold})`;
                   }
                   else if (oldStatus && finalStatus !== oldStatus) {
+                    // 这里的 finalStatus 已经是经过二次确认的了，所以直接相信
                     if (oldStatus === "Offline") {
                       let baseMsg = "";
                       if (finalStatus === "Open") baseMsg = "服务器已上线并<b>开放</b>";
