@@ -518,13 +518,18 @@
                 const html = await fetchSimple(CONFIG.baseUrl);
                 updateProgress(25, CONFIG.labels.step2);
 
-                const scriptRegex = /src="(\/play\/static\/js\/main\.[a-z0-9]+\.js)"/;
+                const scriptRegex = /src="([^"]*\/static\/js\/main\.[a-z0-9]+\.js)"/;
                 const match = html.match(scriptRegex);
 
                 if (!match || !match[1]) throw new Error("Version check failed");
 
-                const origin = new URL(CONFIG.baseUrl).origin;
-                const fullScriptUrl = origin + match[1];
+                let fullScriptUrl = match[1];
+
+                // 判断逻辑：如果是相对路径（以 / 开头），则拼接域名；如果是绝对路径（http 开头），则直接使用
+                if (fullScriptUrl.startsWith('/')) {
+                    const origin = new URL(CONFIG.baseUrl).origin;
+                    fullScriptUrl = origin + fullScriptUrl;
+                }
 
                 const jsContent = await downloadWithProgress(fullScriptUrl, (loaded, total) => {
                     const loadedStr = formatBytes(loaded);
