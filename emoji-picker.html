@@ -188,21 +188,42 @@
         }
 
         .group-section { margin-top: 32px; scroll-margin-top: 140px; }
-        .group-title { font: var(--type-headline); color: var(--sys-on-surface); margin-bottom: 16px; padding-left: 4px; }
+        .group-title { font: var(--type-headline); color: var(--sys-on-surface); margin-bottom: 16px; padding-left: 4px; width: 100%; }
         
+        /* --- NEW & UPDATED LAYOUT CLASSES --- */
+        
+        /* 允许 Subgroups 并排显示的容器 */
+        .group-content-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px; /* Subgroup 之间的间距 */
+            align-items: flex-start;
+        }
+
+        /* 包裹单个 Subgroup（标题+内容）的容器 */
+        .subgroup-container {
+            display: flex;
+            flex-direction: column;
+            /* 关键：fit-content 允许较窄的 subgroup 占用较少空间，从而并排 */
+            width: fit-content; 
+            max-width: 100%;
+        }
+
         .subgroup-pill {
             display: inline-block; font: var(--type-label); color: var(--sys-primary);
             background: var(--sys-surface-container-high); padding: 6px 12px;
-            border-radius: 8px; margin: 16px 0 8px; 
+            border-radius: 8px; 
+            margin: 0 0 8px 0; /* 减少上方边距，因为 flex gap 已经处理了 */
             text-transform: uppercase; letter-spacing: 0.5px;
+            width: fit-content;
         }
 
-        /* --- 核心布局 (保持流式设计) --- */
         .subgroup-content {
             display: flex;
             flex-wrap: wrap; 
             gap: 12px;
-            width: 100%;
+            width: fit-content; /* 紧贴内容 */
+            max-width: 100%;
             align-items: flex-start;
         }
 
@@ -346,7 +367,6 @@
                 "Flags": "旗帜"
             };
 
-            // --- UPDATED TRANSLATIONS: Technical Accuracy ---
             const STATUS_MAP_ZH = {
                 "fully-qualified": "全限定",
                 "minimally-qualified": "最小限定",
@@ -370,7 +390,6 @@
                 "curly hair": "卷发", "white hair": "白发", "bald": "秃头",
                 "mx claus": "圣诞老人(中性)", "mrs. claus": "圣诞奶奶", "santa claus": "圣诞老人",
                 "people wrestling": "摔跤", "men wrestling": "男人摔跤", "women wrestling": "女人摔跤",
-                // --- 关键：解决手机端行政区划旗无法翻译的问题 ---
                 "flag": "旗帜",
                 "scotland": "苏格兰",
                 "england": "英格兰",
@@ -417,7 +436,6 @@
 
             function getFlagTranslation(char) {
                 const codePoints = Array.from(char).map(c => c.codePointAt(0));
-                // 1. 标准国旗 U+1F1E6 - U+1F1FF
                 if (codePoints.length === 2 && codePoints.every(cp => cp >= 0x1F1E6 && cp <= 0x1F1FF)) {
                     try {
                         const r1 = codePoints[0] - 0x1F1E6 + 65;
@@ -426,7 +444,6 @@
                         return regionNames.of(code);
                     } catch (e) { return null; }
                 }
-                // 2. 行政区划旗 (保留逻辑，但以 MANUAL_TERMS_ZH 为准)
                 if (codePoints[0] === 0x1F3F4) {
                     try {
                         const tags = codePoints.slice(1)
@@ -437,7 +454,6 @@
                             const country = tags.substring(0, 2).toUpperCase();
                             const region = tags.substring(2).toUpperCase();
                             const isoCode = `${country}-${region}`;
-                            // 尝试 API，失败则返回 null
                             try { return regionNames.of(isoCode); } catch(e) { return null; }
                         }
                     } catch (e) { return null; }
@@ -499,7 +515,6 @@
             function processStructure(text) {
                 const lines = text.split('\n');
                 
-                // 将手动字典合并到组件字典中
                 if (IS_ZH) {
                     Object.assign(componentMap, MANUAL_TERMS_ZH);
                 }
@@ -545,19 +560,14 @@
                         const qualEn = qualParts.join(':').trim();
                         const baseEnTrimmed = baseEn.trim();
 
-                        // --- 国旗动态翻译 ---
                         if (IS_ZH && baseEnTrimmed === 'flag' && qualEn) {
-                            // 先看手动字典里有没有 (比如 Scotland)
                             let countryZh = componentMap[qualEn.toLowerCase()];
-                            
-                            // 如果没有，再用 API 算 (比如 China)
                             if (!countryZh) {
                                 const apiResult = getFlagTranslation(char);
                                 if (apiResult && apiResult !== qualEn) { 
                                     countryZh = apiResult; 
                                 }
                             }
-                            
                             if (countryZh) {
                                 componentMap[qualEn.toLowerCase()] = countryZh;
                             }
@@ -629,14 +639,12 @@
             }
 
             function buildUI() {
-                // --- FIXED: Explicit Sort Order ---
                 const preferredOrder = ['fully-qualified', 'minimally-qualified', 'unqualified', 'component'];
                 const availableKeys = Object.keys(rawData);
                 const statuses = preferredOrder.filter(k => availableKeys.includes(k));
 
                 if (!statuses.length) return;
                 
-                // Set activeStatus if not already set or invalid
                 if (!activeStatus || !statuses.includes(activeStatus)) {
                     activeStatus = statuses[0];
                 }
@@ -655,9 +663,7 @@
 
             function changeStatus(status) {
                 activeStatus = status;
-                // Update selected chip style
                 Array.from(ui.filters.children).forEach(c => {
-                    // Check text content against map to find correct chip
                     const map = IS_ZH ? STATUS_MAP_ZH : STATUS_MAP_EN;
                     const label = map[status] || status;
                     c.classList.toggle('selected', c.textContent === label);
@@ -693,6 +699,10 @@
                     section.className = 'group-section';
                     section.id = `sec-${idx}`;
                     section.innerHTML = `<div class="group-title">${translatedGroup}</div>`;
+
+                    // 创建一个 Flex 容器，用于放置该大组下的所有子分组
+                    const groupContentWrapper = document.createElement('div');
+                    groupContentWrapper.className = 'group-content-wrapper';
 
                     const subgroups = groups[gName];
                     let hasGroupItems = false;
@@ -742,20 +752,27 @@
 
                         if (hasGridItems) subgroupElements.push(grid);
 
+                        // 如果该子分组有内容，将其包装在一个容器中，然后加入到大组 Flex 容器中
                         if (hasSubgroupItems) {
+                            const subgroupContainer = document.createElement('div');
+                            subgroupContainer.className = 'subgroup-container';
+
                             const sgTitle = document.createElement('div');
                             sgTitle.className = 'subgroup-pill';
                             sgTitle.textContent = sgName.replace(/-/g, ' ');
-                            section.appendChild(sgTitle);
+                            subgroupContainer.appendChild(sgTitle);
 
                             const contentWrapper = document.createElement('div');
                             contentWrapper.className = 'subgroup-content';
                             subgroupElements.forEach(el => contentWrapper.appendChild(el));
-                            section.appendChild(contentWrapper);
+                            subgroupContainer.appendChild(contentWrapper);
+
+                            groupContentWrapper.appendChild(subgroupContainer);
                         }
                     });
 
                     if (hasGroupItems) {
+                        section.appendChild(groupContentWrapper);
                         ui.content.appendChild(section);
 
                         const navItem = document.createElement('div');
