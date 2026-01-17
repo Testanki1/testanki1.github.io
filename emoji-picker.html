@@ -197,12 +197,36 @@
             text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        .emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; margin-bottom: 16px; }
+        /* --- 修正后的关键布局 --- */
+        .subgroup-content {
+            display: flex;
+            flex-wrap: wrap; /* 允许换行 */
+            gap: 12px;       /* 卡片之间的间距 */
+            width: 100%;
+            align-items: flex-start; /* 顶部对齐，防止高度拉伸 */
+        }
 
+        /* 普通网格（无变体的单体Emoji）独占一行，保持整洁 */
+        .emoji-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); 
+            gap: 8px; 
+            width: 100%; 
+            flex: 1 1 100%;
+            margin-bottom: 0;
+        }
+
+        /* 变体卡片（带背景框的组） */
         .variant-card {
-            grid-column: 1 / -1; background: var(--sys-surface-container-high);
+            /* 关键修改： */
+            flex: 0 1 auto; /* 0=不放大，1=可缩小，auto=由内容决定宽度 */
+            width: fit-content; /* 宽度紧贴内容 */
+            max-width: 100%; /* 防止溢出屏幕 */
+            
+            background: var(--sys-surface-container-high);
             border-radius: var(--shape-lg); padding: 12px;
-            display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
+            display: flex; flex-wrap: wrap; gap: 8px; align-items: center; 
+            margin-bottom: 0;
         }
 
         .emoji-btn {
@@ -662,7 +686,12 @@
                             sgTitle.className = 'subgroup-pill';
                             sgTitle.textContent = sgName.replace(/-/g, ' ');
                             section.appendChild(sgTitle);
-                            subgroupElements.forEach(el => section.appendChild(el));
+
+                            // 创建 Flex 容器包裹所有元素
+                            const contentWrapper = document.createElement('div');
+                            contentWrapper.className = 'subgroup-content';
+                            subgroupElements.forEach(el => contentWrapper.appendChild(el));
+                            section.appendChild(contentWrapper);
                         }
                     });
 
