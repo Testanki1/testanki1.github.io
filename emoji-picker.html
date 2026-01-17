@@ -197,52 +197,35 @@
             text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        /* --- 布局核心样式修改 --- */
-
+        /* --- 核心布局 (保持流式设计) --- */
         .subgroup-content {
             display: flex;
-            flex-wrap: wrap; /* 允许换行 */
-            gap: 12px;       /* 块与块之间的间距 */
+            flex-wrap: wrap; 
+            gap: 12px;
             width: 100%;
-            align-items: flex-start; /* 顶部对齐，防止高度拉伸 */
+            align-items: flex-start;
         }
 
-        /* 
-         * 通用块级布局逻辑：
-         * 1. 宽度随内容变化 (fit-content)
-         * 2. 允许被父容器压缩 (flex-shrink: 1)
-         * 3. 内部元素自动换行 (flex-wrap: wrap)
-         */
-
-        /* 普通 Emoji 组 (无背景) */
         .emoji-grid { 
             display: flex; 
             flex-wrap: wrap;
             gap: 8px; 
-            
-            flex: 0 1 auto; /* 关键：只占据需要的空间，不强制撑满 */
+            flex: 0 1 auto; 
             width: fit-content;
             max-width: 100%;
-            
             margin-bottom: 0;
-            
-            /* 加上 padding 以便与带背景的卡片在视觉上对齐 */
             padding: 12px; 
         }
 
-        /* 变体 Emoji 组 (有背景) */
         .variant-card {
             display: flex; 
             flex-wrap: wrap; 
             gap: 8px; 
             align-items: center; 
-            
-            flex: 0 1 auto; /* 关键：只占据需要的空间 */
+            flex: 0 1 auto; 
             width: fit-content;
             max-width: 100%;
-
             margin-bottom: 0;
-            
             background: var(--sys-surface-container-high);
             border-radius: var(--shape-lg); 
             padding: 12px;
@@ -338,7 +321,6 @@
 
             const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
             const URL_STRUCTURE = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
-            // 根据语言选择 CLDR 数据源
             const URL_TRANSLATION = IS_ZH 
                 ? 'https://raw.githubusercontent.com/unicode-org/cldr/refs/heads/main/common/annotations/zh.xml'
                 : 'https://raw.githubusercontent.com/unicode-org/cldr/refs/heads/main/common/annotations/en.xml';
@@ -351,7 +333,6 @@
                 copied: IS_ZH ? "已复制" : "Copied"
             };
 
-            // 10大分类映射
             const GROUP_MAP_ZH = {
                 "Smileys & Emotion": "表情与情感",
                 "People & Body": "人物与身体",
@@ -365,7 +346,6 @@
                 "Flags": "旗帜"
             };
 
-            // 状态映射
             const STATUS_MAP_ZH = {
                 "fully-qualified": "全限定",
                 "minimally-qualified": "最小限定",
@@ -379,7 +359,6 @@
                 "component": "Component"
             };
 
-            // 手动补全字典 (仅中文需要，英文直接用原文)
             const MANUAL_TERMS_ZH = {
                 "man": "男人", "woman": "女人", "person": "人",
                 "boy": "男孩", "girl": "女孩", "child": "儿童", "baby": "婴儿",
@@ -389,7 +368,12 @@
                 "blond hair": "金发", "beard": "胡须", "red hair": "红发",
                 "curly hair": "卷发", "white hair": "白发", "bald": "秃头",
                 "mx claus": "圣诞老人(中性)", "mrs. claus": "圣诞奶奶", "santa claus": "圣诞老人",
-                "people wrestling": "摔跤", "men wrestling": "男人摔跤", "women wrestling": "女人摔跤"
+                "people wrestling": "摔跤", "men wrestling": "男人摔跤", "women wrestling": "女人摔跤",
+                // --- 关键：解决手机端行政区划旗无法翻译的问题 ---
+                "flag": "旗帜",
+                "scotland": "苏格兰",
+                "england": "英格兰",
+                "wales": "威尔士"
             };
 
             const ICON_MAP = {
@@ -428,8 +412,39 @@
                 clearSearch: document.getElementById('clear-search')
             };
 
+            const regionNames = new Intl.DisplayNames(['zh-CN'], { type: 'region' });
+
+            function getFlagTranslation(char) {
+                const codePoints = Array.from(char).map(c => c.codePointAt(0));
+                // 1. 标准国旗 U+1F1E6 - U+1F1FF
+                if (codePoints.length === 2 && codePoints.every(cp => cp >= 0x1F1E6 && cp <= 0x1F1FF)) {
+                    try {
+                        const r1 = codePoints[0] - 0x1F1E6 + 65;
+                        const r2 = codePoints[1] - 0x1F1E6 + 65;
+                        const code = String.fromCharCode(r1, r2);
+                        return regionNames.of(code);
+                    } catch (e) { return null; }
+                }
+                // 2. 行政区划旗 (保留逻辑，但以 MANUAL_TERMS_ZH 为准)
+                if (codePoints[0] === 0x1F3F4) {
+                    try {
+                        const tags = codePoints.slice(1)
+                            .filter(cp => cp >= 0xE0020 && cp <= 0xE007E)
+                            .map(cp => String.fromCharCode(cp - 0xE0000))
+                            .join('');
+                        if (tags.length >= 5) {
+                            const country = tags.substring(0, 2).toUpperCase();
+                            const region = tags.substring(2).toUpperCase();
+                            const isoCode = `${country}-${region}`;
+                            // 尝试 API，失败则返回 null
+                            try { return regionNames.of(isoCode); } catch(e) { return null; }
+                        }
+                    } catch (e) { return null; }
+                }
+                return null;
+            }
+
             async function init() {
-                // 应用 UI 文本
                 ui.loadingTitle.textContent = UI_STRINGS.loadingTitle;
                 ui.loadingText.textContent = UI_STRINGS.loadingText;
                 ui.searchInput.placeholder = UI_STRINGS.searchPlaceholder;
@@ -483,12 +498,11 @@
             function processStructure(text) {
                 const lines = text.split('\n');
                 
-                // 如果是中文，加载手动字典；英文则不需要
+                // 将手动字典合并到组件字典中
                 if (IS_ZH) {
                     Object.assign(componentMap, MANUAL_TERMS_ZH);
                 }
 
-                // 1. 构建组件字典
                 lines.forEach(line => {
                     line = line.trim();
                     if (!line || line.startsWith('#') || !line.includes('; component')) return;
@@ -498,16 +512,14 @@
                     const char = commentParts[0];
                     const nameEn = commentParts.slice(2).join(' ');
                     
-                    // 如果是中文，尝试查找翻译；英文直接用原文
                     if (IS_ZH) {
                         const nameZh = translationMap[char];
                         if (nameZh) componentMap[nameEn.toLowerCase()] = nameZh;
                     } else {
-                        componentMap[nameEn.toLowerCase()] = nameEn; // 英文映射到自身
+                        componentMap[nameEn.toLowerCase()] = nameEn;
                     }
                 });
 
-                // 2. 处理 Emoji
                 let group = "Unknown", subgroup = "Unknown";
                 let baseTranslationCache = {}; 
 
@@ -527,29 +539,46 @@
                         const commentParts = comment.trim().split(' '); 
                         const char = commentParts[0];
                         const nameFullEn = commentParts.slice(2).join(' ');
+
                         const [baseEn, ...qualParts] = nameFullEn.split(':');
                         const qualEn = qualParts.join(':').trim();
                         const baseEnTrimmed = baseEn.trim();
 
+                        // --- 国旗动态翻译 ---
+                        if (IS_ZH && baseEnTrimmed === 'flag' && qualEn) {
+                            // 先看手动字典里有没有 (比如 Scotland)
+                            let countryZh = componentMap[qualEn.toLowerCase()];
+                            
+                            // 如果没有，再用 API 算 (比如 China)
+                            if (!countryZh) {
+                                const apiResult = getFlagTranslation(char);
+                                if (apiResult && apiResult !== qualEn) { 
+                                    countryZh = apiResult; 
+                                }
+                            }
+                            
+                            if (countryZh) {
+                                componentMap[qualEn.toLowerCase()] = countryZh;
+                            }
+                        }
+
                         let baseDisplayName = null;
                         
-                        // 尝试获取翻译
                         baseDisplayName = translationMap[char];
                         if (!baseDisplayName) baseDisplayName = translationMap[char.replace(/\uFE0F/g, '')];
+
                         if (!baseDisplayName) {
                             const noSkin = char.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '');
                             baseDisplayName = translationMap[noSkin];
                             if (!baseDisplayName) baseDisplayName = translationMap[noSkin.replace(/\uFE0F/g, '')];
                         }
 
-                        // 回退逻辑
                         if (baseDisplayName) {
                             baseTranslationCache[baseEnTrimmed] = baseDisplayName;
                         } else {
                             if (baseTranslationCache[baseEnTrimmed]) {
                                 baseDisplayName = baseTranslationCache[baseEnTrimmed];
                             } else {
-                                // 中文尝试查手动字典，英文直接用英文名
                                 if (IS_ZH) {
                                     baseDisplayName = MANUAL_TERMS_ZH[baseEnTrimmed.toLowerCase()] || baseEnTrimmed;
                                 } else {
@@ -558,15 +587,17 @@
                             }
                         }
 
-                        // 关键词
                         let keywords = keywordMap[char] || "";
                         if (!keywords) keywords = keywordMap[char.replace(/\uFE0F/g, '')] || "";
                         if (!keywords) {
                              const noSkin = char.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '');
                              keywords = keywordMap[noSkin] || "";
                         }
+                        if (IS_ZH && baseEnTrimmed === 'flag' && qualEn) {
+                             const countryZh = componentMap[qualEn.toLowerCase()];
+                             if (countryZh) keywords += " " + countryZh;
+                        }
 
-                        // 修饰词翻译
                         let qualDisplay = "";
                         if (qualEn) {
                             const parts = qualEn.split(', ');
@@ -574,7 +605,6 @@
                                 const pLower = p.toLowerCase();
                                 return componentMap[pLower] || p; 
                             });
-                            // 中文用全角逗号，英文用半角
                             qualDisplay = translatedParts.join(IS_ZH ? '，' : ', ');
                         }
 
@@ -605,7 +635,6 @@
                 statuses.forEach(s => {
                     const btn = document.createElement('button');
                     btn.className = `chip ${s === activeStatus ? 'selected' : ''}`;
-                    // 根据语言选择状态映射表
                     const map = IS_ZH ? STATUS_MAP_ZH : STATUS_MAP_EN;
                     btn.textContent = map[s] || s;
                     btn.onclick = () => changeStatus(s);
@@ -629,6 +658,7 @@
                 if (item.name && item.name.toLowerCase().includes(q)) return true;
                 if (item.keywords && item.keywords.toLowerCase().includes(q)) return true;
                 if (item.base && item.base.toLowerCase().includes(q)) return true;
+                if (item.qual && item.qual.toLowerCase().includes(q)) return true;
                 if (item.char.includes(q)) return true;
                 return false;
             }
@@ -643,7 +673,6 @@
                 const groupNames = Object.keys(groups);
 
                 groupNames.forEach((gName, idx) => {
-                    // 翻译组名
                     const translatedGroup = IS_ZH ? (GROUP_MAP_ZH[gName] || gName) : gName;
                     const iconName = ICON_MAP[gName] || 'category';
                     
@@ -706,7 +735,6 @@
                             sgTitle.textContent = sgName.replace(/-/g, ' ');
                             section.appendChild(sgTitle);
 
-                            // 创建 Flex 容器包裹所有元素
                             const contentWrapper = document.createElement('div');
                             contentWrapper.className = 'subgroup-content';
                             subgroupElements.forEach(el => contentWrapper.appendChild(el));
