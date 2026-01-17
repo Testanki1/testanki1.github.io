@@ -346,6 +346,7 @@
                 "Flags": "旗帜"
             };
 
+            // --- UPDATED TRANSLATIONS: Technical Accuracy ---
             const STATUS_MAP_ZH = {
                 "fully-qualified": "全限定",
                 "minimally-qualified": "最小限定",
@@ -628,9 +629,18 @@
             }
 
             function buildUI() {
-                const statuses = Object.keys(rawData);
+                // --- FIXED: Explicit Sort Order ---
+                const preferredOrder = ['fully-qualified', 'minimally-qualified', 'unqualified', 'component'];
+                const availableKeys = Object.keys(rawData);
+                const statuses = preferredOrder.filter(k => availableKeys.includes(k));
+
                 if (!statuses.length) return;
-                activeStatus = statuses.includes('fully-qualified') ? 'fully-qualified' : statuses[0];
+                
+                // Set activeStatus if not already set or invalid
+                if (!activeStatus || !statuses.includes(activeStatus)) {
+                    activeStatus = statuses[0];
+                }
+
                 ui.filters.innerHTML = '';
                 statuses.forEach(s => {
                     const btn = document.createElement('button');
@@ -645,9 +655,12 @@
 
             function changeStatus(status) {
                 activeStatus = status;
-                Array.from(ui.filters.children).forEach((c, i) => {
-                    const keys = Object.keys(rawData);
-                    c.classList.toggle('selected', keys[i] === status);
+                // Update selected chip style
+                Array.from(ui.filters.children).forEach(c => {
+                    // Check text content against map to find correct chip
+                    const map = IS_ZH ? STATUS_MAP_ZH : STATUS_MAP_EN;
+                    const label = map[status] || status;
+                    c.classList.toggle('selected', c.textContent === label);
                 });
                 renderMainContent();
             }
