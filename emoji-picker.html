@@ -1,140 +1,90 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>M3 Emoji Picker</title>
     <style>
+        /* --- M3 Design Tokens & Reset --- */
         :root {
-            /* M3 Core Colors - Light/Blue Theme */
-            --md-sys-color-primary: #0061a4;
-            --md-sys-color-on-primary: #ffffff;
-            --md-sys-color-primary-container: #d1e4ff;
-            --md-sys-color-on-primary-container: #001d36;
+            --md-sys-color-surface: #FDFCFF;
+            --md-sys-color-surface-container: #F0F4F9;
+            --md-sys-color-surface-container-high: #E8EDF4;
+            --md-sys-color-on-surface: #1A1C1E;
+            --md-sys-color-primary: #0061A4;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-primary-container: #D1E4FF;
+            --md-sys-color-on-primary-container: #001D36;
+            --md-sys-color-outline: #74777F;
+            --md-sys-color-outline-variant: #C4C6CF;
+            --md-elevation-level-1: 0 1px 3px 1px rgba(0, 0, 0, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --md-elevation-level-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
             
-            --md-sys-color-secondary: #535f70;
-            --md-sys-color-secondary-container: #d7e3f7;
-            --md-sys-color-on-secondary-container: #101c2b;
-
-            --md-sys-color-surface: #fdfcff;
-            --md-sys-color-surface-container: #f0f4f9; /* Slightly darker than surface */
-            --md-sys-color-on-surface: #1a1c1e;
-            --md-sys-color-on-surface-variant: #43474e;
+            --m3-border-radius-lg: 24px;
+            --m3-border-radius-md: 16px;
+            --m3-border-radius-sm: 12px;
             
-            --md-sys-color-outline: #73777f;
-            --md-sys-color-outline-variant: #c3c7cf;
-
-            --md-ref-typeface-brand: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            
-            /* Elevation & Shape */
-            --md-sys-shape-corner-small: 8px;
-            --md-sys-shape-corner-medium: 12px;
-            --md-sys-shape-corner-large: 16px;
-            --md-sys-shape-corner-full: 9999px;
-            
-            --md-sys-elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
-            --md-sys-elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.3);
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --md-sys-color-primary: #9ecaff;
-                --md-sys-color-on-primary: #003258;
-                --md-sys-color-primary-container: #00497d;
-                --md-sys-color-on-primary-container: #d1e4ff;
-                
-                --md-sys-color-surface: #1a1c1e;
-                --md-sys-color-surface-container: #202429;
-                --md-sys-color-on-surface: #e2e2e6;
-                --md-sys-color-on-surface-variant: #c3c7cf;
-                
-                --md-sys-color-outline: #8d9199;
-                --md-sys-color-outline-variant: #43474e;
-                
-                --md-sys-color-secondary-container: #3b4858;
-                --md-sys-color-on-secondary-container: #d7e3f7;
-            }
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
         body {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             background-color: var(--md-sys-color-surface);
             color: var(--md-sys-color-on-surface);
-            font-family: var(--md-ref-typeface-brand);
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        /* Loading State */
-        #loading {
-            position: fixed; inset: 0; z-index: 50;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            background: var(--md-sys-color-surface);
-            gap: 16px;
-        }
-        .spinner {
-            width: 48px; height: 48px;
-            border: 5px solid var(--md-sys-color-primary-container);
-            border-bottom-color: var(--md-sys-color-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* --- Header & Tabs --- */
+        /* --- Layout Components --- */
+        
+        /* 1. Top Bar (Status Tabs) */
         header {
+            padding: 16px 16px 8px;
+            background: rgba(253, 252, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 10;
+            border-bottom: 1px solid var(--md-sys-color-surface-container-high);
             flex-shrink: 0;
-            background: var(--md-sys-color-surface);
-            padding: 8px 0;
-            border-bottom: 1px solid var(--md-sys-color-outline-variant);
         }
 
         .status-tabs {
             display: flex;
             gap: 8px;
             overflow-x: auto;
-            padding: 0 16px 8px 16px;
             scrollbar-width: none;
+            padding-bottom: 4px;
         }
         .status-tabs::-webkit-scrollbar { display: none; }
 
-        .tab-chip {
-            flex: 0 0 auto;
-            height: 32px;
-            padding: 0 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: var(--md-sys-shape-corner-full);
-            border: 1px solid var(--md-sys-color-outline);
-            color: var(--md-sys-color-on-surface-variant);
+        .chip {
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: 8px;
+            padding: 6px 16px;
             font-size: 14px;
             font-weight: 500;
+            color: var(--md-sys-color-on-surface);
+            background: transparent;
             cursor: pointer;
-            transition: all 0.2s ease;
+            white-space: nowrap;
+            transition: all 0.2s cubic-bezier(0.2, 0.0, 0, 1.0);
             user-select: none;
-            text-transform: capitalize;
         }
-        .tab-chip.active {
+        .chip:hover { background-color: var(--md-sys-color-surface-container-high); }
+        .chip.active {
             background-color: var(--md-sys-color-primary-container);
             color: var(--md-sys-color-on-primary-container);
             border-color: transparent;
         }
-        .tab-chip:hover:not(.active) {
-            background-color: rgba(0,0,0,0.05);
-        }
 
-        /* --- Main Content --- */
-        #main-content {
+        /* 2. Main Content (Emoji Grid) */
+        main {
             flex: 1;
             overflow-y: auto;
-            padding: 0 16px 80px 16px; /* Bottom padding for nav and safe area */
+            padding: 0 16px 80px; /* Bottom padding for nav */
             scroll-behavior: smooth;
         }
 
@@ -142,49 +92,39 @@
             font-size: 22px;
             font-weight: 400;
             color: var(--md-sys-color-on-surface);
-            padding: 24px 0 16px 0;
-            position: sticky;
-            top: 0;
-            background: rgba(253, 252, 255, 0.95); /* Semi-transparent background matching surface */
-            backdrop-filter: blur(5px);
-            z-index: 10;
-        }
-        @media (prefers-color-scheme: dark) {
-            .group-header { background: rgba(26, 28, 30, 0.95); }
+            margin: 32px 0 16px;
+            padding-left: 4px;
         }
 
         .subgroup-title {
             font-size: 12px;
             font-weight: 700;
-            color: var(--md-sys-color-primary);
-            text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin: 16px 0 8px 0;
-            display: flex;
-            align-items: center;
-        }
-        .subgroup-title::after {
-            content: ''; flex: 1; height: 1px;
-            background: var(--md-sys-color-outline-variant);
-            margin-left: 12px; opacity: 0.5;
+            text-transform: uppercase;
+            color: var(--md-sys-color-primary);
+            margin: 24px 0 8px;
+            display: inline-block;
+            background: var(--md-sys-color-surface-container);
+            padding: 4px 12px;
+            border-radius: 8px;
         }
 
-        /* --- Emoji Grid --- */
         .emoji-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 8px;
+            gap: 4px;
+            margin-bottom: 4px;
         }
 
-        /* The container for a set of related emojis (base + variants) */
+        /* Container for Base + Variants */
         .variant-set {
             display: inline-flex;
             flex-wrap: wrap;
             align-items: center;
             background-color: var(--md-sys-color-surface-container);
-            border-radius: var(--md-sys-shape-corner-large);
-            padding: 4px;
+            border-radius: var(--m3-border-radius-md);
+            padding: 6px;
+            margin: 4px 0 12px;
             gap: 2px;
         }
 
@@ -196,477 +136,501 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            border-radius: var(--md-sys-shape-corner-medium);
+            border-radius: 12px;
             transition: transform 0.1s, background-color 0.2s;
             user-select: none;
             position: relative;
         }
         .emoji-item:hover {
-            background-color: rgba(0,0,0,0.05);
-        }
-        @media (prefers-color-scheme: dark) {
-            .emoji-item:hover { background-color: rgba(255,255,255,0.1); }
+            background-color: rgba(0, 0, 0, 0.05);
+            transform: scale(1.1);
         }
         .emoji-item:active {
-            transform: scale(0.92);
+            transform: scale(0.95);
         }
 
-        /* Dashed separator for base variants */
-        .emoji-item.base-last {
-            margin-right: 6px;
+        /* Dashed separator logic */
+        .emoji-item.is-base-last {
+            margin-right: 12px;
         }
-        .emoji-item.base-last::after {
+        .emoji-item.is-base-last::after {
             content: "";
             position: absolute;
-            right: -5px;
+            right: -8px;
             top: 10px;
             bottom: 10px;
             width: 1px;
-            border-right: 1px dashed var(--md-sys-color-outline);
-            opacity: 0.5;
-            pointer-events: none;
+            border-right: 2px dashed var(--md-sys-color-outline-variant);
         }
 
-        /* --- Bottom Navigation --- */
-        .bottom-nav {
-            flex-shrink: 0;
+        /* 3. Bottom Navigation (Groups) */
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             height: 80px;
-            background-color: var(--md-sys-color-surface-container);
-            border-top: 1px solid var(--md-sys-color-outline-variant);
+            background: var(--md-sys-color-surface-container);
             display: flex;
             align-items: center;
             overflow-x: auto;
             padding: 0 16px;
             gap: 8px;
+            z-index: 20;
+            box-shadow: 0 -1px 0 var(--md-sys-color-outline-variant);
             scrollbar-width: none;
         }
-        .bottom-nav::-webkit-scrollbar { display: none; }
+        nav::-webkit-scrollbar { display: none; }
 
         .nav-item {
-            padding: 8px 16px;
-            height: 48px;
-            border-radius: var(--md-sys-shape-corner-full);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 64px;
+            height: 100%;
+            cursor: pointer;
+            color: var(--md-sys-color-on-surface);
+            opacity: 0.7;
+            transition: 0.2s;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            padding: 0 8px;
+        }
+        .nav-item.active {
+            opacity: 1;
+            color: var(--md-sys-color-on-surface);
+        }
+        .nav-indicator {
+            height: 32px;
+            padding: 0 16px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--md-sys-color-on-surface-variant);
-            white-space: nowrap;
-            cursor: pointer;
-            transition: background-color 0.2s, color 0.2s;
+            margin-bottom: 4px;
+            transition: 0.2s;
         }
-        .nav-item.active {
-            background-color: var(--md-sys-color-secondary-container);
-            color: var(--md-sys-color-on-secondary-container);
-        }
-        .nav-item:hover:not(.active) {
-            background-color: rgba(0,0,0,0.05);
+        .nav-item.active .nav-indicator {
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            font-weight: bold;
         }
 
-        /* --- Tooltip / Toast --- */
+        /* 4. Tooltip */
         #tooltip {
             position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%) scale(0.9);
-            background-color: var(--md-sys-color-on-surface);
-            color: var(--md-sys-color-surface);
-            padding: 12px 24px;
-            border-radius: var(--md-sys-shape-corner-medium);
-            box-shadow: var(--md-sys-elevation-3);
+            z-index: 100;
+            background: rgba(30, 30, 30, 0.9);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 13px;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.2s, transform 0.2s;
-            z-index: 100;
+            transition: opacity 0.15s;
             text-align: center;
-            max-width: 90vw;
+            max-width: 200px;
+            box-shadow: var(--md-elevation-level-3);
+            transform: translate(-50%, -100%);
+            margin-top: -12px;
         }
-        #tooltip.show {
-            opacity: 1;
+        #tooltip.show { opacity: 1; }
+        .t-base { display: block; font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+        .t-qual { display: block; font-size: 11px; opacity: 0.8; }
+
+        /* 5. Snackbar (Toast) */
+        #snackbar {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.9);
+            background: #1A1C1E;
+            color: #F2F2F2;
+            padding: 14px 24px;
+            border-radius: 28px; /* Pill shape */
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            z-index: 101;
+            box-shadow: var(--md-elevation-level-3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #snackbar.show {
             transform: translateX(-50%) scale(1);
-        }
-        #tooltip .t-main {
-            display: block;
-            font-size: 16px;
-            font-weight: 500;
-        }
-        #tooltip .t-sub {
-            display: block;
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 2px;
-        }
-        #tooltip .t-action {
-            display: block;
-            font-size: 11px;
-            color: #88cfff; /* Accent within tooltip */
-            margin-top: 6px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 700;
+            opacity: 1;
         }
 
+        /* Loading State */
+        #loading {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--md-sys-color-surface);
+            z-index: 50;
+            gap: 16px;
+        }
+        .spinner {
+            width: 48px; height: 48px;
+            border: 5px solid var(--md-sys-color-surface-container-high);
+            border-top-color: var(--md-sys-color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-msg { color: #BA1A1A; text-align: center; padding: 20px; max-width: 400px; }
     </style>
 </head>
 <body>
 
+    <!-- Loading Screen -->
     <div id="loading">
         <div class="spinner"></div>
-        <div>Loading Emoji Data...</div>
+        <div style="font-weight: 500; color: var(--md-sys-color-primary);">Loading Emoji Data...</div>
+        <div style="font-size: 12px; color: var(--md-sys-color-outline);">Fetching from unicode.org</div>
     </div>
 
+    <!-- Header with Status Tabs -->
     <header>
         <div class="status-tabs" id="status-tabs">
-            <!-- Populated via JS -->
+            <!-- Generated by JS -->
         </div>
     </header>
 
-    <div id="main-content">
-        <!-- Emoji Groups Populated via JS -->
-    </div>
+    <!-- Main Content -->
+    <main id="main-content">
+        <!-- Generated by JS -->
+    </main>
 
-    <nav class="bottom-nav" id="bottom-nav">
-        <!-- Group Nav Populated via JS -->
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav">
+        <!-- Generated by JS -->
     </nav>
 
+    <!-- Floating Elements -->
     <div id="tooltip"></div>
+    <div id="snackbar"></div>
 
     <script>
-        // --- Constants & State ---
-        // Primary URL (Official). If this fails due to CORS, we fallback.
-        const OFFICIAL_URL = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
-        // GitHub Mirror that usually allows CORS (Fallback)
-        const FALLBACK_URL = 'https://raw.githubusercontent.com/unicode-org/cldr/main/tools/cldr-code/src/main/resources/org/unicode/cldr/util/data/emoji/emoji-test.txt';
-        
-        const CACHE_KEY = 'm3_emoji_data_v1';
-        
-        let emojiData = {}; // Structure: { [Status]: { [Group]: { [Subgroup]: { [BaseName]: [Array of variants] } } } }
-        let availableStatuses = new Set();
-        let currentStatus = '';
-        let currentGroups = [];
-        let isAutoScrolling = false;
-        let tooltipTimer = null;
-        let tooltipEl = document.getElementById('tooltip');
-        let mainContent = document.getElementById('main-content');
+        (function() {
+            'use strict';
 
-        // --- Init ---
-        async function init() {
-            try {
-                // Check Cache
-                const cached = localStorage.getItem(CACHE_KEY);
-                if (cached) {
-                    const parsed = JSON.parse(cached);
-                    emojiData = parsed.data;
-                    // Reconstruct Set from keys
-                    availableStatuses = new Set(Object.keys(emojiData));
-                } else {
-                    await fetchData();
-                }
-                
-                // Determine default status (prefer fully-qualified)
-                const statuses = Array.from(availableStatuses).sort();
-                currentStatus = statuses.includes('fully-qualified') ? 'fully-qualified' : statuses[0];
-                
-                renderUI();
-                document.getElementById('loading').style.display = 'none';
-            } catch (e) {
-                document.getElementById('loading').innerHTML = `<div style="color:red; text-align:center; padding:20px;">Error: ${e.message}<br><br><small>If you are opening this as a local HTML file, browser security might block the request.</small></div>`;
-            }
-        }
-
-        // --- Data Fetching & Parsing ---
-        async function fetchData() {
-            let text = '';
-            try {
-                // Try official first
-                const res = await fetch(OFFICIAL_URL);
-                if (!res.ok) throw new Error('Network response not ok');
-                text = await res.text();
-            } catch (err) {
-                console.warn('Official fetch failed (likely CORS), trying fallback...');
-                // Try fallback
-                const res = await fetch(FALLBACK_URL);
-                if (!res.ok) throw new Error('Fallback fetch failed');
-                text = await res.text();
-            }
+            const OFFICIAL_URL = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
             
-            parseData(text);
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ data: emojiData, timestamp: Date.now() }));
-        }
+            // State
+            let emojiData = {}; // { status: { group: { subgroup: { baseName: [items] } } } }
+            let currentStatus = '';
+            let isAutoScrolling = false;
+            let tooltipTimer = null;
 
-        function parseData(text) {
-            const lines = text.split('\n');
-            let curGroup = 'Unknown';
-            let curSubGroup = 'Unknown';
-
-            lines.forEach(line => {
-                line = line.trim();
-                if (!line) return;
-
-                if (line.startsWith('# group:')) {
-                    curGroup = line.split(': ')[1].trim();
-                    return;
-                }
-                if (line.startsWith('# subgroup:')) {
-                    curSubGroup = line.split(': ')[1].trim();
-                    return;
-                }
-                if (line.startsWith('#')) return; // Other comments
-
-                // Line format: CodePoints ; Status # Emoji Name
-                // Example: 1F600 ; fully-qualified # 😀 grinning face
-                if (line.includes(';')) {
-                    const parts = line.split(';');
-                    const codePoints = parts[0].trim();
-                    const remainder = parts[1].split('#');
-                    const status = remainder[0].trim();
-                    const comment = remainder[1].trim();
-                    
-                    // Comment format: [EmojiChar] [Name] (may contain colons)
-                    // We need to separate the char from the name.
-                    // Usually the first space separates char and name.
-                    const firstSpaceIndex = comment.indexOf(' ');
-                    const char = comment.substring(0, firstSpaceIndex);
-                    const fullName = comment.substring(firstSpaceIndex + 1).trim();
-
-                    // Logic for Base Name vs Variant
-                    // E.g. "person: red hair" -> Base: "person", Qual: "red hair"
-                    const nameParts = fullName.split(':');
-                    const baseName = nameParts[0].trim();
-                    const qualifier = nameParts.length > 1 ? nameParts.slice(1).join(':').trim() : "";
-
-                    // Build Structure
-                    if (!availableStatuses.has(status)) availableStatuses.add(status);
-                    
-                    if (!emojiData[status]) emojiData[status] = {};
-                    if (!emojiData[status][curGroup]) emojiData[status][curGroup] = {};
-                    if (!emojiData[status][curGroup][curSubGroup]) emojiData[status][curGroup][curSubGroup] = {};
-                    if (!emojiData[status][curGroup][curSubGroup][baseName]) {
-                        emojiData[status][curGroup][curSubGroup][baseName] = [];
-                    }
-
-                    emojiData[status][curGroup][curSubGroup][baseName].push({
-                        char: char,
-                        base: baseName,
-                        qual: qualifier,
-                        full: fullName
-                    });
-                }
-            });
-        }
-
-        // --- Rendering ---
-        function renderUI() {
-            renderTabs();
-            renderMainContent();
-            renderNav();
-        }
-
-        function renderTabs() {
-            const container = document.getElementById('status-tabs');
-            container.innerHTML = '';
-            
-            const sortedStatuses = Array.from(availableStatuses).sort(); // simple sort
-            
-            sortedStatuses.forEach(status => {
-                const chip = document.createElement('div');
-                chip.className = `tab-chip ${status === currentStatus ? 'active' : ''}`;
-                chip.innerText = status.replace(/-/g, ' ');
-                chip.onclick = () => {
-                    if (currentStatus === status) return;
-                    currentStatus = status;
-                    renderUI();
-                };
-                container.appendChild(chip);
-            });
-        }
-
-        function renderMainContent() {
-            mainContent.innerHTML = '';
-            mainContent.scrollTop = 0;
-            
-            const groupData = emojiData[currentStatus];
-            if (!groupData) {
-                mainContent.innerHTML = '<div style="padding:20px; text-align:center;">No emojis found for this status.</div>';
-                return;
-            }
-
-            currentGroups = Object.keys(groupData);
-
-            currentGroups.forEach(groupName => {
-                const groupEl = document.createElement('div');
-                groupEl.id = `g-${groupName.replace(/\s+/g, '-')}`;
-                
-                // Group Header
-                const header = document.createElement('div');
-                header.className = 'group-header';
-                header.innerText = groupName;
-                groupEl.appendChild(header);
-
-                // Subgroups
-                const subgroups = groupData[groupName];
-                Object.keys(subgroups).forEach(subGroupName => {
-                    const sgTitle = document.createElement('div');
-                    sgTitle.className = 'subgroup-title';
-                    sgTitle.innerText = subGroupName;
-                    groupEl.appendChild(sgTitle);
-
-                    const sgContainer = document.createElement('div');
-                    sgContainer.className = 'emoji-row';
-                    
-                    const baseNames = subgroups[subGroupName];
-                    Object.keys(baseNames).forEach(baseName => {
-                        const items = baseNames[baseName];
-                        
-                        // If multiple variants (base + skin tones/hair), group them
-                        // Check if we have items with empty qualifier (true base) and items with qualifiers
-                        const baseItems = items.filter(i => i.qual === "");
-                        const variantItems = items.filter(i => i.qual !== "");
-                        
-                        if (items.length > 1 && baseItems.length > 0 && variantItems.length > 0) {
-                            // Render as a set
-                            const setEl = document.createElement('div');
-                            setEl.className = 'variant-set';
-                            
-                            baseItems.forEach((item, idx) => {
-                                const isLast = idx === baseItems.length - 1;
-                                setEl.appendChild(createEmojiItem(item, isLast));
-                            });
-                            variantItems.forEach(item => {
-                                setEl.appendChild(createEmojiItem(item, false));
-                            });
-                            
-                            sgContainer.appendChild(setEl);
-                        } else {
-                            // Render individually (or all in one plain row if just multiple unlinked variants)
-                            items.forEach(item => {
-                                sgContainer.appendChild(createEmojiItem(item, false));
-                            });
-                        }
-                    });
-                    
-                    groupEl.appendChild(sgContainer);
-                });
-
-                mainContent.appendChild(groupEl);
-            });
-            
-            // Re-attach scroll listener
-            mainContent.onscroll = handleScroll;
-        }
-
-        function createEmojiItem(item, isBaseLast) {
-            const el = document.createElement('div');
-            el.className = `emoji-item ${isBaseLast ? 'base-last' : ''}`;
-            el.innerText = item.char;
-            
-            // Click to copy
-            el.onclick = () => {
-                navigator.clipboard.writeText(item.char).then(() => {
-                    showToast(item.full, "Copied to clipboard!");
-                });
+            // DOM Elements
+            const els = {
+                loading: document.getElementById('loading'),
+                statusTabs: document.getElementById('status-tabs'),
+                main: document.getElementById('main-content'),
+                nav: document.getElementById('bottom-nav'),
+                tooltip: document.getElementById('tooltip'),
+                snackbar: document.getElementById('snackbar')
             };
 
-            // Long Press / Hover
-            el.onpointerdown = () => showToast(item.full, null, false);
-            el.onmouseenter = () => showToast(item.full, null, false);
-            el.onmouseleave = hideToast;
-
-            return el;
-        }
-
-        function renderNav() {
-            const nav = document.getElementById('bottom-nav');
-            nav.innerHTML = '';
-            
-            currentGroups.forEach((groupName, idx) => {
-                const navItem = document.createElement('div');
-                navItem.className = `nav-item ${idx === 0 ? 'active' : ''}`;
-                navItem.innerText = groupName;
-                navItem.dataset.group = groupName;
-                navItem.onclick = () => {
-                    isAutoScrolling = true;
-                    
-                    // Update Active Visual
-                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-                    navItem.classList.add('active');
-                    navItem.scrollIntoView({ behavior: 'smooth', inline: 'center' });
-
-                    // Scroll Main Content
-                    const targetId = `g-${groupName.replace(/\s+/g, '-')}`;
-                    const target = document.getElementById(targetId);
-                    if (target) {
-                        // Offset for sticky header
-                        const offset = target.offsetTop; 
-                        mainContent.scrollTo({ top: offset, behavior: 'smooth' });
-                    }
-
-                    setTimeout(() => { isAutoScrolling = false; }, 800);
-                };
-                nav.appendChild(navItem);
-            });
-        }
-
-        // --- Event Handlers ---
-        
-        function handleScroll() {
-            if (isAutoScrolling) return;
-
-            // Detect which group is currently in view
-            // Simple logic: find first group header that is above the middle of screen or at top
-            const offset = 100; // Trigger point
-            let currentId = null;
-
-            for (let g of currentGroups) {
-                const id = `g-${g.replace(/\s+/g, '-')}`;
-                const el = document.getElementById(id);
-                if (el) {
-                    const rect = el.getBoundingClientRect();
-                    // If element top is 'above' a certain threshold relative to viewport
-                    if (rect.top <= 150) {
-                        currentId = g;
-                    }
+            // --- 1. Data Fetching & Parsing ---
+            async function init() {
+                try {
+                    const response = await fetch(OFFICIAL_URL);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const text = await response.text();
+                    parseData(text);
+                    renderApp();
+                    els.loading.style.display = 'none';
+                } catch (e) {
+                    console.error(e);
+                    els.loading.innerHTML = `
+                        <div class="error-msg">
+                            <h3>加载失败</h3>
+                            <p>${e.message}</p>
+                            <p style="font-size:12px; margin-top:10px; color:#555;">
+                                <strong>注意：</strong> 由于 unicode.org 不允许跨域 (CORS)，
+                                如果你是直接打开此 HTML 文件，请尝试安装 "Allow CORS" 浏览器插件，
+                                或者在本地服务器环境下运行。
+                            </p>
+                        </div>
+                    `;
                 }
             }
-            
-            if (currentId) {
-                document.querySelectorAll('.nav-item').forEach(i => {
-                    if (i.dataset.group === currentId) {
-                        if (!i.classList.contains('active')) {
-                            i.classList.add('active');
-                            i.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+
+            function parseData(text) {
+                const lines = text.split('\n');
+                let curG = "Unknown", curSG = "Unknown";
+
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (!line) return;
+                    
+                    if (line.startsWith('# group:')) {
+                        curG = line.split(': ')[1].trim();
+                    } else if (line.startsWith('# subgroup:')) {
+                        curSG = line.split(': ')[1].trim();
+                    } else if (!line.startsWith('#') && line.includes(';')) {
+                        // Line format: CodePoints ; Status # Emoji Name
+                        const parts = line.split(';');
+                        const statusPart = parts[1].split('#');
+                        const status = statusPart[0].trim();
+                        const comment = statusPart[1].trim();
+                        
+                        // Parse comment: "😶‍🌫️ E13.1 face in clouds"
+                        // We need the char and the name
+                        const firstSpaceIndex = comment.indexOf(' ');
+                        const emojiChar = comment.substring(0, firstSpaceIndex);
+                        const rest = comment.substring(firstSpaceIndex + 1).trim();
+                        // Skip version (E13.1) to get name
+                        const nameStartIndex = rest.indexOf(' ');
+                        const fullName = rest.substring(nameStartIndex + 1).trim();
+
+                        // Parse Base vs Qualifier (for skin tones etc)
+                        // Logic: "person: light skin tone" -> Base: "person", Qual: "light skin tone"
+                        const nameParts = fullName.split(':');
+                        const baseName = nameParts[0].trim();
+                        const qualifier = nameParts.length > 1 ? nameParts.slice(1).join(':').trim() : "";
+
+                        // Build Structure
+                        if (!emojiData[status]) emojiData[status] = {};
+                        if (!emojiData[status][curG]) emojiData[status][curG] = {};
+                        if (!emojiData[status][curG][curSG]) emojiData[status][curG][curSG] = {};
+                        if (!emojiData[status][curG][curSG][baseName]) {
+                            emojiData[status][curG][curSG][baseName] = [];
                         }
-                    } else {
-                        i.classList.remove('active');
+
+                        emojiData[status][curG][curSG][baseName].push({
+                            char: emojiChar,
+                            base: baseName,
+                            qual: qualifier
+                        });
                     }
                 });
             }
-        }
 
-        function showToast(mainText, actionText, autoHide = true) {
-            clearTimeout(tooltipTimer);
-            
-            let html = `<span class="t-main">${mainText}</span>`;
-            if (actionText) {
-                html += `<span class="t-action">${actionText}</span>`;
+            // --- 2. Rendering ---
+            function renderApp() {
+                // 1. Render Status Tabs
+                const statuses = Object.keys(emojiData);
+                // Default to fully-qualified if exists, else first available
+                currentStatus = statuses.includes('fully-qualified') ? 'fully-qualified' : statuses[0];
+
+                els.statusTabs.innerHTML = '';
+                statuses.forEach(s => {
+                    const chip = document.createElement('button');
+                    chip.className = `chip ${s === currentStatus ? 'active' : ''}`;
+                    chip.textContent = s.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Capitalize
+                    chip.onclick = () => switchStatus(s);
+                    els.statusTabs.appendChild(chip);
+                });
+
+                renderContent();
             }
-            
-            tooltipEl.innerHTML = html;
-            tooltipEl.classList.add('show');
 
-            if (autoHide) {
-                tooltipTimer = setTimeout(hideToast, 2000);
+            function switchStatus(status) {
+                currentStatus = status;
+                document.querySelectorAll('.chip').forEach(c => {
+                    c.classList.toggle('active', c.textContent.toLowerCase().replace(/ /g, '-') === status);
+                });
+                renderContent();
             }
-        }
 
-        function hideToast() {
-            tooltipEl.classList.remove('show');
-        }
+            function renderContent() {
+                els.main.innerHTML = '';
+                els.nav.innerHTML = '';
+                els.main.scrollTop = 0;
 
-        // Run
-        init();
+                const groups = emojiData[currentStatus] || {};
+                const groupNames = Object.keys(groups);
 
+                groupNames.forEach((gName, idx) => {
+                    // 1. Bottom Nav Item
+                    const navItem = document.createElement('div');
+                    navItem.className = `nav-item ${idx === 0 ? 'active' : ''}`;
+                    navItem.dataset.target = `group-${idx}`;
+                    // Shorten name for nav if too long
+                    const shortName = gName.split(' ')[0]; 
+                    navItem.innerHTML = `<div class="nav-indicator">${shortName}</div>`;
+                    navItem.onclick = () => scrollToGroup(idx);
+                    els.nav.appendChild(navItem);
+
+                    // 2. Main Content Block
+                    const gBlock = document.createElement('div');
+                    gBlock.id = `group-${idx}`;
+                    gBlock.innerHTML = `<div class="group-header">${gName}</div>`;
+
+                    const subgroups = groups[gName];
+                    Object.keys(subgroups).forEach(sgName => {
+                        const sgTitle = document.createElement('div');
+                        sgTitle.className = 'subgroup-title';
+                        sgTitle.textContent = sgName;
+                        gBlock.appendChild(sgTitle);
+
+                        const baseMap = subgroups[sgName];
+                        
+                        // Container for simple items to avoid too many divs
+                        let simpleRow = document.createElement('div');
+                        simpleRow.className = 'emoji-row';
+                        let hasSimple = false;
+
+                        Object.keys(baseMap).forEach(baseName => {
+                            const items = baseMap[baseName];
+                            
+                            // Logic: If items > 1 (variants exist), use a container box
+                            // If items == 1, put in flow
+                            
+                            // Check if we have mixed base and qualifiers
+                            const baseItems = items.filter(i => !i.qual);
+                            const variantItems = items.filter(i => i.qual);
+
+                            if (items.length > 1 && baseItems.length > 0 && variantItems.length > 0) {
+                                // Close previous simple row if open
+                                if (hasSimple) { gBlock.appendChild(simpleRow); simpleRow = document.createElement('div'); simpleRow.className = 'emoji-row'; hasSimple = false; }
+
+                                const setDiv = document.createElement('div');
+                                setDiv.className = 'variant-set';
+                                
+                                // Render Base items (usually just one, but logic supports multiple)
+                                baseItems.forEach((obj, i) => {
+                                    const isLast = i === baseItems.length - 1;
+                                    setDiv.appendChild(createEmojiEl(obj, isLast));
+                                });
+                                // Render Variants
+                                variantItems.forEach(obj => {
+                                    setDiv.appendChild(createEmojiEl(obj, false));
+                                });
+                                gBlock.appendChild(setDiv);
+                            } else {
+                                // Just dump them in the simple row
+                                hasSimple = true;
+                                items.forEach(obj => simpleRow.appendChild(createEmojiEl(obj, false)));
+                            }
+                        });
+
+                        if (hasSimple) gBlock.appendChild(simpleRow);
+                    });
+
+                    els.main.appendChild(gBlock);
+                });
+
+                setupScrollSpy(groupNames.length);
+            }
+
+            function createEmojiEl(obj, isBaseLast) {
+                const el = document.createElement('div');
+                el.className = 'emoji-item' + (isBaseLast ? ' is-base-last' : '');
+                el.textContent = obj.char;
+                
+                // Events
+                el.onclick = () => copyToClipboard(obj.char);
+                
+                // Tooltip logic
+                const showTip = () => showTooltip(el, obj.base, obj.qual);
+                el.onmouseenter = showTip;
+                el.onmouseleave = hideTooltip;
+                el.ontouchstart = (e) => { 
+                    // Prevent default to avoid click triggering immediately if we want long press, 
+                    // but for this UI, touch usually means click. 
+                    // We'll show tooltip on touch, copy on click.
+                    showTip(); 
+                };
+
+                return el;
+            }
+
+            // --- 3. Interactions ---
+
+            function copyToClipboard(char) {
+                navigator.clipboard.writeText(char).then(() => {
+                    showSnackbar(`已复制 ${char}`);
+                }).catch(err => {
+                    showSnackbar('复制失败');
+                    console.error(err);
+                });
+            }
+
+            function showSnackbar(msg) {
+                els.snackbar.textContent = msg;
+                els.snackbar.classList.add('show');
+                setTimeout(() => els.snackbar.classList.remove('show'), 2000);
+            }
+
+            function showTooltip(el, base, qual) {
+                if (tooltipTimer) clearTimeout(tooltipTimer);
+                els.tooltip.innerHTML = `<span class="t-base">${base}</span>${qual ? '<span class="t-qual">'+qual+'</span>' : ''}`;
+                
+                const rect = el.getBoundingClientRect();
+                els.tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                els.tooltip.style.top = rect.top + 'px';
+                els.tooltip.classList.add('show');
+            }
+
+            function hideTooltip() {
+                els.tooltip.classList.remove('show');
+            }
+
+            // --- 4. Navigation Logic ---
+
+            function scrollToGroup(idx) {
+                isAutoScrolling = true;
+                const target = document.getElementById(`group-${idx}`);
+                const navItems = document.querySelectorAll('.nav-item');
+                
+                navItems.forEach(n => n.classList.remove('active'));
+                navItems[idx].classList.add('active');
+                navItems[idx].scrollIntoView({ behavior: 'smooth', inline: 'center' });
+
+                if (target) {
+                    // Offset for header
+                    const headerHeight = 0; 
+                    els.main.scrollTo({
+                        top: target.offsetTop - 16,
+                        behavior: 'smooth'
+                    });
+                }
+                
+                setTimeout(() => isAutoScrolling = false, 800);
+            }
+
+            function setupScrollSpy(count) {
+                els.main.onscroll = () => {
+                    if (isAutoScrolling) return;
+                    
+                    let activeIdx = 0;
+                    for (let i = 0; i < count; i++) {
+                        const el = document.getElementById(`group-${i}`);
+                        // 100px offset for trigger point
+                        if (el.offsetTop <= els.main.scrollTop + 150) {
+                            activeIdx = i;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    const navItems = document.querySelectorAll('.nav-item');
+                    navItems.forEach((n, i) => {
+                        const isActive = i === activeIdx;
+                        n.classList.toggle('active', isActive);
+                        if (isActive) {
+                            n.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
+                    });
+                };
+            }
+
+            // Start
+            init();
+
+        })();
     </script>
 </body>
 </html>
