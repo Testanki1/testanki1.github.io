@@ -3,217 +3,378 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Emoji Picker</title>
+    <title>Emoji Library</title>
     <style>
-        /* --- Design Tokens --- */
+        /* --- 1. Design Tokens (Expressive Theme) --- */
         :root {
-            --sys-color-surface: #F8F9FF;
-            --sys-color-surface-container: #EEF0F9;
-            --sys-color-surface-container-high: #E3E6EF;
-            --sys-color-on-surface: #191C20;
-            --sys-color-on-surface-variant: #44474E;
-            --sys-color-primary: #2D6187;
-            --sys-color-on-primary: #FFFFFF;
-            --sys-color-primary-container: #D2E4FF;
-            --sys-color-on-primary-container: #001D34;
-            --sys-color-outline-variant: #C4C6CF;
-            --sys-color-inverse-surface: #2E3135;
-            --sys-color-inverse-on-surface: #F0F0F3;
+            /* Core Colors (Violet Seed) */
+            --sys-primary: #6750A4;
+            --sys-on-primary: #FFFFFF;
+            --sys-primary-container: #EADDFF;
+            --sys-on-primary-container: #21005D;
             
-            --shape-corner-lg: 16px;
-            font-family: system-ui, -apple-system, Roboto, sans-serif;
+            --sys-secondary: #625B71;
+            --sys-secondary-container: #E8DEF8;
+            --sys-on-secondary-container: #1D192B;
+
+            --sys-surface: #FFEF7;
+            --sys-surface-container-low: #F7F2FA;
+            --sys-surface-container: #F3EDF7;
+            --sys-surface-container-high: #ECE6F0;
+            --sys-on-surface: #1D1B20;
+            --sys-on-surface-variant: #49454F;
+            --sys-outline: #79747E;
+            --sys-outline-variant: #CAC4D0;
+
+            --sys-inverse-surface: #313033;
+            --sys-inverse-on-surface: #F4EFF4;
+
+            /* Typography */
+            --type-display: 400 32px/40px system-ui, sans-serif;
+            --type-headline: 400 24px/32px system-ui, sans-serif;
+            --type-label: 500 12px/16px system-ui, sans-serif;
+            --type-body: 400 16px/24px system-ui, sans-serif;
+
+            /* Shape & Spacing */
+            --shape-full: 999px;
+            --shape-xl: 28px;
+            --shape-lg: 16px;
+            --shape-md: 12px;
+            
+            /* Layout */
+            --nav-width-desktop: 88px;
+            --nav-height-mobile: 80px;
         }
 
+        /* --- 2. Global Reset --- */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body {
             margin: 0; padding: 0;
-            background-color: var(--sys-color-surface);
-            color: var(--sys-color-on-surface);
-            /* 使用 dvh 适配移动端动态地址栏 */
-            height: 100vh;
-            height: 100dvh; 
-            display: flex; flex-direction: column;
+            background-color: var(--sys-surface);
+            color: var(--sys-on-surface);
+            font-family: system-ui, -apple-system, Roboto, sans-serif;
+            height: 100dvh; /* Dynamic Viewport Height */
+            display: flex;
             overflow: hidden;
         }
 
-        /* --- Loading --- */
-        #loading-screen {
-            position: fixed; inset: 0; z-index: 999;
-            background: var(--sys-color-surface);
+        /* --- 3. Layout Structure (Responsive) --- */
+        
+        /* Desktop: Row layout (Nav Left + Main Right) */
+        @media (min-width: 800px) {
+            body { flex-direction: row; }
+            nav {
+                width: var(--nav-width-desktop);
+                height: 100%;
+                flex-direction: column;
+                border-right: 1px solid var(--sys-outline-variant);
+                border-top: none;
+                padding: 24px 0;
+            }
+            main {
+                padding: 0 48px 48px; /* Less bottom padding needed on desktop */
+            }
+            .app-container {
+                max-width: 1200px;
+                margin: 0 auto;
+                width: 100%;
+            }
+        }
+
+        /* Mobile: Column layout (Main Top + Nav Bottom) */
+        @media (max-width: 799px) {
+            body { flex-direction: column; }
+            nav {
+                width: 100%;
+                height: var(--nav-height-mobile);
+                flex-direction: row;
+                bottom: 0; left: 0; position: fixed;
+                border-top: 1px solid var(--sys-surface-container-high);
+                background: var(--sys-surface-container);
+            }
+            main {
+                padding: 0 16px 120px; /* More bottom padding for mobile nav */
+            }
+        }
+
+        /* --- 4. Navigation (Rail/Bar) --- */
+        nav {
+            background: var(--sys-surface-container);
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Center items in rail/bar */
+            gap: 12px;
+            z-index: 50;
+            flex-shrink: 0;
+        }
+
+        .nav-scroll-container {
+            display: flex;
+            gap: 8px;
+            /* Handle overflow for both directions depending on layout */
+            overflow: auto;
+            scrollbar-width: none;
+        }
+        .nav-scroll-container::-webkit-scrollbar { display: none; }
+
+        @media (min-width: 800px) {
+            .nav-scroll-container { flex-direction: column; width: 100%; align-items: center; }
+        }
+        @media (max-width: 799px) {
+            .nav-scroll-container { flex-direction: row; width: 100%; padding: 0 16px; align-items: center; }
+        }
+
+        .nav-item {
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            gap: 20px; transition: opacity 0.3s;
+            cursor: pointer;
+            min-width: 56px; min-height: 56px;
+            color: var(--sys-on-surface-variant);
+            transition: 0.2s;
+            border-radius: 16px;
         }
-        .spinner {
+        
+        .nav-icon-box {
+            width: 56px; height: 32px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 14px;
+            transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+            margin-bottom: 4px;
+        }
+        
+        .nav-item.active { color: var(--sys-on-surface); }
+        .nav-item.active .nav-icon-box {
+            background-color: var(--sys-secondary-container);
+            color: var(--sys-on-secondary-container);
+            width: 56px; /* Pill shape */
+        }
+        .nav-label {
+            font: var(--type-label);
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        /* --- 5. Main Content Area --- */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            background: var(--sys-surface);
+        }
+
+        /* Header Area */
+        .top-bar {
+            padding: 24px 0 16px;
+            position: sticky; top: 0;
+            background: rgba(255, 251, 254, 0.95); /* Semi-transparent surface */
+            backdrop-filter: blur(10px);
+            z-index: 40;
+        }
+        @media (prefers-color-scheme: dark) {
+            .top-bar { background: rgba(20, 18, 24, 0.95); }
+        }
+
+        h1 {
+            font: var(--type-display);
+            margin: 0 0 16px 4px;
+            color: var(--sys-on-surface);
+        }
+
+        /* Filter Chips */
+        .chips-row {
+            display: flex; gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+        .chips-row::-webkit-scrollbar { display: none; }
+
+        .chip {
+            height: 32px;
+            padding: 0 16px;
+            border-radius: 8px;
+            border: 1px solid var(--sys-outline);
+            background: transparent;
+            color: var(--sys-on-surface-variant);
+            font: var(--type-label);
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: 0.2s;
+            user-select: none;
+        }
+        .chip:hover { background: var(--sys-surface-container-high); }
+        .chip.selected {
+            background: var(--sys-secondary-container);
+            color: var(--sys-on-secondary-container);
+            border-color: transparent;
+        }
+        .chip .icon { margin-right: 6px; font-size: 14px; }
+
+        /* Emoji Groups */
+        .group-section {
+            margin-top: 32px;
+            scroll-margin-top: 120px; /* Offset for sticky header */
+        }
+        .group-title {
+            font: var(--type-headline);
+            color: var(--sys-on-surface);
+            margin-bottom: 16px;
+            padding-left: 4px;
+        }
+        .subgroup-pill {
+            display: inline-block;
+            font: var(--type-label);
+            color: var(--sys-primary);
+            background: var(--sys-surface-container-high);
+            padding: 6px 12px;
+            border-radius: 8px;
+            margin: 12px 0 8px;
+        }
+
+        /* Grid System */
+        .emoji-grid {
+            display: grid;
+            /* Responsive columns: min 48px width, auto fill */
+            grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        /* Variant Container (The "Card") */
+        .variant-card {
+            grid-column: 1 / -1; /* Span full width */
+            background: var(--sys-surface-container-high);
+            border-radius: var(--shape-lg);
+            padding: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .emoji-btn {
             width: 48px; height: 48px;
-            border: 4px solid var(--sys-color-surface-container-high);
-            border-top-color: var(--sys-color-primary);
+            font-size: 28px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: var(--shape-full); /* Circle hover effect */
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            user-select: none;
+            position: relative;
+        }
+        .emoji-btn:hover { background: var(--sys-surface-container-high); }
+        .variant-card .emoji-btn:hover { background: var(--sys-surface-container); } /* Darker on card */
+        
+        .emoji-btn:active { transform: scale(0.9); background: var(--sys-outline-variant); }
+
+        /* Dashed Separator */
+        .emoji-btn.separator { margin-right: 12px; }
+        .emoji-btn.separator::after {
+            content: ""; position: absolute;
+            right: -10px; top: 10px; bottom: 10px;
+            width: 1px; border-right: 2px dashed var(--sys-outline-variant);
+        }
+
+        /* --- 6. Overlays (Tooltip & Snackbar) --- */
+        
+        /* Tooltip */
+        #tooltip {
+            position: fixed; z-index: 2000;
+            background: var(--sys-inverse-surface);
+            color: var(--sys-inverse-on-surface);
+            padding: 8px 16px;
+            border-radius: var(--shape-md);
+            font-size: 14px; text-align: center;
+            pointer-events: none; opacity: 0;
+            white-space: nowrap; width: max-content; max-width: 90vw;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: opacity 0.15s ease-out;
+        }
+        #tooltip.visible { opacity: 1; }
+        .tt-main { display: block; font-weight: 600; }
+        .tt-sub { display: block; font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+        /* Snackbar */
+        #snackbar {
+            position: fixed; bottom: 24px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--sys-inverse-surface);
+            color: var(--sys-inverse-on-surface);
+            padding: 14px 24px;
+            border-radius: var(--shape-full);
+            font: var(--type-body);
+            font-size: 14px;
+            display: flex; align-items: center; gap: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            opacity: 0; pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.05, 0.7, 0.1, 1.0); /* Expressive easing */
+            z-index: 3000;
+        }
+        #snackbar.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        /* Mobile adjustment for snackbar to be above nav */
+        @media (max-width: 799px) {
+            #snackbar { bottom: 100px; }
+        }
+
+        /* Loading */
+        #loading {
+            position: fixed; inset: 0; z-index: 5000;
+            background: var(--sys-surface);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 24px; transition: opacity 0.4s;
+        }
+        .loader {
+            width: 48px; height: 48px;
+            border: 5px solid var(--sys-surface-container-high);
+            border-top-color: var(--sys-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* --- Header --- */
-        header {
-            flex-shrink: 0;
-            background: rgba(248, 249, 255, 0.9);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--sys-color-surface-container-high);
-            padding: 12px 0; z-index: 10;
-        }
-        .tabs-container {
-            display: flex; gap: 8px; padding: 0 16px;
-            overflow-x: auto; scrollbar-width: none;
-        }
-        .filter-chip {
-            height: 32px; padding: 0 16px;
-            border: 1px solid var(--sys-color-outline-variant);
-            border-radius: 8px; background: transparent;
-            color: var(--sys-color-on-surface-variant);
-            font-size: 14px; font-weight: 500;
-            white-space: nowrap; cursor: pointer;
-            transition: all 0.2s; user-select: none;
-        }
-        .filter-chip.selected {
-            background: var(--sys-color-primary-container);
-            color: var(--sys-color-on-primary-container);
-            border-color: transparent;
-        }
-
-        /* --- Main Content --- */
-        main {
-            flex: 1; overflow-y: auto;
-            /* 关键修改：大幅增加底部内边距，确保最后一行能完全滚出来 */
-            padding: 0 16px 200px; 
-            scroll-behavior: smooth;
-        }
-        
-        .group-block { margin-top: 24px; }
-        .group-title {
-            font-size: 22px; font-weight: 400;
-            color: var(--sys-color-on-surface);
-            margin-bottom: 16px;
-        }
-        .subgroup-label {
-            display: inline-block;
-            font-size: 11px; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.8px;
-            color: var(--sys-color-primary);
-            background: var(--sys-color-surface-container);
-            padding: 6px 12px; border-radius: 8px;
-            margin: 16px 0 8px;
-        }
-
-        .emoji-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-        
-        .variant-set {
-            display: inline-flex; flex-wrap: wrap; align-items: center;
-            background: var(--sys-color-surface-container);
-            border-radius: var(--shape-corner-lg);
-            padding: 6px; gap: 2px; margin: 4px 0 12px;
-        }
-
-        .emoji-btn {
-            width: 44px; height: 44px; font-size: 26px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; border-radius: 10px;
-            transition: transform 0.1s, background 0.2s;
-            user-select: none; position: relative;
-        }
-        .emoji-btn:active { transform: scale(0.92); background: rgba(0,0,0,0.05); }
-        .emoji-btn.base-separator { margin-right: 10px; }
-        .emoji-btn.base-separator::after {
-            content: ""; position: absolute;
-            right: -7px; top: 8px; bottom: 8px;
-            width: 1px; border-right: 2px dashed var(--sys-color-outline-variant);
-        }
-
-        /* --- Bottom Nav --- */
-        nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            height: 80px;
-            background: var(--sys-color-surface-container);
-            display: flex; align-items: center;
-            overflow-x: auto; padding: 0 12px; gap: 4px;
-            z-index: 20; scrollbar-width: none;
-            box-shadow: 0 -1px 0 var(--sys-color-surface-container-high);
-        }
-        .nav-item {
-            min-width: 60px; height: 100%;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            cursor: pointer; opacity: 0.6; transition: 0.2s;
-            color: var(--sys-color-on-surface-variant);
-        }
-        .nav-item.active { opacity: 1; color: var(--sys-color-on-surface); }
-        .nav-icon-pill {
-            height: 32px; padding: 0 16px; border-radius: 16px;
-            display: flex; align-items: center; justify-content: center;
-            margin-bottom: 4px; font-size: 12px; font-weight: 600;
-            transition: 0.3s;
-        }
-        .nav-item.active .nav-icon-pill {
-            background: var(--sys-color-primary-container);
-            color: var(--sys-color-on-primary-container);
-        }
-        .nav-label { font-size: 11px; font-weight: 500; }
-
-        /* --- Tooltip --- */
-        #tooltip {
-            position: fixed; z-index: 2000;
-            background: #1E1E1E;
-            color: #F2F2F2;
-            padding: 10px 16px; 
-            border-radius: 12px;
-            font-size: 14px; 
-            text-align: center;
-            pointer-events: none; 
-            opacity: 0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            
-            /* 强制不换行 */
-            white-space: nowrap;
-            width: max-content;
-            max-width: 92vw;
-            
-            transition: opacity 0.15s;
-        }
-        #tooltip.visible { opacity: 1; }
-        .tt-base { display: block; font-weight: 700; margin-bottom: 2px; }
-        .tt-qual { display: block; font-size: 12px; opacity: 0.8; font-weight: 400; }
-
-        /* --- Snackbar --- */
-        #snackbar {
-            position: fixed; bottom: 90px; left: 50%;
-            transform: translateX(-50%) scale(0.9);
-            background: var(--sys-color-inverse-surface);
-            color: var(--sys-color-inverse-on-surface);
-            padding: 14px 24px; border-radius: 28px;
-            font-size: 14px; font-weight: 500;
-            opacity: 0; pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-            z-index: 2001;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-        #snackbar.visible { transform: translateX(-50%) scale(1); opacity: 1; }
-
     </style>
 </head>
 <body>
 
-    <div id="loading-screen">
-        <div class="spinner"></div>
-        <div style="font-weight:500; color:var(--sys-color-primary)">正在加载 Emoji 数据...</div>
+    <!-- Loading State -->
+    <div id="loading">
+        <div class="loader"></div>
+        <div style="font: var(--type-headline); color: var(--sys-primary);">Emoji Library</div>
+        <div style="font: var(--type-label); color: var(--sys-outline);">Loading Unicode Data...</div>
     </div>
 
-    <header>
-        <div class="tabs-container" id="status-tabs"></div>
-    </header>
+    <!-- Navigation (Rail on Desktop, Bottom Bar on Mobile) -->
+    <nav>
+        <div class="nav-scroll-container" id="nav-container">
+            <!-- JS Injected -->
+        </div>
+    </nav>
 
-    <main id="main-content"></main>
+    <!-- Main Content -->
+    <main id="main-scroll">
+        <div class="app-container">
+            <div class="top-bar">
+                <h1>Emoji Library</h1>
+                <div class="chips-row" id="filter-container">
+                    <!-- JS Injected -->
+                </div>
+            </div>
+            
+            <div id="content-area">
+                <!-- JS Injected -->
+            </div>
+        </div>
+    </main>
 
-    <nav id="bottom-nav"></nav>
-
+    <!-- Overlays -->
     <div id="tooltip"></div>
     <div id="snackbar"></div>
 
@@ -221,236 +382,310 @@
         (function() {
             'use strict';
 
-            const TARGET_URL = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
-            const PROXY_URL = 'https://api.codetabs.com/v1/proxy?quest=';
+            const DATA_URL = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
+            const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
             
-            let emojiData = {}; 
-            let currentStatus = '';
-            let isAutoScrolling = false;
-            let tooltipTimer = null;
+            let rawData = {};
+            let activeStatus = '';
+            let isScrolling = false;
+            let tooltipTimeout;
 
-            const els = {
-                loading: document.getElementById('loading-screen'),
-                tabs: document.getElementById('status-tabs'),
-                main: document.getElementById('main-content'),
-                nav: document.getElementById('bottom-nav'),
+            const ui = {
+                loading: document.getElementById('loading'),
+                nav: document.getElementById('nav-container'),
+                filters: document.getElementById('filter-container'),
+                content: document.getElementById('content-area'),
+                main: document.getElementById('main-scroll'),
                 tooltip: document.getElementById('tooltip'),
                 snackbar: document.getElementById('snackbar')
             };
 
+            // --- Initialization ---
             async function init() {
                 try {
-                    const response = await fetch(PROXY_URL + encodeURIComponent(TARGET_URL));
-                    if (!response.ok) throw new Error('Network error');
-                    const text = await response.text();
-                    parseData(text);
-                    renderApp();
-                    els.loading.style.opacity = '0';
-                    setTimeout(() => els.loading.style.display = 'none', 300);
-                } catch (e) {
-                    els.loading.innerHTML = `<div style="color:#B3261E;padding:20px;text-align:center">加载失败<br><span style="font-size:12px">${e.message}</span></div>`;
+                    const res = await fetch(PROXY + encodeURIComponent(DATA_URL));
+                    if (!res.ok) throw new Error('Connection Failed');
+                    const text = await res.text();
+                    processText(text);
+                    buildUI();
+                    
+                    // Smooth fade out
+                    ui.loading.style.opacity = '0';
+                    setTimeout(() => ui.loading.style.display = 'none', 400);
+                } catch (err) {
+                    ui.loading.innerHTML = `<div style="text-align:center; color:#B3261E">
+                        <h3>Unable to Load</h3>
+                        <p>${err.message}</p>
+                    </div>`;
                 }
             }
 
-            function parseData(text) {
+            // --- Data Processing ---
+            function processText(text) {
                 const lines = text.split('\n');
-                let curG = "Unknown", curSG = "Unknown";
+                let group = "Unknown", subgroup = "Unknown";
+
                 lines.forEach(line => {
                     line = line.trim();
                     if (!line) return;
-                    if (line.startsWith('# group:')) curG = line.split(': ')[1].trim();
-                    else if (line.startsWith('# subgroup:')) curSG = line.split(': ')[1].trim();
+                    
+                    if (line.startsWith('# group:')) group = line.split(': ')[1].trim();
+                    else if (line.startsWith('# subgroup:')) subgroup = line.split(': ')[1].trim();
                     else if (!line.startsWith('#') && line.includes(';')) {
-                        const parts = line.split(';');
-                        const status = parts[1].split('#')[0].trim();
-                        const comment = parts[1].split('#')[1].trim();
-                        const firstSpace = comment.indexOf(' ');
-                        const char = comment.substring(0, firstSpace);
-                        const fullName = comment.substring(comment.indexOf(' ', firstSpace + 1) + 1).trim();
-                        const nameParts = fullName.split(':');
-                        const baseName = nameParts[0].trim();
-                        const qualifier = nameParts.length > 1 ? nameParts.slice(1).join(':').trim() : "";
+                        // Parse: 1F600 ; fully-qualified # 😀 E1.0 grinning face
+                        const [codes, meta] = line.split(';');
+                        const [status, comment] = meta.split('#');
+                        const cleanStatus = status.trim();
+                        
+                        const commentParts = comment.trim().split(' '); // [😀, E1.0, grinning, face]
+                        const char = commentParts[0];
+                        // Skip version (E1.0), join rest
+                        const nameFull = commentParts.slice(2).join(' ');
+                        
+                        // Split Base vs Qualifier (person: red hair)
+                        const [base, ...qualParts] = nameFull.split(':');
+                        const qual = qualParts.join(':').trim();
 
-                        if (!emojiData[status]) emojiData[status] = {};
-                        if (!emojiData[status][curG]) emojiData[status][curG] = {};
-                        if (!emojiData[status][curG][curSG]) emojiData[status][curG][curSG] = {};
-                        if (!emojiData[status][curG][curSG][baseName]) emojiData[status][curG][curSG][baseName] = [];
-                        emojiData[status][curG][curSG][baseName].push({ char, base: baseName, qual: qualifier });
+                        if (!rawData[cleanStatus]) rawData[cleanStatus] = {};
+                        if (!rawData[cleanStatus][group]) rawData[cleanStatus][group] = {};
+                        if (!rawData[cleanStatus][group][subgroup]) rawData[cleanStatus][group][subgroup] = {};
+                        if (!rawData[cleanStatus][group][subgroup][base.trim()]) rawData[cleanStatus][group][subgroup][base.trim()] = [];
+
+                        rawData[cleanStatus][group][subgroup][base.trim()].push({
+                            char, base: base.trim(), qual
+                        });
                     }
                 });
             }
 
-            function renderApp() {
-                const statuses = Object.keys(emojiData);
-                if (statuses.length === 0) return;
-                currentStatus = statuses.includes('fully-qualified') ? 'fully-qualified' : statuses[0];
-                els.tabs.innerHTML = '';
+            // --- UI Building ---
+            function buildUI() {
+                const statuses = Object.keys(rawData);
+                if (!statuses.length) return;
+                
+                // Priority: fully-qualified -> first available
+                activeStatus = statuses.includes('fully-qualified') ? 'fully-qualified' : statuses[0];
+
+                // 1. Build Filters (Top)
+                ui.filters.innerHTML = '';
                 statuses.forEach(s => {
                     const btn = document.createElement('button');
-                    btn.className = `filter-chip ${s === currentStatus ? 'selected' : ''}`;
-                    btn.textContent = s.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    btn.onclick = () => switchStatus(s);
-                    els.tabs.appendChild(btn);
+                    btn.className = `chip ${s === activeStatus ? 'selected' : ''}`;
+                    // Format: fully-qualified -> Fully Qualified
+                    btn.textContent = s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    btn.onclick = () => changeStatus(s);
+                    ui.filters.appendChild(btn);
                 });
-                renderContent();
+
+                renderMainContent();
             }
 
-            function switchStatus(status) {
-                currentStatus = status;
-                Array.from(els.tabs.children).forEach(btn => {
-                    btn.classList.toggle('selected', btn.textContent.toLowerCase().replace(/ /g, '-') === status);
+            function changeStatus(status) {
+                activeStatus = status;
+                Array.from(ui.filters.children).forEach(c => {
+                    c.classList.toggle('selected', c.textContent.toLowerCase().replace(/ /g, '-') === status);
                 });
-                renderContent();
+                renderMainContent();
             }
 
-            function renderContent() {
-                els.main.innerHTML = '';
-                els.nav.innerHTML = '';
-                els.main.scrollTop = 0;
-                const groups = emojiData[currentStatus] || {};
+            function renderMainContent() {
+                ui.content.innerHTML = '';
+                ui.nav.innerHTML = '';
+                ui.main.scrollTop = 0;
+
+                const groups = rawData[activeStatus] || {};
                 const groupNames = Object.keys(groups);
 
                 groupNames.forEach((gName, idx) => {
+                    // 1. Navigation Item
                     const navItem = document.createElement('div');
                     navItem.className = `nav-item ${idx === 0 ? 'active' : ''}`;
                     navItem.dataset.idx = idx;
-                    const shortLabel = gName.split(' ')[0].replace('&','').trim();
-                    navItem.innerHTML = `<div class="nav-icon-pill">${shortLabel.substring(0,2).toUpperCase()}</div><span class="nav-label">${shortLabel}</span>`;
-                    navItem.onclick = () => scrollToGroup(idx);
-                    els.nav.appendChild(navItem);
+                    // Short name: "Smileys & Emotion" -> "Smileys"
+                    const shortName = gName.split(' ')[0].replace('&','').trim();
+                    navItem.innerHTML = `
+                        <div class="nav-icon-box">${shortName.substring(0,2).toUpperCase()}</div>
+                        <span class="nav-label">${shortName}</span>
+                    `;
+                    navItem.onclick = () => scrollToSection(idx);
+                    ui.nav.appendChild(navItem);
 
-                    const gBlock = document.createElement('div');
-                    gBlock.className = 'group-block';
-                    gBlock.id = `g-${idx}`;
-                    gBlock.innerHTML = `<div class="group-title">${gName}</div>`;
+                    // 2. Content Section
+                    const section = document.createElement('section');
+                    section.className = 'group-section';
+                    section.id = `sec-${idx}`;
+                    section.innerHTML = `<div class="group-title">${gName}</div>`;
 
                     const subgroups = groups[gName];
                     Object.keys(subgroups).forEach(sgName => {
-                        const sgLabel = document.createElement('div');
-                        sgLabel.className = 'subgroup-label';
-                        sgLabel.textContent = sgName;
-                        gBlock.appendChild(sgLabel);
+                        const sgTitle = document.createElement('div');
+                        sgTitle.className = 'subgroup-pill';
+                        sgTitle.textContent = sgName;
+                        section.appendChild(sgTitle);
 
                         const baseMap = subgroups[sgName];
-                        let looseRow = document.createElement('div');
-                        looseRow.className = 'emoji-grid';
-                        let hasLoose = false;
+                        
+                        // Grid for single items
+                        let grid = document.createElement('div');
+                        grid.className = 'emoji-grid';
+                        let hasGridItems = false;
 
-                        Object.keys(baseMap).forEach(baseName => {
-                            const items = baseMap[baseName];
+                        Object.keys(baseMap).forEach(base => {
+                            const items = baseMap[base];
                             const baseItems = items.filter(i => !i.qual);
-                            const variantItems = items.filter(i => i.qual);
+                            const variants = items.filter(i => i.qual);
 
-                            if (items.length > 1 && baseItems.length > 0 && variantItems.length > 0) {
-                                if (hasLoose) { gBlock.appendChild(looseRow); looseRow = document.createElement('div'); looseRow.className = 'emoji-grid'; hasLoose = false; }
-                                const setBox = document.createElement('div');
-                                setBox.className = 'variant-set';
-                                baseItems.forEach((obj, i) => setBox.appendChild(createEmojiBtn(obj, i === baseItems.length - 1)));
-                                variantItems.forEach(obj => setBox.appendChild(createEmojiBtn(obj, false)));
-                                gBlock.appendChild(setBox);
+                            // If we have variants, use a Card container
+                            if (items.length > 1 && baseItems.length > 0 && variants.length > 0) {
+                                // Close existing grid
+                                if (hasGridItems) {
+                                    section.appendChild(grid);
+                                    grid = document.createElement('div');
+                                    grid.className = 'emoji-grid';
+                                    hasGridItems = false;
+                                }
+
+                                const card = document.createElement('div');
+                                card.className = 'variant-card';
+                                
+                                baseItems.forEach((item, i) => {
+                                    card.appendChild(createBtn(item, i === baseItems.length - 1));
+                                });
+                                variants.forEach(item => {
+                                    card.appendChild(createBtn(item, false));
+                                });
+                                section.appendChild(card);
+
                             } else {
-                                hasLoose = true;
-                                items.forEach(obj => looseRow.appendChild(createEmojiBtn(obj, false)));
+                                // Add to standard grid
+                                hasGridItems = true;
+                                items.forEach(item => grid.appendChild(createBtn(item, false)));
                             }
                         });
-                        if (hasLoose) gBlock.appendChild(looseRow);
+
+                        if (hasGridItems) section.appendChild(grid);
                     });
-                    els.main.appendChild(gBlock);
+
+                    ui.content.appendChild(section);
                 });
-                setupScrollSpy(groupNames.length);
+
+                initScrollSpy(groupNames.length);
             }
 
-            function createEmojiBtn(obj, isSeparator) {
+            function createBtn(item, isSeparator) {
                 const btn = document.createElement('div');
-                btn.className = 'emoji-btn' + (isSeparator ? ' base-separator' : '');
-                btn.textContent = obj.char;
-                btn.onclick = (e) => { e.stopPropagation(); copyToClipboard(obj.char); };
+                btn.className = 'emoji-btn' + (isSeparator ? ' separator' : '');
+                btn.textContent = item.char;
                 
-                const trigger = () => showTooltip(btn, obj.base, obj.qual);
-                btn.onmouseenter = trigger;
+                // Interactions
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    copyText(item.char);
+                };
+
+                const triggerTip = () => showTooltip(btn, item.base, item.qual);
+                
+                btn.onmouseenter = triggerTip;
                 btn.onmouseleave = hideTooltip;
-                btn.ontouchstart = (e) => { trigger(); }; 
-                btn.ontouchend = () => { setTimeout(hideTooltip, 1500); };
+                btn.ontouchstart = () => triggerTip();
+                btn.ontouchend = () => setTimeout(hideTooltip, 1000);
 
                 return btn;
             }
 
-            function copyToClipboard(char) {
-                navigator.clipboard.writeText(char).then(() => showSnackbar(`已复制 ${char}`))
+            // --- Actions ---
+            function copyText(char) {
+                navigator.clipboard.writeText(char).then(() => showSnackbar(`Copied ${char}`))
                 .catch(() => {
-                    const ta = document.createElement('textarea');
-                    ta.value = char; document.body.appendChild(ta);
-                    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                    showSnackbar(`已复制 ${char}`);
+                    // Fallback
+                    const t = document.createElement('textarea');
+                    t.value = char; document.body.appendChild(t);
+                    t.select(); document.execCommand('copy'); document.body.removeChild(t);
+                    showSnackbar(`Copied ${char}`);
                 });
             }
 
             function showSnackbar(msg) {
-                els.snackbar.textContent = msg;
-                els.snackbar.classList.add('visible');
-                setTimeout(() => els.snackbar.classList.remove('visible'), 2000);
+                ui.snackbar.textContent = msg;
+                ui.snackbar.classList.add('visible');
+                setTimeout(() => ui.snackbar.classList.remove('visible'), 2500);
             }
 
             function showTooltip(el, base, qual) {
-                if (tooltipTimer) clearTimeout(tooltipTimer);
+                if (tooltipTimeout) clearTimeout(tooltipTimeout);
                 
-                els.tooltip.innerHTML = `<span class="tt-base">${base}</span>${qual ? '<span class="tt-qual">'+qual+'</span>' : ''}`;
+                ui.tooltip.innerHTML = `<span class="tt-main">${base}</span>${qual ? '<span class="tt-sub">'+qual+'</span>' : ''}`;
                 
                 const rect = el.getBoundingClientRect();
-                const tipRect = els.tooltip.getBoundingClientRect();
-                const screenW = window.innerWidth;
-                const gap = 14;
+                const tipRect = ui.tooltip.getBoundingClientRect();
+                const gap = 12;
 
-                // 水平定位：居中，但限制在屏幕内
-                let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
-                if (left < 10) left = 10;
-                if (left + tipRect.width > screenW - 10) left = screenW - tipRect.width - 10;
+                // Horizontal Center
+                let left = rect.left + (rect.width/2) - (tipRect.width/2);
+                // Boundary Check
+                left = Math.max(10, Math.min(window.innerWidth - tipRect.width - 10, left));
 
-                // 垂直定位：优先上方，空间不足则下方
+                // Vertical (Top preferred)
                 let top = rect.top - tipRect.height - gap;
-                if (top < 50) {
-                    top = rect.bottom + gap;
-                }
+                if (top < 10) top = rect.bottom + gap; // Flip to bottom if tight
 
-                els.tooltip.style.left = left + 'px';
-                els.tooltip.style.top = top + 'px';
-                els.tooltip.classList.add('visible');
+                ui.tooltip.style.left = `${left}px`;
+                ui.tooltip.style.top = `${top}px`;
+                ui.tooltip.classList.add('visible');
             }
 
             function hideTooltip() {
-                els.tooltip.classList.remove('visible');
+                ui.tooltip.classList.remove('visible');
             }
 
-            function scrollToGroup(idx) {
-                isAutoScrolling = true;
-                const target = document.getElementById(`g-${idx}`);
+            // --- Navigation Logic ---
+            function scrollToSection(idx) {
+                isScrolling = true;
+                const target = document.getElementById(`sec-${idx}`);
+                
+                // Update Nav State
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-                const activeNav = document.querySelector(`.nav-item[data-idx="${idx}"]`);
-                if (activeNav) {
-                    activeNav.classList.add('active');
-                    activeNav.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+                const activeBtn = document.querySelector(`.nav-item[data-idx="${idx}"]`);
+                if (activeBtn) {
+                    activeBtn.classList.add('active');
+                    activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                 }
-                if (target) els.main.scrollTo({ top: target.offsetTop - 16, behavior: 'smooth' });
-                setTimeout(() => isAutoScrolling = false, 800);
+
+                if (target) {
+                    // Offset for sticky header (approx 120px)
+                    const offset = target.offsetTop - 120;
+                    ui.main.scrollTo({ top: offset, behavior: 'smooth' });
+                }
+                
+                setTimeout(() => isScrolling = false, 800);
             }
 
-            function setupScrollSpy(count) {
-                els.main.onscroll = () => {
-                    if (isAutoScrolling) return;
+            function initScrollSpy(count) {
+                ui.main.onscroll = () => {
+                    if (isScrolling) return;
+                    
                     let activeIdx = 0;
+                    const scrollY = ui.main.scrollTop + 180; // Offset trigger
+
                     for (let i = 0; i < count; i++) {
-                        const el = document.getElementById(`g-${i}`);
-                        if (el.offsetTop <= els.main.scrollTop + 150) activeIdx = i; else break;
+                        const el = document.getElementById(`sec-${i}`);
+                        if (el.offsetTop <= scrollY) activeIdx = i;
+                        else break;
                     }
+
                     document.querySelectorAll('.nav-item').forEach((n, i) => {
                         const isActive = i === activeIdx;
                         n.classList.toggle('active', isActive);
-                        if (isActive) n.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        if (isActive) {
+                            n.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
                     });
                 };
             }
 
+            // Start
             init();
+
         })();
     </script>
 </body>
