@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Emoji Library</title>
+    <title>Emoji Picker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
     <style>
-        /* --- 1. Design Tokens (Expressive Theme) --- */
+        /* --- 1. Design Tokens --- */
         :root {
-            /* Core Colors (Violet Seed) */
             --sys-primary: #6750A4;
             --sys-on-primary: #FFFFFF;
             --sys-primary-container: #EADDFF;
@@ -17,11 +17,11 @@
             --sys-secondary-container: #E8DEF8;
             --sys-on-secondary-container: #1D192B;
 
-            --sys-surface: #FFEF7;
+            --sys-surface: #FFFBFE;
             --sys-surface-container-low: #F7F2FA;
             --sys-surface-container: #F3EDF7;
             --sys-surface-container-high: #ECE6F0;
-            --sys-on-surface: #1D1B20;
+            --sys-on-surface: #1C1B1F;
             --sys-on-surface-variant: #49454F;
             --sys-outline: #79747E;
             --sys-outline-variant: #CAC4D0;
@@ -30,10 +30,10 @@
             --sys-inverse-on-surface: #F4EFF4;
 
             /* Typography */
-            --type-display: 400 32px/40px system-ui, sans-serif;
-            --type-headline: 400 24px/32px system-ui, sans-serif;
-            --type-label: 500 12px/16px system-ui, sans-serif;
-            --type-body: 400 16px/24px system-ui, sans-serif;
+            --type-display: 400 32px/40px system-ui, -apple-system, sans-serif;
+            --type-headline: 400 24px/32px system-ui, -apple-system, sans-serif;
+            --type-label: 500 12px/16px system-ui, -apple-system, sans-serif;
+            --type-body: 400 16px/24px system-ui, -apple-system, sans-serif;
 
             /* Shape & Spacing */
             --shape-full: 999px;
@@ -54,14 +54,12 @@
             background-color: var(--sys-surface);
             color: var(--sys-on-surface);
             font-family: system-ui, -apple-system, Roboto, sans-serif;
-            height: 100dvh; /* Dynamic Viewport Height */
+            height: 100dvh;
             display: flex;
             overflow: hidden;
         }
 
-        /* --- 3. Layout Structure (Responsive) --- */
-        
-        /* Desktop: Row layout (Nav Left + Main Right) */
+        /* --- 3. Layout Structure --- */
         @media (min-width: 800px) {
             body { flex-direction: row; }
             nav {
@@ -72,17 +70,10 @@
                 border-top: none;
                 padding: 24px 0;
             }
-            main {
-                padding: 0 48px 48px; /* Less bottom padding needed on desktop */
-            }
-            .app-container {
-                max-width: 1200px;
-                margin: 0 auto;
-                width: 100%;
-            }
+            main { padding: 0 48px 48px; }
+            .app-container { max-width: 1200px; margin: 0 auto; width: 100%; }
         }
 
-        /* Mobile: Column layout (Main Top + Nav Bottom) */
         @media (max-width: 799px) {
             body { flex-direction: column; }
             nav {
@@ -93,250 +84,173 @@
                 border-top: 1px solid var(--sys-surface-container-high);
                 background: var(--sys-surface-container);
             }
-            main {
-                padding: 0 16px 120px; /* More bottom padding for mobile nav */
-            }
+            main { padding: 0 16px 120px; }
         }
 
-        /* --- 4. Navigation (Rail/Bar) --- */
+        /* --- 4. Navigation --- */
         nav {
             background: var(--sys-surface-container);
-            display: flex;
-            align-items: center;
-            justify-content: center; /* Center items in rail/bar */
-            gap: 12px;
-            z-index: 50;
-            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; z-index: 50; flex-shrink: 0;
         }
 
         .nav-scroll-container {
-            display: flex;
-            gap: 8px;
-            /* Handle overflow for both directions depending on layout */
-            overflow: auto;
-            scrollbar-width: none;
+            display: flex; gap: 4px; overflow: auto; scrollbar-width: none;
         }
         .nav-scroll-container::-webkit-scrollbar { display: none; }
 
-        @media (min-width: 800px) {
-            .nav-scroll-container { flex-direction: column; width: 100%; align-items: center; }
-        }
-        @media (max-width: 799px) {
-            .nav-scroll-container { flex-direction: row; width: 100%; padding: 0 16px; align-items: center; }
-        }
+        @media (min-width: 800px) { .nav-scroll-container { flex-direction: column; width: 100%; align-items: center; } }
+        @media (max-width: 799px) { .nav-scroll-container { flex-direction: row; width: 100%; padding: 0 16px; align-items: center; } }
 
         .nav-item {
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            cursor: pointer;
-            min-width: 56px; min-height: 56px;
-            color: var(--sys-on-surface-variant);
-            transition: 0.2s;
-            border-radius: 16px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; min-width: 64px; min-height: 64px;
+            color: var(--sys-on-surface-variant); transition: 0.2s; border-radius: 16px;
+            position: relative;
         }
         
         .nav-icon-box {
-            width: 56px; height: 32px;
-            border-radius: 16px;
+            width: 56px; height: 32px; border-radius: 16px;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 600; font-size: 14px;
             transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
             margin-bottom: 4px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 24px;
+        }
+        .nav-item.active .material-symbols-rounded {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
         
         .nav-item.active { color: var(--sys-on-surface); }
         .nav-item.active .nav-icon-box {
             background-color: var(--sys-secondary-container);
             color: var(--sys-on-secondary-container);
-            width: 56px; /* Pill shape */
         }
-        .nav-label {
-            font: var(--type-label);
-            text-align: center;
-            opacity: 0.8;
-        }
+        .nav-label { font: var(--type-label); text-align: center; opacity: 0.8; font-size: 11px; }
 
-        /* --- 5. Main Content Area --- */
-        main {
-            flex: 1;
-            overflow-y: auto;
-            scroll-behavior: smooth;
-            background: var(--sys-surface);
-        }
+        /* --- 5. Main Content --- */
+        main { flex: 1; overflow-y: auto; scroll-behavior: smooth; background: var(--sys-surface); }
 
-        /* Header Area */
         .top-bar {
-            padding: 24px 0 16px;
-            position: sticky; top: 0;
-            background: rgba(255, 251, 254, 0.95); /* Semi-transparent surface */
-            backdrop-filter: blur(10px);
+            padding: 16px 0 16px; position: sticky; top: 0;
+            background: rgba(255, 251, 254, 0.95); backdrop-filter: blur(10px);
             z-index: 40;
         }
-        @media (prefers-color-scheme: dark) {
-            .top-bar { background: rgba(20, 18, 24, 0.95); }
-        }
+        @media (prefers-color-scheme: dark) { .top-bar { background: rgba(20, 18, 24, 0.95); } }
 
-        h1 {
-            font: var(--type-display);
-            margin: 0 0 16px 4px;
-            color: var(--sys-on-surface);
-        }
+        h1 { font: var(--type-display); margin: 0 0 16px 16px; color: var(--sys-on-surface); }
 
-        /* Filter Chips */
-        .chips-row {
-            display: flex; gap: 8px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-            scrollbar-width: none;
+        /* Search Bar */
+        .search-container {
+            margin: 0 16px 12px;
+            background: var(--sys-surface-container-high);
+            border-radius: 28px;
+            display: flex; align-items: center;
+            height: 56px; padding: 0 16px;
+            transition: 0.2s;
         }
+        .search-container:focus-within {
+            background: var(--sys-surface-container);
+            box-shadow: 0 0 0 2px var(--sys-primary);
+        }
+        .search-icon { color: var(--sys-on-surface-variant); font-size: 24px; }
+        .search-input {
+            border: none; background: transparent;
+            flex: 1; height: 100%;
+            font-size: 16px; color: var(--sys-on-surface);
+            outline: none; margin-left: 12px;
+            font-family: inherit;
+        }
+        .search-input::placeholder { color: var(--sys-outline); }
+        .clear-icon {
+            color: var(--sys-on-surface-variant); cursor: pointer;
+            font-size: 20px; display: none;
+        }
+        .search-input:not(:placeholder-shown) + .clear-icon { display: block; }
+
+        /* Filters */
+        .chips-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 4px; scrollbar-width: none; }
         .chips-row::-webkit-scrollbar { display: none; }
 
         .chip {
-            height: 32px;
-            padding: 0 16px;
-            border-radius: 8px;
-            border: 1px solid var(--sys-outline);
-            background: transparent;
-            color: var(--sys-on-surface-variant);
-            font: var(--type-label);
-            font-weight: 500;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: 0.2s;
-            user-select: none;
+            height: 32px; padding: 0 16px; border-radius: 8px;
+            border: 1px solid var(--sys-outline); background: transparent;
+            color: var(--sys-on-surface-variant); font: var(--type-label); font-weight: 500;
+            cursor: pointer; white-space: nowrap; transition: 0.2s; user-select: none;
         }
         .chip:hover { background: var(--sys-surface-container-high); }
         .chip.selected {
             background: var(--sys-secondary-container);
-            color: var(--sys-on-secondary-container);
-            border-color: transparent;
+            color: var(--sys-on-secondary-container); border-color: transparent;
         }
-        .chip .icon { margin-right: 6px; font-size: 14px; }
 
-        /* Emoji Groups */
-        .group-section {
-            margin-top: 32px;
-            scroll-margin-top: 120px; /* Offset for sticky header */
-        }
-        .group-title {
-            font: var(--type-headline);
-            color: var(--sys-on-surface);
-            margin-bottom: 16px;
-            padding-left: 4px;
-        }
+        .group-section { margin-top: 32px; scroll-margin-top: 140px; }
+        .group-title { font: var(--type-headline); color: var(--sys-on-surface); margin-bottom: 16px; padding-left: 4px; }
+        
         .subgroup-pill {
-            display: inline-block;
-            font: var(--type-label);
-            color: var(--sys-primary);
-            background: var(--sys-surface-container-high);
-            padding: 6px 12px;
-            border-radius: 8px;
-            margin: 12px 0 8px;
+            display: inline-block; font: var(--type-label); color: var(--sys-primary);
+            background: var(--sys-surface-container-high); padding: 6px 12px;
+            border-radius: 8px; margin: 16px 0 8px; 
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        /* Grid System */
-        .emoji-grid {
-            display: grid;
-            /* Responsive columns: min 48px width, auto fill */
-            grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-            gap: 8px;
-            margin-bottom: 16px;
-        }
+        .emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; margin-bottom: 16px; }
 
-        /* Variant Container (The "Card") */
         .variant-card {
-            grid-column: 1 / -1; /* Span full width */
-            background: var(--sys-surface-container-high);
-            border-radius: var(--shape-lg);
-            padding: 12px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 12px;
+            grid-column: 1 / -1; background: var(--sys-surface-container-high);
+            border-radius: var(--shape-lg); padding: 12px;
+            display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
         }
 
         .emoji-btn {
-            width: 48px; height: 48px;
-            font-size: 28px;
+            width: 48px; height: 48px; font-size: 28px;
             display: flex; align-items: center; justify-content: center;
-            border-radius: var(--shape-full); /* Circle hover effect */
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-            user-select: none;
-            position: relative;
+            border-radius: var(--shape-full); cursor: pointer;
+            transition: background 0.2s, transform 0.1s; user-select: none; position: relative;
         }
         .emoji-btn:hover { background: var(--sys-surface-container-high); }
-        .variant-card .emoji-btn:hover { background: var(--sys-surface-container); } /* Darker on card */
-        
+        .variant-card .emoji-btn:hover { background: var(--sys-surface-container); }
         .emoji-btn:active { transform: scale(0.9); background: var(--sys-outline-variant); }
 
-        /* Dashed Separator */
         .emoji-btn.separator { margin-right: 12px; }
         .emoji-btn.separator::after {
-            content: ""; position: absolute;
-            right: -10px; top: 10px; bottom: 10px;
+            content: ""; position: absolute; right: -10px; top: 10px; bottom: 10px;
             width: 1px; border-right: 2px dashed var(--sys-outline-variant);
         }
 
-        /* --- 6. Overlays (Tooltip & Snackbar) --- */
-        
-        /* Tooltip */
+        /* --- 6. Overlays --- */
         #tooltip {
-            position: fixed; z-index: 2000;
-            background: var(--sys-inverse-surface);
-            color: var(--sys-inverse-on-surface);
-            padding: 8px 16px;
-            border-radius: var(--shape-md);
-            font-size: 14px; text-align: center;
-            pointer-events: none; opacity: 0;
-            white-space: nowrap; width: max-content; max-width: 90vw;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: opacity 0.15s ease-out;
+            position: fixed; z-index: 2000; background: var(--sys-inverse-surface);
+            color: var(--sys-inverse-on-surface); padding: 8px 16px;
+            border-radius: var(--shape-md); font-size: 14px; text-align: center;
+            pointer-events: none; opacity: 0; white-space: nowrap; width: max-content; max-width: 90vw;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: opacity 0.15s ease-out;
         }
         #tooltip.visible { opacity: 1; }
         .tt-main { display: block; font-weight: 600; }
-        .tt-sub { display: block; font-size: 12px; opacity: 0.8; margin-top: 2px; }
+        .tt-sub { display: block; font-size: 12px; opacity: 0.8; margin-top: 2px; font-weight: 400; }
 
-        /* Snackbar */
         #snackbar {
-            position: fixed; bottom: 24px; left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            background: var(--sys-inverse-surface);
-            color: var(--sys-inverse-on-surface);
-            padding: 14px 24px;
-            border-radius: var(--shape-full);
-            font: var(--type-body);
-            font-size: 14px;
-            display: flex; align-items: center; gap: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            opacity: 0; pointer-events: none;
-            transition: all 0.4s cubic-bezier(0.05, 0.7, 0.1, 1.0); /* Expressive easing */
-            z-index: 3000;
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: var(--sys-inverse-surface); color: var(--sys-inverse-on-surface);
+            padding: 14px 24px; border-radius: var(--shape-full); font: var(--type-body); font-size: 14px;
+            display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            opacity: 0; pointer-events: none; transition: all 0.4s cubic-bezier(0.05, 0.7, 0.1, 1.0); z-index: 3000;
         }
-        #snackbar.visible {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-        /* Mobile adjustment for snackbar to be above nav */
-        @media (max-width: 799px) {
-            #snackbar { bottom: 100px; }
-        }
+        #snackbar.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+        @media (max-width: 799px) { #snackbar { bottom: 100px; } }
 
-        /* Loading */
         #loading {
-            position: fixed; inset: 0; z-index: 5000;
-            background: var(--sys-surface);
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
+            position: fixed; inset: 0; z-index: 5000; background: var(--sys-surface);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 24px; transition: opacity 0.4s;
         }
         .loader {
-            width: 48px; height: 48px;
-            border: 5px solid var(--sys-surface-container-high);
-            border-top-color: var(--sys-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+            width: 48px; height: 48px; border: 5px solid var(--sys-surface-container-high);
+            border-top-color: var(--sys-primary); border-radius: 50%; animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -344,37 +258,31 @@
 </head>
 <body>
 
-    <!-- Loading State -->
     <div id="loading">
         <div class="loader"></div>
-        <div style="font: var(--type-headline); color: var(--sys-primary);">Emoji Library</div>
-        <div style="font: var(--type-label); color: var(--sys-outline);">Loading Unicode Data...</div>
+        <div style="font: var(--type-headline); color: var(--sys-primary);" id="loading-title">Emoji Picker</div>
+        <div style="font: var(--type-label); color: var(--sys-outline);" id="loading-text">Loading...</div>
     </div>
 
-    <!-- Navigation (Rail on Desktop, Bottom Bar on Mobile) -->
     <nav>
-        <div class="nav-scroll-container" id="nav-container">
-            <!-- JS Injected -->
-        </div>
+        <div class="nav-scroll-container" id="nav-container"></div>
     </nav>
 
-    <!-- Main Content -->
     <main id="main-scroll">
         <div class="app-container">
             <div class="top-bar">
-                <h1>Emoji Library</h1>
-                <div class="chips-row" id="filter-container">
-                    <!-- JS Injected -->
+                <h1>Emoji Picker</h1>
+                <div class="search-container">
+                    <span class="material-symbols-rounded search-icon">search</span>
+                    <input type="text" class="search-input" id="search-input" placeholder="Search...">
+                    <span class="material-symbols-rounded clear-icon" id="clear-search">close</span>
                 </div>
+                <div class="chips-row" id="filter-container"></div>
             </div>
-            
-            <div id="content-area">
-                <!-- JS Injected -->
-            </div>
+            <div id="content-area"></div>
         </div>
     </main>
 
-    <!-- Overlays -->
     <div id="tooltip"></div>
     <div id="snackbar"></div>
 
@@ -382,226 +290,432 @@
         (function() {
             'use strict';
 
-            const DATA_URL = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
+            // --- 1. 国际化配置 (I18N) ---
+            const IS_ZH = navigator.language.startsWith('zh');
+
             const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
-            
+            const URL_STRUCTURE = 'https://www.unicode.org/Public/emoji/latest/emoji-test.txt';
+            // 根据语言选择 CLDR 数据源
+            const URL_TRANSLATION = IS_ZH 
+                ? 'https://raw.githubusercontent.com/unicode-org/cldr/refs/heads/main/common/annotations/zh.xml'
+                : 'https://raw.githubusercontent.com/unicode-org/cldr/refs/heads/main/common/annotations/en.xml';
+
+            const UI_STRINGS = {
+                loadingTitle: IS_ZH ? "Emoji 库" : "Emoji Picker",
+                loadingText: IS_ZH ? "正在加载 Unicode 结构与翻译..." : "Loading Unicode structure and translations...",
+                searchPlaceholder: IS_ZH ? "搜索表情 (如: 好的, ok, 挥手)" : "Search emojis (e.g. happy, cat)",
+                noResult: IS_ZH ? "未找到匹配的表情" : "No matching emojis found",
+                copied: IS_ZH ? "已复制" : "Copied"
+            };
+
+            // 10大分类映射
+            const GROUP_MAP_ZH = {
+                "Smileys & Emotion": "表情与情感",
+                "People & Body": "人物与身体",
+                "Component": "组件",
+                "Animals & Nature": "动物与自然",
+                "Food & Drink": "食物与饮料",
+                "Travel & Places": "旅行与地点",
+                "Activities": "活动",
+                "Objects": "物品",
+                "Symbols": "符号",
+                "Flags": "旗帜"
+            };
+
+            // 状态映射
+            const STATUS_MAP_ZH = {
+                "fully-qualified": "全限定",
+                "minimally-qualified": "最小限定",
+                "unqualified": "无限定",
+                "component": "组件"
+            };
+            const STATUS_MAP_EN = {
+                "fully-qualified": "Fully Qualified",
+                "minimally-qualified": "Minimally Qualified",
+                "unqualified": "Unqualified",
+                "component": "Component"
+            };
+
+            // 手动补全字典 (仅中文需要，英文直接用原文)
+            const MANUAL_TERMS_ZH = {
+                "man": "男人", "woman": "女人", "person": "人",
+                "boy": "男孩", "girl": "女孩", "child": "儿童", "baby": "婴儿",
+                "older person": "老人", "adult": "成人",
+                "holding hands": "牵手", "family": "家庭", "kiss": "亲吻",
+                "couple with heart": "恋爱",
+                "blond hair": "金发", "beard": "胡须", "red hair": "红发",
+                "curly hair": "卷发", "white hair": "白发", "bald": "秃头",
+                "mx claus": "圣诞老人(中性)", "mrs. claus": "圣诞奶奶", "santa claus": "圣诞老人",
+                "people wrestling": "摔跤", "men wrestling": "男人摔跤", "women wrestling": "女人摔跤"
+            };
+
+            const ICON_MAP = {
+                "Smileys & Emotion": "emoji_emotions",
+                "People & Body": "emoji_people",
+                "Component": "palette",
+                "Animals & Nature": "emoji_nature",
+                "Food & Drink": "emoji_food_beverage",
+                "Travel & Places": "emoji_transportation",
+                "Activities": "emoji_events",
+                "Objects": "emoji_objects",
+                "Symbols": "emoji_symbols",
+                "Flags": "emoji_flags"
+            };
+
             let rawData = {};
+            let translationMap = {}; 
+            let keywordMap = {};     
+            let componentMap = {}; 
             let activeStatus = '';
             let isScrolling = false;
             let tooltipTimeout;
+            let longPressTimer;
 
             const ui = {
                 loading: document.getElementById('loading'),
+                loadingTitle: document.getElementById('loading-title'),
+                loadingText: document.getElementById('loading-text'),
                 nav: document.getElementById('nav-container'),
                 filters: document.getElementById('filter-container'),
                 content: document.getElementById('content-area'),
                 main: document.getElementById('main-scroll'),
                 tooltip: document.getElementById('tooltip'),
-                snackbar: document.getElementById('snackbar')
+                snackbar: document.getElementById('snackbar'),
+                searchInput: document.getElementById('search-input'),
+                clearSearch: document.getElementById('clear-search')
             };
 
-            // --- Initialization ---
             async function init() {
+                // 应用 UI 文本
+                ui.loadingTitle.textContent = UI_STRINGS.loadingTitle;
+                ui.loadingText.textContent = UI_STRINGS.loadingText;
+                ui.searchInput.placeholder = UI_STRINGS.searchPlaceholder;
+                document.querySelector('h1').textContent = UI_STRINGS.loadingTitle;
+
                 try {
-                    const res = await fetch(PROXY + encodeURIComponent(DATA_URL));
-                    if (!res.ok) throw new Error('Connection Failed');
-                    const text = await res.text();
-                    processText(text);
+                    const [structRes, transRes] = await Promise.all([
+                        fetch(PROXY + encodeURIComponent(URL_STRUCTURE)),
+                        fetch(PROXY + encodeURIComponent(URL_TRANSLATION))
+                    ]);
+
+                    if (!structRes.ok || !transRes.ok) throw new Error('Network Error');
+
+                    const structText = await structRes.text();
+                    const transText = await transRes.text();
+
+                    parseTranslations(transText);
+                    processStructure(structText);
                     buildUI();
                     
-                    // Smooth fade out
+                    ui.searchInput.addEventListener('input', () => renderMainContent());
+                    ui.clearSearch.addEventListener('click', () => {
+                        ui.searchInput.value = '';
+                        renderMainContent();
+                        ui.searchInput.focus();
+                    });
+
                     ui.loading.style.opacity = '0';
                     setTimeout(() => ui.loading.style.display = 'none', 400);
                 } catch (err) {
-                    ui.loading.innerHTML = `<div style="text-align:center; color:#B3261E">
-                        <h3>Unable to Load</h3>
-                        <p>${err.message}</p>
-                    </div>`;
+                    console.error(err);
+                    ui.loading.innerHTML = `<div style="text-align:center; color:#B3261E"><h3>Error</h3><p>${err.message}</p></div>`;
                 }
             }
 
-            // --- Data Processing ---
-            function processText(text) {
+            function parseTranslations(xmlString) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+                const annotations = xmlDoc.querySelectorAll("annotation");
+                annotations.forEach(node => {
+                    const char = node.getAttribute("cp");
+                    const type = node.getAttribute("type");
+                    if (type === 'tts' && char) {
+                        translationMap[char] = node.textContent;
+                    } else if (!type && char) {
+                        keywordMap[char] = node.textContent;
+                    }
+                });
+            }
+
+            function processStructure(text) {
                 const lines = text.split('\n');
+                
+                // 如果是中文，加载手动字典；英文则不需要
+                if (IS_ZH) {
+                    Object.assign(componentMap, MANUAL_TERMS_ZH);
+                }
+
+                // 1. 构建组件字典
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (!line || line.startsWith('#') || !line.includes('; component')) return;
+                    const [codes, meta] = line.split(';');
+                    const [status, comment] = meta.split('#');
+                    const commentParts = comment.trim().split(' '); 
+                    const char = commentParts[0];
+                    const nameEn = commentParts.slice(2).join(' ');
+                    
+                    // 如果是中文，尝试查找翻译；英文直接用原文
+                    if (IS_ZH) {
+                        const nameZh = translationMap[char];
+                        if (nameZh) componentMap[nameEn.toLowerCase()] = nameZh;
+                    } else {
+                        componentMap[nameEn.toLowerCase()] = nameEn; // 英文映射到自身
+                    }
+                });
+
+                // 2. 处理 Emoji
                 let group = "Unknown", subgroup = "Unknown";
+                let baseTranslationCache = {}; 
 
                 lines.forEach(line => {
                     line = line.trim();
                     if (!line) return;
                     
-                    if (line.startsWith('# group:')) group = line.split(': ')[1].trim();
-                    else if (line.startsWith('# subgroup:')) subgroup = line.split(': ')[1].trim();
-                    else if (!line.startsWith('#') && line.includes(';')) {
-                        // Parse: 1F600 ; fully-qualified # 😀 E1.0 grinning face
+                    if (line.startsWith('# group:')) {
+                        group = line.split(': ')[1].trim();
+                    } else if (line.startsWith('# subgroup:')) {
+                        subgroup = line.split(': ')[1].trim();
+                    } else if (!line.startsWith('#') && line.includes(';')) {
                         const [codes, meta] = line.split(';');
                         const [status, comment] = meta.split('#');
                         const cleanStatus = status.trim();
                         
-                        const commentParts = comment.trim().split(' '); // [😀, E1.0, grinning, face]
+                        const commentParts = comment.trim().split(' '); 
                         const char = commentParts[0];
-                        // Skip version (E1.0), join rest
-                        const nameFull = commentParts.slice(2).join(' ');
+                        const nameFullEn = commentParts.slice(2).join(' ');
+                        const [baseEn, ...qualParts] = nameFullEn.split(':');
+                        const qualEn = qualParts.join(':').trim();
+                        const baseEnTrimmed = baseEn.trim();
+
+                        let baseDisplayName = null;
                         
-                        // Split Base vs Qualifier (person: red hair)
-                        const [base, ...qualParts] = nameFull.split(':');
-                        const qual = qualParts.join(':').trim();
+                        // 尝试获取翻译
+                        baseDisplayName = translationMap[char];
+                        if (!baseDisplayName) baseDisplayName = translationMap[char.replace(/\uFE0F/g, '')];
+                        if (!baseDisplayName) {
+                            const noSkin = char.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '');
+                            baseDisplayName = translationMap[noSkin];
+                            if (!baseDisplayName) baseDisplayName = translationMap[noSkin.replace(/\uFE0F/g, '')];
+                        }
+
+                        // 回退逻辑
+                        if (baseDisplayName) {
+                            baseTranslationCache[baseEnTrimmed] = baseDisplayName;
+                        } else {
+                            if (baseTranslationCache[baseEnTrimmed]) {
+                                baseDisplayName = baseTranslationCache[baseEnTrimmed];
+                            } else {
+                                // 中文尝试查手动字典，英文直接用英文名
+                                if (IS_ZH) {
+                                    baseDisplayName = MANUAL_TERMS_ZH[baseEnTrimmed.toLowerCase()] || baseEnTrimmed;
+                                } else {
+                                    baseDisplayName = baseEnTrimmed;
+                                }
+                            }
+                        }
+
+                        // 关键词
+                        let keywords = keywordMap[char] || "";
+                        if (!keywords) keywords = keywordMap[char.replace(/\uFE0F/g, '')] || "";
+                        if (!keywords) {
+                             const noSkin = char.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '');
+                             keywords = keywordMap[noSkin] || "";
+                        }
+
+                        // 修饰词翻译
+                        let qualDisplay = "";
+                        if (qualEn) {
+                            const parts = qualEn.split(', ');
+                            const translatedParts = parts.map(p => {
+                                const pLower = p.toLowerCase();
+                                return componentMap[pLower] || p; 
+                            });
+                            // 中文用全角逗号，英文用半角
+                            qualDisplay = translatedParts.join(IS_ZH ? '，' : ', ');
+                        }
 
                         if (!rawData[cleanStatus]) rawData[cleanStatus] = {};
                         if (!rawData[cleanStatus][group]) rawData[cleanStatus][group] = {};
                         if (!rawData[cleanStatus][group][subgroup]) rawData[cleanStatus][group][subgroup] = {};
-                        if (!rawData[cleanStatus][group][subgroup][base.trim()]) rawData[cleanStatus][group][subgroup][base.trim()] = [];
+                        
+                        if (!rawData[cleanStatus][group][subgroup][baseEnTrimmed]) {
+                            rawData[cleanStatus][group][subgroup][baseEnTrimmed] = [];
+                        }
 
-                        rawData[cleanStatus][group][subgroup][base.trim()].push({
-                            char, base: base.trim(), qual
+                        rawData[cleanStatus][group][subgroup][baseEnTrimmed].push({
+                            char: char,
+                            name: baseDisplayName,
+                            base: baseEnTrimmed,
+                            qual: qualDisplay,
+                            keywords: keywords
                         });
                     }
                 });
             }
 
-            // --- UI Building ---
             function buildUI() {
                 const statuses = Object.keys(rawData);
                 if (!statuses.length) return;
-                
-                // Priority: fully-qualified -> first available
                 activeStatus = statuses.includes('fully-qualified') ? 'fully-qualified' : statuses[0];
-
-                // 1. Build Filters (Top)
                 ui.filters.innerHTML = '';
                 statuses.forEach(s => {
                     const btn = document.createElement('button');
                     btn.className = `chip ${s === activeStatus ? 'selected' : ''}`;
-                    // Format: fully-qualified -> Fully Qualified
-                    btn.textContent = s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    // 根据语言选择状态映射表
+                    const map = IS_ZH ? STATUS_MAP_ZH : STATUS_MAP_EN;
+                    btn.textContent = map[s] || s;
                     btn.onclick = () => changeStatus(s);
                     ui.filters.appendChild(btn);
                 });
-
                 renderMainContent();
             }
 
             function changeStatus(status) {
                 activeStatus = status;
-                Array.from(ui.filters.children).forEach(c => {
-                    c.classList.toggle('selected', c.textContent.toLowerCase().replace(/ /g, '-') === status);
+                Array.from(ui.filters.children).forEach((c, i) => {
+                    const keys = Object.keys(rawData);
+                    c.classList.toggle('selected', keys[i] === status);
                 });
                 renderMainContent();
             }
 
+            function isMatch(item, query) {
+                if (!query) return true;
+                const q = query.toLowerCase();
+                if (item.name && item.name.toLowerCase().includes(q)) return true;
+                if (item.keywords && item.keywords.toLowerCase().includes(q)) return true;
+                if (item.base && item.base.toLowerCase().includes(q)) return true;
+                if (item.char.includes(q)) return true;
+                return false;
+            }
+
             function renderMainContent() {
+                const searchQuery = ui.searchInput.value.trim();
                 ui.content.innerHTML = '';
                 ui.nav.innerHTML = '';
-                ui.main.scrollTop = 0;
+                if (!searchQuery) ui.main.scrollTop = 0;
 
                 const groups = rawData[activeStatus] || {};
                 const groupNames = Object.keys(groups);
 
                 groupNames.forEach((gName, idx) => {
-                    // 1. Navigation Item
-                    const navItem = document.createElement('div');
-                    navItem.className = `nav-item ${idx === 0 ? 'active' : ''}`;
-                    navItem.dataset.idx = idx;
-                    // Short name: "Smileys & Emotion" -> "Smileys"
-                    const shortName = gName.split(' ')[0].replace('&','').trim();
-                    navItem.innerHTML = `
-                        <div class="nav-icon-box">${shortName.substring(0,2).toUpperCase()}</div>
-                        <span class="nav-label">${shortName}</span>
-                    `;
-                    navItem.onclick = () => scrollToSection(idx);
-                    ui.nav.appendChild(navItem);
-
-                    // 2. Content Section
+                    // 翻译组名
+                    const translatedGroup = IS_ZH ? (GROUP_MAP_ZH[gName] || gName) : gName;
+                    const iconName = ICON_MAP[gName] || 'category';
+                    
                     const section = document.createElement('section');
                     section.className = 'group-section';
                     section.id = `sec-${idx}`;
-                    section.innerHTML = `<div class="group-title">${gName}</div>`;
+                    section.innerHTML = `<div class="group-title">${translatedGroup}</div>`;
 
                     const subgroups = groups[gName];
-                    Object.keys(subgroups).forEach(sgName => {
-                        const sgTitle = document.createElement('div');
-                        sgTitle.className = 'subgroup-pill';
-                        sgTitle.textContent = sgName;
-                        section.appendChild(sgTitle);
+                    let hasGroupItems = false;
 
+                    Object.keys(subgroups).forEach(sgName => {
                         const baseMap = subgroups[sgName];
-                        
-                        // Grid for single items
                         let grid = document.createElement('div');
                         grid.className = 'emoji-grid';
                         let hasGridItems = false;
+                        let hasSubgroupItems = false;
+                        const subgroupElements = [];
 
                         Object.keys(baseMap).forEach(base => {
                             const items = baseMap[base];
-                            const baseItems = items.filter(i => !i.qual);
-                            const variants = items.filter(i => i.qual);
+                            const matchedItems = items.filter(item => isMatch(item, searchQuery));
+                            if (matchedItems.length === 0) return;
 
-                            // If we have variants, use a Card container
-                            if (items.length > 1 && baseItems.length > 0 && variants.length > 0) {
-                                // Close existing grid
-                                if (hasGridItems) {
-                                    section.appendChild(grid);
-                                    grid = document.createElement('div');
-                                    grid.className = 'emoji-grid';
-                                    hasGridItems = false;
+                            hasSubgroupItems = true;
+                            hasGroupItems = true;
+
+                            const baseItems = matchedItems.filter(i => !i.qual);
+                            const variants = matchedItems.filter(i => i.qual);
+
+                            if (items.length > 1 && matchedItems.length > 1) {
+                                if (hasGridItems) { 
+                                    subgroupElements.push(grid); 
+                                    grid = document.createElement('div'); 
+                                    grid.className = 'emoji-grid'; 
+                                    hasGridItems = false; 
                                 }
-
                                 const card = document.createElement('div');
                                 card.className = 'variant-card';
                                 
-                                baseItems.forEach((item, i) => {
-                                    card.appendChild(createBtn(item, i === baseItems.length - 1));
-                                });
-                                variants.forEach(item => {
-                                    card.appendChild(createBtn(item, false));
-                                });
-                                section.appendChild(card);
-
+                                if (baseItems.length > 0) {
+                                    baseItems.forEach((item, i) => {
+                                        const isLastBase = (i === baseItems.length - 1) && (variants.length > 0);
+                                        card.appendChild(createBtn(item, isLastBase));
+                                    });
+                                }
+                                variants.forEach(item => card.appendChild(createBtn(item, false)));
+                                subgroupElements.push(card);
                             } else {
-                                // Add to standard grid
                                 hasGridItems = true;
-                                items.forEach(item => grid.appendChild(createBtn(item, false)));
+                                matchedItems.forEach(item => grid.appendChild(createBtn(item, false)));
                             }
                         });
 
-                        if (hasGridItems) section.appendChild(grid);
+                        if (hasGridItems) subgroupElements.push(grid);
+
+                        if (hasSubgroupItems) {
+                            const sgTitle = document.createElement('div');
+                            sgTitle.className = 'subgroup-pill';
+                            sgTitle.textContent = sgName.replace(/-/g, ' ');
+                            section.appendChild(sgTitle);
+                            subgroupElements.forEach(el => section.appendChild(el));
+                        }
                     });
 
-                    ui.content.appendChild(section);
-                });
+                    if (hasGroupItems) {
+                        ui.content.appendChild(section);
 
-                initScrollSpy(groupNames.length);
+                        const navItem = document.createElement('div');
+                        navItem.className = `nav-item ${ui.nav.children.length === 0 ? 'active' : ''}`;
+                        navItem.dataset.idx = idx;
+                        navItem.innerHTML = `<div class="nav-icon-box"><span class="material-symbols-rounded">${iconName}</span></div>`;
+                        
+                        navItem.onclick = () => scrollToSection(idx);
+                        navItem.addEventListener('touchstart', (e) => {
+                            longPressTimer = setTimeout(() => { showTooltip(navItem, translatedGroup); }, 500);
+                        });
+                        navItem.addEventListener('touchend', () => {
+                            clearTimeout(longPressTimer);
+                            setTimeout(hideTooltip, 1000);
+                        });
+                        navItem.onmouseenter = () => showTooltip(navItem, translatedGroup);
+                        navItem.onmouseleave = hideTooltip;
+
+                        ui.nav.appendChild(navItem);
+                    }
+                });
+                
+                if (ui.content.children.length === 0) {
+                    ui.content.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--sys-outline);">${UI_STRINGS.noResult}</div>`;
+                } else {
+                    initScrollSpy();
+                }
             }
 
             function createBtn(item, isSeparator) {
                 const btn = document.createElement('div');
                 btn.className = 'emoji-btn' + (isSeparator ? ' separator' : '');
                 btn.textContent = item.char;
-                
-                // Interactions
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    copyText(item.char);
-                };
-
-                const triggerTip = () => showTooltip(btn, item.base, item.qual);
-                
+                btn.onclick = (e) => { e.stopPropagation(); copyText(item.char); };
+                const triggerTip = () => showTooltip(btn, item.name, item.qual);
                 btn.onmouseenter = triggerTip;
                 btn.onmouseleave = hideTooltip;
                 btn.ontouchstart = () => triggerTip();
                 btn.ontouchend = () => setTimeout(hideTooltip, 1000);
-
                 return btn;
             }
 
-            // --- Actions ---
             function copyText(char) {
-                navigator.clipboard.writeText(char).then(() => showSnackbar(`Copied ${char}`))
+                navigator.clipboard.writeText(char).then(() => showSnackbar(`${UI_STRINGS.copied} ${char}`))
                 .catch(() => {
-                    // Fallback
                     const t = document.createElement('textarea');
                     t.value = char; document.body.appendChild(t);
                     t.select(); document.execCommand('copy'); document.body.removeChild(t);
-                    showSnackbar(`Copied ${char}`);
+                    showSnackbar(`${UI_STRINGS.copied} ${char}`);
                 });
             }
 
@@ -613,79 +727,55 @@
 
             function showTooltip(el, base, qual) {
                 if (tooltipTimeout) clearTimeout(tooltipTimeout);
-                
                 ui.tooltip.innerHTML = `<span class="tt-main">${base}</span>${qual ? '<span class="tt-sub">'+qual+'</span>' : ''}`;
-                
                 const rect = el.getBoundingClientRect();
                 const tipRect = ui.tooltip.getBoundingClientRect();
                 const gap = 12;
-
-                // Horizontal Center
                 let left = rect.left + (rect.width/2) - (tipRect.width/2);
-                // Boundary Check
                 left = Math.max(10, Math.min(window.innerWidth - tipRect.width - 10, left));
-
-                // Vertical (Top preferred)
                 let top = rect.top - tipRect.height - gap;
-                if (top < 10) top = rect.bottom + gap; // Flip to bottom if tight
-
+                if (top < 10) top = rect.bottom + gap;
                 ui.tooltip.style.left = `${left}px`;
                 ui.tooltip.style.top = `${top}px`;
                 ui.tooltip.classList.add('visible');
             }
 
-            function hideTooltip() {
-                ui.tooltip.classList.remove('visible');
-            }
+            function hideTooltip() { ui.tooltip.classList.remove('visible'); }
 
-            // --- Navigation Logic ---
             function scrollToSection(idx) {
                 isScrolling = true;
                 const target = document.getElementById(`sec-${idx}`);
-                
-                // Update Nav State
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 const activeBtn = document.querySelector(`.nav-item[data-idx="${idx}"]`);
-                if (activeBtn) {
-                    activeBtn.classList.add('active');
-                    activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                }
-
-                if (target) {
-                    // Offset for sticky header (approx 120px)
-                    const offset = target.offsetTop - 120;
-                    ui.main.scrollTo({ top: offset, behavior: 'smooth' });
-                }
-                
+                if (activeBtn) { activeBtn.classList.add('active'); activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }
+                if (target) { const offset = target.offsetTop - 120; ui.main.scrollTo({ top: offset, behavior: 'smooth' }); }
                 setTimeout(() => isScrolling = false, 800);
             }
 
-            function initScrollSpy(count) {
+            function initScrollSpy() {
                 ui.main.onscroll = () => {
                     if (isScrolling) return;
-                    
-                    let activeIdx = 0;
-                    const scrollY = ui.main.scrollTop + 180; // Offset trigger
-
-                    for (let i = 0; i < count; i++) {
-                        const el = document.getElementById(`sec-${i}`);
-                        if (el.offsetTop <= scrollY) activeIdx = i;
-                        else break;
-                    }
-
-                    document.querySelectorAll('.nav-item').forEach((n, i) => {
-                        const isActive = i === activeIdx;
-                        n.classList.toggle('active', isActive);
-                        if (isActive) {
-                            n.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    let activeIdx = -1;
+                    const scrollY = ui.main.scrollTop + 180;
+                    const sections = document.querySelectorAll('.group-section');
+                    for (const section of sections) {
+                        if (section.offsetTop <= scrollY) {
+                            activeIdx = parseInt(section.id.split('-')[1]);
+                        } else {
+                            break;
                         }
-                    });
+                    }
+                    if (activeIdx !== -1) {
+                        document.querySelectorAll('.nav-item').forEach(n => {
+                            const isActive = parseInt(n.dataset.idx) === activeIdx;
+                            n.classList.toggle('active', isActive);
+                            if (isActive) n.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        });
+                    }
                 };
             }
 
-            // Start
             init();
-
         })();
     </script>
 </body>
