@@ -190,21 +190,17 @@
         .group-section { margin-top: 32px; scroll-margin-top: 140px; }
         .group-title { font: var(--type-headline); color: var(--sys-on-surface); margin-bottom: 16px; padding-left: 4px; width: 100%; }
         
-        /* --- NEW & UPDATED LAYOUT CLASSES --- */
-        
-        /* 允许 Subgroups 并排显示的容器 */
+        /* Layout Classes */
         .group-content-wrapper {
             display: flex;
             flex-wrap: wrap;
-            gap: 24px; /* Subgroup 之间的间距 */
+            gap: 24px;
             align-items: flex-start;
         }
 
-        /* 包裹单个 Subgroup（标题+内容）的容器 */
         .subgroup-container {
             display: flex;
             flex-direction: column;
-            /* 关键：fit-content 允许较窄的 subgroup 占用较少空间，从而并排 */
             width: fit-content; 
             max-width: 100%;
         }
@@ -213,7 +209,7 @@
             display: inline-block; font: var(--type-label); color: var(--sys-primary);
             background: var(--sys-surface-container-high); padding: 6px 12px;
             border-radius: 8px; 
-            margin: 0 0 8px 0; /* 减少上方边距，因为 flex gap 已经处理了 */
+            margin: 0 0 8px 0;
             text-transform: uppercase; letter-spacing: 0.5px;
             width: fit-content;
         }
@@ -222,7 +218,7 @@
             display: flex;
             flex-wrap: wrap; 
             gap: 12px;
-            width: fit-content; /* 紧贴内容 */
+            width: fit-content;
             max-width: 100%;
             align-items: flex-start;
         }
@@ -388,7 +384,8 @@
                 "flag": "旗帜",
                 "scotland": "苏格兰",
                 "england": "英格兰",
-                "wales": "威尔士"
+                "wales": "威尔士",
+                "facing right": "向右"
             };
 
             const ICON_MAP = {
@@ -533,6 +530,8 @@
 
                 let group = "Unknown", subgroup = "Unknown";
                 let baseTranslationCache = {}; 
+                // 新增：缓存 "英文名 -> 中文名"，用于处理复合名称
+                let nameToZhCache = {};
 
                 lines.forEach(line => {
                     line = line.trim();
@@ -586,11 +585,35 @@
                                 baseDisplayName = baseTranslationCache[baseEnTrimmed];
                             } else {
                                 if (IS_ZH) {
-                                    baseDisplayName = MANUAL_TERMS_ZH[baseEnTrimmed.toLowerCase()] || baseEnTrimmed;
+                                    // 1. 尝试直接从手动字典获取
+                                    baseDisplayName = MANUAL_TERMS_ZH[baseEnTrimmed.toLowerCase()];
+
+                                    // 2. 如果没有，尝试处理 "facing right" 后缀
+                                    if (!baseDisplayName) {
+                                        const suffix = " facing right";
+                                        if (baseEnTrimmed.endsWith(suffix)) {
+                                            const coreName = baseEnTrimmed.substring(0, baseEnTrimmed.length - suffix.length);
+                                            // 尝试查找核心部分的翻译 (先查缓存，再查组件映射，再查手动表)
+                                            const coreTrans = nameToZhCache[coreName.toLowerCase()] || 
+                                                              componentMap[coreName.toLowerCase()] || 
+                                                              MANUAL_TERMS_ZH[coreName.toLowerCase()];
+                                            if (coreTrans) {
+                                                baseDisplayName = coreTrans + "（向右）";
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 3. 兜底：使用英文原名
+                                    if (!baseDisplayName) baseDisplayName = baseEnTrimmed;
                                 } else {
                                     baseDisplayName = baseEnTrimmed;
                                 }
                             }
+                        }
+                        
+                        // 缓存成功解析的名称，供后续行使用（特别是复合名称）
+                        if (IS_ZH && baseDisplayName) {
+                            nameToZhCache[baseEnTrimmed.toLowerCase()] = baseDisplayName;
                         }
 
                         let keywords = keywordMap[char] || "";
