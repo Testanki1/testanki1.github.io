@@ -8,7 +8,7 @@
     
     <title>HTML 编辑器</title>
     
-    <!-- 异步加载字体，降低阻塞概率 -->
+    <!-- 异步加载字体 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -24,7 +24,8 @@
             --md-sys-color-primary-container: #EADDFF;
             --md-sys-color-on-primary-container: #21005D;
             --md-sys-color-outline: #79747E;
-            /* 严格按照您的要求，不使用系统字体回退 */
+            --md-sys-color-surface-variant: #F3EDF7;
+            --md-sys-color-on-surface: #1D1B20;
             --md-sys-typescale-body: 'Roboto', sans-serif;
             --md-sys-typescale-code: 'Roboto Mono', monospace;
         }
@@ -34,7 +35,6 @@
             box-sizing: border-box;
         }
 
-        /* --- 核心修改：CSS 自动保险丝 --- */
         @keyframes force-show {
             0% { opacity: 0; }
             100% { opacity: 1; }
@@ -50,20 +50,14 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            
-            /* 1. 初始状态：透明 */
             opacity: 0;
-            
-            /* 2. 设定动画：延迟 1.5秒 后，强制执行淡入动画 */
-            /* forwards 保持动画结束后的状态（即保持可见） */
             animation: force-show 0.5s ease-in 1.5s forwards;
         }
 
-        /* 3. 如果 JS 成功运行，会添加这个类，立即显示，取消等待 */
         body.js-loaded {
-            animation: none; /* 取消延迟动画 */
-            opacity: 1;      /* 立即显示 */
-            transition: opacity 0.4s ease; /* 平滑过渡 */
+            animation: none;
+            opacity: 1;
+            transition: opacity 0.4s ease;
         }
 
         .app-container {
@@ -89,8 +83,8 @@
             height: 100%;
             border: none;
             outline: none;
-            padding: 0; 
-            padding-bottom: 100px; 
+            padding: 16px; 
+            padding-bottom: 180px; /* 增加底部留白，防止被面板遮挡 */
             font-size: 16px;
             line-height: 1.6;
             color: #1D1B20;
@@ -105,9 +99,13 @@
             content: attr(data-placeholder);
             color: var(--md-sys-color-outline);
             opacity: 0.6;
-            padding-left: 16px; 
-            padding-top: 16px;
             display: block;
+        }
+
+        /* 图片在编辑器中最大宽度限制，防止撑破布局 */
+        #visualEditor img {
+            max-width: 100%;
+            height: auto;
         }
 
         #codeEditor {
@@ -146,7 +144,7 @@
         .segmented-switch {
             pointer-events: auto;
             display: flex;
-            background-color: #F3EDF7; 
+            background-color: var(--md-sys-color-surface-variant); 
             border-radius: 50px;
             padding: 4px; 
             height: 56px;
@@ -190,6 +188,76 @@
             word-wrap: normal;
             direction: ltr;
         }
+
+        /* --- 新增：属性检查器面板样式 --- */
+        #inspectorPanel {
+            position: absolute;
+            bottom: 100px; /* 位于切换按钮上方 */
+            left: 16px;
+            right: 16px;
+            background-color: #2b2930; /* 深色背景，突出显示 */
+            color: #f2f0f4;
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 30;
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            gap: 8px;
+            font-family: var(--md-sys-typescale-code);
+            font-size: 12px;
+            animation: slideUp 0.2s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .inspector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+        }
+
+        .inspector-tag {
+            font-weight: bold;
+            color: #d0bcff;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        .inspector-close {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            padding: 4px;
+            margin: -4px;
+        }
+
+        .inspector-row {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            word-break: break-all;
+        }
+
+        .inspector-label {
+            color: rgba(255,255,255,0.6);
+            font-size: 10px;
+        }
+
+        .inspector-value {
+            color: #e6e1e5;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 6px;
+            border-radius: 4px;
+            user-select: text; /* 允许复制 */
+        }
     </style>
 </head>
 <body>
@@ -198,6 +266,19 @@
     <div class="editor-wrapper">
         <div id="visualEditor" contenteditable="true" data-placeholder="在此粘贴内容..."></div>
         <textarea id="codeEditor" spellcheck="false"></textarea>
+        
+        <!-- 新增：属性检查器面板 -->
+        <div id="inspectorPanel">
+            <div class="inspector-header">
+                <span id="inspectorTag" class="inspector-tag">TAG</span>
+                <button id="inspectorClose" class="inspector-close">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
+                </button>
+            </div>
+            <div id="inspectorContent">
+                <!-- 动态内容将插入这里 -->
+            </div>
+        </div>
     </div>
 
     <div class="switch-container">
@@ -216,20 +297,31 @@
 
 <script>
     // --- 1. 国际化 (i18n) 处理 ---
-    (function() {
-        const userLang = navigator.language || navigator.userLanguage; 
-        const isChinese = userLang.startsWith('zh');
+    const userLang = navigator.language || navigator.userLanguage; 
+    const isChinese = userLang.startsWith('zh');
+    
+    const i18n = {
+        title: isChinese ? "HTML 编辑器" : "HTML Editor",
+        placeholder: isChinese ? "在此粘贴内容..." : "Paste content here...",
+        preview: isChinese ? "预览" : "Preview",
+        code: isChinese ? "代码" : "Code",
+        style: isChinese ? "样式" : "Style",
+        src: isChinese ? "图片源" : "Source",
+        href: isChinese ? "链接" : "Link",
+        class: isChinese ? "类名" : "Class"
+    };
 
+    (function() {
         if (!isChinese) {
-            document.title = "HTML Editor";
+            document.title = i18n.title;
             const visualEditor = document.getElementById('visualEditor');
-            if (visualEditor) visualEditor.setAttribute('data-placeholder', "Paste content here...");
+            if (visualEditor) visualEditor.setAttribute('data-placeholder', i18n.placeholder);
             
             const btnVisualText = document.querySelector('#btnVisual .btn-text');
-            if (btnVisualText) btnVisualText.textContent = "Preview";
+            if (btnVisualText) btnVisualText.textContent = i18n.preview;
             
             const btnCodeText = document.querySelector('#btnCode .btn-text');
-            if (btnCodeText) btnCodeText.textContent = "Code";
+            if (btnCodeText) btnCodeText.textContent = i18n.code;
             
             document.documentElement.lang = "en";
         }
@@ -237,31 +329,105 @@
 
     // --- 2. 智能显示逻辑 ---
     function showApp() {
-        // 添加类名，触发 CSS 中的 body.js-loaded 样式
-        // 这会立即覆盖掉那个延迟 1.5秒 的动画
         document.body.classList.add('js-loaded');
     }
 
-    // 尝试等待字体加载
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(showApp).catch(showApp);
     } else {
-        // 浏览器不支持，直接显示
         showApp();
     }
-    
-    // 注意：这里不再需要 JS 的 setTimeout 保险丝了
-    // 因为 CSS 的 animation: force-show 1.5s 会自动处理超时情况
 
     // --- 3. 编辑器核心逻辑 ---
     const visualEditor = document.getElementById('visualEditor');
     const codeEditor = document.getElementById('codeEditor');
     const btnVisual = document.getElementById('btnVisual');
     const btnCode = document.getElementById('btnCode');
+    
+    // 检查器相关元素
+    const inspectorPanel = document.getElementById('inspectorPanel');
+    const inspectorTag = document.getElementById('inspectorTag');
+    const inspectorContent = document.getElementById('inspectorContent');
+    const inspectorClose = document.getElementById('inspectorClose');
 
     let isCodeView = false;
     const voidTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
 
+    // --- 新增：点击元素显示属性逻辑 ---
+    visualEditor.addEventListener('click', (e) => {
+        // 如果点击的是编辑器本身（空白处），则隐藏面板
+        if (e.target === visualEditor) {
+            inspectorPanel.style.display = 'none';
+            return;
+        }
+
+        // 如果是链接，阻止默认跳转行为，方便编辑和查看
+        if (e.target.tagName === 'A') {
+            e.preventDefault();
+        }
+
+        const target = e.target;
+        const tagName = target.tagName.toLowerCase();
+        
+        // 准备显示的数据
+        let infoHtml = '';
+
+        // 1. 获取 src (针对图片)
+        if (target.hasAttribute('src')) {
+            infoHtml += createInspectorRow(i18n.src, target.getAttribute('src'));
+        }
+
+        // 2. 获取 href (针对链接)
+        if (target.hasAttribute('href')) {
+            infoHtml += createInspectorRow(i18n.href, target.getAttribute('href'));
+        }
+
+        // 3. 获取 style (内联样式)
+        if (target.hasAttribute('style')) {
+            infoHtml += createInspectorRow(i18n.style, target.getAttribute('style'));
+        }
+
+        // 4. 获取 class
+        if (target.className && typeof target.className === 'string') {
+            infoHtml += createInspectorRow(i18n.class, target.className);
+        }
+
+        // 如果没有任何特殊属性，显示提示或仅显示标签
+        if (infoHtml === '') {
+            // 也可以选择不显示面板，或者显示“无内联样式”
+            // 这里我们选择显示面板，方便用户确认选中了什么
+            infoHtml = `<div class="inspector-row"><span class="inspector-label">Info</span><span class="inspector-value">No inline styles</span></div>`;
+        }
+
+        // 更新 UI
+        inspectorTag.textContent = `<${tagName}>`;
+        inspectorContent.innerHTML = infoHtml;
+        inspectorPanel.style.display = 'flex';
+    });
+
+    // 辅助函数：创建面板行 HTML
+    function createInspectorRow(label, value) {
+        // 简单的转义防止 XSS
+        const safeValue = value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        return `
+            <div class="inspector-row">
+                <span class="inspector-label">${label}</span>
+                <span class="inspector-value">${safeValue}</span>
+            </div>
+        `;
+    }
+
+    // 关闭面板
+    inspectorClose.addEventListener('click', () => {
+        inspectorPanel.style.display = 'none';
+    });
+
+    // 切换到代码模式时隐藏面板
+    function hideInspector() {
+        inspectorPanel.style.display = 'none';
+    }
+
+    // --- 格式化 HTML ---
     function formatHTML(html) {
         const tab = '  '; 
         let result = '';
@@ -302,6 +468,7 @@
 
     btnCode.addEventListener('click', () => {
         if (isCodeView) return;
+        hideInspector(); // 切换时隐藏面板
         const rawHTML = visualEditor.innerHTML;
         codeEditor.value = formatHTML(rawHTML);
         codeEditor.style.display = 'block';
