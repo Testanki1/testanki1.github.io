@@ -2,136 +2,294 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HTML 可视化/代码切换器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HTML / Code</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
     <style>
+        :root {
+            /* M3 Color System */
+            --md-sys-color-surface: #FEF7FF;
+            --md-sys-color-surface-container: #F3EDF7;
+            --md-sys-color-surface-container-low: #F7F2FA;
+            --md-sys-color-on-surface: #1D1B20;
+            --md-sys-color-primary: #6750A4;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-primary-container: #EADDFF;
+            --md-sys-color-on-primary-container: #21005D;
+            --md-sys-color-outline: #79747E;
+            --md-sys-color-outline-variant: #CAC4D0;
+
+            /* M3 Shapes */
+            --md-sys-shape-corner-large: 28px;
+            --md-sys-shape-corner-medium: 16px;
+            --md-sys-shape-corner-small: 12px;
+            
+            /* Typography */
+            --md-sys-typescale-body-large: 'Roboto', sans-serif;
+            --md-sys-typescale-code: 'Roboto Mono', monospace;
+        }
+
+        * {
+            /* 关键：去除移动端点击高亮 */
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: sans-serif;
-            margin: 20px;
-            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            font-family: var(--md-sys-typescale-body-large);
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            /* 使用 dvh 适应移动端动态视口 */
+            height: 100dvh; 
+            width: 100vw;
+            overflow: hidden; /* 禁止 Body 滚动，由内部容器处理 */
+            display: flex;
+            justify-content: center;
         }
-        .container {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+
+        /* 主容器：负责响应式宽度的限制 */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            position: relative;
         }
-        #visualEditor {
-            border: 1px solid #ccc;
-            min-height: 250px;
-            padding: 15px;
-            margin-bottom: 15px;
-            background-color: #fff;
-            overflow: auto; /* 如果内容过多，允许滚动 */
+
+        /* 头部 */
+        header {
+            padding: 16px 24px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
         }
-        #codeEditor {
-            border: 1px solid #ccc;
-            width: 98%; /* 考虑边框和内边距 */
-            min-height: 250px;
-            padding: 10px;
-            margin-bottom: 15px;
-            font-family: monospace; /* 等宽字体适合代码 */
-            font-size: 14px;
-            background-color: #e9e9e9;
-            display: none; /* 默认隐藏 */
-            box-sizing: border-box; /* 让 padding 和 border 不增加总宽度 */
-        }
-        button {
-            padding: 10px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
+
         h1 {
-            color: #333;
+            font-size: 22px;
+            font-weight: 400;
+            margin: 0;
+            color: var(--md-sys-color-on-surface);
+        }
+
+        /* 编辑器外层卡片 */
+        .editor-wrapper {
+            flex-grow: 1; /* 占据剩余所有空间 */
+            padding: 0 16px 16px 16px; /* 移动端边距 */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 编辑器容器（实际可见区域） */
+        .editor-container {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-large);
+            width: 100%;
+            height: 100%; /* 填满 wrapper */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* 内部滚动 */
+            position: relative;
+        }
+
+        /* 输入框通用样式 */
+        .editor-box {
+            width: 100%;
+            height: 100%; /* 填满 container */
+            border: none;
+            outline: none;
+            background-color: transparent;
+            padding: 24px;
+            padding-bottom: 88px; /* 底部留白，防止内容被 FAB 遮挡 */
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--md-sys-color-on-surface);
+            resize: none;
+            overflow-y: auto; /* 内容过多时滚动 */
+            -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+        }
+
+        /* 滚动条隐藏 (移动端体验更好，或保持细条) */
+        .editor-box::-webkit-scrollbar {
+            width: 4px;
+        }
+        .editor-box::-webkit-scrollbar-thumb {
+            background: var(--md-sys-color-outline-variant);
+            border-radius: 2px;
+        }
+
+        #visualEditor {
+            display: block;
+        }
+        
+        #visualEditor:empty:before {
+            content: attr(data-placeholder);
+            color: var(--md-sys-color-outline);
+        }
+
+        #codeEditor {
+            display: none;
+            font-family: var(--md-sys-typescale-code);
+            white-space: pre;
+            font-size: 14px;
+            background-color: var(--md-sys-color-surface-container-low); /* 代码模式稍微深一点的背景 */
+        }
+
+        /* 浮动按钮容器 */
+        .fab-container {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            z-index: 10;
+        }
+
+        /* M3 Extended FAB */
+        .fab-extended {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: 56px;
+            padding: 0 20px; /* 如果有文字 */
+            min-width: 56px; 
+            border-radius: 16px;
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            border: none;
+            font-family: var(--md-sys-typescale-body-large);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 4px 8px 3px rgba(0,0,0,0.15);
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+            user-select: none;
+        }
+
+        .fab-extended:active {
+            transform: scale(0.96);
+            box-shadow: 0 2px 4px 2px rgba(0,0,0,0.15);
+        }
+
+        /* 桌面端适配 (大屏幕优化) */
+        @media (min-width: 800px) {
+            body {
+                background-color: var(--md-sys-color-surface-container-low); /* 背景色区分 */
+            }
+
+            .app-container {
+                max-width: 800px; /* 限制最大宽度 */
+                height: 95dvh; /* 上下留白 */
+                margin-top: 2.5dvh;
+                background-color: var(--md-sys-color-surface);
+                border-radius: var(--md-sys-shape-corner-large);
+                box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            }
+
+            .editor-wrapper {
+                padding: 0 24px 24px 24px;
+            }
+
+            .editor-container {
+                /* 桌面端内部背景稍微区分 */
+                background-color: #fff; 
+                border: 1px solid var(--md-sys-color-outline-variant);
+            }
+            
+            #codeEditor {
+                 background-color: #fcfcfc;
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>HTML 编辑器</h1>
-    <p>在此处粘贴您的 HTML 内容（可以直接从网页、Word 等复制粘贴）：</p>
+<div class="app-container">
+    <header>
+        <h1>HTML / Editor</h1>
+    </header>
 
-    <!-- 可视化编辑区域 -->
-    <div id="visualEditor" contenteditable="true">
-        <p>在这里<b>粘贴</b>或<i>编辑</i>内容...</p>
-        <ul>
-            <li>列表项 1</li>
-            <li>列表项 2</li>
-        </ul>
+    <div class="editor-wrapper">
+        <div class="editor-container">
+            <!-- 可视化视图 -->
+            <div id="visualEditor" class="editor-box" contenteditable="true" data-placeholder="..."></div>
+
+            <!-- 代码视图 -->
+            <textarea id="codeEditor" class="editor-box" spellcheck="false"></textarea>
+            
+            <!-- 按钮位于编辑器区域之上 (绝对定位) -->
+            <div class="fab-container">
+                <button id="toggleButton" class="fab-extended">
+                    <span class="material-symbols-outlined" id="btnIcon">code</span>
+                    <span id="btnText">Code</span>
+                </button>
+            </div>
+        </div>
     </div>
-
-    <!-- HTML 代码编辑区域 -->
-    <textarea id="codeEditor"></textarea>
-
-    <!-- 切换按钮 -->
-    <button id="toggleButton">查看 HTML 代码</button>
 </div>
 
 <script>
-    // 获取元素引用
     const visualEditor = document.getElementById('visualEditor');
     const codeEditor = document.getElementById('codeEditor');
     const toggleButton = document.getElementById('toggleButton');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
 
-    // 追踪当前视图状态 (false: 可视化, true: 代码)
     let isCodeView = false;
 
-    // 按钮点击事件处理
+    // 格式化功能
+    function formatHTML(html) {
+        const tab = '  '; 
+        let result = '';
+        let indent = '';
+
+        html = html.replace(/>\s+</g, '><').trim();
+        const tokens = html.split(/(<[^>]+>)/g).filter(s => s.trim() !== '');
+        const voidTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
+
+        tokens.forEach(token => {
+            let isClosing = token.startsWith('</');
+            let isOpening = token.startsWith('<') && !isClosing;
+            let tagName = '';
+            
+            if (isOpening) {
+                const match = token.match(/^<([a-z0-9]+)/i);
+                if (match) tagName = match[1].toLowerCase();
+            }
+
+            if (isClosing) indent = indent.substring(tab.length);
+            result += indent + token + '\n';
+            if (isOpening && !voidTags.includes(tagName) && !token.includes('/>')) indent += tab;
+        });
+
+        return result.trim();
+    }
+
     toggleButton.addEventListener('click', () => {
         if (isCodeView) {
-            // --- 从代码视图切换到可视化视图 ---
-            // 1. 获取代码编辑器的内容
-            const htmlCode = codeEditor.value;
-            // 2. 将 HTML 代码设置回可视化编辑器
-            visualEditor.innerHTML = htmlCode;
-            // 3. 显示可视化编辑器，隐藏代码编辑器
+            // Code -> Visual
+            visualEditor.innerHTML = codeEditor.value;
             visualEditor.style.display = 'block';
             codeEditor.style.display = 'none';
-            // 4. 更新按钮文字
-            toggleButton.textContent = '查看 HTML 代码';
-            // 5. 更新视图状态
+            btnText.textContent = 'Code';
+            btnIcon.textContent = 'code';
             isCodeView = false;
         } else {
-            // --- 从可视化视图切换到代码视图 ---
-            // 1. 获取可视化编辑器的内部 HTML
-            const visualHTML = visualEditor.innerHTML;
-            // 2. 将 HTML 代码设置到代码编辑器（使用 .value）
-            codeEditor.value = visualHTML;
-            // 3. 隐藏可视化编辑器，显示代码编辑器
+            // Visual -> Code
+            const rawHTML = visualEditor.innerHTML;
+            codeEditor.value = formatHTML(rawHTML);
             visualEditor.style.display = 'none';
             codeEditor.style.display = 'block';
-            // 4. 更新按钮文字
-            toggleButton.textContent = '查看可视化效果';
-            // 5. 更新视图状态
+            btnText.textContent = 'View';
+            btnIcon.textContent = 'visibility';
             isCodeView = true;
         }
     });
-
-    // (可选) 如果希望在可视化编辑器内容变化时自动更新代码编辑器的值（即使代码区不可见）
-    // visualEditor.addEventListener('input', () => {
-    //     if (!isCodeView) { // 只有在可视化视图下编辑时才更新隐藏的代码区
-    //         codeEditor.value = visualEditor.innerHTML;
-    //     }
-    // });
-
-    // (可选) 如果希望在代码编辑器内容变化时自动更新可视化编辑器的值（即使可视化区不可见）
-    // codeEditor.addEventListener('input', () => {
-    //     if (isCodeView) { // 只有在代码视图下编辑时才更新隐藏的可视化区
-    //          visualEditor.innerHTML = codeEditor.value; // 注意：这可能执行脚本，有安全风险！
-    //     }
-    // });
-    // **注意**: 上面代码编辑器实时更新可视化区的做法有潜在的 XSS 风险，
-    // 因为用户输入的代码会被直接执行。对于简单的切换，点击按钮时更新更安全。
-
 </script>
 
 </body>
