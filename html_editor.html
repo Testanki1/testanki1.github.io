@@ -8,16 +8,23 @@
     
     <title>HTML 编辑器</title>
     
+    <!-- 异步加载字体，降低阻塞概率 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" media="print" onload="this.media='all'">
+    
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    </noscript>
 
     <style>
         :root {
             --md-sys-color-primary-container: #EADDFF;
             --md-sys-color-on-primary-container: #21005D;
             --md-sys-color-outline: #79747E;
+            /* 严格按照您的要求，不使用系统字体回退 */
             --md-sys-typescale-body: 'Roboto', sans-serif;
             --md-sys-typescale-code: 'Roboto Mono', monospace;
         }
@@ -25,6 +32,12 @@
         * {
             -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
+        }
+
+        /* --- 核心修改：CSS 自动保险丝 --- */
+        @keyframes force-show {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
         }
 
         html, body {
@@ -38,9 +51,19 @@
             display: flex;
             flex-direction: column;
             
-            /* --- 修改点：初始隐藏，等待字体加载 --- */
+            /* 1. 初始状态：透明 */
             opacity: 0;
-            transition: opacity 0.4s ease-in-out;
+            
+            /* 2. 设定动画：延迟 1.5秒 后，强制执行淡入动画 */
+            /* forwards 保持动画结束后的状态（即保持可见） */
+            animation: force-show 0.5s ease-in 1.5s forwards;
+        }
+
+        /* 3. 如果 JS 成功运行，会添加这个类，立即显示，取消等待 */
+        body.js-loaded {
+            animation: none; /* 取消延迟动画 */
+            opacity: 1;      /* 立即显示 */
+            transition: opacity 0.4s ease; /* 平滑过渡 */
         }
 
         .app-container {
@@ -61,7 +84,6 @@
             position: relative; 
         }
 
-        /* --- Preview (预览) 区域 --- */
         #visualEditor {
             width: 100%;
             height: 100%;
@@ -76,10 +98,10 @@
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             display: block; 
+            font-family: var(--md-sys-typescale-body);
         }
 
         #visualEditor:empty:before {
-            /* content 属性将由 JS 动态控制 */
             content: attr(data-placeholder);
             color: var(--md-sys-color-outline);
             opacity: 0.6;
@@ -88,7 +110,6 @@
             display: block;
         }
 
-        /* --- HTML 代码区域 --- */
         #codeEditor {
             position: absolute; 
             top: 0;
@@ -112,7 +133,6 @@
             z-index: 10;
         }
 
-        /* 底部开关 */
         .switch-container {
             position: absolute;
             bottom: 30px;
@@ -158,7 +178,17 @@
         }
 
         .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
             font-size: 20px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
         }
     </style>
 </head>
@@ -166,7 +196,7 @@
 
 <div class="app-container">
     <div class="editor-wrapper">
-        <div id="visualEditor" contenteditable="true" data-placeholder=""></div>
+        <div id="visualEditor" contenteditable="true" data-placeholder="在此粘贴内容..."></div>
         <textarea id="codeEditor" spellcheck="false"></textarea>
     </div>
 
@@ -174,60 +204,57 @@
         <div class="segmented-switch">
             <button id="btnVisual" class="segment-btn active">
                 <span class="material-symbols-outlined">visibility</span>
-                <span id="txtVisual">预览</span>
+                <span class="btn-text">预览</span>
             </button>
             <button id="btnCode" class="segment-btn">
                 <span class="material-symbols-outlined">code</span>
-                <span id="txtCode">代码</span>
+                <span class="btn-text">代码</span>
             </button>
         </div>
     </div>
 </div>
 
 <script>
-    // --- 国际化配置 (I18n) ---
-    const i18n = {
-        zh: {
-            title: 'HTML 编辑器',
-            placeholder: '在此粘贴内容...',
-            visual: '预览',
-            code: '代码',
-            lang: 'zh-CN'
-        },
-        en: {
-            title: 'HTML Editor',
-            placeholder: 'Paste content here...',
-            visual: 'Preview',
-            code: 'Code',
-            lang: 'en'
+    // --- 1. 国际化 (i18n) 处理 ---
+    (function() {
+        const userLang = navigator.language || navigator.userLanguage; 
+        const isChinese = userLang.startsWith('zh');
+
+        if (!isChinese) {
+            document.title = "HTML Editor";
+            const visualEditor = document.getElementById('visualEditor');
+            if (visualEditor) visualEditor.setAttribute('data-placeholder', "Paste content here...");
+            
+            const btnVisualText = document.querySelector('#btnVisual .btn-text');
+            if (btnVisualText) btnVisualText.textContent = "Preview";
+            
+            const btnCodeText = document.querySelector('#btnCode .btn-text');
+            if (btnCodeText) btnCodeText.textContent = "Code";
+            
+            document.documentElement.lang = "en";
         }
-    };
+    })();
 
-    // 检测系统语言
-    // 如果 language 字符串以 'zh' 开头 (zh-CN, zh-TW, zh-HK)，则视为中文，否则为英文
-    const userLang = navigator.language || navigator.userLanguage; 
-    const isChinese = userLang.toLowerCase().startsWith('zh');
-    const text = isChinese ? i18n.zh : i18n.en;
+    // --- 2. 智能显示逻辑 ---
+    function showApp() {
+        // 添加类名，触发 CSS 中的 body.js-loaded 样式
+        // 这会立即覆盖掉那个延迟 1.5秒 的动画
+        document.body.classList.add('js-loaded');
+    }
 
-    // --- 应用语言设置 ---
-    document.documentElement.lang = text.lang;
-    document.title = text.title;
+    // 尝试等待字体加载
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(showApp).catch(showApp);
+    } else {
+        // 浏览器不支持，直接显示
+        showApp();
+    }
     
-    // UI 文本替换
+    // 注意：这里不再需要 JS 的 setTimeout 保险丝了
+    // 因为 CSS 的 animation: force-show 1.5s 会自动处理超时情况
+
+    // --- 3. 编辑器核心逻辑 ---
     const visualEditor = document.getElementById('visualEditor');
-    visualEditor.setAttribute('data-placeholder', text.placeholder);
-    
-    document.getElementById('txtVisual').textContent = text.visual;
-    document.getElementById('txtCode').textContent = text.code;
-
-    // --- 字体加载策略 ---
-    // document.fonts.ready 返回一个 Promise，当字体加载完成后解决
-    document.fonts.ready.then(function() {
-        // 字体加载完成，显示界面
-        document.body.style.opacity = '1';
-    });
-
-    // --- 编辑器核心逻辑 ---
     const codeEditor = document.getElementById('codeEditor');
     const btnVisual = document.getElementById('btnVisual');
     const btnCode = document.getElementById('btnCode');
@@ -240,19 +267,14 @@
         let result = '';
         let indent = '';
 
-        // 1. 清洗：移除现有换行符
         html = html.replace(/[\r\n]+/g, ' ').replace(/>\s+</g, '><').trim();
-
         const tokens = html.split(/(<[^>]+>)/g).filter(s => s.trim() !== '');
 
         tokens.forEach(token => {
             let isClosing = token.startsWith('</');
             let isOpening = token.startsWith('<') && !isClosing;
             
-            if (!token.startsWith('<')) {
-                token = token.trim();
-            }
-
+            if (!token.startsWith('<')) token = token.trim();
             if (token.length === 0) return;
 
             let tagName = '';
@@ -262,9 +284,7 @@
             }
 
             if (isClosing) indent = indent.substring(tab.length);
-            
             result += indent + token + '\n';
-            
             if (isOpening && !voidTags.includes(tagName) && !token.includes('/>')) indent += tab;
         });
 
@@ -273,10 +293,8 @@
 
     btnVisual.addEventListener('click', () => {
         if (!isCodeView) return;
-
         visualEditor.innerHTML = codeEditor.value;
         codeEditor.style.display = 'none';
-
         btnVisual.classList.add('active');
         btnCode.classList.remove('active');
         isCodeView = false;
@@ -284,12 +302,10 @@
 
     btnCode.addEventListener('click', () => {
         if (isCodeView) return;
-
         const rawHTML = visualEditor.innerHTML;
         codeEditor.value = formatHTML(rawHTML);
         codeEditor.style.display = 'block';
         visualEditor.innerHTML = ''; 
-
         btnCode.classList.add('active');
         btnVisual.classList.remove('active');
         isCodeView = true;
