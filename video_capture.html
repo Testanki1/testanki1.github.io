@@ -1,296 +1,603 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>视频帧精确提取器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Video Frame Extractor</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f7f9; color: #333; }
-        h1 { color: #0056b3; }
-        p { max-width: 720px; margin: 10px auto; }
-        video { max-width: 100%; height: auto; border: 2px solid #ccc; background-color: #000; border-radius: 8px; margin-bottom: 15px;}
-        .controls-container { max-width: 720px; margin: 20px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 3px solid #007bff; }
-        button { padding: 10px 20px; margin: 10px 5px; font-size: 16px; cursor: pointer; border-radius: 5px; border: 1px solid #007bff; background-color: #007bff; color: white; transition: background-color 0.2s, transform 0.1s; }
-        button:hover:not(:disabled) { background-color: #0056b3; }
-        button:active:not(:disabled) { transform: scale(0.98); }
-        button:disabled { cursor: not-allowed; background-color: #a0a0a0; border-color: #a0a0a0; opacity: 0.7; }
-        #status { font-weight: bold; color: #0056b3; min-height: 20px; margin-top: 15px; }
-        .input-group { display: flex; align-items: center; justify-content: center; margin: 15px 0; }
-        .time-input { text-align: center; font-size: 1.2em; width: 120px; margin: 0 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        #framePreviewContainer { margin-top: 20px; padding: 10px; border: 1px dashed #ddd; min-height: 100px; background-color: #f9f9f9; border-radius: 8px; }
-        #framePreview { max-width: 100%; height: auto; border: 1px solid #eee; display: none; margin: 0 auto; }
+        :root {
+            --md-sys-color-primary: #00639b;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #cce5ff;
+            --md-sys-color-on-primary-container: #001d32;
+            --md-sys-color-secondary-container: #dbe4f0;
+            --md-sys-color-on-secondary-container: #101c2b;
+            --md-sys-color-surface: #f8f9ff;
+            --md-sys-color-surface-variant: #e1e2ec;
+            --md-sys-color-on-surface: #181c20;
+            --md-sys-color-outline: #74777f;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.4s ease-in;
+        }
+
+        body.visible {
+            opacity: 1;
+        }
+
+        /* --- Top Bar --- */
+        .top-bar {
+            flex-shrink: 0;
+            width: 100%;
+            padding: 16px 24px 0;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            margin: 0;
+            color: var(--md-sys-color-on-surface);
+        }
+
+        /* --- Video Stage --- */
+        .video-stage {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: transparent;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        video {
+            display: none; 
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            gap: 16px;
+            padding: 20px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            height: 200px;
+            border: 2px dashed var(--md-sys-color-outline);
+            border-radius: 24px;
+            background-color: rgba(255,255,255,0.5);
+        }
+
+        /* --- Controls Card (Common) --- */
+        .controls-card {
+            flex-shrink: 0;
+            background-color: var(--md-sys-color-surface-variant);
+            display: flex;
+            flex-direction: column;
+            opacity: 0.5;
+            pointer-events: none; 
+            transition: opacity 0.3s;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+            z-index: 20;
+        }
+
+        body.ready .controls-card {
+            opacity: 1;
+            pointer-events: all;
+        }
+        body.ready video { display: block; }
+        body.ready .empty-state { display: none; }
+
+        /* --- 核心：响应式布局 --- */
+
+        /* 1. Mobile Styles (Default / Small Screens) */
+        .controls-card {
+            width: 100%;
+            border-radius: 28px 28px 0 0;
+            padding: 24px 24px 16px;
+            padding-bottom: calc(16px + env(safe-area-inset-bottom));
+            gap: 20px;
+        }
+
+        .actions-row {
+            display: grid;
+            grid-template-columns: auto 1fr; 
+            grid-template-rows: auto auto; 
+            gap: 16px;
+            align-items: center;
+        }
+        .left-actions { grid-column: 1; }
+        .center-actions { 
+            grid-column: 2; 
+            justify-content: flex-end; 
+        }
+        .right-actions { 
+            grid-column: 1 / -1; 
+            width: 100%; 
+        }
+        .btn-primary { 
+            width: 100%; 
+            justify-content: center; 
+        }
+
+        /* 2. Desktop Styles (Larger Screens) */
+        /* 当屏幕宽于 768px (平板/电脑) 时，切换 UI */
+        @media (min-width: 768px) {
+            .controls-card {
+                /* 变为悬浮岛屿 */
+                width: 90%;
+                max-width: 800px;
+                margin: 0 auto 24px auto; /* 底部留空，居中 */
+                border-radius: 28px; /* 全圆角 */
+                padding: 20px 32px;
+                gap: 12px; /* 更紧凑的垂直间距 */
+            }
+
+            .actions-row {
+                /* 变回单行 Flex 布局 */
+                display: flex;
+                flex-direction: row;
+                justify-content: space-between;
+                gap: 20px;
+            }
+
+            .left-actions, .center-actions, .right-actions {
+                grid-column: auto;
+                width: auto;
+                justify-content: flex-start;
+            }
+
+            .center-actions {
+                flex-grow: 1;
+                justify-content: center;
+                background: rgba(255,255,255,0.6);
+                padding: 4px 16px;
+                border-radius: 20px;
+            }
+
+            .right-actions {
+                width: auto;
+            }
+
+            .btn-primary {
+                width: auto; /* 按钮恢复自然宽度 */
+                padding: 0 32px;
+            }
+        }
+
+        /* --- UI Elements --- */
+        .timeline-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 32px;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: var(--md-sys-color-outline);
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: var(--md-sys-color-primary);
+            -webkit-appearance: none;
+            margin-top: -7px;
+            transition: transform 0.1s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .left-actions, .center-actions, .right-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-primary {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            border-radius: 24px;
+            height: 48px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-primary:active { transform: scale(0.96); }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--md-sys-color-on-surface);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-btn:hover { background-color: rgba(0,0,0,0.05); }
+
+        .time-display {
+            background-color: transparent;
+            border: none;
+            border-bottom: 2px solid var(--md-sys-color-outline);
+            padding: 4px;
+            font-family: monospace;
+            font-size: 1rem;
+            width: 70px;
+            text-align: center;
+            color: var(--md-sys-color-on-surface);
+            font-weight: bold;
+        }
+
+        .fab-extended {
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            padding: 10px 24px;
+            border-radius: 16px;
+            border: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .fab-extended:hover { box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+        /* Loader & Toast */
+        #pageLoader {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            border: 5px solid var(--md-sys-color-surface-variant);
+            border-bottom-color: var(--md-sys-color-primary);
+            border-radius: 50%;
+            animation: rotation 1s linear infinite;
+            z-index: 9999;
+        }
+        @keyframes rotation {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        #toast {
+            visibility: hidden;
+            min-width: 150px;
+            background-color: #323232;
+            color: #fff;
+            text-align: center;
+            border-radius: 50px;
+            padding: 10px 20px;
+            position: fixed;
+            z-index: 2000;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 </head>
 <body>
 
-<h1>视频帧精确提取器</h1>
-<p>加载视频后，暂停或拖动进度条，即可在下方工具中看到对应时间的预览帧，并可进行微调和保存。</p>
+<div id="pageLoader"></div>
+<div id="toast">Saved</div>
 
-<input type="file" id="videoFile" accept="video/*">
-<br><br>
-<video id="videoPlayer" controls>
-    <source id="videoSource" type="video/mp4">
-    你的浏览器不支持 HTML5 视频播放。
-</video>
-<br>
-
-<div class="controls-container">
-    <h2>精确时间帧预览与保存</h2>
-    <div class="input-group">
-        <button id="timeDecreaseBtn" title="减小 0.01 秒" disabled>&laquo; -0.01s</button>
-        <input type="number" id="timeInput" class="time-input" min="0" step="0.001" placeholder="时间 (秒)" disabled>
-        <button id="timeIncreaseBtn" title="增加 0.01 秒" disabled>&raquo; +0.01s</button>
-    </div>
-
-    <div id="framePreviewContainer">
-        <p id="previewPlaceholder">此处将显示提取的帧</p>
-        <img id="framePreview" alt="提取的帧预览">
-    </div>
-    
-    <button id="saveFrameBtn" disabled>保存预览中的帧</button>
+<div class="top-bar">
+    <h1 id="txtTitle">Video Frame Extractor</h1>
+    <button class="fab-extended" id="selectVideoBtn" onclick="document.getElementById('videoFile').click()">
+        <span class="material-symbols-rounded">video_file</span>
+        <span id="selectVideoText">Select Video</span>
+    </button>
+    <input type="file" id="videoFile" accept="video/*" style="display: none;">
 </div>
 
-<div id="status"></div>
+<div class="video-stage">
+    <div class="empty-state">
+        <span class="material-symbols-rounded" style="font-size: 64px; opacity: 0.3;">movie</span>
+        <p id="txtEmptyState">Click "Select Video" button above</p>
+    </div>
+    <video id="videoPlayer" playsinline>
+        <source id="videoSource" type="video/mp4">
+    </video>
+</div>
+
+<div class="controls-card">
+    <div class="timeline-container">
+        <span id="currentTimeLabel" style="font-size: 0.9rem; min-width: 40px; font-weight: 500;">0:00</span>
+        <input type="range" id="progressBar" value="0" min="0" step="0.001">
+        <span id="durationLabel" style="font-size: 0.9rem; min-width: 40px;">0:00</span>
+    </div>
+
+    <div class="actions-row">
+        <!-- Play -->
+        <div class="left-actions">
+            <button id="playPauseBtn" class="icon-btn" title="Play/Pause">
+                <span class="material-symbols-rounded" id="playIcon">play_arrow</span>
+            </button>
+        </div>
+
+        <!-- Time -->
+        <div class="center-actions">
+            <button id="timeDecreaseBtn" class="icon-btn" title="-0.01s">
+                <span class="material-symbols-rounded">chevron_left</span>
+            </button>
+            <input type="number" id="timeInput" class="time-display" min="0" step="0.001" placeholder="0.000">
+            <button id="timeIncreaseBtn" class="icon-btn" title="+0.01s">
+                <span class="material-symbols-rounded">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Save -->
+        <div class="right-actions">
+            <button id="saveFrameBtn" class="btn-primary">
+                <span class="material-symbols-rounded">save_alt</span>
+                <span id="txtSaveBtn">Save</span>
+            </button>
+        </div>
+    </div>
+</div>
 
 <script>
-    // --- DOM Elements ---
-    const videoFileInput = document.getElementById('videoFile');
+    // i18n
+    const i18n = {
+        en: {
+            title: "Video Frame Extractor",
+            selectVideo: "Select Video",
+            changeVideo: "Change Video",
+            emptyState: "Click \"Select Video\" button above",
+            saveBtn: "Save Current Frame",
+            toastSaved: "Saved: ",
+            toastLoaded: "Video Loaded",
+            toastError: "Error saving frame"
+        },
+        zh: {
+            title: "视频帧提取器",
+            selectVideo: "选择视频",
+            changeVideo: "更换视频",
+            emptyState: "请点击上方的“选择视频”按钮",
+            saveBtn: "保存当前帧",
+            toastSaved: "已保存: ",
+            toastLoaded: "视频加载完成",
+            toastError: "保存出错"
+        }
+    };
+    const systemLang = navigator.language || navigator.userLanguage;
+    const curLang = systemLang.startsWith('zh') ? 'zh' : 'en';
+    const texts = i18n[curLang];
+
+    // Init
+    const pageLoader = document.getElementById('pageLoader');
+    document.fonts.ready.then(() => {
+        applyLanguage();
+        pageLoader.style.display = 'none';
+        document.body.classList.add('visible');
+    });
+
+    function applyLanguage() {
+        document.getElementById('txtTitle').textContent = texts.title;
+        document.getElementById('selectVideoText').textContent = texts.selectVideo;
+        document.getElementById('txtEmptyState').textContent = texts.emptyState;
+        document.getElementById('txtSaveBtn').textContent = texts.saveBtn;
+        document.title = texts.title;
+    }
+
+    // Elements
+    const videoFile = document.getElementById('videoFile');
     const videoPlayer = document.getElementById('videoPlayer');
     const videoSource = document.getElementById('videoSource');
-    const statusDiv = document.getElementById('status');
-    
+    const selectVideoText = document.getElementById('selectVideoText');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const progressBar = document.getElementById('progressBar');
     const timeInput = document.getElementById('timeInput');
+    const currentTimeLabel = document.getElementById('currentTimeLabel');
+    const durationLabel = document.getElementById('durationLabel');
     const timeDecreaseBtn = document.getElementById('timeDecreaseBtn');
     const timeIncreaseBtn = document.getElementById('timeIncreaseBtn');
-    const framePreview = document.getElementById('framePreview');
-    const previewPlaceholder = document.getElementById('previewPlaceholder');
     const saveFrameBtn = document.getElementById('saveFrameBtn');
+    const toast = document.getElementById('toast');
 
-    // --- State Variables ---
-    let videoFileName = '';
-    let currentFrameUrl = null; 
-    let isSeeking = false;
-    let timeUpdateTimeout;
+    // State
+    let videoFileName = 'video';
     const TIME_STEP = 0.01;
+    let isDragging = false; 
+    let animationFrameId;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
 
-    // --- Canvas Setup ---
-    const hiddenCanvas = document.createElement('canvas');
-    const context = hiddenCanvas.getContext('2d');
+    function formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
 
-    // --- Event Listeners ---
-
-    videoFileInput.addEventListener('change', function(event) {
-        resetUI();
-        const file = event.target.files[0];
-        if (file) {
-            videoFileName = file.name.split('.').slice(0, -1).join('.') || 'video';
-            const url = URL.createObjectURL(file);
-            videoSource.src = url;
-            videoPlayer.load();
-        }
+    // Logic
+    videoFile.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        videoFileName = file.name.split('.').slice(0, -1).join('.') || 'video';
+        const url = URL.createObjectURL(file);
+        selectVideoText.textContent = texts.changeVideo;
+        document.body.classList.remove('ready'); 
+        videoPlayer.pause();
+        videoSource.src = url;
+        videoPlayer.load();
+        playIcon.textContent = 'play_arrow';
     });
-    
-    videoPlayer.addEventListener('loadedmetadata', function() {
-        if (videoPlayer.videoWidth > 0) {
-            hiddenCanvas.width = videoPlayer.videoWidth;
-            hiddenCanvas.height = videoPlayer.videoHeight;
-        }
-        timeInput.max = videoPlayer.duration.toFixed(3);
+
+    videoPlayer.addEventListener('loadedmetadata', () => {
+        progressBar.max = videoPlayer.duration;
+        durationLabel.textContent = formatTime(videoPlayer.duration);
         timeInput.value = "0.000";
-        updateButtonStates();
-        statusDiv.textContent = '视频已加载，正在提取第一帧...';
-
-        // ✅ 修改点 2: 视频元数据加载完成后，主动更新并显示第一帧
-        updateFramePreview(0);
-    });
-    
-    // 当视频播放或暂停时更新按钮状态
-    videoPlayer.addEventListener('play', updateButtonStates);
-    videoPlayer.addEventListener('pause', () => {
-        updateButtonStates();
-        syncTimeAndPreview();
+        document.body.classList.add('ready');
+        showToast(texts.toastLoaded);
     });
 
-    // 监听seeked事件，处理拖动进度条的情况
-    videoPlayer.addEventListener('seeked', () => {
-        // 只有当视频处于暂停状态时，拖动进度条才更新预览
-        if (videoPlayer.paused) {
-            updateButtonStates();
-            syncTimeAndPreview();
+    function togglePlay() {
+        if (!document.body.classList.contains('ready')) return;
+        if (videoPlayer.paused || videoPlayer.ended) videoPlayer.play();
+        else videoPlayer.pause();
+    }
+
+    function updateLoop() {
+        if (!videoPlayer.paused && !videoPlayer.ended) {
+            if (!isDragging) syncControls(videoPlayer.currentTime);
+            animationFrameId = requestAnimationFrame(updateLoop);
         }
+    }
+
+    playPauseBtn.addEventListener('click', togglePlay);
+    videoPlayer.addEventListener('click', togglePlay);
+    videoPlayer.addEventListener('play', () => {
+        playIcon.textContent = 'pause';
+        cancelAnimationFrame(animationFrameId);
+        updateLoop();
+    });
+    videoPlayer.addEventListener('pause', () => {
+        playIcon.textContent = 'play_arrow';
+        cancelAnimationFrame(animationFrameId);
+        syncControls(videoPlayer.currentTime);
+    });
+    videoPlayer.addEventListener('timeupdate', () => {
+        if (!isDragging && videoPlayer.paused) syncControls(videoPlayer.currentTime);
     });
 
-    videoPlayer.addEventListener('error', function() {
-        alert('加载或播放视频时发生错误。');
-        resetUI();
-    });
+    function syncControls(time) {
+        progressBar.value = time;
+        timeInput.value = time.toFixed(3);
+        currentTimeLabel.textContent = formatTime(time);
+    }
 
-    // --- 精确时间控制交互 ---
-    timeInput.addEventListener('input', () => {
-        clearTimeout(timeUpdateTimeout);
-        timeUpdateTimeout = setTimeout(() => {
-            let targetTime = parseFloat(timeInput.value);
-            if (!isNaN(targetTime)) {
-                targetTime = Math.max(0, Math.min(targetTime, videoPlayer.duration));
-                timeInput.value = targetTime.toFixed(3);
-                updateFramePreview(targetTime);
-            }
-        }, 300);
+    progressBar.addEventListener('input', () => {
+        isDragging = true;
+        const time = parseFloat(progressBar.value);
+        timeInput.value = time.toFixed(3);
+        currentTimeLabel.textContent = formatTime(time);
+        videoPlayer.currentTime = time;
+    });
+    progressBar.addEventListener('change', () => {
+        isDragging = false;
+        videoPlayer.currentTime = parseFloat(progressBar.value);
+    });
+    timeInput.addEventListener('change', () => {
+        let val = parseFloat(timeInput.value);
+        if (isNaN(val)) val = 0;
+        val = Math.max(0, Math.min(val, videoPlayer.duration));
+        videoPlayer.currentTime = val;
+        if(videoPlayer.paused) progressBar.value = val;
     });
 
     timeDecreaseBtn.addEventListener('click', () => {
-        let currentTime = parseFloat(timeInput.value) || 0;
-        let newTime = Math.max(0, currentTime - TIME_STEP);
-        timeInput.value = newTime.toFixed(3);
-        updateFramePreview(newTime);
+        videoPlayer.pause();
+        videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - TIME_STEP);
     });
-
     timeIncreaseBtn.addEventListener('click', () => {
-        let currentTime = parseFloat(timeInput.value) || 0;
-        let newTime = Math.min(videoPlayer.duration, currentTime + TIME_STEP);
-        timeInput.value = newTime.toFixed(3);
-        updateFramePreview(newTime);
+        videoPlayer.pause();
+        videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + TIME_STEP);
     });
 
     saveFrameBtn.addEventListener('click', () => {
-        if (!currentFrameUrl) {
-            alert('没有可保存的预览帧。');
-            return;
+        if (videoPlayer.readyState < 2) return;
+        try {
+            canvas.width = videoPlayer.videoWidth;
+            canvas.height = videoPlayer.videoHeight;
+            ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const timestamp = videoPlayer.currentTime.toFixed(3).replace('.', '_');
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${videoFileName}_${timestamp}s.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                showToast(`${texts.toastSaved}${timestamp}s`);
+            }, 'image/png');
+        } catch (e) {
+            console.error(e);
+            showToast(texts.toastError);
         }
-        const timestamp = parseFloat(timeInput.value).toFixed(3).replace('.', '_');
-        const filename = `${videoFileName}_frame_at_${timestamp}s.png`;
-        
-        const link = document.createElement('a');
-        link.href = currentFrameUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        statusDiv.textContent = `已保存预览中的帧: ${filename}`;
     });
 
-    // --- Helper Functions ---
-
-    /**
-     * 同步视频当前时间到输入框并更新预览
-     */
-    function syncTimeAndPreview() {
-        if (isSeeking || videoPlayer.readyState < videoPlayer.HAVE_METADATA) return;
-        const currentTime = videoPlayer.currentTime;
-        timeInput.value = currentTime.toFixed(3);
-        updateFramePreview(currentTime);
+    function showToast(message) {
+        toast.textContent = message;
+        toast.className = "show";
+        setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
     }
-
-    async function updateFramePreview(targetTime) {
-        if (isSeeking || videoPlayer.readyState < videoPlayer.HAVE_METADATA) return;
-
-        isSeeking = true;
-        updateButtonStates();
-        statusDiv.textContent = `正在定位到 ${targetTime.toFixed(3)}s 并提取...`;
-
-        try {
-            await seekToTime(targetTime);
-            const frameBlob = await captureFrameAsBlob();
-            
-            if (currentFrameUrl) URL.revokeObjectURL(currentFrameUrl);
-            
-            currentFrameUrl = URL.createObjectURL(frameBlob);
-            framePreview.src = currentFrameUrl;
-            framePreview.style.display = 'block';
-            previewPlaceholder.style.display = 'none';
-
-            statusDiv.textContent = `已成功提取 ${targetTime.toFixed(3)}s 处的帧。`;
-
-        } catch (error) {
-            console.error('更新帧预览时出错:', error);
-            statusDiv.textContent = `提取失败: ${error.message}`;
-            alert(`提取帧时出错: ${error.message}`);
-        } finally {
-            isSeeking = false;
-            updateButtonStates();
-        }
-    }
-    
-    function resetUI() {
-        statusDiv.textContent = '请选择一个视频文件。';
-        isSeeking = false;
-        if(videoPlayer.src && videoPlayer.src.startsWith('blob:')) {
-            URL.revokeObjectURL(videoPlayer.src);
-        }
-        videoSource.src = '';
-        videoFileName = '';
-        videoPlayer.load();
-        
-        resetFramePreview();
-        timeInput.value = '';
-        timeInput.max = null;
-
-        updateButtonStates();
-    }
-
-    function resetFramePreview() {
-        if (currentFrameUrl) {
-            URL.revokeObjectURL(currentFrameUrl);
-            currentFrameUrl = null;
-        }
-        framePreview.src = '';
-        framePreview.style.display = 'none';
-        previewPlaceholder.style.display = 'block';
-    }
-
-    function updateButtonStates() {
-        const videoLoaded = videoPlayer.readyState >= videoPlayer.HAVE_METADATA;
-        const disableAllPreciseControls = !videoLoaded || isSeeking;
-        
-        timeInput.disabled = disableAllPreciseControls;
-        timeDecreaseBtn.disabled = disableAllPreciseControls;
-        timeIncreaseBtn.disabled = disableAllPreciseControls;
-        saveFrameBtn.disabled = disableAllPreciseControls || !currentFrameUrl;
-        videoFileInput.disabled = isSeeking;
-    }
-
-    function seekToTime(time) {
-        return new Promise((resolve) => {
-            const onSeeked = () => {
-                videoPlayer.removeEventListener('seeked', onSeeked);
-                requestAnimationFrame(() => resolve());
-            };
-            
-            if (Math.abs(videoPlayer.currentTime - time) < 0.01) {
-                 requestAnimationFrame(() => resolve());
-                 return;
-            }
-
-            videoPlayer.addEventListener('seeked', onSeeked);
-            videoPlayer.currentTime = time;
-        });
-    }
-
-    function captureFrameAsBlob() {
-        return new Promise((resolve, reject) => {
-            try {
-                if (hiddenCanvas.width !== videoPlayer.videoWidth || hiddenCanvas.height !== videoPlayer.videoHeight) {
-                    hiddenCanvas.width = videoPlayer.videoWidth;
-                    hiddenCanvas.height = videoPlayer.videoHeight;
-                }
-                // ✅ 修改点 1: 在绘制新帧之前，先清空画布
-                context.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-                context.drawImage(videoPlayer, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
-                hiddenCanvas.toBlob(blob => {
-                    if (blob) resolve(blob);
-                    else reject(new Error('无法将Canvas转换为Blob。'));
-                }, 'image/png');
-            } catch (e) {
-                reject(new Error(`捕获帧时出错: ${e.message}`));
-            }
-        });
-    }
-
-    // --- Initial State ---
-    updateButtonStates();
-
 </script>
-
 </body>
 </html>
