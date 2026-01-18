@@ -3,232 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HTML / Code</title>
+    <meta name="theme-color" content="#FFFFFF">
+    <meta name="color-scheme" content="light">
+    
+    <!-- 标题已修正 -->
+    <title>HTML 编辑器</title>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
         :root {
-            /* M3 Color System */
-            --md-sys-color-surface: #FEF7FF;
-            --md-sys-color-surface-container: #F3EDF7;
-            --md-sys-color-surface-container-low: #F7F2FA;
-            --md-sys-color-on-surface: #1D1B20;
-            --md-sys-color-primary: #6750A4;
-            --md-sys-color-on-primary: #FFFFFF;
             --md-sys-color-primary-container: #EADDFF;
             --md-sys-color-on-primary-container: #21005D;
             --md-sys-color-outline: #79747E;
-            --md-sys-color-outline-variant: #CAC4D0;
-
-            /* M3 Shapes */
-            --md-sys-shape-corner-large: 28px;
-            --md-sys-shape-corner-medium: 16px;
-            --md-sys-shape-corner-small: 12px;
-            
-            /* Typography */
-            --md-sys-typescale-body-large: 'Roboto', sans-serif;
+            --md-sys-typescale-body: 'Roboto', sans-serif;
             --md-sys-typescale-code: 'Roboto Mono', monospace;
         }
 
         * {
-            /* 关键：去除移动端点击高亮 */
             -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
         }
 
-        body {
+        html, body {
             margin: 0;
             padding: 0;
-            font-family: var(--md-sys-typescale-body-large);
-            background-color: var(--md-sys-color-surface);
-            color: var(--md-sys-color-on-surface);
-            /* 使用 dvh 适应移动端动态视口 */
+            background-color: #FFFFFF;
+            color: #1D1B20;
             height: 100dvh; 
             width: 100vw;
-            overflow: hidden; /* 禁止 Body 滚动，由内部容器处理 */
+            overflow: hidden;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
         }
 
-        /* 主容器：负责响应式宽度的限制 */
         .app-container {
             display: flex;
             flex-direction: column;
             width: 100%;
             height: 100%;
             position: relative;
+            max-width: none; 
         }
 
-        /* 头部 */
-        header {
-            padding: 16px 24px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-        }
-
-        h1 {
-            font-size: 22px;
-            font-weight: 400;
-            margin: 0;
-            color: var(--md-sys-color-on-surface);
-        }
-
-        /* 编辑器外层卡片 */
         .editor-wrapper {
-            flex-grow: 1; /* 占据剩余所有空间 */
-            padding: 0 16px 16px 16px; /* 移动端边距 */
+            flex-grow: 1;
+            padding: 0; 
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative; 
         }
 
-        /* 编辑器容器（实际可见区域） */
-        .editor-container {
-            background-color: var(--md-sys-color-surface-container);
-            border-radius: var(--md-sys-shape-corner-large);
+        /* --- Preview (预览) 区域 --- */
+        #visualEditor {
             width: 100%;
-            height: 100%; /* 填满 wrapper */
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* 内部滚动 */
-            position: relative;
-        }
-
-        /* 输入框通用样式 */
-        .editor-box {
-            width: 100%;
-            height: 100%; /* 填满 container */
+            height: 100%;
             border: none;
             outline: none;
-            background-color: transparent;
-            padding: 24px;
-            padding-bottom: 88px; /* 底部留白，防止内容被 FAB 遮挡 */
+            
+            /* 全屏效果：0 padding */
+            padding: 0; 
+            
+            /* 底部留白，防止被按钮遮挡 */
+            padding-bottom: 100px; 
+            
             font-size: 16px;
             line-height: 1.6;
-            color: var(--md-sys-color-on-surface);
+            color: #1D1B20;
             resize: none;
-            overflow-y: auto; /* 内容过多时滚动 */
-            -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: block; 
         }
 
-        /* 滚动条隐藏 (移动端体验更好，或保持细条) */
-        .editor-box::-webkit-scrollbar {
-            width: 4px;
-        }
-        .editor-box::-webkit-scrollbar-thumb {
-            background: var(--md-sys-color-outline-variant);
-            border-radius: 2px;
-        }
-
-        #visualEditor {
-            display: block;
-        }
-        
         #visualEditor:empty:before {
             content: attr(data-placeholder);
             color: var(--md-sys-color-outline);
+            opacity: 0.6;
+            /* 占位符单独设置边距，避免贴边 */
+            padding-left: 16px; 
+            padding-top: 16px;
+            display: block;
         }
 
+        /* --- HTML 代码区域 --- */
         #codeEditor {
-            display: none;
+            position: absolute; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            
+            /* 代码区域保留边距，方便阅读 */
+            padding: 16px;
+            padding-top: 20px;
+            padding-bottom: 140px;
+            
             font-family: var(--md-sys-typescale-code);
             white-space: pre;
-            font-size: 14px;
-            background-color: var(--md-sys-color-surface-container-low); /* 代码模式稍微深一点的背景 */
-        }
-
-        /* 浮动按钮容器 */
-        .fab-container {
-            position: absolute;
-            bottom: 24px;
-            right: 24px;
+            font-size: 13px;
+            color: #333;
+            
+            background-color: #FFFFFF !important; 
+            
+            resize: none;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            
+            display: none; 
             z-index: 10;
         }
 
-        /* M3 Extended FAB */
-        .fab-extended {
+        /* 底部开关 */
+        .switch-container {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 20; 
+        }
+
+        .segmented-switch {
+            pointer-events: auto;
+            display: flex;
+            background-color: #F3EDF7; 
+            border-radius: 50px;
+            padding: 4px; 
+            height: 56px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+        }
+
+        .segment-btn {
+            border: none;
+            background: transparent;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            height: 56px;
-            padding: 0 20px; /* 如果有文字 */
-            min-width: 56px; 
-            border-radius: 16px;
+            gap: 8px;
+            cursor: pointer;
+            font-family: var(--md-sys-typescale-body);
+            font-size: 14px;
+            font-weight: 500;
+            color: #49454F;
+            padding: 0 24px;
+            border-radius: 50px;
+            min-width: 110px;
+            transition: all 0.2s ease;
+        }
+
+        .segment-btn.active {
             background-color: var(--md-sys-color-primary-container);
             color: var(--md-sys-color-on-primary-container);
-            border: none;
-            font-family: var(--md-sys-typescale-body-large);
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            box-shadow: 0 4px 8px 3px rgba(0,0,0,0.15);
-            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
-            user-select: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
-        .fab-extended:active {
-            transform: scale(0.96);
-            box-shadow: 0 2px 4px 2px rgba(0,0,0,0.15);
-        }
-
-        /* 桌面端适配 (大屏幕优化) */
-        @media (min-width: 800px) {
-            body {
-                background-color: var(--md-sys-color-surface-container-low); /* 背景色区分 */
-            }
-
-            .app-container {
-                max-width: 800px; /* 限制最大宽度 */
-                height: 95dvh; /* 上下留白 */
-                margin-top: 2.5dvh;
-                background-color: var(--md-sys-color-surface);
-                border-radius: var(--md-sys-shape-corner-large);
-                box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            }
-
-            .editor-wrapper {
-                padding: 0 24px 24px 24px;
-            }
-
-            .editor-container {
-                /* 桌面端内部背景稍微区分 */
-                background-color: #fff; 
-                border: 1px solid var(--md-sys-color-outline-variant);
-            }
-            
-            #codeEditor {
-                 background-color: #fcfcfc;
-            }
+        .material-symbols-outlined {
+            font-size: 20px;
         }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <header>
-        <h1>HTML / Editor</h1>
-    </header>
-
     <div class="editor-wrapper">
-        <div class="editor-container">
-            <!-- 可视化视图 -->
-            <div id="visualEditor" class="editor-box" contenteditable="true" data-placeholder="..."></div>
+        <div id="visualEditor" contenteditable="true" data-placeholder="在此粘贴内容..."></div>
+        <textarea id="codeEditor" spellcheck="false"></textarea>
+    </div>
 
-            <!-- 代码视图 -->
-            <textarea id="codeEditor" class="editor-box" spellcheck="false"></textarea>
-            
-            <!-- 按钮位于编辑器区域之上 (绝对定位) -->
-            <div class="fab-container">
-                <button id="toggleButton" class="fab-extended">
-                    <span class="material-symbols-outlined" id="btnIcon">code</span>
-                    <span id="btnText">Code</span>
-                </button>
-            </div>
+    <div class="switch-container">
+        <div class="segmented-switch">
+            <button id="btnVisual" class="segment-btn active">
+                <span class="material-symbols-outlined">visibility</span>
+                预览
+            </button>
+            <button id="btnCode" class="segment-btn">
+                <span class="material-symbols-outlined">code</span>
+                代码
+            </button>
         </div>
     </div>
 </div>
@@ -236,59 +195,70 @@
 <script>
     const visualEditor = document.getElementById('visualEditor');
     const codeEditor = document.getElementById('codeEditor');
-    const toggleButton = document.getElementById('toggleButton');
-    const btnText = document.getElementById('btnText');
-    const btnIcon = document.getElementById('btnIcon');
+    const btnVisual = document.getElementById('btnVisual');
+    const btnCode = document.getElementById('btnCode');
 
     let isCodeView = false;
+    const voidTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
 
-    // 格式化功能
     function formatHTML(html) {
         const tab = '  '; 
         let result = '';
         let indent = '';
 
-        html = html.replace(/>\s+</g, '><').trim();
+        // 1. 清洗：移除现有换行符
+        html = html.replace(/[\r\n]+/g, ' ').replace(/>\s+</g, '><').trim();
+
         const tokens = html.split(/(<[^>]+>)/g).filter(s => s.trim() !== '');
-        const voidTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
 
         tokens.forEach(token => {
             let isClosing = token.startsWith('</');
             let isOpening = token.startsWith('<') && !isClosing;
-            let tagName = '';
             
+            if (!token.startsWith('<')) {
+                token = token.trim();
+            }
+
+            if (token.length === 0) return;
+
+            let tagName = '';
             if (isOpening) {
                 const match = token.match(/^<([a-z0-9]+)/i);
                 if (match) tagName = match[1].toLowerCase();
             }
 
             if (isClosing) indent = indent.substring(tab.length);
+            
             result += indent + token + '\n';
+            
             if (isOpening && !voidTags.includes(tagName) && !token.includes('/>')) indent += tab;
         });
 
         return result.trim();
     }
 
-    toggleButton.addEventListener('click', () => {
-        if (isCodeView) {
-            // Code -> Visual
-            visualEditor.innerHTML = codeEditor.value;
-            visualEditor.style.display = 'block';
-            codeEditor.style.display = 'none';
-            btnText.textContent = 'Code';
-            btnIcon.textContent = 'code';
-            isCodeView = false;
-        } else {
-            // Visual -> Code
-            const rawHTML = visualEditor.innerHTML;
-            codeEditor.value = formatHTML(rawHTML);
-            visualEditor.style.display = 'none';
-            codeEditor.style.display = 'block';
-            btnText.textContent = 'View';
-            btnIcon.textContent = 'visibility';
-            isCodeView = true;
-        }
+    btnVisual.addEventListener('click', () => {
+        if (!isCodeView) return;
+
+        visualEditor.innerHTML = codeEditor.value;
+        codeEditor.style.display = 'none';
+
+        btnVisual.classList.add('active');
+        btnCode.classList.remove('active');
+        isCodeView = false;
+    });
+
+    btnCode.addEventListener('click', () => {
+        if (isCodeView) return;
+
+        const rawHTML = visualEditor.innerHTML;
+        codeEditor.value = formatHTML(rawHTML);
+        codeEditor.style.display = 'block';
+        visualEditor.innerHTML = ''; 
+
+        btnCode.classList.add('active');
+        btnVisual.classList.remove('active');
+        isCodeView = true;
     });
 </script>
 
