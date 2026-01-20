@@ -65,7 +65,7 @@
             --elevation-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
-        /* 浅色主题 (自动计算适配) */
+        /* 浅色主题 */
         [data-theme="light"] {
             --md-sys-color-background: #F4F8FC;
             --md-sys-color-on-background: #001926;
@@ -111,12 +111,12 @@
             color: var(--md-sys-color-on-background);
             transition: background-color var(--motion-duration), color var(--motion-duration);
             min-height: 100vh;
-            font-size: 13px; /* 紧凑基础字体 */
+            font-size: 13px;
             line-height: 1.4;
         }
 
         .app-container {
-            max-width: 900px; /* 更窄的容器 */
+            max-width: 900px;
             margin: 0 auto;
             padding: 12px;
             padding-top: 56px;
@@ -183,7 +183,7 @@
         }
         #backButton span.material-symbols-rounded { font-size: 16px; }
 
-        /* --- 搜索区域 (紧凑版) --- */
+        /* --- 搜索区域 --- */
         .form-container {
             max-width: 360px;
             margin: 0 auto 20px;
@@ -206,7 +206,7 @@
 
         .form-group input, .form-group select {
             width: 100%;
-            height: 38px; /* 进一步减小高度 */
+            height: 38px;
             padding: 0 10px;
             background-color: var(--md-sys-color-surface-container-high);
             color: var(--md-sys-color-on-surface);
@@ -246,32 +246,55 @@
             font-weight: 500;
         }
 
-        /* --- 监测按钮 --- */
+        /* --- 监测按钮 (修复 MD3 规范和触摸卡顿) --- */
         .monitor-container { text-align: center; margin-bottom: 12px; }
+        
         #monitorButton {
-            height: 32px;
-            padding: 0 16px;
+            height: 40px; /* 稍微高一点，符合触控目标 */
+            padding: 0 24px;
             border-radius: var(--radius-pill);
-            border: 1px solid var(--md-sys-color-outline);
-            background: transparent;
-            color: var(--md-sys-color-primary);
-            font-size: 12px;
+            border: none; /* Filled Button 不要有边框 */
+            
+            /* 默认状态：Primary Filled */
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        #monitorButton:hover:not(:disabled) {
-            background-color: var(--md-sys-color-primary-container);
-            border-color: var(--md-sys-color-primary);
+
+        /* 仅在支持 Hover 的设备上启用 Hover 效果，防止手机上点击后变色卡住 */
+        @media (hover: hover) {
+            #monitorButton:hover:not(:disabled) {
+                background-color: var(--md-sys-color-primary-container);
+                color: var(--md-sys-color-on-primary-container);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
         }
+
+        /* 监测中状态：Error Filled */
         #monitorButton.monitoring {
             background-color: var(--md-sys-color-error);
             color: var(--md-sys-color-on-error);
-            border-color: transparent;
-            animation: pulse-red 2s infinite;
+            animation: none; /* 移除廉价的脉冲动画 */
+        }
+        
+        /* 监测中的 Hover */
+        @media (hover: hover) {
+            #monitorButton.monitoring:hover {
+                filter: brightness(1.1);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
         }
 
-        /* --- 选项卡 (Compact Pill) --- */
+        /* --- 选项卡 --- */
         .tabs {
             display: flex;
             justify-content: center;
@@ -304,9 +327,8 @@
         .tab-content { display: none; animation: fadeUp 0.2s var(--motion-easing); }
         .tab-content.active { display: block; }
 
-        /* --- 玩家概览 (改为 Flexbox 自动适应宽度) --- */
+        /* --- 玩家概览 --- */
         #profileSummary {
-            /* 移除 Grid，改用 Flexbox 实现内容自适应 */
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
@@ -319,24 +341,104 @@
             padding: 10px;
             background-color: var(--md-sys-color-surface-container);
             border-radius: var(--radius-medium);
-            border: 1px solid rgba(255,255,255,0.03);
-            /* 关键修改：自动宽度，自动填充，不收缩 */
+            border: 1px solid transparent;
             flex: 1 0 auto; 
             width: auto;
-            min-width: 100px; /* 防止内容极少时太窄 */
+            min-width: 100px;
         }
+
+        .summary-item.full-width {
+            flex-basis: 100%;
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            border: none;
+        }
+        
+        .summary-item.full-width .summary-label {
+            color: var(--md-sys-color-on-primary-container);
+            font-size: 11px;
+            opacity: 0.8;
+            margin-bottom: 4px;
+        }
+
+        .summary-item.full-width .summary-value {
+            font-size: 24px;
+            color: var(--md-sys-color-on-primary-container);
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
         .summary-label { font-size: 10px; color: var(--md-sys-color-secondary); margin-bottom: 2px; text-transform: uppercase; opacity: 0.9; letter-spacing: 0.5px; }
         .summary-value { 
             font-size: 13px; 
             font-weight: 600; 
             color: var(--md-sys-color-on-surface); 
             line-height: 1.2;
-            /* 关键修改：强制不换行，迫使容器变宽 */
             white-space: nowrap; 
         }
         .summary-value.premium { color: var(--md-sys-color-primary); text-shadow: 0 0 8px rgba(118, 255, 51, 0.2); }
 
-        /* --- 排行榜 (Grid Layout) --- */
+        /* --- 变更日志 (MD3 列表样式修复) --- */
+        #changeLogContainer {
+            max-height: 60vh; 
+            overflow-y: auto;
+            /* 背景和边框调整，更像一个 Surface */
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--radius-large); 
+            padding: 8px 0; /* padding 上下留白，左右为0，方便列表项填满 */
+            border: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .log-entry {
+            /* 移除左侧边框和深色背景，改为透明 */
+            background-color: transparent;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .log-entry:last-child { border-bottom: none; }
+
+        .log-icon-wrapper {
+            /* 左侧图标容器 */
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .log-icon-wrapper .material-symbols-rounded { font-size: 18px; }
+
+        .log-text-content {
+            flex-grow: 1;
+        }
+
+        .log-timestamp { 
+            font-size: 11px; 
+            color: var(--md-sys-color-on-surface-variant); 
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+        
+        .log-details {
+            font-size: 13px;
+            color: var(--md-sys-color-on-surface);
+            line-height: 1.4;
+        }
+        .log-details strong {
+            color: var(--md-sys-color-primary);
+            font-weight: 600;
+        }
+
+        /* --- 排行榜 & 列表通用 --- */
         .leaderboard-category {
             background-color: var(--md-sys-color-surface-container);
             border-radius: var(--radius-large);
@@ -347,12 +449,7 @@
             flex-direction: column;
             border: 1px solid var(--md-sys-color-outline-variant);
         }
-        .leaderboard-category h3 {
-            font-size: 14px;
-            text-align: center;
-            margin: 0 0 10px;
-            color: var(--md-sys-color-primary);
-        }
+        .leaderboard-category h3 { font-size: 14px; text-align: center; margin: 0 0 10px; color: var(--md-sys-color-primary); }
 
         .leaderboard-carousel-container { position: relative; margin-top: 12px; }
         
@@ -362,23 +459,13 @@
             gap: 12px;
             transition: opacity 0.2s ease;
         }
-        @media (min-width: 768px) {
-            #leaderboardCarouselContent { grid-template-columns: 1fr 1fr; }
-        }
+        @media (min-width: 768px) { #leaderboardCarouselContent { grid-template-columns: 1fr 1fr; } }
 
         .carousel-nav-button {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 10;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            border: none;
-            background-color: var(--md-sys-color-surface);
-            color: var(--md-sys-color-on-surface);
-            cursor: pointer;
-            box-shadow: var(--elevation-shadow);
+            position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+            width: 28px; height: 28px; border-radius: 50%; border: none;
+            background-color: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface);
+            cursor: pointer; box-shadow: var(--elevation-shadow);
             display: flex; align-items: center; justify-content: center;
             border: 1px solid var(--md-sys-color-outline-variant);
         }
@@ -386,26 +473,15 @@
         #leaderboardPrev { left: -14px; }
         #leaderboardNext { right: -14px; }
 
-        /* 表格通用 (紧凑) */
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
         th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-        th { 
-            color: var(--md-sys-color-secondary); 
-            font-weight: 500; font-size: 11px; 
-            background-color: var(--md-sys-color-surface-container);
-            position: sticky; top: 0; z-index: 1;
-        }
+        th { color: var(--md-sys-color-secondary); font-weight: 500; font-size: 11px; background-color: var(--md-sys-color-surface-container); position: sticky; top: 0; z-index: 1; }
         tr:last-child td { border-bottom: none; }
         .player-link { font-weight: 500; color: var(--md-sys-color-on-surface); }
         .player-link:hover { color: var(--md-sys-color-primary); text-decoration: underline; }
 
-        .leaderboard-table-wrapper, .list-container {
-            overflow-x: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--md-sys-color-outline-variant) transparent;
-        }
+        .leaderboard-table-wrapper, .list-container { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--md-sys-color-outline-variant) transparent; }
 
-        /* --- 横向滚动列表 (Compact Cards) --- */
         .list-section { margin-bottom: 20px; }
         .list-title {
             font-size: 14px; margin-bottom: 8px; font-weight: 600;
@@ -414,24 +490,14 @@
             color: var(--md-sys-color-on-background);
         }
         
-        .list-container {
-            display: flex;
-            padding: 4px;
-            gap: 8px;
-            scroll-snap-type: x mandatory;
-        }
+        .list-container { display: flex; padding: 4px; gap: 8px; scroll-snap-type: x mandatory; }
         
         .data-card {
-            flex: 0 0 160px; /* 超紧凑宽度 */
-            scroll-snap-align: start;
+            flex: 0 0 160px; scroll-snap-align: start;
             background-color: var(--md-sys-color-surface-container);
-            padding: 10px;
-            border-radius: var(--radius-medium);
-            display: flex;
-            flex-direction: column;
-            text-align: center;
-            border: 1px solid transparent;
-            transition: transform 0.2s, box-shadow 0.2s;
+            padding: 10px; border-radius: var(--radius-medium);
+            display: flex; flex-direction: column; text-align: center;
+            border: 1px solid transparent; transition: transform 0.2s, box-shadow 0.2s;
         }
         .data-card:hover { transform: translateY(-2px); box-shadow: var(--elevation-shadow); border-color: var(--md-sys-color-outline-variant); }
         .data-card.changed { border: 1px solid var(--md-sys-color-primary); background-color: rgba(118, 255, 51, 0.05); }
@@ -439,103 +505,55 @@
         .item-name { font-size: 12px; font-weight: 600; margin-bottom: 6px; height: 28px; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
         .item-image { width: 48px; height: 48px; object-fit: contain; margin: 0 auto 6px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
         
-        /* 强制单行显示，防止高度不一致 */
-        .data-card div { 
-            font-size: 11px; 
-            margin: 1px 0; 
-            color: var(--md-sys-color-on-surface-variant);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
-        }
+        .data-card div { font-size: 11px; margin: 1px 0; color: var(--md-sys-color-on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
         .data-card strong { color: var(--md-sys-color-on-surface); }
 
         .view-data-button {
-            margin-top: auto;
-            padding: 4px 8px;
+            margin-top: auto; padding: 4px 8px;
             background-color: var(--md-sys-color-secondary-container);
             color: var(--md-sys-color-secondary);
-            border: none;
-            border-radius: var(--radius-small);
-            font-size: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 6px;
+            border: none; border-radius: var(--radius-small);
+            font-size: 10px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 6px;
         }
         .view-data-button:hover { filter: brightness(1.1); }
 
-        /* --- 模态框 (Compact) --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(2px);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 1000;
-            animation: fadeIn 0.2s;
+            background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(2px);
+            display: flex; justify-content: center; align-items: center; z-index: 1000; animation: fadeIn 0.2s;
         }
         .modal-content {
-            background-color: var(--md-sys-color-surface-container);
-            color: var(--md-sys-color-on-surface);
-            padding: 16px;
-            border-radius: var(--radius-large);
-            width: 90%; max-width: 360px; max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-            border: 1px solid var(--md-sys-color-outline-variant);
+            background-color: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface);
+            padding: 16px; border-radius: var(--radius-large);
+            width: 90%; max-width: 360px; max-height: 80vh; overflow-y: auto;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3); border: 1px solid var(--md-sys-color-outline-variant);
         }
         .modal-content h3 { color: var(--md-sys-color-primary); text-align: center; margin-top: 0; font-size: 15px; }
         .close-button {
-            display: block; margin: 12px auto 0;
-            padding: 6px 20px;
-            background-color: var(--md-sys-color-error);
-            color: var(--md-sys-color-on-error);
-            border: none; border-radius: var(--radius-pill);
-            cursor: pointer; font-size: 11px; font-weight: bold;
+            display: block; margin: 12px auto 0; padding: 6px 20px;
+            background-color: var(--md-sys-color-error); color: var(--md-sys-color-on-error);
+            border: none; border-radius: var(--radius-pill); cursor: pointer; font-size: 11px; font-weight: bold;
         }
 
-        /* --- 排名表格特化 --- */
         #rankingsTableContainer {
-            background-color: var(--md-sys-color-surface-container);
-            border-radius: var(--radius-large);
-            padding: 12px;
-            margin-bottom: 20px;
-            overflow-x: auto;
+            background-color: var(--md-sys-color-surface-container); border-radius: var(--radius-large);
+            padding: 12px; margin-bottom: 20px; overflow-x: auto;
         }
         #rankingsTableContainer h3 { text-align: center; color: var(--md-sys-color-primary); margin-bottom: 8px; font-size: 14px; }
 
-        /* --- 辅助类 --- */
         .change-indicator { font-size: 10px; font-weight: 700; margin-left: 2px; padding: 0 3px; border-radius: 4px; }
         .change-increase { color: var(--chart-increase); background-color: rgba(118, 255, 51, 0.1); }
         .change-decrease { color: var(--chart-decrease); background-color: rgba(255, 102, 102, 0.1); }
 
         .loader { display: none; justify-content: center; padding: 20px; }
         .loader-inner {
-            width: 24px; height: 24px;
-            border-radius: 50%;
-            border: 3px solid var(--md-sys-color-surface-container-high);
-            border-top-color: var(--md-sys-color-primary);
+            width: 24px; height: 24px; border-radius: 50%;
+            border: 3px solid var(--md-sys-color-surface-container-high); border-top-color: var(--md-sys-color-primary);
             animation: spin 0.8s linear infinite;
         }
 
-        /* 日志 */
-        #changeLogContainer {
-            max-height: 60vh; overflow-y: auto;
-            background-color: var(--md-sys-color-surface-container);
-            border-radius: var(--radius-medium); padding: 10px;
-        }
-        .log-entry {
-            background-color: var(--md-sys-color-surface);
-            padding: 8px; margin-bottom: 6px;
-            border-radius: 6px;
-            border-left: 3px solid var(--md-sys-color-primary);
-            font-size: 11px;
-        }
-        .log-timestamp { font-size: 10px; color: var(--md-sys-color-secondary); margin-bottom: 2px; }
         .no-data-message { text-align: center; color: var(--md-sys-color-outline); padding: 16px; font-size: 11px; font-style: italic; }
 
-        /* 奖励图标 */
         .prize-icons-container { display: flex; gap: 2px; align-items: center; }
         .prize-icon { width: 14px; height: 14px; background-size: contain; background-repeat: no-repeat; background-position: center; }
         .prize-icon.drone { background-image: url('https://pages.tankionline.com/images/challenge/hyperion.png'); }
@@ -548,7 +566,6 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 102, 102, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(255, 102, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 102, 102, 0); } }
     </style>
 </head>
 <body>
@@ -605,7 +622,11 @@
     <div id="resultsWrapper" class="results-wrapper" style="display: none;">
         
         <div class="monitor-container">
-            <button id="monitorButton">开启实时监测</button>
+            <!-- 修复后的监测按钮，增加图标指示 -->
+            <button id="monitorButton">
+                <span class="material-symbols-rounded">play_arrow</span>
+                <span>开启实时监测</span>
+            </button>
         </div>
 
         <div class="tabs">
@@ -965,9 +986,39 @@
     }
     async function handleFetch() { if (isMonitoring) { displayError('请先停止监测再进行新的查询'); return; } currentServer = elements.serverSelect.value; currentUsername = elements.usernameInput.value.trim(); if (!currentUsername) { displayError('请输入昵称'); return; } clearDisplay(true); setLoading(true); try { const profileData = await fetchProfileData(currentServer, currentUsername); updateDisplay(profileData); lastProfileData = profileData; } catch (error) { console.error('获取数据时出错:', error); displayError(error.message); } finally { setLoading(false); } }
     async function fetchProfileData(server, username) { const baseUrl = API_CONFIG.baseUrls[server]; if (!baseUrl) throw new Error('无效的服务器选择'); const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest='; try { const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`; const apiUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; const response = await fetch(apiUrl); if (!response.ok) throw new Error(`网络响应错误: ${response.status}`); const profileData = await response.json(); if (profileData?.responseType === 'NOT_FOUND') { throw new Error('找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。'); } else if (profileData?.response) { return profileData.response; } else { throw new Error('无效的响应数据格式'); } } catch (err) { throw err; } }
-    function toggleMonitoring() { if (isMonitoring) stopMonitoring(); else { if (!lastProfileData) { displayError('请先至少查询一次，再开启监测'); return; } isMonitoring = true; startMonitoring(); } }
-    function startMonitoring() { if (!isMonitoring) return; elements.monitorButton.textContent = "停止监测"; elements.monitorButton.classList.add('monitoring'); elements.fetchButton.disabled = true; elements.usernameInput.disabled = true; elements.serverSelect.disabled = true; displayError("监测已开启..."); performMonitoringFetch(); }
-    function stopMonitoring() { isMonitoring = false; clearTimeout(monitoringTimeoutId); elements.monitorButton.textContent = "开启实时监测"; elements.monitorButton.classList.remove('monitoring'); elements.fetchButton.disabled = false; elements.usernameInput.disabled = false; elements.serverSelect.disabled = false; displayError(''); }
+    
+    function toggleMonitoring() { 
+        if (isMonitoring) stopMonitoring(); 
+        else { 
+            if (!lastProfileData) { displayError('请先至少查询一次，再开启监测'); return; } 
+            isMonitoring = true; startMonitoring(); 
+        } 
+    }
+    
+    function startMonitoring() { 
+        if (!isMonitoring) return; 
+        // 更改按钮文本和样式
+        elements.monitorButton.innerHTML = `<span class="material-symbols-rounded">stop</span><span>停止监测</span>`;
+        elements.monitorButton.classList.add('monitoring'); 
+        elements.fetchButton.disabled = true; 
+        elements.usernameInput.disabled = true; 
+        elements.serverSelect.disabled = true; 
+        displayError("监测已开启..."); 
+        performMonitoringFetch(); 
+    }
+    
+    function stopMonitoring() { 
+        isMonitoring = false; 
+        clearTimeout(monitoringTimeoutId); 
+        // 恢复按钮文本和样式
+        elements.monitorButton.innerHTML = `<span class="material-symbols-rounded">play_arrow</span><span>开启实时监测</span>`;
+        elements.monitorButton.classList.remove('monitoring'); 
+        elements.fetchButton.disabled = false; 
+        elements.usernameInput.disabled = false; 
+        elements.serverSelect.disabled = false; 
+        displayError(''); 
+    }
+    
     async function performMonitoringFetch() { if (!isMonitoring) return; try { const newData = await fetchProfileData(currentServer, currentUsername); if (isMonitoring) displayError('监测中...数据已刷新'); updateDisplay(newData, lastProfileData); lastProfileData = newData; } catch (error) { console.error("Monitoring fetch failed, will retry:", error); if (isMonitoring) displayError(`监测中断: ${error.message} (${API_CONFIG.monitorInterval / 1000}秒后重试)`); } finally { if (isMonitoring) { monitoringTimeoutId = setTimeout(performMonitoringFetch, API_CONFIG.monitorInterval); } } }
     function updateDisplay(newData, oldData = null) { 
         if (oldData === null) {
@@ -980,8 +1031,36 @@
         displayAllLists(newData, oldData);
     }
     function createChangeSpan(diff) { if (diff === 0 || isNaN(diff)) return ''; const sign = diff > 0 ? '+' : ''; const className = diff > 0 ? 'change-increase' : 'change-decrease'; return `<span class="change-indicator ${className}">${sign}${diff.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span>`; }
-    function logChange(item, oldValue, newValue) { const entry = { timestamp: new Date().toLocaleString('zh-CN'), item: translateText(item), oldValue: oldValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A', newValue: newValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A' }; changeLog.unshift(entry); renderChangeLog(); }
-    function renderChangeLog() { if (changeLog.length === 0) { elements.changeLogContainer.innerHTML = `<p class="no-data-message">暂无数据变更记录</p>`; return; } elements.changeLogContainer.innerHTML = changeLog.map(log => `<div class="log-entry"><div class="log-timestamp">${log.timestamp}</div><div class="log-details"><strong>${log.item}:</strong> ${log.oldValue} ➝ ${log.newValue}</div></div>`).join(''); }
+    
+    function logChange(item, oldValue, newValue) { 
+        const entry = { 
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false }), // 简化时间显示
+            item: translateText(item), 
+            oldValue: oldValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A', 
+            newValue: newValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A' 
+        }; 
+        changeLog.unshift(entry); 
+        renderChangeLog(); 
+    }
+    
+    function renderChangeLog() { 
+        if (changeLog.length === 0) { elements.changeLogContainer.innerHTML = `<p class="no-data-message">暂无数据变更记录</p>`; return; } 
+        // 重新设计的 List Item 渲染
+        elements.changeLogContainer.innerHTML = changeLog.map(log => `
+            <div class="log-entry">
+                <div class="log-icon-wrapper">
+                    <span class="material-symbols-rounded">update</span>
+                </div>
+                <div class="log-text-content">
+                    <div class="log-timestamp">${log.timestamp}</div>
+                    <div class="log-details">
+                        <strong>${log.item}</strong> 
+                        从 ${log.oldValue} 变为 ${log.newValue}
+                    </div>
+                </div>
+            </div>
+        `).join(''); 
+    }
     
     function displayProfileSummary(profile, oldProfile = null) { 
         const getStat = (p, key, oldP, label) => { 
@@ -1007,9 +1086,15 @@
         
         const rankNum = profile.rank || 1;
         const rankName = (rankNum > 0) ? (rankNum <= RANKS.length ? RANKS[rankNum - 1] : `传奇 ${rankNum - RANKS.length}`) : "未知等级"; 
+
+        // 1. 单独生成昵称 HTML (全宽、大字体) - 使用 MD3 Filled Card 风格
+        const nicknameHTML = `<div class="summary-item full-width">
+            <span class="summary-label">玩家昵称</span>
+            <span class="summary-value">${profile.name || 'N/A'}</span>
+        </div>`;
         
         const summaryData = [ 
-            { label: '昵称', value: profile.name || 'N/A' }, 
+            // { label: '昵称', value: profile.name || 'N/A' }, // 已移除
             { label: '等级', value: rankName }, 
             { label: '经验值', value: `${score.value}${score.changeHTML} / ${profile.scoreNext?.toLocaleString() || 0}` }, 
             { label: 'VIP 状态', value: profile.hasPremium ? '已激活' : '未激活', isPremium: profile.hasPremium }, 
@@ -1022,7 +1107,8 @@
             { label: '获得金箱子', value: `${caughtGolds.value}${caughtGolds.changeHTML}` }, 
         ]; 
         
-        elements.profileSummary.innerHTML = summaryData.map(item => `<div class="summary-item"><span class="summary-label">${item.label}</span><span class="summary-value ${item.isPremium ? 'premium' : ''}">${item.value}</span></div>`).join(''); 
+        // 2. 拼接 HTML
+        elements.profileSummary.innerHTML = nicknameHTML + summaryData.map(item => `<div class="summary-item"><span class="summary-label">${item.label}</span><span class="summary-value ${item.isPremium ? 'premium' : ''}">${item.value}</span></div>`).join(''); 
     }
     
     function displayRankingsTable(newData, oldData = null) { 
