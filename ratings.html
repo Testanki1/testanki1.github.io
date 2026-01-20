@@ -426,7 +426,17 @@
 
         .item-name { font-size: 12px; font-weight: 600; margin-bottom: 6px; height: 28px; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
         .item-image { width: 48px; height: 48px; object-fit: contain; margin: 0 auto 6px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
-        .data-card div { font-size: 11px; margin: 1px 0; color: var(--md-sys-color-on-surface-variant); }
+        
+        /* 强制单行显示，防止高度不一致 */
+        .data-card div { 
+            font-size: 11px; 
+            margin: 1px 0; 
+            color: var(--md-sys-color-on-surface-variant);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
         .data-card strong { color: var(--md-sys-color-on-surface); }
 
         .view-data-button {
@@ -630,7 +640,7 @@
 
     initTheme();
 
-    // --- 核心业务逻辑 (保持不变) ---
+    // --- 核心业务逻辑 ---
     const API_CONFIG = {
         baseUrls: { 'eu': 'https://ratings.tankionline.com/api/eu/profile/', 'cn': 'https://ratings.3dtank.com/get_stat/profile/' },
         leaderboardUrl: 'https://ratings.tankionline.com/api/eu/top/',
@@ -638,7 +648,15 @@
     };
     const RANKS = ["新兵", "二等兵", "一等兵", "下士", "中士", "上士", "三级军士长", "二级军士长", "一级军士长", "军士长", "五级准尉", "四级准尉", "三级准尉", "二级准尉", "一级准尉", "特级准尉", "少尉", "中尉", "上尉", "少校", "中校", "上校", "准将", "少将", "中将", "上将", "元帅", "陆军元帅", "统帅", "大元帅", "传奇"];
     const LIST_DATA_CONFIGS = [{ key: 'turretsPlayed', title: '使用的炮塔' }, { key: 'hullsPlayed', title: '使用的底盘' }, { key: 'dronesPlayed', title: '使用的无人机' }, { key: 'resistanceModules', title: '使用的防御模块' }, { key: 'paintsPlayed', title: '使用的迷彩' }, { key: 'modesPlayed', title: '玩过的模式' }, { key: 'suppliesUsage', title: '使用的道具' }, { key: 'presents', title: '收到的礼物' }];
-    const TRANSLATION_MAP = { 'JGR': '个人剑圣', 'TJR': '团队剑圣', 'RESISTANCE': '抗性', 'SHAFT': '镭射炮', 'THUNDER': '雷暴炮', 'CRITICAL': '暴击', 'MINE': '地雷', 'RAILGUN': '激光炮', 'FREEZE': '冰风暴', 'SMOKY': '轰天炮', 'RICOCHET': '火龙珠', 'ARTILLERY': '马格南', 'FIREBIRD': '火焰炮', 'TWINS': '离子炮', 'GAUSS': '电磁炮', 'ROCKET_LAUNCHER': '火箭炮', 'ISIS': '磁力炮', 'TESLA': '特斯拉', 'SCORPIO': '蝎子', 'MACHINE_GUN': '极速炮', 'SHOTGUN': '滑膛炮' };
+    
+    // 翻译映射表 (确保键名正确)
+    const TRANSLATION_MAP = { 
+        'JGR': '个人剑圣', 'TJR': '团队剑圣', 'RESISTANCE': '抗性', 'SHAFT': '镭射炮', 'THUNDER': '雷暴炮', 
+        'CRITICAL': '暴击', 'MINE': '地雷', 'RAILGUN': '激光炮', 'FREEZE': '冰风暴', 'SMOKY': '轰天炮', 
+        'RICOCHET': '火龙珠', 'ARTILLERY': '马格南', 'FIREBIRD': '火焰炮', 'TWINS': '离子炮', 'GAUSS': '电磁炮', 
+        'ROCKET_LAUNCHER': '火箭炮', 'ISIS': '磁力炮', 'TESLA': '特斯拉', 'SCORPIO': '蝎子', 
+        'MACHINE_GUN': '极速炮', 'SHOTGUN': '滑膛炮', 'MODULE': '模块'
+    };
     
     const LEADERBOARD_CATEGORIES = [
         { key: 'score', title: '经验值' },
@@ -715,7 +733,26 @@
         }
     }
     
-    function translateText(text) { if (typeof text !== 'string' || !text) return text; let translated = text; const replacementOrder = ['ROCKET_LAUNCHER', 'MACHINE_GUN', 'FIREBIRD', 'RESISTANCE', 'RICOCHET', 'ARTILLERY', 'SHOTGUN', 'THUNDER', 'CRITICAL', 'RAILGUN', 'FREEZE', 'SCORPIO', 'SMOKY', 'SHAFT', 'TWINS', 'GAUSS', 'TESLA', 'ISIS', 'MINE', 'JGR', 'TJR']; replacementOrder.forEach(key => { if (TRANSLATION_MAP[key]) translated = translated.replace(new RegExp(key, 'g'), TRANSLATION_MAP[key]); }); if (translated.includes('_')) translated = translated.replace(/_/g, ''); return translated; }
+    // --- 改进后的翻译函数 ---
+    function translateText(text) { 
+        if (typeof text !== 'string' || !text) return text; 
+        
+        let translated = text;
+
+        // 1. 按长度排序键名 (长词优先)
+        const sortedKeys = Object.keys(TRANSLATION_MAP).sort((a, b) => b.length - a.length);
+
+        sortedKeys.forEach(key => { 
+            // 使用 'gi' 标志，忽略大小写
+            const regex = new RegExp(key, 'gi');
+            if (regex.test(translated)) {
+                translated = translated.replace(regex, TRANSLATION_MAP[key]); 
+            }
+        }); 
+        
+        // 2. 清理分隔符 (移除剩余的下划线 _ 和 连字符 -，以及空格)
+        return translated.replace(/[_\-\s]/g, ''); 
+    }
     
     function showLeaderboardView(pushState = true) {
         elements.resultsWrapper.style.display = 'none';
@@ -1068,7 +1105,7 @@
     
             let cardHTML = `<div class="item-name">${translateText(item.name) || '-'}</div>`;
             if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`;
-            if (item.properties != null) cardHTML += createField('特性', item.properties?.toLocaleString(), 'properties');
+            if (item.properties != null) cardHTML += createField('特性', translateText(item.properties?.toLocaleString()), 'properties');
             if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>等级:</strong> ${getGradeName(item.grade)}</div>`;
             if (item.scoreEarned != null && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
             if (item.timePlayed > 0 && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('时长', formatTime(item.timePlayed), 'timePlayed');
@@ -1156,7 +1193,20 @@
         overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('close-button')) overlay.remove(); });
     }
 
-    function formatTime(ms) { if (!ms || ms <= 0) return '-'; const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = (ms % 60000) / 1000; const parts = []; if (h > 0) parts.push(`${h} 小时`); if (m > 0) parts.push(`${m} 分`); if (s > 0 || parts.length === 0) parts.push(`${s} 秒`); return parts.join(' '); }
+    function formatTime(ms) { 
+        if (!ms || ms <= 0) return '-'; 
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        // 修复：移除秒数的小数位，使文本更短
+        const s = (ms % 60000) / 1000; 
+        
+        const parts = []; 
+        if (h > 0) parts.push(`${h} 小时`); 
+        if (m > 0) parts.push(`${m} 分钟`); 
+        if (s > 0 || parts.length === 0) parts.push(`${s} 秒`); 
+        return parts.join(' '); 
+    }
+    
     function getGradeName(grade) { return grade != null && grade > -1 ? `Mk${grade + 1}` : '-'; }
 </script>
 </body>
