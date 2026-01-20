@@ -1205,8 +1205,22 @@
             if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`;
             if (item.properties != null) cardHTML += createField('特性', translateText(item.properties?.toLocaleString()), 'properties');
             if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>等级:</strong> ${getGradeName(item.grade)}</div>`;
-            if (item.scoreEarned != null && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
-            if (item.timePlayed > 0 && title !== '使用的道具' && title !== '收到的礼物') cardHTML += createField('时长', formatTime(item.timePlayed), 'timePlayed');
+            
+            // --- 修改开始：针对时长和经验值的逻辑 ---
+            if (title !== '使用的道具' && title !== '收到的礼物') {
+                if (item.timePlayed > 0) {
+                    // 有游戏时长：显示经验值和时长
+                    if (item.scoreEarned != null) {
+                        cardHTML += createField('经验值', item.scoreEarned?.toLocaleString(), 'scoreEarned');
+                    }
+                    cardHTML += createField('时长', formatTime(item.timePlayed), 'timePlayed');
+                } else {
+                    // 时长为 0：只显示未进行游戏，不显示经验值
+                    cardHTML += `<div style="font-size: 11px; color: var(--md-sys-color-outline); margin-top: 4px; font-style: italic;">未进行游戏</div>`;
+                }
+            }
+            // --- 修改结束 ---
+
             if (item.count != null && title === '收到的礼物') cardHTML += createField('数量', item.count?.toLocaleString(), 'count');
             if (item.usages != null && title === '使用的道具') cardHTML += createField('数量', item.usages?.toLocaleString(), 'usages');
             cardDiv.innerHTML = cardHTML;
