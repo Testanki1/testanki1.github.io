@@ -784,7 +784,7 @@ retry: "retry in",
 
 // Leaderboard
 lb_title: "Weekly / Event Leaderboards",
-lb_score: "Score",
+lb_score: "Experience",
 lb_crystals: "Crystals Earned",
 lb_golds: "Gold Boxes Caught",
 lb_efficiency: "Efficiency (Score/Hour)",
@@ -801,7 +801,7 @@ no_data_lb: "No Data",
 rank: "Rank",
 unknown_rank: "Unknown Rank",
 label_nickname: "Nickname",
-label_score: "Score",
+label_score: "Experience",
 label_vip: "Premium",
 vip_active: "Active",
 vip_inactive: "Inactive",
@@ -839,7 +839,7 @@ list_presents: "Gifts Received",
 prop: "Properties",
 not_played: "Not Played",
 count: "Count",
-view_types: "Details",
+view_types: "Types",
 view_versions: "Versions",
 view_grades: "Grades",
 
@@ -1240,7 +1240,29 @@ handleFetch();
 }
 }
 async function handleFetch() { if (isMonitoring) { displayError(T.error_monitor); return; } currentServer = elements.serverSelect.value; currentUsername = elements.usernameInput.value.trim(); if (!currentUsername) { displayError(T.error_input_name); return; } clearDisplay(true); setLoading(true); try { const profileData = await fetchProfileData(currentServer, currentUsername); updateDisplay(profileData); lastProfileData = profileData; } catch (error) { console.error('Fetch Error:', error); displayError(error.message); } finally { setLoading(false); } }
-async function fetchProfileData(server, username) { const baseUrl = API_CONFIG.baseUrls[server]; if (!baseUrl) throw new Error('Invalid Server'); const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest='; try { const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=cn&_=${Date.now()}`; const apiUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; const response = await fetch(apiUrl); if (!response.ok) throw new Error(`Network Error: ${response.status}`); const profileData = await response.json(); if (profileData?.responseType === 'NOT_FOUND') { throw new Error(T.error_not_found); } else if (profileData?.response) { return profileData.response; } else { throw new Error('Invalid response format'); } } catch (err) { throw err; } }
+async function fetchProfileData(server, username) { 
+    const baseUrl = API_CONFIG.baseUrls[server]; 
+    if (!baseUrl) throw new Error('Invalid Server'); 
+    const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest='; 
+    try { 
+        // 动态设置语言参数：如果不是中文，则使用 en
+        const langParam = isChinese ? 'cn' : 'en';
+        const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=${langParam}&_=${Date.now()}`; 
+        const apiUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; 
+        const response = await fetch(apiUrl); 
+        if (!response.ok) throw new Error(`Network Error: ${response.status}`); 
+        const profileData = await response.json(); 
+        if (profileData?.responseType === 'NOT_FOUND') { 
+            throw new Error(T.error_not_found); 
+        } else if (profileData?.response) { 
+            return profileData.response; 
+        } else { 
+            throw new Error('Invalid response format'); 
+        } 
+    } catch (err) { 
+        throw err; 
+    } 
+}
 
 function toggleMonitoring() {
 if (isMonitoring) stopMonitoring();
@@ -1446,7 +1468,7 @@ aggregatedNewData.sort((a, b) => (b.hasChanged - a.hasChanged) || (b.timePlayed 
 aggregatedNewData.forEach(item => {
 const cardDiv = document.createElement('div');
 cardDiv.className = `data-card ${item.hasChanged ? 'changed' : ''}`;
-let imageUrl = item.imageUrl ? item.imageUrl.replace(/s\.(eu\.tankionline|3dtank)\.com/g, 'res.3dtank.com').replace(/\.tnk/g, '.webp') : null;
+let imageUrl = item.imageUrl ? item.imageUrl.replace(/s\.(eu\.tankionline|3dtank)\.com/g, isChinese ? 'res.3dtank.com' : 's.eu.tankionline.com').replace(/\.tnk/g, '.webp') : null;
 
 const createField = (label, value, prop) => {
 const isChanged = item.changes[prop];
