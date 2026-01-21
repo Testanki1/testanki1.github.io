@@ -4,196 +4,269 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D坦克战斗聊天字体图集渲染器</title>
-    <!-- 1. 引入网页字体 (Rubik 和 M PLUS 1p) 用于美化UI -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;700&family=Rubik:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            /* Core Palette */
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-on-primary: #001926;
+            
+            --md-sys-color-background: #001926;
+            --md-sys-color-on-background: #BFD5FF;
+            
+            --md-sys-color-surface-container: #0d2633; 
+            --md-sys-color-outline: #BFD5FF;
+            
+            --md-sys-shape-corner-extra-large: 28px;
+            --md-sys-shape-corner-full: 9999px;
+            --md-sys-shape-corner-medium: 12px;
+
+            --font-main: 'Rubik', 'M PLUS 1p', sans-serif;
+        }
+
         * {
+            box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
         }
-        :root {
-            --bg-main: #001926;
-            --bg-container: #002333;
-            --bg-input: #001018;
-            --color-primary: #76FF33;
-            --color-secondary: #00D4FF;
-            --color-text: #BFD5FF;
-            --color-border: #004a66;
-            --color-error: #FF6666;
-            --color-warning: #FFC107;
-        }
 
-        /* 2. 应用网页字体到整个UI界面 */
         body {
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-            background-color: var(--bg-main);
-            color: var(--color-text);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start; 
-            min-height: 100vh;
             margin: 0;
             padding: 20px;
-            box-sizing: border-box;
+            min-height: 100vh;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            font-family: var(--font-main);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
         }
-        .container {
-            background-color: var(--bg-container);
-            padding: 30px;
-            border-radius: 12px;
-            border: 1px solid var(--color-border);
-            box-shadow: 0 0 25px rgba(0, 212, 255, 0.1);
-            width: 100%;
-            max-width: 800px;
-        }
-        h1 {
-            text-align: center;
-            color: var(--color-secondary);
-            margin-top: 0;
-            text-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
-            font-weight: 700;
-        }
-        label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 10px;
-            color: var(--color-text);
-        }
-        #text-input {
-            width: 100%;
-            padding: 12px;
-            font-size: 1.2em;
-            background-color: var(--bg-input);
-            color: var(--color-text);
-            border: 2px solid var(--color-border);
-            border-radius: 8px;
-            box-sizing: border-box;
-            margin-bottom: 20px;
-            transition: border-color 0.3s, box-shadow 0.3s;
-            resize: vertical;
-            min-height: 100px;
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-        }
-        #text-input:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 8px rgba(118, 255, 51, 0.3);
-        }
-        #text-input::placeholder {
-            color: rgba(191, 213, 255, 0.5);
-        }
-        #text-input:disabled {
-            background-color: var(--bg-container);
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        #output-container {
-            border: 1px solid var(--color-border);
-            background-color: var(--bg-container);
-            background-image: 
-                linear-gradient(45deg, #001926 25%, transparent 25%), 
-                linear-gradient(-45deg, #001926 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #001926 75%),
-                linear-gradient(-45deg, transparent 75%, #001926 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
 
-            padding: 10px;
+        .container {
+            width: 100%;
+            max-width: 840px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-extra-large);
+            padding: 24px;
             margin-top: 20px;
-            border-radius: 8px;
-            overflow: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         }
-        #output-canvas {
-            display: block;
-            image-rendering: pixelated;
+
+        h1 {
+            margin: 0 0 8px 0;
+            font-weight: 700;
+            font-size: 2rem;
+            text-align: center;
+            color: var(--md-sys-color-on-background);
+            line-height: 1.2;
         }
+
         #status {
             text-align: center;
-            color: rgba(191, 213, 255, 0.7);
-            margin-bottom: 20px;
-            font-style: italic;
-            transition: color 0.3s;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 32px;
+            min-height: 1.2em;
         }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--md-sys-color-primary);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            border: 2px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-medium);
+            padding: 16px;
+            font-family: var(--font-main);
+            font-size: 1.1rem;
+            resize: vertical;
+            transition: all 0.2s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 0 0 4px rgba(118, 255, 51, 0.15);
+        }
+
+        textarea:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: rgba(191, 213, 255, 0.2);
+        }
+
+        #output-wrapper {
+            background-color: var(--md-sys-color-background);
+            border-radius: var(--md-sys-shape-corner-medium);
+            padding: 20px;
+            margin-bottom: 32px;
+            overflow: hidden;
+            border: 1px solid rgba(191, 213, 255, 0.1);
+        }
+
+        #output-canvas {
+            display: block;
+            image-rendering: pixelated; 
+            max-width: 100%;
+        }
+
         .actions {
             display: flex;
-            gap: 15px;
-            margin-top: 20px;
+            gap: 16px;
             flex-wrap: wrap;
         }
-        .action-button {
-            flex-grow: 1;
-            padding: 12px 20px;
-            font-size: 1em;
+
+        .btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 16px 24px;
+            border-radius: var(--md-sys-shape-corner-full);
+            font-family: var(--font-main);
             font-weight: 700;
-            border-radius: 8px;
-            border: 2px solid transparent;
+            font-size: 1rem;
             cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+            text-align: center;
+            border: none;
+            transition: transform 0.1s, filter 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .action-button:active {
+
+        .btn:active {
             transform: scale(0.98);
         }
-        #save-button {
-            background-color: var(--color-primary);
-            color: var(--bg-main);
-            border-color: var(--color-primary);
+
+        .btn-primary {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
         }
-        #save-button:hover {
+        .btn-primary:hover {
             filter: brightness(1.1);
+            box-shadow: 0 4px 12px rgba(118, 255, 51, 0.3);
         }
-        #clear-button {
+
+        .btn-outlined {
             background-color: transparent;
-            color: var(--color-text);
-            border-color: var(--color-border);
+            color: var(--md-sys-color-primary);
+            border: 2px solid var(--md-sys-color-primary);
         }
-        #clear-button:hover {
-            background-color: var(--color-text);
-            color: var(--bg-main);
-            border-color: var(--color-text);
+        .btn-outlined:hover {
+            background-color: rgba(118, 255, 51, 0.1);
+        }
+
+        /* Loading animation bar */
+        .loading-bar-container {
+            width: 100%;
+            height: 4px;
+            background-color: rgba(191, 213, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        .loading-bar {
+            height: 100%;
+            background-color: var(--md-sys-color-primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 16px;
+                border-radius: 20px;
+            }
+            .actions {
+                flex-direction: column;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>3D坦克战斗聊天字体图集渲染器</h1>
-    <p id="status">正在初始化并加载字体...</p>
+    <h1 id="app-title">3D坦克战斗聊天字体图集渲染器</h1>
+    <div id="status">正在初始化...</div>
+    <div id="loading-bar-container" class="loading-bar-container">
+        <div id="loading-bar" class="loading-bar"></div>
+    </div>
 
-    <label for="text-input">输入要渲染的文字 (支持换行):</label>
-    <textarea id="text-input" placeholder="等待字体加载完成..." disabled></textarea>
+    <div class="input-group">
+        <label for="text-input" id="input-label">输入文字</label>
+        <textarea id="text-input" placeholder="等待字体加载..." disabled></textarea>
+    </div>
 
-    <div id="output-container">
+    <div id="output-wrapper">
         <canvas id="output-canvas"></canvas>
     </div>
 
     <div class="actions">
-        <button id="save-button" class="action-button">保存为图片</button>
-        <button id="clear-button" class="action-button">清空内容</button>
+        <button id="save-button" class="btn btn-primary">保存图片</button>
+        <button id="clear-button" class="btn btn-outlined">清空内容</button>
     </div>
-
 </div>
 
 <script>
+    // Localization / I18n
+    const isZh = navigator.language.toLowerCase().startsWith('zh');
+    
+    const texts = {
+        title: isZh ? '3D坦克战斗聊天字体图集渲染器' : 'Tanki Online Chat Font Renderer',
+        init: isZh ? '正在初始化...' : 'Initializing...',
+        loading: isZh ? '正在加载字体资源...' : 'Loading font resources...',
+        loaded: isZh ? '字体资源加载完成' : 'All fonts loaded',
+        label: isZh ? '输入文字' : 'Input Text',
+        placeholderWait: isZh ? '等待字体加载...' : 'Waiting for fonts...',
+        placeholderReady: isZh ? '在此输入内容...' : 'Type here...',
+        save: isZh ? '保存图片' : 'Save Image',
+        clear: isZh ? '清空内容' : 'Clear',
+        alert: isZh ? '请先输入文字' : 'Please input text first'
+    };
+
+    // Apply translations
+    document.getElementById('app-title').textContent = texts.title;
+    document.title = texts.title;
+    document.getElementById('status').textContent = texts.init;
+    document.getElementById('input-label').textContent = texts.label;
+    document.getElementById('text-input').placeholder = texts.placeholderWait;
+    document.getElementById('save-button').textContent = texts.save;
+    document.getElementById('clear-button').textContent = texts.clear;
+    if (!isZh) {
+        document.documentElement.lang = 'en';
+    }
+
     const textInput = document.getElementById('text-input');
     const canvas = document.getElementById('output-canvas');
     const statusEl = document.getElementById('status');
+    const loadingBarContainer = document.getElementById('loading-bar-container');
+    const loadingBar = document.getElementById('loading-bar');
     const ctx = canvas.getContext('2d');
     const saveButton = document.getElementById('save-button');
     const clearButton = document.getElementById('clear-button');
 
-    const UI_COLORS = {
-        SUCCESS: '#76FF33',
-        WARNING: '#FFC107',
-        LOADING: '#00D4FF',
-        ERROR: '#FF6666'
-    };
-
+    // Font data storage
     const fontData = {};
-    const loadingErrors = [];
-    
-    // 3. 恢复使用您最初的 "open_sans" 字体图集用于Canvas渲染
     const fontSources = [
         { name: 'open_sans_armenian', png: 'https://testanki1.github.io/font-renderer/images/open_sans_armenian.f4961ef6.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_armenian.0c4bdbc3.txt' },
         { name: 'open_sans_cjk', png: 'https://testanki1.github.io/font-renderer/images/open_sans_cjk.6b6f51ca.png', txt: 'https://testanki1.github.io/font-renderer/textdata/open_sans_cjk.45a1fbad.txt' },
@@ -204,54 +277,32 @@
 
     const totalDefinitions = fontSources.length;
 
-    function checkReadyState() { 
-        const loadedCount = Object.keys(fontData).length; 
-        if (loadedCount > 0) { 
-            textInput.disabled = false; 
-            textInput.placeholder = '在此输入...'; 
-            statusEl.textContent = `成功加载 ${loadedCount}/${totalDefinitions} 个字体。可以开始输入了！`; 
-            statusEl.style.color = UI_COLORS.SUCCESS;
-            if (loadedCount < totalDefinitions) { 
-                statusEl.textContent += ` (部分字体加载失败或未完成)`; 
-                statusEl.style.color = UI_COLORS.WARNING;
-            } 
-        } else { 
-            statusEl.textContent = '所有字体加载失败。请检查网络连接或浏览器控制台。'; 
-            statusEl.style.color = UI_COLORS.ERROR;
-        } 
-    }
-
-    async function loadFontsFromUrls() { 
-        statusEl.textContent = `正在从网络加载 ${fontSources.length} 组字体文件...`; 
-        statusEl.style.color = UI_COLORS.LOADING;
-        const loadPromises = fontSources.map(async (source) => { 
-            try { 
-                const [imageResponse, textResponse] = await Promise.all([ fetch(source.png), fetch(source.txt) ]); 
-                if (!imageResponse.ok) throw new Error(`图片加载失败: ${source.png} (${imageResponse.statusText})`); 
-                if (!textResponse.ok) throw new Error(`度量文件加载失败: ${source.txt} (${textResponse.statusText})`); 
-                const imageBlob = await imageResponse.blob(); 
-                const image = await new Promise((resolve, reject) => { 
-                    const img = new Image(); 
-                    img.onload = () => resolve(img); 
-                    img.onerror = () => reject(new Error('无法解析图片')); 
-                    img.src = URL.createObjectURL(imageBlob); 
+    // Parsing logic for the BMFont text format
+    function parseMetricData(text) { 
+        const metricsMap = new Map(); 
+        const lines = text.split('\n'); 
+        for (let i = 1; i < lines.length; i++) { 
+            const line = lines[i].trim(); 
+            if (!line || line.startsWith('kerning')) break; 
+            const parts = line.split(/\s+/); 
+            if (parts.length >= 8) { 
+                const charCode = parseInt(parts[0], 10); 
+                if (isNaN(charCode)) continue; 
+                metricsMap.set(charCode, { 
+                    x: parseInt(parts[1], 10), 
+                    y: parseInt(parts[2], 10), 
+                    width: parseInt(parts[3], 10), 
+                    height: parseInt(parts[4], 10), 
+                    xoffset: parseInt(parts[5], 10), 
+                    yoffset: parseInt(parts[6], 10), 
+                    xadvance: parseInt(parts[7], 10) 
                 }); 
-                const metricsText = await textResponse.text(); 
-                fontData[source.name] = { image: image, metrics: parseMetricData(metricsText) }; 
-                console.log(`字体 '${source.name}' 加载成功!`); 
-            } catch (error) { 
-                const errorMsg = `字体源 '${source.name}' 加载失败: ${error.message}`; 
-                console.error(errorMsg); 
-                loadingErrors.push(errorMsg); 
             } 
-        }); 
-        await Promise.allSettled(loadPromises); 
-        checkReadyState(); 
+        } 
+        return metricsMap; 
     }
 
-    function parseMetricData(text) { const metricsMap = new Map(); const lines = text.split('\n'); for (let i = 1; i < lines.length; i++) { const line = lines[i].trim(); if (!line || line.startsWith('kerning')) break; const parts = line.split(/\s+/); if (parts.length >= 8) { const charCode = parseInt(parts[0], 10); if (isNaN(charCode)) continue; metricsMap.set(charCode, { x: parseInt(parts[1], 10), y: parseInt(parts[2], 10), width: parseInt(parts[3], 10), height: parseInt(parts[4], 10), xoffset: parseInt(parts[5], 10), yoffset: parseInt(parts[6], 10), xadvance: parseInt(parts[7], 10) }); } } return metricsMap; }
-    
-    // 4. 恢复原始的字符查找逻辑，使其能遍历所有已加载的字体图集
+    // Find character data across all loaded fonts
     function findCharData(charCode) {
         for (const name in fontData) {
             const font = fontData[name];
@@ -262,24 +313,80 @@
         return null;
     }
 
-    function renderText(text) {
-        const isAnyFontReady = Object.keys(fontData).length > 0;
-        if (!isAnyFontReady) return;
+    // Update UI based on loading progress
+    function updateLoadingStatus() {
+        const loadedCount = Object.keys(fontData).length;
+        const percent = (loadedCount / totalDefinitions) * 100;
+        
+        loadingBar.style.width = `${percent}%`;
 
-        const outputContainer = document.getElementById('output-container');
+        // Only enable input when ALL fonts are loaded
+        if (loadedCount === totalDefinitions) {
+            textInput.disabled = false;
+            textInput.placeholder = texts.placeholderReady;
+            statusEl.textContent = texts.loaded;
+            statusEl.style.color = 'var(--md-sys-color-primary)';
+            setTimeout(() => {
+                loadingBarContainer.style.display = 'none';
+            }, 500);
+        } else {
+            textInput.disabled = true;
+            statusEl.textContent = texts.loading;
+            loadingBarContainer.style.display = 'block';
+        }
+    }
+
+    async function loadFontsFromUrls() {
+        updateLoadingStatus();
+        
+        const loadPromises = fontSources.map(async (source) => {
+            try {
+                const [imageResponse, textResponse] = await Promise.all([
+                    fetch(source.png),
+                    fetch(source.txt)
+                ]);
+
+                if (!imageResponse.ok) throw new Error(`Image error: ${source.png}`);
+                if (!textResponse.ok) throw new Error(`Text error: ${source.txt}`);
+
+                const imageBlob = await imageResponse.blob();
+                const image = await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = () => reject(new Error('Image parse error'));
+                    img.src = URL.createObjectURL(imageBlob);
+                });
+
+                const metricsText = await textResponse.text();
+                fontData[source.name] = { image: image, metrics: parseMetricData(metricsText) };
+                
+                updateLoadingStatus();
+            } catch (error) {
+                console.error(`Failed to load ${source.name}:`, error);
+            }
+        });
+
+        await Promise.allSettled(loadPromises);
+    }
+
+    function renderText(text) {
+        if (Object.keys(fontData).length === 0) return;
+
+        const outputContainer = document.getElementById('output-wrapper');
         const style = window.getComputedStyle(outputContainer);
         const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
         const availableWidth = outputContainer.clientWidth - paddingX;
-        
+
         canvas.width = availableWidth;
+        // Initial clear
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (!text) {
-            canvas.height = 1;
+            canvas.height = 1; // Minimize height if empty
             return;
         }
 
-        const lineHeight = 25; 
+        const lineHeight = 25;
         let cursorX = 0;
         let cursorY = 0;
         const charPositions = [];
@@ -288,6 +395,7 @@
         const getCharMetrics = (char) => {
             const charData = findCharData(char.charCodeAt(0));
             if (charData) return charData.metrics;
+            // Default placeholder metrics
             return { xoffset: 0, yoffset: 0, width: 17, height: 17, xadvance: 17 };
         };
 
@@ -300,6 +408,8 @@
 
             const metrics = getCharMetrics(char);
             const charRenderWidth = metrics.xoffset + metrics.width;
+            
+            // Wrap text if needed
             if (cursorX > 0 && (cursorX + charRenderWidth) > availableWidth) {
                 cursorX = 0;
                 cursorY += lineHeight;
@@ -314,7 +424,7 @@
                 drawX: drawX,
                 drawY: drawY,
             });
-            
+
             cursorX += metrics.xadvance;
 
             if (metrics.height > 0) {
@@ -324,7 +434,8 @@
                 }
             }
         }
-        
+
+        // Adjust canvas height to fit text
         if (text.endsWith('\n')) {
              actualMaxHeight = Math.max(actualMaxHeight, cursorY);
         } else if (text.length > 0) {
@@ -333,8 +444,9 @@
 
         canvas.height = Math.max(1, actualMaxHeight);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = false; // Keep pixelated look
 
+        // Draw characters
         charPositions.forEach(pos => {
             if (pos.image) {
                 const m = pos.metrics;
@@ -345,12 +457,14 @@
                     );
                 }
             } else {
-                ctx.fillStyle = UI_COLORS.ERROR;
+                // Draw error box for missing chars
+                ctx.fillStyle = '#FF6666'; 
                 ctx.fillRect(pos.drawX, pos.drawY, pos.metrics.width - 2, pos.metrics.height - 2);
             }
         });
     }
 
+    // Event Listeners
     textInput.addEventListener('input', (event) => {
         renderText(event.target.value);
     });
@@ -358,14 +472,14 @@
     window.addEventListener('resize', () => {
         renderText(textInput.value);
     });
-    
+
     saveButton.addEventListener('click', () => {
         if (!textInput.value.trim()) {
-            alert('请输入内容后再保存！');
+            alert(texts.alert);
             return;
         }
         const link = document.createElement('a');
-        link.download = 'rendered-text.png';
+        link.download = 'tank-chat-text.png';
         link.href = canvas.toDataURL('image/png');
         link.click();
     });
@@ -375,7 +489,9 @@
         renderText('');
     });
 
+    // Start loading
     loadFontsFromUrls();
+
 </script>
 
 </body>
