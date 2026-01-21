@@ -2,120 +2,809 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>视频周报字幕内容搜索</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>视频日志字幕搜索（中文）</title>
 
-    <!-- 核心修改点 1: 导入 Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
         :root {
-            --bg-color: #001926;
-            --primary-color: #76FF33;
-            --text-color: #ccc;
-            --text-muted-color: #BFD5FF;
-            --container-bg: #00253a;
-            --border-color: #38444d;
+            /* --- 核心调色板 (用户指定) --- */
+            --seed-bg: #001926;
+            --seed-primary: #76FF33;
+            --seed-text: #BFD5FF;
+
+            /* --- 系统颜色映射 --- */
+            --md-sys-color-background: var(--seed-bg);
+            --md-sys-color-on-background: var(--seed-text);
+            
+            /* Surface Tones: 在深色模式下，通过亮度区分层级 */
+            --md-sys-color-surface: #001926;
+            --md-sys-color-surface-container-low: #001f2f;
+            --md-sys-color-surface-container: #002535;
+            --md-sys-color-surface-container-high: #002e42;
+            --md-sys-color-surface-container-highest: #00384d;
+            
+            --md-sys-color-primary: var(--seed-primary);
+            --md-sys-color-on-primary: #001926;
+            
+            --md-sys-color-on-surface: var(--seed-text);
+            --md-sys-color-on-surface-variant: #8faec9;
+            --md-sys-color-outline: #405562;
+            --md-sys-color-outline-variant: #253844;
+
+            /* --- 字体系统 --- */
+            --font-family-base: 'Rubik', 'M PLUS 1p', sans-serif;
+
+            /* --- 形状 Tokens --- */
+            --md-sys-shape-corner-medium: 12px;
+            --md-sys-shape-corner-large: 16px;
+            --md-sys-shape-corner-xl: 28px;
+            --md-sys-shape-corner-full: 9999px;
+
+            /* --- 动效 Tokens (Expressive) --- */
+            /* Emphasized easing: 用于强调 UI 的进出和主要交互 */
+            --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0.0, 0, 1.0);
+            --md-sys-motion-duration-medium: 300ms;
+            --md-sys-motion-duration-short: 200ms;
+        }
+
+        /* --- 全局重置与字体强制 --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            /* 1. 消除移动端点击高亮 */
+            -webkit-tap-highlight-color: transparent;
+            /* 2. 强制全站字体 */
+            font-family: var(--font-family-base) !important;
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
-            /* 核心修改点 2: 应用新的字体栈 */
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-            line-height: 1.6;
-            color: var(--text-color);
-            background-color: var(--bg-color);
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-surface);
             margin: 0;
-            padding: 20px 15px;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: scroll; /* 保持滚动条轨道，防止布局跳动 */
         }
-        /* ... 其他所有样式保持不变 ... */
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { color: var(--primary-color); text-align: center; font-weight: 600; letter-spacing: 1px; }
-        .description { text-align: center; color: var(--text-muted-color); margin-bottom: 30px; }
-        #search-container { display: flex; gap: 10px; margin-bottom: 20px; }
-        #search-input { flex-grow: 1; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 16px; background-color: var(--container-bg); color: #fff; transition: border-color 0.3s, box-shadow 0.3s; }
-        #search-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(118, 255, 51, 0.2); }
-        #search-button { padding: 12px 25px; border: none; background-color: var(--primary-color); color: var(--bg-color); font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.2s, transform 0.1s; }
-        #search-button:hover { background-color: #62d92b; }
-        #search-button:active { transform: scale(0.98); }
-        #search-button:disabled { background-color: #55664a; cursor: not-allowed; }
-        #status { text-align: center; font-style: italic; color: var(--text-muted-color); margin: 20px 0; min-height: 1.6em; }
-        .result-item { background-color: var(--container-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: transform 0.2s, border-color 0.2s; }
-        .result-item:hover { transform: translateY(-3px); border-color: var(--primary-color); }
-        .result-item h3 { margin: 0 0 10px 0; font-size: 1.2em; }
-        .view-file-link { color: #00D4FF; text-decoration: none; cursor: pointer; font-weight: 500; }
-        .view-file-link:hover { text-decoration: underline; }
-        .result-item p { margin: 0; color: var(--text-color); white-space: pre-wrap; word-break: break-word; }
-        .highlight { background-color: var(--primary-color); color: var(--bg-color); font-weight: bold; padding: 2px 5px; border-radius: 4px; }
-        #no-results-message { text-align: center; padding: 40px 20px; background-color: var(--container-bg); border-radius: 8px; color: var(--text-muted-color); font-size: 1.1em; display: none; }
-        footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #777; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background-color: #002030; border: 1px solid var(--border-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; height: 85%; max-height: 90vh; display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .modal-header { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px; font-size: 1.2em; color: var(--primary-color); font-weight: 500; }
-        .modal-body { flex-grow: 1; overflow-y: auto; white-space: pre; color: #e0e0e0; font-size: 14px; line-height: 1.5; }
-        .modal-body::-webkit-scrollbar { width: 10px; }
-        .modal-body::-webkit-scrollbar-track { background: var(--container-bg); border-radius: 5px; }
-        .modal-body::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 5px; border: 2px solid var(--container-bg); }
-        .modal-body::-webkit-scrollbar-thumb:hover { background-color: var(--primary-color); }
-        .modal-close-button { position: absolute; top: 15px; right: 20px; font-size: 32px; color: #aaa; cursor: pointer; line-height: 1; transition: color 0.2s, transform 0.2s; }
-        .modal-close-button:hover { color: #fff; transform: rotate(90deg); }
-        .highlight-line { background-color: rgba(118, 255, 51, 0.15); display: block; margin: 0 -20px; padding: 0 20px; box-shadow: 0 0 10px rgba(118, 255, 51, 0.2); }
+
+        /* --- 加载遮罩 --- */
+        #loading-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--md-sys-color-background);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--md-sys-color-surface-container-high);
+            border-top: 4px solid var(--md-sys-color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        /* --- 主布局容器 --- */
+        .container {
+            width: 100%;
+            max-width: 840px; /* Compact/Medium Breakpoint */
+            margin: 0 auto;
+            padding: 64px 24px 24px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: 
+                opacity var(--md-sys-motion-duration-medium) ease-out,
+                transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+        }
+
+        .container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* --- 标题区域 --- */
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+            width: 100%;
+        }
+
+        h1 {
+            color: var(--md-sys-color-primary);
+            font-weight: 500;
+            font-size: 3.5rem; /* Display Small -> Medium */
+            line-height: 1.1;
+            margin: 0 0 16px 0;
+            letter-spacing: -1.5px; /* 紧凑字距，Expressive 特征 */
+        }
+
+        .description {
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 1.125rem;
+            line-height: 1.6;
+            margin: 0 auto;
+            max-width: 600px;
+        }
+        
+        .description strong {
+            color: var(--md-sys-color-on-surface);
+            font-weight: 600;
+        }
+
+        /* --- 搜索栏 (Floating Search Field) --- */
+        .search-wrapper {
+            width: 100%;
+            max-width: 720px;
+            margin-bottom: 32px;
+            position: relative;
+            z-index: 10;
+        }
+
+        #search-container {
+            display: flex;
+            align-items: center;
+            background-color: var(--md-sys-color-surface-container-high);
+            border-radius: var(--md-sys-shape-corner-full); /* Pill shape */
+            padding: 8px;
+            transition: 
+                background-color 200ms ease,
+                box-shadow 200ms var(--md-sys-motion-easing-emphasized);
+            border: 1px solid transparent; /* 预留边框位置防止跳动 */
+        }
+        
+        /* 悬浮状态 */
+        #search-container:hover {
+            background-color: var(--md-sys-color-surface-container-highest);
+        }
+
+        /* 激活/聚焦状态 */
+        #search-container:focus-within {
+            background-color: var(--md-sys-color-surface-container-highest);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); /* Elevation 3 */
+            border-color: var(--md-sys-color-outline); /* Subtle outline */
+        }
+
+        .search-icon-leading {
+            color: var(--md-sys-color-on-surface);
+            margin-left: 16px;
+            font-size: 24px;
+            opacity: 0.8;
+        }
+
+        #search-input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: var(--md-sys-color-on-surface);
+            font-size: 1.125rem;
+            padding: 12px 16px;
+            outline: none;
+            /* 确保光标颜色跟随主题 */
+            caret-color: var(--md-sys-color-primary); 
+        }
+
+        #search-input::placeholder {
+            color: var(--md-sys-color-on-surface-variant);
+            opacity: 0.7;
+        }
+
+        #search-button {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            border-radius: var(--md-sys-shape-corner-full);
+            padding: 0 32px;
+            height: 48px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 
+                transform var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-emphasized),
+                filter 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            /* 消除按钮点击的默认轮廓，使用自定义样式 */
+            outline-offset: 2px;
+        }
+
+        #search-button:hover:not(:disabled) {
+            filter: brightness(1.05);
+            transform: scale(1.03); /* 轻微放大，富有弹性的手感 */
+            box-shadow: 0 4px 8px rgba(118, 255, 51, 0.2);
+        }
+
+        #search-button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        
+        #search-button:focus-visible {
+            outline: 2px solid var(--md-sys-color-primary);
+            outline-offset: 4px;
+        }
+        
+        #search-button:disabled {
+            background-color: var(--md-sys-color-surface-container);
+            color: var(--md-sys-color-on-surface-variant);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* --- 状态显示 --- */
+        #status {
+            min-height: 24px;
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        /* --- 结果列表 (Cards) --- */
+        #results {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .result-item {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-large);
+            padding: 24px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden; /* 用于潜在的 Ripple 效果溢出控制 */
+            transition: 
+                background-color 0.2s,
+                border-color 0.2s,
+                transform var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-emphasized),
+                box-shadow 0.2s;
+        }
+
+        /* State Layer: Hover */
+        .result-item:hover {
+            background-color: var(--md-sys-color-surface-container-high);
+            transform: scale(1.01); /* 极其细微的放大 */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); /* Elevation 2 */
+            border-color: var(--md-sys-color-outline-variant);
+        }
+        
+        /* State Layer: Active (Pressed) */
+        .result-item:active {
+            transform: scale(0.98);
+            background-color: var(--md-sys-color-surface-container-highest);
+        }
+
+        .result-item h3 {
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--md-sys-color-primary);
+            pointer-events: none; /* 点击穿透 */
+        }
+
+        .result-item p {
+            margin: 0;
+            color: var(--md-sys-color-on-surface);
+            font-size: 1rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            pointer-events: none; /* 默认穿透 */
+        }
+        
+        /* 允许选中文本，但不触发点击事件 (JS控制) */
+        .result-item p {
+            pointer-events: auto; 
+        }
+
+        .highlight {
+            background-color: rgba(118, 255, 51, 0.2);
+            color: #fff; /* 在高亮背景上强制白色以保证对比度 */
+            padding: 0 4px;
+            border-radius: 4px;
+            font-weight: 600;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+        }
+
+        /* --- 空状态 --- */
+        #no-results-message {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 64px;
+            background-color: var(--md-sys-color-surface-container-low);
+            border-radius: var(--md-sys-shape-corner-large);
+            border: 1px dashed var(--md-sys-color-outline);
+            color: var(--md-sys-color-on-surface-variant);
+            width: 100%;
+            text-align: center;
+        }
+
+        /* --- Footer --- */
+        footer {
+            text-align: center;
+            padding: 48px 24px;
+            font-size: 0.875rem;
+            color: var(--md-sys-color-on-surface-variant);
+            opacity: 0.6;
+            margin-top: auto;
+        }
+
+        /* --- 模态框 (Full-screen Dialog) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 15, 23, 0.7); /* Scrim color */
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity var(--md-sys-motion-duration-short) linear;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: var(--md-sys-color-surface-container);
+            width: 90%;
+            max-width: 800px;
+            height: 85vh;
+            border-radius: var(--md-sys-shape-corner-xl);
+            box-shadow: 0 24px 48px rgba(0,0,0,0.6); /* Elevation 5 */
+            display: flex;
+            flex-direction: column;
+            
+            /* 入场动画: 从下方滑入并放大 */
+            transform: translateY(40px) scale(0.95);
+            transition: transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+            
+            border: 1px solid var(--md-sys-color-outline-variant);
+            overflow: hidden;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-header {
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--md-sys-color-surface-container-high);
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--md-sys-color-on-surface);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .modal-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--md-sys-color-on-surface-variant);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+            margin-left: 16px;
+        }
+
+        .modal-close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: var(--md-sys-color-on-surface);
+        }
+
+        .modal-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 32px;
+            /* 强制覆盖所有字体，确保不回退 */
+            font-family: var(--font-family-base) !important; 
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--md-sys-color-on-surface);
+            white-space: pre-wrap;
+            background-color: #00121d; /* 内容区域更深一点，增加沉浸感 */
+        }
+
+        /* 模态框滚动条美化 */
+        .modal-body::-webkit-scrollbar { width: 8px; }
+        .modal-body::-webkit-scrollbar-track { background: transparent; }
+        .modal-body::-webkit-scrollbar-thumb {
+            background-color: var(--md-sys-color-outline);
+            border-radius: 4px;
+        }
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background-color: var(--md-sys-color-on-surface-variant);
+        }
+
+        .highlight-line {
+            display: block;
+            background-color: rgba(118, 255, 51, 0.1);
+            border-left: 3px solid var(--md-sys-color-primary);
+            padding: 6px 20px;
+            margin: 0 -32px; /* 抵消 padding */
+            color: var(--md-sys-color-primary);
+        }
+
+        /* 图标字体例外，但要强制加载 */
+        .material-symbols-rounded {
+            font-family: 'Material Symbols Rounded' !important;
+            font-size: 20px;
+            vertical-align: middle;
+            font-weight: normal;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spinning { animation: spin 1s linear infinite; }
+
+        /* 响应式调整 */
+        @media (max-width: 600px) {
+            h1 { font-size: 2.25rem; }
+            .container { padding: 48px 16px; }
+            #search-container { flex-direction: column; border-radius: 20px; padding: 12px; gap: 8px; }
+            .search-icon-leading { display: none; }
+            #search-input { text-align: center; width: 100%; padding: 8px; }
+            #search-button { width: 100%; justify-content: center; }
+            .modal-content { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+            .modal-header { padding: 16px; }
+            .modal-body { padding: 20px; }
+        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>视频周报字幕内容搜索</h1></h1>
-        <p class="description">在<strong>3D坦克视频周报字幕</strong>中搜索所有内容。</p>
-        <div id="search-container">
-            <input type="text" id="search-input" placeholder="输入要查找的关键词...">
-            <button id="search-button">搜索</button>
-        </div>
-        <div id="status"></div>
-        <div id="results"></div>
-        <div id="no-results-message">在这里未找到匹配的结果。</div>
+    <!-- Loading Mask -->
+    <div id="loading-mask">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">资源加载中</div>
     </div>
+
+    <div class="container">
+        <header>
+            <h1>视频日志字幕搜索</h1>
+            <p class="description">
+                在<strong>3D坦克视频日志</strong>字幕中快速查找内容。<br>
+                支持全文检索与上下文预览。
+            </p>
+        </header>
+        
+        <div class="search-wrapper">
+            <div id="search-container">
+                <span class="material-symbols-rounded search-icon-leading">search</span>
+                <input type="text" id="search-input" placeholder="输入关键词（例如：更新、地图）..." autocomplete="off">
+                <button id="search-button">
+                    搜索
+                </button>
+            </div>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div id="results"></div>
+        
+        <div id="no-results-message">
+            <span class="material-symbols-rounded" style="font-size: 56px; opacity: 0.3; margin-bottom: 24px;">search_off</span>
+            <span style="opacity: 0.8;">未找到相关内容，请尝试更换关键词。</span>
+        </div>
+    </div>
+
     <footer>
-        <p>此工具通过 GitHub API 获取文件列表并进行内容搜索。</p>
+        <p>数据来源：GitHub API (testanki1/testanki1.github.io)</p>
     </footer>
+
+    <!-- File View Modal -->
     <div id="file-modal" class="modal-overlay">
         <div class="modal-content">
-            <span id="modal-close" class="modal-close-button">×</span>
-            <div id="modal-header" class="modal-header"></div>
-            <pre id="modal-body" class="modal-body"></pre>
+            <div class="modal-header">
+                <span id="modal-title-text" class="modal-title">文件名</span>
+                <button id="modal-close" class="modal-close-btn" title="关闭">
+                    <span class="material-symbols-rounded" style="font-size: 24px;">close</span>
+                </button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
         </div>
     </div>
 
 <script>
-    // ... JavaScript部分完全保持不变 ...
+    // --- 字体加载与 UI 初始化 ---
+    window.addEventListener('load', () => {
+        // 使用 document.fonts.ready 确保字体渲染无闪烁
+        document.fonts.ready.then(() => {
+            const loadingMask = document.getElementById('loading-mask');
+            const container = document.querySelector('.container');
+            
+            loadingMask.style.opacity = '0';
+            setTimeout(() => {
+                loadingMask.style.display = 'none';
+                container.classList.add('visible');
+                // 自动聚焦搜索框
+                document.getElementById('search-input').focus();
+            }, 500);
+        });
+    });
+
+    // --- 核心逻辑 ---
     const owner = 'testanki1';
     const repo = 'testanki1.github.io';
     const subtitlesPath = 'V-LOG_subtitles';
     const apiURL = `https://api.github.com/repos/${owner}/${repo}/contents/${subtitlesPath}`;
     const fileBaseURL = `https://testanki1.github.io/${subtitlesPath}/`;
+
     const searchInput = document.getElementById('search-input');
     const searchButton = document.getElementById('search-button');
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
     const noResultsMessage = document.getElementById('no-results-message');
     const modal = document.getElementById('file-modal');
-    const modalHeader = document.getElementById('modal-header');
+    const modalHeaderTitle = document.getElementById('modal-title-text');
     const modalBody = document.getElementById('modal-body');
     const modalClose = document.getElementById('modal-close');
+
     let srtFiles = [];
-    async function fetchFileList() { statusDiv.textContent = '正在初始化，获取字幕文件列表...'; try { const response = await fetch(apiURL); if (!response.ok) throw new Error(`GitHub API 请求失败: ${response.status}`); const data = await response.json(); srtFiles = data.filter(file => file.type === 'file' && file.name.endsWith('.srt')).map(file => file.name); if (srtFiles.length > 0) { statusDiv.textContent = `已成功加载 ${srtFiles.length} 个字幕文件，请输入关键词开始搜索。`; } else { statusDiv.textContent = '警告：未在指定位置找到 .srt 文件。'; } } catch (error) { console.error('获取文件列表失败:', error); statusDiv.textContent = `错误：无法加载文件列表。请检查网络连接或浏览器控制台。`; } }
-    async function performSearch() { const searchTerm = searchInput.value.trim(); if (!searchTerm) { alert('请输入搜索关键词！'); return; } if (srtFiles.length === 0) { alert('文件列表尚未加载完成，请稍候。'); return; } searchButton.disabled = true; searchButton.textContent = '搜索中...'; resultsDiv.innerHTML = ''; noResultsMessage.style.display = 'none'; statusDiv.textContent = `正在 ${srtFiles.length} 个文件中搜索 "${searchTerm}"...`; const searchPromises = srtFiles.map(fileName => searchInFile(fileName, searchTerm)); try { const allMatches = await Promise.all(searchPromises); const flattenedMatches = allMatches.flat(); if (flattenedMatches.length === 0) { statusDiv.textContent = '搜索完成。'; noResultsMessage.style.display = 'block'; } else { statusDiv.textContent = `搜索完成！共找到 ${flattenedMatches.length} 条匹配结果。`; flattenedMatches.forEach(displayResult); } } catch (error) { console.error('搜索过程中发生错误:', error); statusDiv.textContent = `搜索失败: ${error.message}`; } finally { searchButton.disabled = false; searchButton.textContent = '搜索'; } }
-    async function searchInFile(fileName, searchTerm) { const fileURL = fileBaseURL + encodeURIComponent(fileName); const matches = []; try { const response = await fetch(fileURL); if (!response.ok) return []; const content = await response.text(); const lines = content.split('\n'); const lowerCaseSearchTerm = searchTerm.toLowerCase(); for (const line of lines) { if (!/^\d/.test(line) && line.toLowerCase().includes(lowerCaseSearchTerm)) { matches.push({ fileName, line }); } } } catch (error) { console.error(`处理文件 ${fileName} 时出错:`, error); } return matches; }
-    function displayResult(result) { const resultItem = document.createElement('div'); resultItem.className = 'result-item'; const regex = new RegExp(escapeRegExp(searchInput.value), 'gi'); const highlightedLine = result.line.replace(regex, `<span class="highlight">$&</span>`); const h3 = document.createElement('h3'); const link = document.createElement('a'); link.href = '#'; link.className = 'view-file-link'; link.textContent = result.fileName; link.dataset.filename = result.fileName; link.dataset.lineContent = result.line; h3.appendChild(link); const p = document.createElement('p'); p.innerHTML = highlightedLine; resultItem.appendChild(h3); resultItem.appendChild(p); resultsDiv.appendChild(resultItem); }
-    async function showFileInModal(fileName, lineToFind) { modalHeader.textContent = fileName; modalBody.innerHTML = '正在加载文件内容...'; modal.style.display = 'flex'; const fileURL = fileBaseURL + encodeURIComponent(fileName); try { const response = await fetch(fileURL); if (!response.ok) throw new Error(`文件加载失败: ${response.status}`); const content = await response.text(); const escapeHTML = (str) => str.replace(/</g, '<').replace(/>/g, '>'); const escapedContent = escapeHTML(content); const escapedLineToFind = escapeHTML(lineToFind); const finalHTML = escapedContent.replace(escapedLineToFind, `<span id="scroll-to-target" class="highlight-line">${escapedLineToFind}</span>`); modalBody.innerHTML = finalHTML; const targetElement = document.getElementById('scroll-to-target'); if (targetElement) { requestAnimationFrame(() => { targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); } } catch (error) { console.error('加载文件内容失败:', error); modalBody.textContent = `错误：无法加载文件内容。\n${error.message}`; } }
-    function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+    async function fetchFileList() {
+        statusDiv.textContent = '正在连接 GitHub API 获取字幕库...';
+        try {
+            const response = await fetch(apiURL);
+            if (!response.ok) throw new Error(`GitHub API 请求失败: ${response.status}`);
+            const data = await response.json();
+            
+            srtFiles = data
+                .filter(file => file.type === 'file' && file.name.endsWith('.srt'))
+                .map(file => file.name);
+
+            if (srtFiles.length > 0) {
+                statusDiv.innerHTML = `<span style="color:var(--md-sys-color-primary); font-size:1.2em;">●</span> 已加载 ${srtFiles.length} 个字幕文件。`;
+            } else {
+                statusDiv.textContent = '警告：未在指定位置找到 .srt 文件。';
+            }
+        } catch (error) {
+            console.error('获取文件列表失败:', error);
+            statusDiv.textContent = `无法加载文件列表，请检查网络连接。`;
+        }
+    }
+
+    async function performSearch() {
+        const searchTerm = searchInput.value.trim();
+        if (!searchTerm) {
+            // 简单的“摇头”动画反馈
+            const container = document.getElementById('search-container');
+            container.style.transform = 'translateX(6px)';
+            setTimeout(() => container.style.transform = 'translateX(-6px)', 50);
+            setTimeout(() => container.style.transform = 'translateX(0)', 100);
+            return;
+        }
+        
+        if (srtFiles.length === 0) {
+            alert('文件列表尚未加载完成，请稍候。');
+            return;
+        }
+
+        searchButton.disabled = true;
+        const originalBtnContent = searchButton.innerHTML;
+        searchButton.innerHTML = '<span class="material-symbols-rounded spinning">sync</span> 搜索中';
+        
+        resultsDiv.innerHTML = '';
+        noResultsMessage.style.display = 'none';
+        statusDiv.textContent = `正在检索...`;
+
+        const searchPromises = srtFiles.map(fileName => searchInFile(fileName, searchTerm));
+
+        try {
+            const allMatches = await Promise.all(searchPromises);
+            const flattenedMatches = allMatches.flat();
+
+            if (flattenedMatches.length === 0) {
+                statusDiv.textContent = '';
+                noResultsMessage.style.display = 'flex';
+            } else {
+                statusDiv.textContent = `找到 ${flattenedMatches.length} 条结果`;
+                // 使用 Fragment 批量插入，提高性能
+                const fragment = document.createDocumentFragment();
+                flattenedMatches.forEach(match => {
+                    fragment.appendChild(createResultItem(match));
+                });
+                resultsDiv.appendChild(fragment);
+            }
+        } catch (error) {
+            console.error('搜索过程中发生错误:', error);
+            statusDiv.textContent = `搜索失败: ${error.message}`;
+        } finally {
+            searchButton.disabled = false;
+            searchButton.innerHTML = originalBtnContent;
+        }
+    }
+
+    async function searchInFile(fileName, searchTerm) {
+        const fileURL = fileBaseURL + encodeURIComponent(fileName);
+        const matches = [];
+
+        try {
+            const response = await fetch(fileURL);
+            if (!response.ok) return [];
+            
+            const content = await response.text();
+            const lines = content.split('\n');
+            const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+            for (const line of lines) {
+                if (!line.includes('-->') && isNaN(line.trim()) && line.toLowerCase().includes(lowerCaseSearchTerm)) {
+                    matches.push({ fileName, line });
+                }
+            }
+        } catch (error) {
+            console.error(`处理文件 ${fileName} 时出错:`, error);
+        }
+        return matches;
+    }
+
+    function createResultItem(result) {
+        const resultItem = document.createElement('div');
+        resultItem.className = 'result-item';
+        resultItem.dataset.filename = result.fileName;
+        resultItem.dataset.lineContent = result.line;
+
+        const regex = new RegExp(escapeRegExp(searchInput.value), 'gi');
+        const highlightedLine = result.line.replace(regex, `<span class="highlight">$&</span>`);
+
+        const h3 = document.createElement('h3');
+        const icon = document.createElement('span');
+        icon.className = 'material-symbols-rounded';
+        icon.textContent = 'description'; // 或者 'subtitles'
+        
+        const textSpan = document.createElement('span');
+        textSpan.className = 'filename-text';
+        textSpan.textContent = result.fileName;
+        
+        h3.appendChild(icon);
+        h3.appendChild(textSpan);
+
+        const p = document.createElement('p');
+        p.innerHTML = highlightedLine;
+
+        resultItem.appendChild(h3);
+        resultItem.appendChild(p);
+        
+        return resultItem;
+    }
+
+    async function showFileInModal(fileName, lineToFind) {
+        modalHeaderTitle.textContent = fileName;
+        modalBody.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--md-sys-color-on-surface-variant)"><span class="material-symbols-rounded spinning" style="font-size:32px;">sync</span><br><br>正在读取文件...</div>';
+        
+        modal.style.display = 'flex';
+        // Double RAF for smoother transition
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                modal.classList.add('show');
+            });
+        });
+
+        const fileURL = fileBaseURL + encodeURIComponent(fileName);
+
+        try {
+            const response = await fetch(fileURL);
+            if (!response.ok) throw new Error(`文件加载失败: ${response.status}`);
+            
+            const content = await response.text();
+            const escapeHTML = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escapedContent = escapeHTML(content);
+            const escapedLineToFind = escapeHTML(lineToFind);
+            
+            const finalHTML = escapedContent.replace(
+                escapedLineToFind, 
+                `<span id="scroll-to-target" class="highlight-line">${escapedLineToFind}</span>`
+            );
+
+            modalBody.innerHTML = finalHTML;
+
+            const targetElement = document.getElementById('scroll-to-target');
+            if (targetElement) {
+                // 稍微延迟以确保渲染完成
+                setTimeout(() => {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 200);
+            }
+
+        } catch (error) {
+            console.error('加载文件内容失败:', error);
+            modalBody.textContent = `错误：无法加载文件内容。\n${error.message}`;
+        }
+    }
+    
+    function closeModal() {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 300); // Match CSS transition duration
+    }
+
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // --- 事件监听 ---
+
     searchButton.addEventListener('click', performSearch);
-    searchInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') { performSearch(); } });
-    resultsDiv.addEventListener('click', (event) => { if (event.target.classList.contains('view-file-link')) { event.preventDefault(); const fileName = event.target.dataset.filename; const lineContent = event.target.dataset.lineContent; showFileInModal(fileName, lineContent); } });
-    modalClose.addEventListener('click', () => { modal.style.display = 'none'; });
-    modal.addEventListener('click', (event) => { if (event.target === modal) { modal.style.display = 'none'; } });
-    document.addEventListener('DOMContentLoaded', fetchFileList);
+    
+    searchInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            performSearch();
+        }
+    });
+
+    // 智能点击判断：区分选中复制和点击查看
+    resultsDiv.addEventListener('click', (event) => {
+        const item = event.target.closest('.result-item');
+        if (item) {
+            const selection = window.getSelection();
+            // 只有当没有选中文本时，才触发弹窗
+            if (selection.toString().length === 0) {
+                const fileName = item.dataset.filename;
+                const lineContent = item.dataset.lineContent;
+                showFileInModal(fileName, lineContent);
+            }
+        }
+    });
+
+    modalClose.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+    
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.style.display === 'flex') {
+            closeModal();
+        }
+    });
+
+    // Start
+    fetchFileList();
 </script>
 </body>
 </html>
