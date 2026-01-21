@@ -22,7 +22,7 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        # 【修复点 1】指定安装 p-limit@3 版本，兼容 require 语法
+        # 安装依赖，确保 p-limit 版本兼容
         run: |
           npm i playwright nodemailer p-limit@3
           npx playwright install --with-deps chromium
@@ -44,14 +44,20 @@ jobs:
 
           // --- 配置 ---
           const STATE_FILE = 'server_status.json';
-          const CHECK_INTERVAL = 5 * 60 * 1000; // 5分钟
           
-          // 【修复点 2】改为 5.8 小时，配合每 5 小时的 Cron，确保新任务来接力时旧任务还活着
+          // 【修改点 1】检测间隔改为 3 分钟
+          const CHECK_INTERVAL = 3 * 60 * 1000; 
+          
+          // 保持 5.8 小时运行时间，配合 Cron
           const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; 
           
           const START_TIME = Date.now();
           const BROWSER_CONCURRENCY = 5; 
           
+          // 【修改点 2】全局变量，用于存储"第一次检测到变化"的状态，用于防抖动
+          // 格式: { "url": { status: "Open", hash: "xxx", ... } }
+          let pendingChanges = {};
+
           const transporter = nodemailer.createTransport({
             host: "smtp.qq.com",
             port: 465,
@@ -134,73 +140,108 @@ jobs:
             console.log(`[${getTime()}] 监测循环开始...`);
 
             let urls = [];
+            // 【修改点 3】移除了 review 服务器
             for (let i = 1; i <= 10; i++) {
               urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
-              urls.push(`https://client-review-${i}-public.test-ru.tankionline.com/`);
             }
             urls.push("https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com");
             urls.push("https://tankiclassic.com/play/");
 
-            let oldStatusJson = {};
+            // 读取已保存的状态 (Committed State)
+            let committedStatusJson = {};
             if (fs.existsSync(STATE_FILE)) {
-              try { oldStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) {}
+              try { committedStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) {}
             }
-            let newStatusJson = { ...oldStatusJson };
+            
+            // 我们将构建一个新的 JSON 对象，仅在确认变化后才写入文件
+            let finalStatusJson = { ...committedStatusJson }; 
             let notifications = [];
             let availableServers = [];
 
             // Phase 1: Curl
             const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
-            let candidates = [];
-            
+            let candidatesForBrowser = [];
+            let currentResults = {}; // 存储本轮检测的所有结果
+
+            // 处理 Curl 结果
             for (const res of curlResults) {
               const { url, statusCode, hash } = res;
               if (statusCode !== 404 && statusCode !== 403 && statusCode !== 502 && statusCode !== 0) {
-                candidates.push({ url, hash });
+                candidatesForBrowser.push({ url, hash });
               } else {
-                const oldEntry = oldStatusJson[url] || {};
+                // Curl 判定为离线
+                const oldEntry = committedStatusJson[url] || {};
                 const oldHash = oldEntry.hash || "";
                 const hashToSave = oldHash ? oldHash : hash; 
-                newStatusJson[url] = { status: "Offline", hash: hashToSave };
-                if (oldEntry.status && oldEntry.status !== "Offline") {
-                   let oldDisplay = oldEntry.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
-                   notifications.push(`- <a href="${url}">${url}</a>: 服务器已下线 (原状态: ${oldDisplay})`);
-                }
+                currentResults[url] = { status: "Offline", hash: hashToSave };
               }
             }
 
-            // Phase 2: Browser
-            if (candidates.length > 0) {
+            // Phase 2: Browser (仅针对 Curl 存活的)
+            if (candidatesForBrowser.length > 0) {
               let browser = null;
               try {
                 browser = await chromium.launch();
                 const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
                 const limit = pLimit(BROWSER_CONCURRENCY);
                 
-                const browserPromises = candidates.map(candidate => {
+                const browserPromises = candidatesForBrowser.map(candidate => {
                   return limit(() => checkBrowserPage(context, candidate.url).then(res => ({ ...res, hash: candidate.hash })));
                 });
                 const browserResults = await Promise.all(browserPromises);
 
                 for (const res of browserResults) {
                   const { url, status: finalStatus, hash } = res;
-                  const oldEntry = oldStatusJson[url] || {};
-                  const oldStatus = oldEntry.status || null;
+                  const oldEntry = committedStatusJson[url] || {};
                   const oldHash = oldEntry.hash || null;
                   
                   let hashToSave = hash;
-                  if (finalStatus === 'Offline' && oldHash) hashToSave = oldHash;
+                  if (finalStatus === 'Offline' && oldHash) hashToSave = oldHash; // 离线时保留旧 hash
+                  
+                  currentResults[url] = { status: finalStatus, hash: hashToSave };
+                }
+              } catch (err) {
+                console.error("浏览器检测出错:", err);
+              } finally {
+                if (browser) await browser.close();
+              }
+            }
 
-                  newStatusJson[url] = { status: finalStatus, hash: hashToSave };
+            // --- 【核心逻辑修改】双重确认机制 ---
+            // 遍历所有 URL，对比 currentResults 和 committedStatusJson
+            let hasConfirmedChanges = false;
+
+            for (const url of urls) {
+              const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
+              const committedEntry = committedStatusJson[url] || {};
+              
+              // 辅助函数：比较两个状态对象是否相等
+              const isSame = (a, b) => a.status === b.status && a.hash === b.hash;
+
+              if (isSame(currentEntry, committedEntry)) {
+                // 1. 状态没变：清除该 URL 的待确认记录（如果是假警报，这里就消除了）
+                if (pendingChanges[url]) {
+                  delete pendingChanges[url];
+                }
+                finalStatusJson[url] = committedEntry; // 保持原状
+              } else {
+                // 2. 状态变了
+                if (pendingChanges[url] && isSame(pendingChanges[url], currentEntry)) {
+                  // A. 待确认列表里有，而且和当前状态一致 -> 【确认变化！】
+                  hasConfirmedChanges = true;
+                  finalStatusJson[url] = currentEntry; // 更新最终文件
+                  delete pendingChanges[url]; // 移除待确认
+
+                  // --- 生成通知逻辑 (和之前一样) ---
+                  const oldStatus = committedEntry.status || null;
+                  const oldHash = committedEntry.hash || null;
+                  const finalStatus = currentEntry.status;
+                  const hash = currentEntry.hash;
 
                   let displayStatus = "";
                   let displayStatusBold = "";
                   if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
                   if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
-
-                  if (finalStatus !== "Offline") {
-                    availableServers.push(`<a href="${url}">${url}</a> (状态: <b>${displayStatus}</b>)`);
-                  }
 
                   let message = "";
                   if (!oldStatus && finalStatus !== "Offline") {
@@ -226,19 +267,33 @@ jobs:
                   else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
                      message = `网页代码已更新 (状态: ${displayStatusBold})`;
                   }
+                  
                   if (message) notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
-                }
 
-              } catch (err) {
-                console.error("浏览器检测出错:", err);
-              } finally {
-                if (browser) await browser.close();
+                } else {
+                  // B. 第一次发现变化（或变化与待确认的不一致） -> 【加入待确认，不报警】
+                  console.log(`[${getTime()}] 发现潜在变化: ${url} (原: ${committedEntry.status} -> 新: ${currentEntry.status})。等待下一次检测确认...`);
+                  pendingChanges[url] = currentEntry;
+                  // 保持文件中的状态不变，直到确认
+                  finalStatusJson[url] = committedEntry;
+                }
+              }
+
+              // 统计可用服务器列表 (用于邮件底部显示，这里显示的是 Current 状态，即便未确认也可以在邮件里列出，或者只列出 confirmed，为了严谨我们只列出 committed 的或者 confirmed 的)
+              // 这里我们逻辑改为：如果状态是 Open/Closed (非 Offline)，加入列表。
+              // 注意：如果处于 Pending 状态，finalStatusJson 还是旧的。
+              // 为了邮件准确性，availableServers 应该反映 finalStatusJson (即已确认的状态)
+              const statusToShow = finalStatusJson[url] || {};
+              if (statusToShow.status && statusToShow.status !== "Offline") {
+                 let disp = statusToShow.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                 availableServers.push(`<a href="${url}">${url}</a> (状态: ${disp})`);
               }
             }
 
+            // 处理通知发送
             if (notifications.length > 0) {
-              console.log(`[${getTime()}] 检测到变化，正在处理通知和保存...`);
-              fs.writeFileSync(STATE_FILE, JSON.stringify(newStatusJson, null, 2));
+              console.log(`[${getTime()}] 确认状态变化，正在处理通知和保存...`);
+              fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
               commitAndPush();
               let changeDetails = notifications.join('<br>');
               let availableListHeader = `<br><hr><b>当前已上线的服务器列表 (${availableServers.length} 个):</b><br>`;
@@ -246,8 +301,10 @@ jobs:
               let fullBody = `检测到以下服务器状态发生变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
               await sendEmail(fullBody);
             } else {
+              const pendingCount = Object.keys(pendingChanges).length;
               const duration = ((Date.now() - loopStart) / 1000).toFixed(1);
-              console.log(`[${getTime()}] 无状态变化。 (耗时: ${duration}秒)`);
+              let pendingMsg = pendingCount > 0 ? ` (有 ${pendingCount} 个状态待确认)` : "";
+              console.log(`[${getTime()}] 无已确认的状态变化。${pendingMsg} (耗时: ${duration}秒)`);
             }
           }
 
