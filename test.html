@@ -19,7 +19,7 @@
         }
 
         body {
-            font-family: 'Rubik', 'M PLUS 1p';
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
             margin: 0;
             padding-top: 100px;
             padding-bottom: 40px;
@@ -187,7 +187,8 @@
 <body>
     <div class="header">
         <h1>
-            3D坦克测试服务器
+            <!-- 文本将由JS控制 -->
+            <span id="header-title-text">3D坦克测试服务器</span>
             <span class="header-subtitle">主页重新设计</span>
         </h1>
     </div>
@@ -214,11 +215,36 @@
     <div id="no-servers" class="hidden">当前暂无服务器</div>
 
     <script>
+        // --- 语言检测逻辑 ---
+        const userLang = navigator.language || navigator.userLanguage; 
+        const isChinese = userLang.startsWith('zh');
+
+        const texts = {
+            title: isChinese ? '3D坦克测试服务器' : 'Tanki Online Test Server',
+            subtitle: isChinese ? '主页重新设计' : 'Homepage Redesign',
+            back: isChinese ? '返回' : 'Back',
+            loading: isChinese ? '加载中...' : 'Loading...',
+            online: isChinese ? '在线: ' : 'Online: ',
+            inbattles: isChinese ? '战斗中: ' : 'In Battles: ',
+            noServers: isChinese ? '当前暂无服务器' : 'No servers available currently'
+        };
+
+        // 更新静态页面内容
+        document.title = texts.title;
+        document.getElementById('header-title-text').textContent = texts.title;
+        document.querySelector('.header-subtitle').textContent = texts.subtitle;
+        document.getElementById('no-servers').textContent = texts.noServers;
+
+        if (!isChinese) {
+            document.documentElement.lang = "en";
+        }
+        // -------------------
+
         if (document.referrer.includes('testanki1.github.io')) {
             const backButton = document.createElement('a');
             backButton.href = '#';
             backButton.className = 'button back-button'; 
-            backButton.textContent = '返回';
+            backButton.textContent = texts.back; // 使用动态文本
             document.body.appendChild(backButton);
             backButton.addEventListener('click', function(event) {
                 event.preventDefault(); 
@@ -250,7 +276,7 @@
 
             const onlineCount = document.createElement('span');
             onlineCount.className = 'online-count';
-            onlineCount.textContent = '加载中...';
+            onlineCount.textContent = texts.loading; // 使用动态文本
 
             const inbattlesCount = document.createElement('span');
             inbattlesCount.className = 'inbattles-count';
@@ -302,9 +328,9 @@
                 container.appendChild(element);
             }
 
-            // 3. 更新数据文本
-            element.querySelector('.online-count').textContent = `在线: ${onlineCount}`;
-            element.querySelector('.inbattles-count').textContent = `战斗中: ${inbattlesCount}`;
+            // 3. 更新数据文本 (使用动态语言前缀)
+            element.querySelector('.online-count').textContent = `${texts.online}${onlineCount}`;
+            element.querySelector('.inbattles-count').textContent = `${texts.inbattles}${inbattlesCount}`;
         }
 
         function removeButton(elementId) {
