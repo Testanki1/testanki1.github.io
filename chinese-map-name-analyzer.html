@@ -4,321 +4,627 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D坦克中文地图高频词分析</title>
-    <!-- 字体: 思源黑体 -->
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+
     <style>
-        * {
-        -webkit-tap-highlight-color: transparent;
-        }
-        
-        /* --- 浅色主题 (默认) --- */
         :root {
-            --md-sys-color-primary: #6750A4;
-            --md-sys-color-on-primary: #FFFFFF;
-            --md-sys-color-primary-container: #EADDFF;
-            --md-sys-color-on-primary-container: #21005E;
-            --md-sys-color-secondary: #625B71;
-            --md-sys-color-tertiary: #7D5260;
-            --md-sys-color-background: #FFFBFE;
-            --md-sys-color-on-background: #1C1B1F;
-            --md-sys-color-surface: #F3EDF7;
-            --md-sys-color-surface-container: #FFFBFE;
-            --md-sys-color-surface-container-highest: #E6E0E9;
-            --md-sys-color-surface-variant: #E7E0EC;
-            --md-sys-color-on-surface-variant: #49454E;
-            --md-sys-color-outline: #79747E;
-            --md-sys-color-shadow: rgba(103, 80, 164, 0.3);
-            --transition-speed: 0.25s;
+            /* M3 Expressive Palette */
+            --color-primary: #76FF33;
+            --color-on-primary: #002200;
+            --color-background: #001926;
+            --color-surface: rgba(0, 37, 58, 0.5);
+            --color-surface-solid: #00253A;
+            --color-secondary: #BFD5FF;
+            --color-outline: rgba(191, 213, 255, 0.2);
+            
+            /* Fonts: Rubik first, M PLUS 1p second */
+            --font-stack: 'Rubik', 'M PLUS 1p', sans-serif;
+            
+            --radius-lg: 32px;
+            --radius-md: 24px;
+            --radius-full: 999px;
+            
+            --anim-speed: 0.3s;
+            --anim-ease: cubic-bezier(0.2, 0, 0, 1);
         }
 
-        /* --- 深色主题 --- */
-        body.theme-dark {
-            --md-sys-color-primary: #76FF33;
-            --md-sys-color-on-primary: #002200;
-            --md-sys-color-primary-container: #235203;
-            --md-sys-color-on-primary-container: #91FF54;
-            --md-sys-color-secondary: #BCCDAE;
-            --md-sys-color-tertiary: #A1CDA8;
-            --md-sys-color-background: #001926;
-            --md-sys-color-on-background: #E0E3E4;
-            --md-sys-color-surface: #00253A;
-            --md-sys-color-surface-container: #003049;
-            --md-sys-color-surface-container-highest: #00405F;
-            --md-sys-color-surface-variant: #40484C;
-            --md-sys-color-on-surface-variant: #C0C8CC;
-            --md-sys-color-outline: #BFD5FF;
-            --md-sys-color-shadow: rgba(118, 255, 51, 0.3);
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
-
-        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
         body {
-            font-family: 'Noto Sans SC', sans-serif;
-            background-color: var(--md-sys-color-background);
-            color: var(--md-sys-color-on-background);
+            background-color: var(--color-background);
+            color: var(--color-secondary);
+            font-family: var(--font-stack);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            padding: 24px;
-            box-sizing: border-box;
-            transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+            overflow-x: hidden;
+            opacity: 0; /* Hidden initially for font loading */
+            transition: opacity 0.5s ease;
         }
 
-        .container { width: 100%; max-width: 700px; text-align: center; }
+        body.fonts-loaded {
+            opacity: 1;
+        }
 
-        .header { position: relative; } 
-        .header h1 { font-size: 2.8rem; font-weight: 700; color: var(--md-sys-color-primary); letter-spacing: -1px; margin: 0 0 16px; }
-        .header p { font-size: 1.2rem; color: var(--md-sys-color-on-surface-variant); max-width: 600px; margin: 0 auto 48px; }
-        
-        .theme-btn {
-            position: absolute;
-            top: 0;
-            right: 0;
+        /* Loading State */
+        #loader {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
             display: flex;
             justify-content: center;
             align-items: center;
+            background-color: var(--color-background);
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+        
+        .spinner {
             width: 48px;
             height: 48px;
+            border: 4px solid var(--color-outline);
+            border-top-color: var(--color-primary);
             border-radius: 50%;
-            border: none;
-            background-color: transparent;
-            color: var(--md-sys-color-primary);
-            cursor: pointer;
-            transition: all var(--transition-speed) ease;
+            animation: spin 1s linear infinite;
         }
-        .theme-btn:hover {
-            background-color: var(--md-sys-color-primary-container);
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Main App */
+        #app {
+            width: 100%;
+            max-width: 800px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            text-align: center;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 20px rgba(118, 255, 51, 0.15);
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 1.1rem;
+            opacity: 0.8;
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .highlight-text {
+            color: var(--color-secondary);
+            font-weight: 400;
+        }
+
+        /* Glass Panel */
+        .glass-panel {
+            background: linear-gradient(145deg, rgba(0, 37, 58, 0.4), rgba(0, 25, 38, 0.6));
+            border: 1px solid var(--color-outline);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            min-height: 520px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s var(--anim-ease);
+        }
+
+        /* Controls */
+        .controls-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            z-index: 2;
+        }
+
+        .label-small {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--color-secondary);
+            opacity: 0.7;
+            font-weight: 500;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Buttons */
+        .btn-icon {
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-outline);
+            background: transparent;
+            color: var(--color-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-stack);
+            transition: all 0.3s var(--anim-ease);
+        }
+
+        .btn-icon:hover {
+            background: rgba(191, 213, 255, 0.05);
+            border-color: rgba(191, 213, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-icon.active {
+            background: var(--color-primary);
+            color: var(--color-on-primary);
+            border-color: var(--color-primary);
+            box-shadow: 0 0 15px rgba(118, 255, 51, 0.3);
+            transform: scale(1.05);
+        }
+
+        .btn-nav {
+            width: 3rem;
+            height: 3rem;
+            border-radius: var(--radius-full);
+            border: 1px solid var(--color-outline);
+            background: transparent;
+            color: var(--color-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s var(--anim-ease);
+        }
+
+        .btn-nav:hover:not(:disabled) {
+            background: rgba(118, 255, 51, 0.1);
+            border-color: var(--color-primary);
+            color: var(--color-primary);
             transform: scale(1.1);
         }
 
-        .interactive-viewer {
-            background-color: var(--md-sys-color-surface);
-            border-radius: 28px;
-            border: 1px solid var(--md-sys-color-surface-variant);
-            box-shadow: 0 8px 32px 0 rgba(0,0,0,0.08);
-            padding: 32px;
-            max-height: 85vh;
-            overflow-y: auto;
-            transition: background-color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+        .btn-nav:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: transparent;
+            transform: scale(1);
         }
 
-        .controls { margin-bottom: 24px; }
-        .length-filters { display: flex; justify-content: center; gap: 16px; margin-bottom: 32px; }
-
-        .filter-btn {
-            width: 52px; height: 52px; display: flex; justify-content: center; align-items: center; border-radius: 50%;
-            border: 2px solid var(--md-sys-color-outline); background-color: transparent; color: var(--md-sys-color-outline);
-            cursor: pointer; transition: all var(--transition-speed) ease;
-        }
-        .filter-btn .material-symbols-outlined { font-size: 28px; }
-        .filter-btn:hover { background-color: var(--md-sys-color-surface-container-highest); transform: scale(1.1); }
-        .filter-btn.active {
-            background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
-            border-color: var(--md-sys-color-primary); transform: scale(1.1);
-            box-shadow: 0 4px 12px var(--md-sys-color-shadow);
+        .material-symbols-rounded {
+            font-size: 24px;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
 
-        .navigation { display: flex; justify-content: space-between; align-items: center; }
-        
-        .nav-btn {
-            display: flex; justify-content: center; align-items: center; width: 48px; height: 48px; border-radius: 50%; border: none;
-            background-color: transparent; color: var(--md-sys-color-primary); cursor: pointer;
-            transition: all var(--transition-speed) ease;
+        /* Navigation */
+        .nav-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding: 0 1rem;
         }
-        .nav-btn:hover:not(:disabled) { background-color: var(--md-sys-color-primary-container); transform: scale(1.1); }
-        .nav-btn:disabled { color: var(--md-sys-color-outline); cursor: not-allowed; background-color: transparent; transform: scale(1); }
-        .nav-btn .material-symbols-outlined { font-size: 32px; }
 
-        #position-indicator { font-size: 1.1rem; font-weight: 500; color: var(--md-sys-color-secondary); min-width: 60px; }
-        
-        .display-card {
-            background-color: var(--md-sys-color-surface-container);
-            border: 1px solid var(--md-sys-color-surface-variant);
-            border-radius: 20px;
-            padding: 24px;
+        #position-indicator {
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.1em;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--color-secondary);
+            opacity: 0.9;
+        }
+
+        /* Content Card */
+        #display-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
             opacity: 1;
             transform: translateY(0);
-            transition: opacity var(--transition-speed) ease, transform var(--transition-speed) ease, background-color var(--transition-speed) ease;
+            transition: opacity 0.2s ease, transform 0.2s ease;
         }
-        .display-card.content-fading { opacity: 0; transform: translateY(10px); }
-
-        #keyword-display {
-            font-size: 3rem; font-weight: 700; margin-bottom: 8px;
-            background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary));
-            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
-        }
-
-        #frequency-display { font-size: 1.1rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px; }
-        #map-list-display .map-item { font-size: 1rem; padding: 10px 0; }
-        #map-list-display .map-item:not(:first-child) { border-top: 1px solid var(--md-sys-color-surface-variant); }
-        .empty-state { padding: 40px 0; color: var(--md-sys-color-on-surface-variant); }
-        .empty-state .material-symbols-outlined { font-size: 48px; margin-bottom: 16px; }
-        .empty-state p { margin: 0; font-size: 1.1rem; font-weight: 500; }
-        .interactive-viewer::-webkit-scrollbar { width: 8px; }
-        .interactive-viewer::-webkit-scrollbar-track { background: var(--md-sys-color-surface-variant); border-radius: 4px;}
-        .interactive-viewer::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline); border-radius: 4px; }
         
+        #display-card.fading {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.35rem 1rem;
+            border-radius: var(--radius-full);
+            background: rgba(118, 255, 51, 0.1);
+            color: var(--color-primary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(118, 255, 51, 0.2);
+        }
+
+        .word-title {
+            font-size: 4.5rem;
+            font-weight: 700;
+            color: var(--color-secondary);
+            margin-bottom: 2rem;
+            line-height: 1;
+            background: linear-gradient(180deg, #fff, var(--color-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .map-list-container {
+            width: 100%;
+            max-width: 420px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-outline);
+            overflow: hidden;
+            text-align: left;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .map-list-header {
+            padding: 1rem 1.5rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--color-secondary);
+            opacity: 0.6;
+            background: rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--color-outline);
+            font-weight: 500;
+        }
+
+        .map-list {
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+
+        .map-item {
+            padding: 0.85rem 1.5rem;
+            font-size: 1rem;
+            color: rgba(191, 213, 255, 0.9);
+            border-bottom: 1px solid rgba(191, 213, 255, 0.05);
+            transition: background 0.2s;
+            display: block; /* Changed from flex to block to fix copy/paste newlines */
+        }
+
+        .map-item:last-child {
+            border-bottom: none;
+        }
+
+        .map-item:hover {
+            background: rgba(118, 255, 51, 0.05);
+            color: #fff;
+        }
+
+        .highlight-word {
+            color: var(--color-primary);
+            font-weight: 700;
+            margin: 0;
+            text-shadow: 0 0 10px rgba(118, 255, 51, 0.4);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(191, 213, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(118, 255, 51, 0.3);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            opacity: 0.5;
+            padding: 3rem;
+        }
+
+        /* Responsive */
         @media (max-width: 600px) {
-            body { padding: 16px; align-items: flex-start; }
-            .header { padding-top: 48px; }
-            .header h1 { font-size: 2rem; }
-            .header p { font-size: 1rem; margin-bottom: 32px; }
-            .theme-btn { top: 8px; right: 8px; }
-            .interactive-viewer { padding: 16px; max-height: 80vh; }
+            h1 { font-size: 2.5rem; }
+            .word-title { font-size: 3rem; }
+            #app { padding: 1rem; gap: 1.5rem; }
+            .glass-panel { padding: 1.5rem; min-height: 400px; }
+            .btn-icon { width: 3rem; height: 3rem; }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="header">
-            <h1>3D坦克中文地图高频词分析</h1>
-            <p>发现中文地图名称中的重复词语，洞察命名规律。</p>
-            <button id="theme-toggle-btn" class="theme-btn" title="切换主题">
-                <span class="material-symbols-outlined">dark_mode</span>
-            </button>
-        </div>
+    <div id="loader">
+        <div class="spinner"></div>
+    </div>
 
-        <div class="interactive-viewer">
-            <div class="controls">
-                <div class="length-filters" id="length-filters-container"></div>
-                <div class="navigation">
-                    <button class="nav-btn" id="prev-btn" title="上一个"><span class="material-symbols-outlined">chevron_left</span></button>
-                    <span id="position-indicator">1 / 1</span>
-                    <button class="nav-btn" id="next-btn" title="下一个"><span class="material-symbols-outlined">chevron_right</span></button>
+    <div id="app">
+        <header>
+            <h1>3D坦克<br><span class="highlight-text">地图分析</span></h1>
+            <p class="subtitle">中文地图高频命名规律探索</p>
+        </header>
+
+        <main class="glass-panel">
+            <div class="controls-area">
+                <span class="label-small">词长筛选</span>
+                <div id="filters-container" class="filter-group">
+                    <!-- Filters generated by JS -->
                 </div>
             </div>
 
-            <div class="display-card" id="display-card">
-                <!-- Content will be injected here -->
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                <div class="nav-header">
+                    <button id="prev-btn" class="btn-nav" aria-label="上一个">
+                        <span class="material-symbols-rounded">chevron_left</span>
+                    </button>
+                    
+                    <span id="position-indicator"></span>
+
+                    <button id="next-btn" class="btn-nav" aria-label="下一个">
+                        <span class="material-symbols-rounded">chevron_right</span>
+                    </button>
+                </div>
+
+                <div id="display-card">
+                    <!-- Content generated by JS -->
+                </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <script>
+        // Data
         const mapNames = [ "亚历山大罗夫斯克", "群岛", "竞技场", "天空管道", "城镇3C", "柏林巷站", "山城大战", "训练场", "要塞3C", "路桥大战", "黑色营地", "峡谷", "核电站", "切尔努什卡", "科隆", "孔贝", "空中楼阁", "十字路口", "死亡轨道", "甲板9号", "沙漠", "异次元空间", "城镇角斗场", "古代城堡", "爱丁堡", "海滨中心", "遗弃工厂", "农场", "黑色森林", "黑色城堡", "未来世界", "古墓废墟", "铁塔", "双塔遗迹", "高原", "公路大战", "山岗", "工厂之战", "圣地之战", "小岛", "欧洲村庄", "大桥3C", "失落神庙", "疯狂思维空间", "十字角斗场", "高架桥", "平原", "火车站", "天空要塞", "山顶城堡", "炼油厂保卫战", "隧道对抗", "德国小镇", "边塞角斗场", "穿越之战", "小方块", "多边形", "红色警戒", "渡桥之战", "里约", "演练场", "高地角斗场", "辽源", "山城3C", "小桥之战", "寂静", "混乱城市", "摩天大楼", "废墟大战", "运动场", "地铁", "广场3C", "山谷", "潮汐", "城堡争夺", "2042", "约克郡", "动感区域" ];
-        let groupedWords = {}, activeLength = 0, currentIndex = 0;
-        const lengthIcons = { 3: 'segment', 2: 'drag_handle', 1: 'match_case' };
-
-        const filtersContainer = document.getElementById('length-filters-container');
-        const prevBtn = document.getElementById('prev-btn');
-        const nextBtn = document.getElementById('next-btn');
-        const positionIndicator = document.getElementById('position-indicator');
-        const displayCard = document.getElementById('display-card');
-        const themeToggleBtn = document.getElementById('theme-toggle-btn');
-
-        function analyzeAndSetup() {
-            const wordCounts={};mapNames.forEach(t=>{const e=new Set;for(let s=0;s<t.length;s++)for(let a=s+1;a<=t.length;a++)e.add(t.substring(s,a));e.forEach(t=>{wordCounts[t]=(wordCounts[t]||0)+1})});let candidates=Object.entries(wordCounts).filter(([,t])=>t>=2);const finalWords=candidates.filter(([t,e])=>!candidates.some(([s,a])=>s.length>t.length&&s.includes(t)&&a===e));finalWords.sort(([t,e],[s,a])=>{const n=s.length-t.length;if(n)return n;const r=a-e;if(r)return r;return t.localeCompare(s,"zh-Hans-CN")}),finalWords.forEach(([t,e])=>{const s=t.length;groupedWords[s]||(groupedWords[s]=[]),groupedWords[s].push({word:t,count:e})}),setupFilters();const availableLengths=Object.keys(groupedWords).map(Number).sort((t,e)=>e-t);availableLengths.length>0&&setActiveLength(availableLengths[0], true);
-        }
         
-        function setupFilters() {
-            filtersContainer.innerHTML = '';
-            Object.keys(groupedWords).map(Number).sort((a,b)=>b-a).forEach(len => {
-                const btn = document.createElement('button');
-                btn.className = 'filter-btn'; btn.dataset.length = len;
-                btn.title = `${len}个字`;
-                btn.innerHTML = `<span class="material-symbols-outlined">${lengthIcons[len] || 'help'}</span>`;
-                btn.onclick = () => setActiveLength(len);
-                filtersContainer.appendChild(btn);
+        let groupedWords = {};
+        let activeLength = 0;
+        let currentIndex = 0;
+        
+        const dom = {
+            loader: document.getElementById('loader'),
+            app: document.getElementById('app'),
+            filters: document.getElementById('filters-container'),
+            prevBtn: document.getElementById('prev-btn'),
+            nextBtn: document.getElementById('next-btn'),
+            indicator: document.getElementById('position-indicator'),
+            display: document.getElementById('display-card')
+        };
+
+        const lengthIcons = { 
+            3: 'segment', 
+            2: 'drag_handle', 
+            1: 'match_case' 
+        };
+
+        function init() {
+            // Process Data
+            const wordCounts = {};
+            mapNames.forEach(name => {
+                const uniqueWordsInMap = new Set();
+                for (let i = 0; i < name.length; i++) {
+                    for (let j = i + 1; j <= name.length; j++) {
+                        uniqueWordsInMap.add(name.substring(i, j));
+                    }
+                }
+                uniqueWordsInMap.forEach(word => {
+                    wordCounts[word] = (wordCounts[word] || 0) + 1;
+                });
+            });
+
+            // Filter
+            let candidates = Object.entries(wordCounts).filter(([, count]) => count >= 2);
+            
+            // Remove substrings if superstring exists with same count
+            const finalWords = candidates.filter(([word, count]) => {
+                return !candidates.some(([otherWord, otherCount]) => 
+                    otherWord.length > word.length && otherWord.includes(word) && otherCount === count
+                );
+            });
+
+            // Sort
+            finalWords.sort(([wA, cA], [wB, cB]) => {
+                if (wB.length !== wA.length) return wB.length - wA.length;
+                if (cB !== cA) return cB - cA;
+                return wA.localeCompare(wB, "zh-Hans-CN");
+            });
+
+            // Group
+            finalWords.forEach(([word, count]) => {
+                const len = word.length;
+                if (!groupedWords[len]) groupedWords[len] = [];
+                groupedWords[len].push({ word, count });
+            });
+
+            // Setup UI
+            setupFilters();
+            
+            // Initial Active State
+            const lengths = Object.keys(groupedWords).map(Number).sort((a, b) => b - a);
+            if (lengths.length > 0) {
+                activeLength = lengths[0];
+                updateDisplay(true); // Initial load, no fade animation
+            } else {
+                renderContent();
+            }
+
+            // Events
+            dom.prevBtn.addEventListener('click', () => navigate(-1));
+            dom.nextBtn.addEventListener('click', () => navigate(1));
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') navigate(-1);
+                if (e.key === 'ArrowRight') navigate(1);
             });
         }
-        
-        function setActiveLength(len, isInitialLoad = false) {
-            activeLength = len; currentIndex = 0;
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.length) === len));
-            updateDisplay(isInitialLoad);
+
+        function setupFilters() {
+            dom.filters.innerHTML = '';
+            const lengths = Object.keys(groupedWords).map(Number).sort((a, b) => b - a);
+            
+            lengths.forEach(len => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-icon';
+                btn.setAttribute('aria-label', `${len}个字`);
+                btn.dataset.len = len;
+                
+                const icon = lengthIcons[len] || 'short_text';
+                btn.innerHTML = `<span class="material-symbols-rounded">${icon}</span>`;
+                
+                btn.onclick = () => {
+                    if (activeLength === len) return;
+                    activeLength = len;
+                    currentIndex = 0;
+                    updateFiltersState();
+                    updateDisplay();
+                };
+                dom.filters.appendChild(btn);
+            });
+            updateFiltersState();
         }
 
-        function navigate(direction) {
+        function updateFiltersState() {
+            Array.from(dom.filters.children).forEach(btn => {
+                if (parseInt(btn.dataset.len) === activeLength) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        function navigate(dir) {
             const list = groupedWords[activeLength];
-            if (!list) return;
-            let newIndex = currentIndex + direction;
+            if (!list || list.length === 0) return;
+            
+            let newIndex = currentIndex + dir;
             if (newIndex < 0) newIndex = list.length - 1;
             if (newIndex >= list.length) newIndex = 0;
+            
             currentIndex = newIndex;
             updateDisplay();
         }
 
-        function updateDisplay(isInitialLoad = false) {
-            displayCard.classList.add('content-fading');
+        // Handles the animation cycle
+        function updateDisplay(immediate = false) {
+            if (immediate) {
+                renderContent();
+                return;
+            }
+
+            dom.display.classList.add('fading');
             
             setTimeout(() => {
-                const list = groupedWords[activeLength];
-                if (!list || list.length === 0) {
-                    displayCard.innerHTML = `<div class="empty-state">
-                        <span class="material-symbols-outlined">sentiment_dissatisfied</span>
-                        <p>该长度下无高频词</p>
+                renderContent();
+                dom.display.classList.remove('fading');
+            }, 200);
+        }
+
+        // Renders the HTML content based on current state
+        function renderContent() {
+            const list = groupedWords[activeLength];
+            
+            if (!list || list.length === 0) {
+                dom.display.innerHTML = `
+                    <div class="empty-state">
+                        <span class="material-symbols-rounded" style="font-size: 48px; margin-bottom: 1rem; opacity: 0.5;">search_off</span>
+                        <p>无数据</p>
                     </div>`;
-                    positionIndicator.textContent = '0 / 0';
-                    prevBtn.disabled = true; nextBtn.disabled = true;
-                } else {
-                    const data = list[currentIndex];
-                    const mapsHTML = mapNames.filter(n => n.includes(data.word)).sort((a,b) => a.localeCompare(b,'zh-Hans-CN')).map(name => `<div class="map-item">${name}</div>`).join('');
-                    displayCard.innerHTML = `
-                        <div id="keyword-display">${data.word}</div>
-                        <div id="frequency-display">频次: ${data.count}</div>
-                        <div id="map-list-display">${mapsHTML}</div>`;
-                    positionIndicator.textContent = `${currentIndex + 1} / ${list.length}`;
-                    prevBtn.disabled = list.length <= 1; nextBtn.disabled = list.length <= 1;
-                }
-                if (!isInitialLoad) {
-                   document.querySelector('.interactive-viewer').scrollTop = 0;
-                }
-                displayCard.classList.remove('content-fading');
-            }, isInitialLoad ? 0 : 150);
-        }
-
-        // --- 主题切换逻辑 ---
-        function applyTheme(theme) {
-            const icon = themeToggleBtn.querySelector('.material-symbols-outlined');
-            if (theme === 'dark') {
-                document.body.classList.add('theme-dark');
-                icon.textContent = 'light_mode';
-            } else {
-                document.body.classList.remove('theme-dark');
-                icon.textContent = 'dark_mode';
-            }
-        }
-
-        function toggleTheme() {
-            const currentThemeIsDark = document.body.classList.contains('theme-dark');
-            const newTheme = currentThemeIsDark ? 'light' : 'dark';
-            localStorage.setItem('theme', newTheme); // 保存用户选择
-            applyTheme(newTheme);
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // 初始化页面分析
-            analyzeAndSetup();
-
-            // 设置按钮事件
-            prevBtn.onclick = () => navigate(-1);
-            nextBtn.onclick = () => navigate(1);
-            themeToggleBtn.onclick = toggleTheme;
-
-            // --- 主题初始化 ---
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme) {
-                // 如果用户有保存的选择，则使用该选择
-                applyTheme(savedTheme);
-            } else {
-                // 否则，跟随系统主题
-                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                applyTheme(prefersDark ? 'dark' : 'light');
+                dom.indicator.textContent = '0 / 0';
+                dom.prevBtn.disabled = true;
+                dom.nextBtn.disabled = true;
+                return;
             }
 
-            // 监听系统主题变化
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-                // 仅当用户没有手动设置主题时才响应系统变化
-                if (!localStorage.getItem('theme')) {
-                    applyTheme(event.matches ? 'dark' : 'light');
-                }
-            });
+            const data = list[currentIndex];
+            
+            // Map List HTML
+            const mapsHTML = mapNames
+                .filter(n => n.includes(data.word))
+                .sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+                .map(name => {
+                    const highlighted = name.replace(
+                        new RegExp(data.word, 'g'), 
+                        `<span class="highlight-word">${data.word}</span>`
+                    );
+                    return `<div class="map-item">${highlighted}</div>`;
+                }).join('');
+
+            dom.display.innerHTML = `
+                <div>
+                    <div class="tag">出现 ${data.count} 次</div>
+                    <h2 class="word-title">${data.word}</h2>
+                </div>
+                <div class="map-list-container">
+                    <div class="map-list-header">相关地图</div>
+                    <div class="map-list">
+                        ${mapsHTML}
+                    </div>
+                </div>
+            `;
+            
+            dom.indicator.textContent = `${currentIndex + 1} / ${list.length}`;
+            
+            const hasMultiple = list.length > 1;
+            dom.prevBtn.disabled = !hasMultiple;
+            dom.nextBtn.disabled = !hasMultiple;
+        }
+
+        // Font Loading Strategy & Initialization
+        document.fonts.ready.then(() => {
+            init();
+            
+            // Hide Loader
+            dom.loader.style.opacity = '0';
+            
+            // Show App
+            document.body.classList.add('fonts-loaded');
+            
+            setTimeout(() => {
+                dom.loader.style.display = 'none';
+            }, 500);
         });
+
     </script>
 </body>
 </html>
