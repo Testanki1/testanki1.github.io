@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>背景音乐消除器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Color Tokens */
+            --md-sys-color-primary: #6750A4;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-primary-container: #EADDFF;
+            --md-sys-color-on-primary-container: #21005D;
+            --md-sys-color-secondary: #625B71;
+            --md-sys-color-secondary-container: #E8DEF8;
+            --md-sys-color-on-secondary-container: #1D192B;
+            --md-sys-color-background: #FEF7FF;
+            --md-sys-color-on-background: #1D1B20;
+            --md-sys-color-surface: #FEF7FF;
+            --md-sys-color-surface-container: #F3EDF7;
+            --md-sys-color-surface-container-high: #ECE6F0;
+            --md-sys-color-outline: #79747E;
+            --md-sys-color-outline-variant: #C4C7C5;
+            --md-sys-color-error: #B3261E;
+            --md-sys-color-success: #146C2E;
+
+            /* Elevation & Shape */
+            --md-sys-elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+            --md-sys-elevation-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+            --md-sys-shape-corner-medium: 12px;
+            --md-sys-shape-corner-large: 16px;
+            --md-sys-shape-corner-xl: 28px;
+            
+            /* Typography */
+            --md-sys-typescale-headline-large: 400 32px/40px 'Roboto', sans-serif;
+            --md-sys-typescale-title-medium: 500 16px/24px 'Roboto', sans-serif;
+            --md-sys-typescale-body-large: 400 16px/24px 'Roboto', sans-serif;
+            --md-sys-typescale-label-large: 500 14px/20px 'Roboto', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            opacity: 0;
+            transition: opacity 0.4s ease-in;
+        }
+
+        body.loaded {
+            opacity: 1;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        h1 {
+            font: var(--md-sys-typescale-headline-large);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font: var(--md-sys-typescale-body-large);
+            color: var(--md-sys-color-secondary);
+        }
+
+        /* Card Styles */
+        .card {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-large);
+            padding: 24px;
+            box-shadow: var(--md-sys-elevation-1);
+        }
+
+        /* Upload Section */
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .upload-box {
+            position: relative;
+            background-color: var(--md-sys-color-surface-container-high);
+            border: 2px dashed var(--md-sys-color-outline-variant);
+            border-radius: var(--md-sys-shape-corner-medium);
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            overflow: hidden;
+            padding: 16px;
+        }
+
+        .upload-box:hover {
+            background-color: var(--md-sys-color-surface-container);
+            border-color: var(--md-sys-color-primary);
+        }
+
+        .upload-box input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-icon {
+            width: 32px;
+            height: 32px;
+            fill: var(--md-sys-color-primary);
+            margin-bottom: 8px;
+        }
+
+        .upload-text {
+            font: var(--md-sys-typescale-label-large);
+            color: var(--md-sys-color-on-background);
+        }
+
+        .file-name {
+            font-size: 12px;
+            color: var(--md-sys-color-secondary);
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* Main Actions */
+        .action-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        /* Buttons */
+        .btn {
+            border: none;
+            outline: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 40px;
+            padding: 0 24px;
+            border-radius: 20px;
+            font: var(--md-sys-typescale-label-large);
+            transition: all 0.2s;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:disabled {
+            opacity: 0.38;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .btn-filled {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            box-shadow: var(--md-sys-elevation-1);
+        }
+
+        .btn-filled:hover {
+            box-shadow: var(--md-sys-elevation-2);
+            background-color: rgba(103, 80, 164, 0.92);
+        }
+
+        .btn-tonal {
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+
+        .btn-tonal:hover {
+            box-shadow: var(--md-sys-elevation-1);
+        }
+
+        /* Player */
+        .player-container {
+            opacity: 0.5;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .player-container.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .progress-area {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 32px; /* Touch target */
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background-color: var(--md-sys-color-surface-container-high);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--md-sys-color-primary);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .time-labels {
+            display: flex;
+            justify-content: space-between;
+            font: var(--md-sys-typescale-label-large);
+            color: var(--md-sys-color-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .btn-icon-large {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+
+        .btn-icon-large:hover {
+            box-shadow: var(--md-sys-elevation-2);
+            transform: scale(1.05);
+        }
+
+        .btn-icon-large:active {
+            transform: scale(0.95);
+        }
+
+        .icon-svg {
+            width: 32px;
+            height: 32px;
+            fill: currentColor;
+        }
+
+        /* Status */
+        .status-msg {
+            text-align: center;
+            height: 20px;
+            font: var(--md-sys-typescale-label-large);
+            color: var(--md-sys-color-secondary);
+        }
+        .status-msg.success { color: var(--md-sys-color-success); }
+        .status-msg.error { color: var(--md-sys-color-error); }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 480px) {
+            .upload-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <header>
+            <h1>背景音乐消除器</h1>
+            <p class="subtitle">基于相位抵消算法 · 纯本地处理 · 非 AI</p>
+        </header>
+
+        <!-- Upload Card -->
+        <div class="card">
+            <div class="upload-grid">
+                <div class="upload-box" id="mixUploadBox">
+                    <input type="file" id="mixInput" accept="audio/*, video/*">
+                    <svg class="upload-icon" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                    <span class="upload-text">混合音视频</span>
+                    <div class="file-name" id="mixFileName"></div>
+                </div>
+                <div class="upload-box" id="bgmUploadBox">
+                    <input type="file" id="bgmInput" accept="audio/*">
+                    <svg class="upload-icon" viewBox="0 0 24 24"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+                    <span class="upload-text">背景音乐</span>
+                    <div class="file-name" id="bgmFileName"></div>
+                </div>
+            </div>
+
+            <div class="action-area">
+                <div id="statusText" class="status-msg"></div>
+                <button id="autoAlignBtn" class="btn btn-filled" disabled>
+                    <svg class="icon-svg" style="width:18px;height:18px;" viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                    开始自动对齐
+                </button>
+            </div>
+        </div>
+
+        <!-- Player Card -->
+        <div class="card player-container" id="playerCard">
+            <div class="progress-area">
+                <div class="progress-bar-container" id="progressContainer">
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+                <div class="time-labels">
+                    <span id="currentTime">00:00</span>
+                    <span id="totalTime">00:00</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="togglePlayBtn" class="btn-icon-large">
+                    <svg id="iconPlay" class="icon-svg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="iconPause" class="icon-svg hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+            </div>
+
+            <div style="display: flex; justify-content: center; margin-top: 8px;">
+                <button id="exportBtn" class="btn btn-tonal">
+                    <svg class="icon-svg" style="width:18px;height:18px;" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    导出处理结果
+                </button>
+            </div>
+            <div id="exportStatus" class="status-msg hidden">正在渲染...</div>
+        </div>
+
+    </div>
+
+    <script>
+        // Font loading handler
+        document.fonts.ready.then(() => {
+            document.body.classList.add('loaded');
+        });
+
+        // UI Elements
+        const mixInput = document.getElementById('mixInput');
+        const bgmInput = document.getElementById('bgmInput');
+        const mixFileName = document.getElementById('mixFileName');
+        const bgmFileName = document.getElementById('bgmFileName');
+        const autoAlignBtn = document.getElementById('autoAlignBtn');
+        const statusText = document.getElementById('statusText');
+        
+        const playerCard = document.getElementById('playerCard');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const togglePlayBtn = document.getElementById('togglePlayBtn');
+        const iconPlay = document.getElementById('iconPlay');
+        const iconPause = document.getElementById('iconPause');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+        
+        const exportBtn = document.getElementById('exportBtn');
+        const exportStatus = document.getElementById('exportStatus');
+
+        // Audio Logic Variables
+        let audioCtx;
+        let mixBuffer = null;
+        let bgmBuffer = null;
+        let mixSource = null;
+        let bgmSource = null;
+        let bgmGain = null;
+        let masterGain = null;
+        let mixDelayNode = null;
+        let bgmDelayNode = null;
+        
+        let isPlaying = false;
+        let startTime = 0;
+        let pauseTime = 0;
+        let animationFrameId;
+        
+        // Processing Parameters (calculated automatically)
+        let offsetTime = 0;
+        let amplitude = 1.0;
+        let invertPhase = true;
+
+        // --- Audio Context & Loading ---
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100});
+        }
+
+        async function loadAudioFile(file) {
+            initAudio();
+            const arrayBuffer = await file.arrayBuffer();
+            return await audioCtx.decodeAudioData(arrayBuffer);
+        }
+
+        function checkReady() {
+            if (mixBuffer && bgmBuffer) {
+                autoAlignBtn.disabled = false;
+            }
+        }
+
+        mixInput.addEventListener('change', async (e) => {
+            if (e.target.files[0]) {
+                mixFileName.textContent = e.target.files[0].name;
+                mixBuffer = await loadAudioFile(e.target.files[0]);
+                checkReady();
+            }
+        });
+
+        bgmInput.addEventListener('change', async (e) => {
+            if (e.target.files[0]) {
+                bgmFileName.textContent = e.target.files[0].name;
+                bgmBuffer = await loadAudioFile(e.target.files[0]);
+                checkReady();
+            }
+        });
+
+        // --- Auto Align Logic ---
+
+        autoAlignBtn.addEventListener('click', () => {
+            if (!mixBuffer || !bgmBuffer) return;
+            
+            autoAlignBtn.disabled = true;
+            statusText.textContent = "正在计算对齐...";
+            statusText.className = "status-msg";
+            
+            // Allow UI to update
+            setTimeout(() => {
+                try {
+                    performAutoAlign();
+                    statusText.textContent = "对齐成功";
+                    statusText.className = "status-msg success";
+                    
+                    playerCard.classList.add('active');
+                    totalTimeEl.textContent = formatTime(mixBuffer.duration);
+                    autoAlignBtn.disabled = false;
+                } catch (e) {
+                    console.error(e);
+                    statusText.textContent = "对齐失败";
+                    statusText.className = "status-msg error";
+                    autoAlignBtn.disabled = false;
+                }
+            }, 100);
+        });
+
+        function performAutoAlign() {
+            const sampleRate = mixBuffer.sampleRate;
+            const startSec = Math.min(10, mixBuffer.duration / 2);
+            const len = 5 * sampleRate;
+            const startIdx = Math.floor(startSec * sampleRate);
+            
+            const mixData = mixBuffer.getChannelData(0);
+            const bgmData = bgmBuffer.getChannelData(0);
+            
+            const mixChunk = mixData.slice(startIdx, startIdx + len);
+            
+            const searchWindow = 2.0 * sampleRate;
+            const bgmStart = Math.max(0, startIdx - searchWindow);
+            const bgmEnd = Math.min(bgmData.length, startIdx + len + searchWindow);
+            const bgmChunk = bgmData.slice(bgmStart, bgmEnd);
+            
+            // Coarse Search
+            let bestOffset = 0;
+            let maxCorr = -Infinity;
+            const step = 2;
+            
+            for (let i = 0; i < bgmChunk.length - mixChunk.length; i += step) {
+                let sum = 0;
+                for (let j = 0; j < mixChunk.length; j += 50) {
+                    sum += mixChunk[j] * bgmChunk[i + j];
+                }
+                if (sum > maxCorr) {
+                    maxCorr = sum;
+                    bestOffset = i;
+                }
+            }
+            
+            // Fine Search
+            let refinedOffset = bestOffset;
+            let refinedMax = -Infinity;
+            const range = 200; 
+            const fineStart = Math.max(0, bestOffset - range);
+            const fineEnd = Math.min(bgmChunk.length - mixChunk.length, bestOffset + range);
+            
+            for (let i = fineStart; i < fineEnd; i++) {
+                let sum = 0;
+                for (let j = 0; j < mixChunk.length; j += 10) {
+                    sum += mixChunk[j] * bgmChunk[i + j];
+                }
+                if (sum > refinedMax) {
+                    refinedMax = sum;
+                    refinedOffset = i;
+                }
+            }
+
+            const bgmMatchIdx = bgmStart + refinedOffset;
+            const offsetSamples = startIdx - bgmMatchIdx;
+            
+            // Amplitude Calculation
+            let sumMixSq = 0, sumBgmSq = 0;
+            for(let k=0; k < len; k+=10) {
+                sumMixSq += mixChunk[k]*mixChunk[k];
+                sumBgmSq += bgmChunk[refinedOffset+k]*bgmChunk[refinedOffset+k];
+            }
+            let estAmp = sumBgmSq > 0 ? Math.sqrt(sumMixSq/sumBgmSq) : 1.0;
+
+            offsetTime = offsetSamples / sampleRate;
+            amplitude = estAmp;
+        }
+
+        // --- Playback Logic ---
+
+        function togglePlay() {
+            if (isPlaying) pause();
+            else play();
+        }
+
+        function play() {
+            if (isPlaying) return;
+            if (mixBuffer && pauseTime >= mixBuffer.duration) pauseTime = 0;
+
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            mixSource = audioCtx.createBufferSource();
+            mixSource.buffer = mixBuffer;
+            bgmSource = audioCtx.createBufferSource();
+            bgmSource.buffer = bgmBuffer;
+            
+            mixDelayNode = audioCtx.createDelay(5.0); 
+            bgmDelayNode = audioCtx.createDelay(5.0);
+            
+            bgmGain = audioCtx.createGain();
+            masterGain = audioCtx.createGain();
+            
+            // Anti-pop: start silent
+            masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            // Phase Inversion & Amp
+            const val = invertPhase ? -amplitude : amplitude;
+            bgmGain.gain.value = val;
+
+            // Graph Connection
+            mixSource.connect(mixDelayNode);
+            mixDelayNode.connect(masterGain);
+            
+            bgmSource.connect(bgmDelayNode);
+            bgmDelayNode.connect(bgmGain);
+            bgmGain.connect(masterGain);
+            
+            masterGain.connect(audioCtx.destination);
+            
+            // Apply Delays
+            const now = audioCtx.currentTime;
+            if (offsetTime >= 0) {
+                mixDelayNode.delayTime.value = 0;
+                bgmDelayNode.delayTime.value = offsetTime;
+            } else {
+                mixDelayNode.delayTime.value = Math.abs(offsetTime);
+                bgmDelayNode.delayTime.value = 0;
+            }
+
+            // Sync start time (add small buffer for browser to prepare)
+            const syncTime = now + 0.05;
+            const playDuration = mixBuffer.duration - pauseTime;
+            
+            if (playDuration > 0) {
+                mixSource.start(syncTime, pauseTime, playDuration);
+                bgmSource.start(syncTime, pauseTime, playDuration);
+                
+                // Anti-pop fade in
+                const alignmentGap = Math.abs(offsetTime);
+                const muteDuration = Math.max(0.02, alignmentGap);
+                
+                masterGain.gain.setValueAtTime(0, syncTime + muteDuration);
+                masterGain.gain.linearRampToValueAtTime(1.0, syncTime + muteDuration + 0.04);
+            }
+
+            startTime = syncTime - pauseTime;
+            isPlaying = true;
+            
+            mixSource.onended = () => {
+                if(isPlaying && (audioCtx.currentTime - startTime >= mixBuffer.duration - 0.1)) {
+                    pause();
+                    pauseTime = 0; 
+                    updateProgressUI(0);
+                }
+            };
+            
+            updateIcons();
+            requestAnimationFrame(progressLoop);
+        }
+
+        function pause() {
+            if (!isPlaying) return;
+            if (mixSource) { try { mixSource.stop(); } catch(e){} mixSource = null; }
+            if (bgmSource) { try { bgmSource.stop(); } catch(e){} bgmSource = null; }
+            
+            pauseTime = audioCtx.currentTime - startTime;
+            isPlaying = false;
+            updateIcons();
+            cancelAnimationFrame(animationFrameId);
+        }
+
+        function updateIcons() {
+            if (isPlaying) {
+                iconPlay.classList.add('hidden');
+                iconPause.classList.remove('hidden');
+            } else {
+                iconPlay.classList.remove('hidden');
+                iconPause.classList.add('hidden');
+            }
+        }
+
+        function progressLoop() {
+            if (!isPlaying) return;
+            // Don't fight with the drag event for UI updates
+            if (!isDragging) {
+                const current = audioCtx.currentTime - startTime;
+                updateProgressUI(current);
+            }
+            animationFrameId = requestAnimationFrame(progressLoop);
+        }
+
+        function updateProgressUI(time) {
+            if (!mixBuffer) return;
+            if (time < 0) time = 0;
+            if (time > mixBuffer.duration) time = mixBuffer.duration;
+            
+            const percent = (time / mixBuffer.duration) * 100;
+            progressFill.style.width = `${percent}%`;
+            currentTimeEl.textContent = formatTime(time);
+        }
+
+        function formatTime(sec) {
+            if (sec < 0) sec = 0;
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            const ms = Math.floor((sec % 1) * 100);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Seeking & Dragging Logic
+        let isDragging = false;
+        let wasPlayingBeforeDrag = false;
+
+        function handleSeek(e) {
+            if (!mixBuffer) return;
+            const rect = progressContainer.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+            
+            const percent = x / rect.width;
+            const seekTime = percent * mixBuffer.duration;
+            
+            // Update UI immediately
+            updateProgressUI(seekTime);
+            
+            return seekTime;
+        }
+
+        // Fix: Pause on Drag Start to prevent conflicts and glitches
+        progressContainer.addEventListener('mousedown', (e) => {
+            if (!mixBuffer) return;
+            isDragging = true;
+            wasPlayingBeforeDrag = isPlaying;
+            if (isPlaying) {
+                pause(); // Pause immediately when drag starts
+            }
+            pauseTime = handleSeek(e); // Update pauseTime immediately
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !mixBuffer) return;
+            e.preventDefault();
+            pauseTime = handleSeek(e); // Track drag position
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            
+            // Final seek position check
+            pauseTime = handleSeek(e);
+            
+            if (wasPlayingBeforeDrag) {
+                play();
+            }
+            // If it wasn't playing, we just leave it paused at the new time
+            
+            isDragging = false;
+        });
+
+        // Touch support for mobile (also with Pause on Drag)
+        progressContainer.addEventListener('touchstart', (e) => {
+            if (!mixBuffer) return;
+            isDragging = true;
+            wasPlayingBeforeDrag = isPlaying;
+            if (isPlaying) {
+                pause();
+            }
+            pauseTime = handleSeek(e.touches[0]);
+        }, {passive: false});
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging || !mixBuffer) return;
+            e.preventDefault();
+            pauseTime = handleSeek(e.touches[0]);
+        }, {passive: false});
+
+        document.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            if (wasPlayingBeforeDrag) {
+                play();
+            }
+            isDragging = false;
+        });
+
+        togglePlayBtn.addEventListener('click', togglePlay);
+
+        // --- Export Logic ---
+
+        exportBtn.addEventListener('click', async () => {
+            if (!mixBuffer || !bgmBuffer) return;
+            
+            exportStatus.classList.remove('hidden');
+            
+            // Allow UI update
+            await new Promise(r => setTimeout(r, 50));
+
+            const length = mixBuffer.length;
+            const sampleRate = mixBuffer.sampleRate;
+            const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
+            
+            const offMix = offlineCtx.createBufferSource();
+            offMix.buffer = mixBuffer;
+            const offBgm = offlineCtx.createBufferSource();
+            offBgm.buffer = bgmBuffer;
+            
+            const offMixDelay = offlineCtx.createDelay(5.0);
+            const offBgmDelay = offlineCtx.createDelay(5.0);
+            const offBgmGain = offlineCtx.createGain();
+
+            if (offsetTime >= 0) {
+                offMixDelay.delayTime.value = 0;
+                offBgmDelay.delayTime.value = offsetTime;
+            } else {
+                offMixDelay.delayTime.value = Math.abs(offsetTime);
+                offBgmDelay.delayTime.value = 0;
+            }
+
+            offBgmGain.gain.value = invertPhase ? -amplitude : amplitude;
+
+            offMix.connect(offMixDelay);
+            offMixDelay.connect(offlineCtx.destination);
+            offBgm.connect(offBgmDelay);
+            offBgmDelay.connect(offBgmGain);
+            offBgmGain.connect(offlineCtx.destination);
+            
+            offMix.start(0);
+            offBgm.start(0);
+            
+            const renderedBuffer = await offlineCtx.startRendering();
+            const wav = audioBufferToWav(renderedBuffer);
+            
+            const blob = new Blob([wav], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `cleaned_${Date.now()}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            
+            exportStatus.classList.add('hidden');
+        });
+
+        function audioBufferToWav(buffer) {
+            const numOfChan = buffer.numberOfChannels;
+            const length = buffer.length * numOfChan * 2 + 44;
+            const bufferArr = new ArrayBuffer(length);
+            const view = new DataView(bufferArr);
+            const channels = [];
+            let i, sample, offset = 0, pos = 0;
+
+            // RIFF chunk descriptor
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8); 
+            setUint32(0x45564157); // "WAVE"
+
+            // fmt sub-chunk
+            setUint32(0x20746d66); // "fmt "
+            setUint32(16); 
+            setUint16(1); // PCM (1)
+            setUint16(numOfChan);
+            setUint32(buffer.sampleRate);
+            setUint32(buffer.sampleRate * 2 * numOfChan); 
+            setUint16(numOfChan * 2); 
+            setUint16(16); 
+
+            // data sub-chunk
+            setUint32(0x61746164); // "data"
+            setUint32(length - pos - 4);
+
+            for (i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+            while (pos < buffer.length) {
+                for (i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                    sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF) | 0;
+                    view.setInt16(44 + offset, sample, true);
+                    offset += 2;
+                }
+                pos++;
+            }
+
+            return bufferArr;
+
+            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+        }
+    </script>
+</body>
+</html>
