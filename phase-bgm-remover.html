@@ -153,49 +153,6 @@
             text-align: center;
         }
 
-        /* Manual Offset Input */
-        .offset-control {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-            width: 100%;
-        }
-
-        .input-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: var(--md-sys-color-surface-container-high);
-            padding: 4px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--md-sys-color-outline-variant);
-        }
-
-        .input-group label {
-            font: var(--md-sys-typescale-label-large);
-            color: var(--md-sys-color-secondary);
-            white-space: nowrap;
-        }
-
-        .input-group input {
-            background: transparent;
-            border: none;
-            color: var(--md-sys-color-on-background);
-            font: var(--md-sys-typescale-body-large);
-            font-weight: 500;
-            width: 90px;
-            text-align: right;
-            outline: none;
-        }
-        
-        .input-hint {
-            font-size: 12px;
-            color: var(--md-sys-color-secondary);
-            text-align: center;
-        }
-
         /* Main Actions */
         .action-area {
             display: flex;
@@ -348,6 +305,11 @@
         .status-msg.success { color: var(--md-sys-color-success); }
         .status-msg.error { color: var(--md-sys-color-error); }
 
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
         .hidden { display: none !important; }
 
         @media (max-width: 480px) {
@@ -383,20 +345,10 @@
             </div>
 
             <div class="action-area">
-                <div class="offset-control">
-                    <div class="input-group">
-                        <label for="offsetInput">预估偏移</label>
-                        <!-- Updated step for higher precision -->
-                        <input type="number" id="offsetInput" step="0.000001" value="0.0">
-                        <label>秒</label>
-                    </div>
-                    <div class="input-hint">可先输入大概值试听，再点击对齐精确修正</div>
-                </div>
-
                 <div id="statusText" class="status-msg"></div>
                 <button id="autoAlignBtn" class="btn btn-filled" disabled>
                     <svg class="icon-svg" style="width:18px;height:18px;" viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-                    在该偏移附近自动对齐
+                    开始自动对齐
                 </button>
             </div>
         </div>
@@ -445,7 +397,6 @@
         const mixFileName = document.getElementById('mixFileName');
         const bgmFileName = document.getElementById('bgmFileName');
         const autoAlignBtn = document.getElementById('autoAlignBtn');
-        const offsetInput = document.getElementById('offsetInput');
         const statusText = document.getElementById('statusText');
         
         const playerCard = document.getElementById('playerCard');
@@ -476,9 +427,7 @@
         let pauseTime = 0;
         let animationFrameId;
         
-        // Processing Parameters
-        // offsetTime > 0: BGM is delayed (Starts later than Mix)
-        // offsetTime < 0: Mix is delayed (BGM starts first)
+        // Processing Parameters (calculated automatically)
         let offsetTime = 0;
         let amplitude = 1.0;
         let invertPhase = true;
@@ -498,8 +447,6 @@
         function checkReady() {
             if (mixBuffer && bgmBuffer) {
                 autoAlignBtn.disabled = false;
-                playerCard.classList.add('active'); // Enable player for manual auditioning immediately
-                totalTimeEl.textContent = formatTime(mixBuffer.duration);
             }
         }
 
@@ -519,37 +466,24 @@
             }
         });
 
-        // --- Manual Offset Handling ---
-        offsetInput.addEventListener('input', (e) => {
-            // Update global offset immediately for auditioning
-            const val = parseFloat(e.target.value);
-            if (!isNaN(val)) {
-                offsetTime = val;
-                // If playing, simple way to apply is pause and user replays.
-                // We won't live-update audio nodes to avoid glitches, 
-                // but user can scrub to hear change.
-            }
-        });
-
         // --- Auto Align Logic ---
 
         autoAlignBtn.addEventListener('click', () => {
             if (!mixBuffer || !bgmBuffer) return;
             
             autoAlignBtn.disabled = true;
-            statusText.textContent = "正在计算...";
+            statusText.textContent = "正在计算对齐...";
             statusText.className = "status-msg";
             
             // Allow UI to update
             setTimeout(() => {
                 try {
                     performAutoAlign();
-                    statusText.textContent = "校准成功";
+                    statusText.textContent = "对齐成功";
                     statusText.className = "status-msg success";
                     
-                    // Update input with precise value (6 decimal places)
-                    offsetInput.value = offsetTime.toFixed(6);
-                    
+                    playerCard.classList.add('active');
+                    totalTimeEl.textContent = formatTime(mixBuffer.duration);
                     autoAlignBtn.disabled = false;
                 } catch (e) {
                     console.error(e);
@@ -562,12 +496,6 @@
 
         function performAutoAlign() {
             const sampleRate = mixBuffer.sampleRate;
-            
-            // We use the Manual Input as the center point for our search
-            const manualOffset = parseFloat(offsetInput.value) || 0;
-            
-            // Select a sample chunk from the Mix
-            // We take a chunk 10 seconds in (or halfway if short)
             const startSec = Math.min(10, mixBuffer.duration / 2);
             const len = 5 * sampleRate;
             const startIdx = Math.floor(startSec * sampleRate);
@@ -577,75 +505,53 @@
             
             const mixChunk = mixData.slice(startIdx, startIdx + len);
             
-            // Calculate where we expect this chunk to be in the BGM based on manual offset
-            // offsetTime = MixTime - BgmTime. 
-            // So BgmTime = MixTime - offsetTime.
-            const expectedBgmIdx = startIdx - Math.floor(manualOffset * sampleRate);
-            
-            // Define a search window around the expected index (+/- 30 seconds)
-            const searchWindow = 30.0 * sampleRate;
-            
-            // Ensure bounds
-            const bgmStart = Math.max(0, expectedBgmIdx - searchWindow);
-            const bgmEnd = Math.min(bgmData.length, expectedBgmIdx + len + searchWindow);
-            
-            // If window is invalid (out of bounds), fail gracefully or expand
-            if (bgmEnd <= bgmStart + mixChunk.length) {
-                throw new Error("Search window out of bounds");
-            }
-            
+            const searchWindow = 2.0 * sampleRate;
+            const bgmStart = Math.max(0, startIdx - searchWindow);
+            const bgmEnd = Math.min(bgmData.length, startIdx + len + searchWindow);
             const bgmChunk = bgmData.slice(bgmStart, bgmEnd);
             
-            // Coarse Search (step optimized for larger window)
-            let bestLocalOffset = 0;
+            // Coarse Search
+            let bestOffset = 0;
             let maxCorr = -Infinity;
-            const step = 20;
+            const step = 2;
             
             for (let i = 0; i < bgmChunk.length - mixChunk.length; i += step) {
                 let sum = 0;
-                // Optimization: sample every 100th point to maintain performance
-                for (let j = 0; j < mixChunk.length; j += 100) {
+                for (let j = 0; j < mixChunk.length; j += 50) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
                 if (sum > maxCorr) {
                     maxCorr = sum;
-                    bestLocalOffset = i;
+                    bestOffset = i;
                 }
             }
             
-            // Fine Search around coarse peak
-            let refinedLocalOffset = bestLocalOffset;
+            // Fine Search
+            let refinedOffset = bestOffset;
             let refinedMax = -Infinity;
             const range = 200; 
-            const fineStart = Math.max(0, bestLocalOffset - range);
-            const fineEnd = Math.min(bgmChunk.length - mixChunk.length, bestLocalOffset + range);
+            const fineStart = Math.max(0, bestOffset - range);
+            const fineEnd = Math.min(bgmChunk.length - mixChunk.length, bestOffset + range);
             
             for (let i = fineStart; i < fineEnd; i++) {
                 let sum = 0;
-                // Optimization: sample every 10th point
                 for (let j = 0; j < mixChunk.length; j += 10) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
                 if (sum > refinedMax) {
                     refinedMax = sum;
-                    refinedLocalOffset = i;
+                    refinedOffset = i;
                 }
             }
 
-            // Convert local offset back to global
-            // The match started at bgmChunk[refinedLocalOffset]
-            // Which is bgmData[bgmStart + refinedLocalOffset]
-            const bgmMatchIdx = bgmStart + refinedLocalOffset;
-            
-            // The mix chunk started at startIdx
-            // Offset (samples) = MixIdx - BgmIdx
+            const bgmMatchIdx = bgmStart + refinedOffset;
             const offsetSamples = startIdx - bgmMatchIdx;
             
             // Amplitude Calculation
             let sumMixSq = 0, sumBgmSq = 0;
             for(let k=0; k < len; k+=10) {
                 sumMixSq += mixChunk[k]*mixChunk[k];
-                sumBgmSq += bgmChunk[refinedLocalOffset+k]*bgmChunk[refinedLocalOffset+k];
+                sumBgmSq += bgmChunk[refinedOffset+k]*bgmChunk[refinedOffset+k];
             }
             let estAmp = sumBgmSq > 0 ? Math.sqrt(sumMixSq/sumBgmSq) : 1.0;
 
@@ -678,11 +584,14 @@
             bgmGain = audioCtx.createGain();
             masterGain = audioCtx.createGain();
             
+            // Anti-pop: start silent
             masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
+            // Phase Inversion & Amp
             const val = invertPhase ? -amplitude : amplitude;
             bgmGain.gain.value = val;
 
+            // Graph Connection
             mixSource.connect(mixDelayNode);
             mixDelayNode.connect(masterGain);
             
@@ -692,41 +601,30 @@
             
             masterGain.connect(audioCtx.destination);
             
-            // Apply Delays based on offsetTime
+            // Apply Delays
             const now = audioCtx.currentTime;
-            
-            // Logic adjustment: Shift BGM only, do not delay the Mixed Audio.
-            
-            let bgmPlayShift = 0;
-            
             if (offsetTime >= 0) {
-                // BGM Starts Later (Positive Offset). 
-                // We delay the BGM output.
                 mixDelayNode.delayTime.value = 0;
-                bgmDelayNode.delayTime.value = offsetTime; 
+                bgmDelayNode.delayTime.value = offsetTime;
             } else {
-                // BGM Starts Earlier (Negative Offset).
-                // Instead of delaying Mix, we start playing BGM from a later point in its buffer.
-                mixDelayNode.delayTime.value = 0;
+                mixDelayNode.delayTime.value = Math.abs(offsetTime);
                 bgmDelayNode.delayTime.value = 0;
-                bgmPlayShift = Math.abs(offsetTime);
             }
 
+            // Sync start time (add small buffer for browser to prepare)
             const syncTime = now + 0.05;
             const playDuration = mixBuffer.duration - pauseTime;
             
             if (playDuration > 0) {
                 mixSource.start(syncTime, pauseTime, playDuration);
+                bgmSource.start(syncTime, pauseTime, playDuration);
                 
-                // For BGM, we adjust the start offset in the buffer
-                // Note: pauseTime refers to the current time in the Mix track.
-                // If BGM is shifted early (bgmPlayShift > 0), it means at Mix Time 0, BGM is already at bgmPlayShift.
-                // So at Mix Time = pauseTime, BGM is at pauseTime + bgmPlayShift.
-                bgmSource.start(syncTime, pauseTime + bgmPlayShift, playDuration);
+                // Anti-pop fade in
+                const alignmentGap = Math.abs(offsetTime);
+                const muteDuration = Math.max(0.02, alignmentGap);
                 
-                // Fade in
-                masterGain.gain.setValueAtTime(0, syncTime);
-                masterGain.gain.linearRampToValueAtTime(1.0, syncTime + 0.1);
+                masterGain.gain.setValueAtTime(0, syncTime + muteDuration);
+                masterGain.gain.linearRampToValueAtTime(1.0, syncTime + muteDuration + 0.04);
             }
 
             startTime = syncTime - pauseTime;
@@ -767,6 +665,7 @@
 
         function progressLoop() {
             if (!isPlaying) return;
+            // Don't fight with the drag event for UI updates
             if (!isDragging) {
                 const current = audioCtx.currentTime - startTime;
                 updateProgressUI(current);
@@ -792,7 +691,7 @@
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
-        // Seeking
+        // Seeking & Dragging Logic
         let isDragging = false;
         let wasPlayingBeforeDrag = false;
 
@@ -804,37 +703,52 @@
             
             const percent = x / rect.width;
             const seekTime = percent * mixBuffer.duration;
+            
+            // Update UI immediately
             updateProgressUI(seekTime);
+            
             return seekTime;
         }
 
+        // Fix: Pause on Drag Start to prevent conflicts and glitches
         progressContainer.addEventListener('mousedown', (e) => {
             if (!mixBuffer) return;
             isDragging = true;
             wasPlayingBeforeDrag = isPlaying;
-            if (isPlaying) pause();
-            pauseTime = handleSeek(e);
+            if (isPlaying) {
+                pause(); // Pause immediately when drag starts
+            }
+            pauseTime = handleSeek(e); // Update pauseTime immediately
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || !mixBuffer) return;
             e.preventDefault();
-            pauseTime = handleSeek(e);
+            pauseTime = handleSeek(e); // Track drag position
         });
 
         document.addEventListener('mouseup', (e) => {
             if (!isDragging) return;
+            
+            // Final seek position check
             pauseTime = handleSeek(e);
-            if (wasPlayingBeforeDrag) play();
+            
+            if (wasPlayingBeforeDrag) {
+                play();
+            }
+            // If it wasn't playing, we just leave it paused at the new time
+            
             isDragging = false;
         });
-        
-        // Touch events
+
+        // Touch support for mobile (also with Pause on Drag)
         progressContainer.addEventListener('touchstart', (e) => {
             if (!mixBuffer) return;
             isDragging = true;
             wasPlayingBeforeDrag = isPlaying;
-            if (isPlaying) pause();
+            if (isPlaying) {
+                pause();
+            }
             pauseTime = handleSeek(e.touches[0]);
         }, {passive: false});
 
@@ -846,7 +760,9 @@
 
         document.addEventListener('touchend', (e) => {
             if (!isDragging) return;
-            if (wasPlayingBeforeDrag) play();
+            if (wasPlayingBeforeDrag) {
+                play();
+            }
             isDragging = false;
         });
 
@@ -858,12 +774,12 @@
             if (!mixBuffer || !bgmBuffer) return;
             
             exportStatus.classList.remove('hidden');
+            
+            // Allow UI update
             await new Promise(r => setTimeout(r, 50));
 
             const length = mixBuffer.length;
             const sampleRate = mixBuffer.sampleRate;
-            // Note: If offset is large, offline buffer might need to be larger or handled differently
-            // but keeping it simple for now.
             const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
             
             const offMix = offlineCtx.createBufferSource();
@@ -871,21 +787,16 @@
             const offBgm = offlineCtx.createBufferSource();
             offBgm.buffer = bgmBuffer;
             
-            // Note: DelayNode max default is dynamic in OfflineCtx but usually safe.
-            const offMixDelay = offlineCtx.createDelay(179.0); // Allow larger delays for offline
-            const offBgmDelay = offlineCtx.createDelay(179.0);
+            const offMixDelay = offlineCtx.createDelay(5.0);
+            const offBgmDelay = offlineCtx.createDelay(5.0);
             const offBgmGain = offlineCtx.createGain();
-
-            let bgmExportStartOffset = 0;
 
             if (offsetTime >= 0) {
                 offMixDelay.delayTime.value = 0;
                 offBgmDelay.delayTime.value = offsetTime;
             } else {
-                offMixDelay.delayTime.value = 0;
+                offMixDelay.delayTime.value = Math.abs(offsetTime);
                 offBgmDelay.delayTime.value = 0;
-                // BGM starts early, so we skip the beginning
-                bgmExportStartOffset = Math.abs(offsetTime);
             }
 
             offBgmGain.gain.value = invertPhase ? -amplitude : amplitude;
@@ -897,7 +808,7 @@
             offBgmGain.connect(offlineCtx.destination);
             
             offMix.start(0);
-            offBgm.start(0, bgmExportStartOffset);
+            offBgm.start(0);
             
             const renderedBuffer = await offlineCtx.startRendering();
             const wav = audioBufferToWav(renderedBuffer);
@@ -907,7 +818,7 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `processed_${Date.now()}.wav`;
+            a.download = `cleaned_${Date.now()}.wav`;
             document.body.appendChild(a);
             a.click();
             
@@ -922,19 +833,22 @@
             const channels = [];
             let i, sample, offset = 0, pos = 0;
 
+            // RIFF chunk descriptor
             setUint32(0x46464952); // "RIFF"
             setUint32(length - 8); 
             setUint32(0x45564157); // "WAVE"
 
+            // fmt sub-chunk
             setUint32(0x20746d66); // "fmt "
             setUint32(16); 
-            setUint16(1); 
+            setUint16(1); // PCM (1)
             setUint16(numOfChan);
             setUint32(buffer.sampleRate);
             setUint32(buffer.sampleRate * 2 * numOfChan); 
             setUint16(numOfChan * 2); 
             setUint16(16); 
 
+            // data sub-chunk
             setUint32(0x61746164); // "data"
             setUint32(length - pos - 4);
 
