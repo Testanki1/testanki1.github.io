@@ -1,766 +1,814 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="viewport" content="width=device-width, viewport-fit=cover, initial-scale=1, user-scalable=no" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>3D坦克服务器列表</title>
-    <link rel="shortcut icon" href="https://tankionline.com/favicon.ico" />
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tanki Online Server List</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+
     <style>
         :root {
-            /* Palette based on your colors */
-            --md-primary: #76ff33;
-            --md-on-primary: #001d05;
-            --md-primary-container: #004e10;
-            --md-on-primary-container: #8dff53;
+            /* Color Palette */
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-on-primary: #001926;
+            --md-sys-color-background: #001926;
+            --md-sys-color-on-background: #BFD5FF;
+            --md-sys-color-surface: rgba(191, 213, 255, 0.08);
+            --md-sys-color-surface-variant: rgba(191, 213, 255, 0.16);
+            --md-sys-color-outline: rgba(191, 213, 255, 0.3);
             
-            --md-background: radial-gradient(circle at center, rgb(32, 48, 64) 0%, rgb(3, 8, 13) 100%);
-            
-            --md-surface: #1e2b38;
-            --md-surface-container-high: #283746; /* Popup bg */
-            --md-on-surface: #e1e2e6;
-            --md-on-surface-variant: #c4c7c5;
-            
-            --md-outline: #8e918f;
-            --md-outline-variant: #444746;
-
             /* Typography */
-            --md-font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-            
-            /* Shapes (Expressive = Larger Corners) */
-            --shape-full: 9999px;
-            --shape-extra-large: 28px;
-            --shape-large: 16px;
-            --shape-medium: 12px;
+            --font-family-base: 'Rubik', 'M PLUS 1p', sans-serif;
 
-            /* Motion */
-            --motion-easing: cubic-bezier(0.2, 0, 0, 1);
-            --motion-duration: 0.3s;
+            /* Spacing & Layout */
+            --border-radius-lg: 24px;
+            --border-radius-md: 16px;
+            --gap-md: 16px;
+            --gap-sm: 8px;
         }
 
         * {
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            font-family: var(--md-font-family);
-        }
-
-        html, body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--md-background);
-            color: var(--md-on-surface);
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* 1. Buttons (Filled, Tonal, Text) */
-        .m3-btn {
-            position: relative;
-            display: inline-flex;
+        /* Initial hidden state to prevent FOUT and language flash */
+        body {
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            font-family: var(--font-family-base);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 40px;
-            padding: 0 24px;
-            border: none;
-            border-radius: var(--shape-full);
-            font-size: 14px;
-            font-weight: 500;
-            letter-spacing: 0.1px;
-            cursor: pointer;
-            transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-            text-decoration: none;
-            overflow: hidden;
-            user-select: none;
-        }
-        
-        /* State Layer Effect (Ripple alternative) */
-        .m3-btn::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: currentColor;
+            overflow-x: hidden;
             opacity: 0;
-            transition: opacity 0.2s;
-        }
-        .m3-btn:hover::after { opacity: 0.08; }
-        .m3-btn:active::after { opacity: 0.12; }
-
-        .m3-btn-filled {
-            background-color: var(--md-primary);
-            color: var(--md-on-primary);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
-        .m3-btn-filled:hover { box-shadow: 0 2px 5px rgba(0,0,0,0.4); transform: translateY(-1px); }
-        .m3-btn-filled:active { transform: translateY(0); }
-
-        .m3-btn-tonal {
-            background-color: rgba(118, 255, 51, 0.15);
-            color: var(--md-on-primary-container);
+            transition: opacity 0.5s ease-in-out;
         }
 
-        .m3-btn-text {
-            background-color: transparent;
-            color: var(--md-primary);
-            padding: 0 12px;
+        body.loaded {
+            opacity: 1;
         }
-        
-        /* Icon Button (for close X) */
-        .m3-icon-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: none;
-            background: transparent;
-            color: var(--md-on-surface-variant);
-            cursor: pointer;
-            transition: background 0.2s, color 0.2s;
-        }
-        .m3-icon-btn:hover {
-            background-color: rgba(255,255,255,0.08);
-            color: var(--md-on-surface);
-        }
-        .material-symbols-rounded { font-size: 24px; }
 
-        /* 2. Cards (The main server links) */
+        /* Material Symbols */
+        .material-symbols-rounded {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+          font-size: 24px;
+          user-select: none;
+        }
+
+        /* Container */
         .container {
             width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 16px;
-            opacity: 0;
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-        @keyframes fadeIn { to { opacity: 1; } }
-
-        .grid-layout {
-            display: grid;
-            gap: 16px;
-            width: 100%;
-            max-width: 800px;
-            perspective: 1000px;
-        }
-        
-        .main-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-        /* Partners Grid: smaller items */
-        .partners-grid { 
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
-            max-height: 85vh;
-            overflow-y: auto;
-            padding-bottom: 20px;
-            /* Custom Scrollbar */
-            scrollbar-width: thin;
-            scrollbar-color: var(--md-outline-variant) transparent;
-        }
-        .partners-grid::-webkit-scrollbar { width: 6px; }
-        .partners-grid::-webkit-scrollbar-thumb { background: var(--md-outline-variant); border-radius: 10px; }
-
-        .m3-card {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 24px 16px;
-            background: rgba(30, 43, 56, 0.6); /* Glassy dark */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: var(--shape-extra-large);
-            text-decoration: none;
-            color: var(--md-on-surface);
-            transition: all var(--motion-duration) var(--motion-easing);
-            min-height: 130px;
-            cursor: pointer;
-            overflow: hidden;
-        }
-        /* Hover Effect */
-        .m3-card::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: var(--md-primary);
-            opacity: 0;
-            transition: opacity 0.3s;
-            z-index: 0;
-        }
-        .m3-card:hover {
-            transform: translateY(-4px) scale(1.02);
-            border-color: var(--md-primary);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-        }
-        .m3-card:hover::before { opacity: 0.05; }
-        
-        .m3-card:active { transform: scale(0.98); }
-
-        .card-content { position: relative; z-index: 1; text-align: center; }
-        .card-title { font-size: 24px; font-weight: 600; margin: 0 0 4px 0; }
-        .card-sub { font-size: 12px; color: var(--md-on-surface-variant); opacity: 0.8; }
-        .m3-card:hover .card-title { color: var(--md-primary); }
-
-        /* Partner Card Variants */
-        .partner-card { 
-            min-height: 80px; 
-            padding: 16px; 
-            border-radius: var(--shape-large);
-        }
-        .partner-card .card-title { font-size: 18px; }
-        
-        /* 4399 Group Special Styling */
-        .partner-group-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            background: rgba(255,255,255,0.03);
-            border-radius: var(--shape-large);
-            padding: 8px;
-            border: 1px solid var(--md-outline-variant);
-        }
-        .partner-group-btn {
-            display: block;
-            text-align: center;
-            padding: 10px;
-            text-decoration: none;
-            border-radius: var(--shape-medium);
-            background: rgba(255,255,255,0.05);
-            color: var(--md-on-surface);
-            transition: 0.2s;
-        }
-        .partner-group-btn:first-child {
-            font-weight: bold;
-            font-size: 16px;
-            color: var(--md-primary);
-        }
-        .partner-group-btn:last-child {
-            font-size: 12px;
-            color: var(--md-on-surface-variant);
-        }
-        .partner-group-btn:hover { background: rgba(118, 255, 51, 0.1); }
-
-        /* 3. Dialogs / Modals (M3 Standard) */
-        .dialog-scrim {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(4px);
-            z-index: 999;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        .dialog-scrim.open { display: flex; opacity: 1; }
-
-        .m3-dialog-surface {
-            background: var(--md-surface-container-high);
-            width: 90%;
-            max-width: 320px;
-            border-radius: 28px;
+            max-width: 600px;
             padding: 24px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transform: scale(0.9);
-            transition: transform 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
+            padding-bottom: 48px;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            gap: 16px;
         }
-        .dialog-scrim.open .m3-dialog-surface { transform: scale(1); }
 
-        .dialog-header {
+        /* Header */
+        header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-        }
-        .dialog-headline {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 400; /* Expressive uses lighter weights for headlines */
-        }
-        
-        /* Mobile Platform List in Dialog */
-        .dialog-list {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .list-item {
-            display: flex;
-            align-items: center;
-            padding: 12px 16px;
-            text-decoration: none;
-            color: var(--md-on-surface);
-            border-radius: var(--shape-full); /* Stadium shape items */
-            transition: background 0.2s;
-        }
-        .list-item:hover { background: rgba(255,255,255,0.08); color: var(--md-primary); }
-        .list-item-text { font-size: 16px; }
-
-        /* 4. M3 Input Field (Outlined) */
-        .m3-field {
+            margin-bottom: 32px;
+            height: 48px;
             position: relative;
-            margin-top: 8px;
         }
-        .m3-field input {
-            width: 100%;
-            background: inherit;
-            border: 1px solid var(--md-outline);
-            border-radius: 4px;
-            padding: 14px 16px;
-            color: var(--md-on-surface);
-            font-size: 16px;
-            outline: none;
-            transition: border-color 0.2s;
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            flex-grow: 1;
+            text-align: center;
+            color: var(--md-sys-color-on-background);
         }
-        .m3-field input:focus {
-            border-color: var(--md-primary);
-            border-width: 2px;
-            padding: 13px 15px; /* compensate for border width */
-        }
-        .m3-field label {
+
+        .back-btn {
             position: absolute;
-            left: 12px;
-            top: 16px;
-            background-color: var(--md-surface-container-high);
-            padding: 0 4px;
-            color: var(--md-on-surface-variant);
-            font-size: 16px;
-            transition: 0.2s ease-out;
+            left: 0;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--md-sys-color-on-background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .back-btn:hover {
+            background-color: var(--md-sys-color-surface-variant);
+        }
+
+        /* Navigation Views */
+        .view {
+            display: none;
+            flex-direction: column;
+            gap: var(--gap-md);
+            animation: fadeIn 0.3s ease-out;
+            width: 100%;
+        }
+
+        .view.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Menu Cards */
+        .menu-card {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--border-radius-lg);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+            border: 1px solid transparent;
+            text-decoration: none; /* For the anchor tag card */
+            color: inherit;
+        }
+
+        .menu-card:hover {
+            background-color: var(--md-sys-color-surface-variant);
+        }
+
+        .menu-card:active {
+            transform: scale(0.98);
+        }
+
+        .menu-card img {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+        }
+
+        .menu-card span {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--md-sys-color-primary);
+        }
+
+        /* List Items */
+        .list-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap-sm);
+        }
+
+        .list-item {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--border-radius-md);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            text-decoration: none;
+            color: var(--md-sys-color-on-background);
+            transition: background-color 0.2s;
+            border: 1px solid transparent;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden; /* For marquee mask */
+        }
+
+        .list-item:hover {
+            background-color: var(--md-sys-color-surface-variant);
+        }
+
+        .list-item:active {
+            background-color: rgba(118, 255, 51, 0.1);
+        }
+
+        .list-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
             pointer-events: none;
         }
-        /* Float label when focused or has content */
-        .m3-field input:focus + label,
-        .m3-field input:not(:placeholder-shown) + label {
-            top: -10px;
-            font-size: 12px;
-            color: var(--md-primary);
-            font-weight: 500;
-        }
 
-        /* 5. M3 Switch (Replacement for Checkbox) */
-        .m3-switch-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            padding: 8px 0;
-            user-select: none;
-        }
-        .m3-switch-label { flex-grow: 1; font-size: 16px; }
-        
-        /* The Switch Track */
-        .m3-switch {
-            position: relative;
-            width: 52px;
+        .list-item img {
+            width: 32px;
             height: 32px;
-            background-color: var(--md-outline-variant);
-            border-radius: 16px; /* Full rounding */
-            border: 2px solid var(--md-outline);
-            transition: 0.2s;
+            object-fit: contain;
             flex-shrink: 0;
         }
-        /* The Handle (Thumb) */
-        .m3-switch::after {
-            content: "";
-            position: absolute;
-            top: 50%;
-            left: 6px;
-            transform: translateY(-50%);
-            width: 16px;
-            height: 16px;
-            background-color: var(--md-outline);
-            border-radius: 50%;
-            transition: 0.2s cubic-bezier(0.2, 0, 0, 1.5); /* Bouncy effect */
-        }
-        /* Hidden Input */
-        .m3-switch input { display: none; }
-        
-        /* Checked State */
-        .m3-switch.checked {
-            background-color: var(--md-primary);
-            border-color: var(--md-primary);
-        }
-        .m3-switch.checked::after {
-            background-color: var(--md-on-primary);
-            width: 24px;
-            height: 24px;
-            left: 24px; /* Move right */
-        }
 
-        /* Utility Bars (Top/Bottom) */
-        .util-bar {
-            position: absolute;
-            padding: 16px;
+        .list-item-content {
             display: flex;
-            gap: 12px;
-            z-index: 100;
-            pointer-events: none; /* Allow clicks through empty space */
+            flex-direction: column;
+            flex-grow: 1;
+            min-width: 0; /* Enable truncation in children */
         }
-        .util-bar > * { pointer-events: auto; }
-        .top-bar { top: 0; left: 0; right: 0; justify-content: space-between; }
-        .bottom-bar { bottom: 0; right: 0; }
 
-        /* Helper for mobile layout optimization */
-        @media (max-width: 600px) {
-            .m3-btn { padding: 0 16px; height: 36px; font-size: 13px; }
-            .card-title { font-size: 20px; }
-            .grid-layout { width: 92%; }
+        .list-item-title {
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.4;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .list-item-subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s;
+        }
+
+        /* URL Marquee Styles */
+        .url-marquee-container {
+            height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.2s, height 0.2s;
+            margin-top: 0;
+            position: relative;
+            width: 100%;
+        }
+
+        .list-item:hover .url-marquee-container,
+        .menu-card:hover .url-marquee-container {
+            height: 26px; /* Increased height to prevent descender clipping */
+            opacity: 1;
+            margin-top: 4px;
+        }
+        
+        /* Hide subtitle on hover to make room/cleaner look? 
+           User didn't specify, but let's keep subtitle and add URL below.
+           Actually, the prompt says "display the URL", usually implies replacing or adding.
+           Let's add it below. 
+        */
+
+        .url-marquee {
+            white-space: nowrap;
+            font-size: 11px;
+            line-height: 26px;
+            color: var(--md-sys-color-primary);
+            position: absolute;
+            left: 0;
+            /* Simple infinite scroll */
+            animation: marquee 8s linear infinite;
+        }
+        
+        /* If content fits, no animation needed really, but user asked for loop animation. */
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* This creates a gap if we simply translate -100%. 
+           A perfect loop needs duplicated content or specific JS calculation.
+           To be safe and robust without complex JS sizing, we'll use a very long scroll 
+           that resets, or just scroll text out. 
+           
+           Better approach for "Loop Animation":
+           Start from 0, go to -50% (if we duplicate text).
+        */
+        
+        .url-marquee-content {
+            display: inline-block;
+            padding-right: 50px; /* Gap between loops */
+        }
+
+        /* Submenu */
+        .sub-menu {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+            margin-left: 24px;
+            padding-left: 16px;
+            border-left: 2px solid var(--md-sys-color-outline);
+        }
+
+        .sub-menu.open {
+            display: flex;
+        }
+
+        .sub-item {
+            background-color: transparent;
+            border: 1px solid var(--md-sys-color-outline);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--md-sys-color-background); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--md-sys-color-surface-variant); 
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
-    <!-- 顶部按钮组 -->
-    <div class="util-bar top-bar">
-        <div style="display: flex; gap: 8px;">
-            <a href="/status" id="mainServerStatusButton" class="m3-btn m3-btn-filled">服务器状态</a>
-            <button id="partnersBackButton" class="m3-btn m3-btn-tonal" style="display: none;">
-                <span class="material-symbols-rounded" style="font-size: 18px; margin-right: 4px;">arrow_back</span>
-                返回
+
+    <div class="container">
+        <!-- Header -->
+        <header id="main-header" class="hidden">
+            <button class="back-btn" onclick="goHome()" aria-label="Back">
+                <span class="material-symbols-rounded">arrow_back</span>
             </button>
-        </div>
-        <div style="display: flex; gap: 8px;">
-             <a href="/about" id="mainAboutButton" class="m3-btn m3-btn-tonal">关于</a>
-             <button id="partnersMobileButton" class="m3-btn m3-btn-filled" style="display: none;">移动版</button>
-        </div>
-    </div>
+            <h1 id="page-title">Title</h1>
+        </header>
 
-    <!-- 底部按钮组 -->
-    <div class="util-bar bottom-bar">
-        <button id="mainSettingsButton" class="m3-btn m3-btn-tonal">
-            <span class="material-symbols-rounded" style="font-size: 18px; margin-right: 4px;">settings</span>
-            设置
-        </button>
-    </div>
-
-    <!-- 1. 设置弹窗 (Settings Dialog) -->
-    <div id="settingsPopup" class="dialog-scrim">
-        <div class="m3-dialog-surface">
-            <div class="dialog-header">
-                <h2 class="dialog-headline">设置</h2>
-                <button class="m3-icon-btn" id="closeSettingsPopup" aria-label="Close">
-                    <span class="material-symbols-rounded">close</span>
-                </button>
-            </div>
-            
-            <!-- M3 Text Field -->
-            <div class="m3-field">
-                <input type="text" id="customUrl" placeholder=" " />
-                <label for="customUrl">自定义网址</label>
-            </div>
-            
-            <!-- M3 Switch (replacing Checkbox) -->
-            <div class="m3-switch-container" onclick="toggleSwitch('chineseSwitch')">
-                <div class="m3-switch-label">外服锁定中文</div>
-                <div class="m3-switch" id="chineseSwitchEl">
-                    <input type="checkbox" id="chineseCheckbox" />
-                </div>
+        <!-- Home View -->
+        <div id="view-home" class="view active">
+            <div style="text-align: center; margin-bottom: 24px; margin-top: 24px;">
+                <h1 style="font-size: 32px; color: var(--md-sys-color-primary);" data-i18n="app_title">Tanki Online</h1>
+                <p style="opacity: 0.7; margin-top: 8px;" data-i18n="select_server">Select Server</p>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-                <button id="redirectButton" class="m3-btn m3-btn-filled" style="width: 100%;">
-                    跳转
-                </button>
+            <div class="menu-card" onclick="goTo('global')">
+                <img src="https://testanki1.github.io/logos/tankionline.svg" alt="Global">
+                <span data-i18n="server_global">Global</span>
             </div>
-        </div>
-    </div>
 
-    <!-- 2. 移动版平台弹窗 (Mobile Platforms Dialog) -->
-    <div id="mobilePlatformsPopup" class="dialog-scrim">
-        <div class="m3-dialog-surface">
-            <div class="dialog-header">
-                <h2 class="dialog-headline">下载平台</h2>
-                <!-- M3 Icon Button for close -->
-                <button class="m3-icon-btn" id="closeMobilePopup" aria-label="Close">
-                    <span class="material-symbols-rounded">close</span>
-                </button>
+            <div class="menu-card" onclick="goTo('cn')">
+                <img src="https://testanki1.github.io/logos/tankionline-cn.svg" alt="CN">
+                <span data-i18n="server_cn">China</span>
             </div>
-            
-            <div class="dialog-list">
-                <a href="https://appgallery.huawei.com/app/C101972055" class="list-item">
-                    <span class="list-item-text">华为应用市场</span>
-                </a>
-                <a href="https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145" class="list-item">
-                    <span class="list-item-text">vivo 应用商店</span>
-                </a>
-                <a href="https://app.mi.com/details?id=com.tankionline.mi" class="list-item">
-                    <span class="list-item-text">小米应用商店</span>
-                </a>
-                <a href="https://store.oppomobile.com/" class="list-item">
-                    <span class="list-item-text">OPPO 软件商店</span>
-                </a>
-                <a href="https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640" class="list-item">
-                    <span class="list-item-text">荣耀应用市场</span>
-                </a>
-                <a href="https://www.ldmnq.com/app/8762.html" class="list-item">
-                    <span class="list-item-text">雷电模拟器</span>
-                </a>
-            </div>
-            
-            <div style="display: flex; justify-content: flex-end;">
-                <button class="m3-btn m3-btn-text" onclick="closeDialog('mobilePlatformsPopup')">关闭</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Main Content Area -->
-    <div id="mainContent" class="container">
-        <div class="grid-layout main-grid">
-            <a href="https://3dtank.com/play" class="m3-card" id="guofuLink">
-                <div class="card-content">
-                    <div class="card-title">国服</div>
-                    <div class="card-sub">3dtank.com</div>
-                </div>
-            </a>
-            <a href="https://tankionline.com/play?resources=https://s-de.eu.tankionline.com" class="m3-card" id="waifuLink">
-                <div class="card-content">
-                    <div class="card-title">外服</div>
-                    <div class="card-sub">tankionline.com</div>
-                </div>
-            </a>
-            <a href="/test" class="m3-card" id="testServerLink">
-                <div class="card-content">
-                    <div class="card-title">测试服</div>
-                    <div class="card-sub">Test Server</div>
-                </div>
-            </a>
-            <a href="#" id="navigateToPartners" class="m3-card">
-                <div class="card-content">
-                    <div class="card-title">国服联运服</div>
-                    <div class="card-sub">4399 / 7k7k / YY 等</div>
-                </div>
+            <a href="https://testanki1.github.io/test" target="_blank" class="menu-card">
+                <img src="https://testanki1.github.io/logos/test.svg" alt="Test">
+                <span data-i18n="server_test">Test</span>
+                <div class="url-marquee-container"><div class="url-marquee">
+                    <span class="url-marquee-content">https://testanki1.github.io/test</span>
+                    <span class="url-marquee-content">https://testanki1.github.io/test</span>
+                </div></div>
             </a>
         </div>
-    </div>
 
-    <!-- Partners Content Area -->
-    <div id="partnersContent" class="container" style="display: none;">
-        <div class="grid-layout partners-grid">
-            <!-- 4399 Group (Grouped together as requested) -->
-            <div class="partner-group-container">
-                <a href="https://my.4399.com/yxtk/" class="partner-group-btn">4399</a>
-                <a href="https://my.4399.com/yxtk/play?sid=1" class="partner-group-btn">自动登录</a>
+        <!-- Global Server View -->
+        <div id="view-global" class="view">
+            <div class="list-group">
+                <a href="https://tankionline.com/play/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/browser.svg" alt="Browser">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="web_client">Web</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://tankionline.com/play/</span>
+                            <span class="url-marquee-content">https://tankionline.com/play/</span>
+                        </div></div>
+                    </div>
+                </a>
+
+                <div class="list-item" onclick="toggleWindowsMenu(this)">
+                    <img src="https://testanki1.github.io/logos/windows.svg" alt="Windows">
+                    <div class="list-item-content">
+                        <span class="list-item-title">Windows</span>
+                    </div>
+                    <span class="material-symbols-rounded expand-icon">expand_more</span>
+                </div>
+                <div id="windows-submenu" class="sub-menu">
+                    <a href="https://tankionline.com/desktop/TankiOnlineSetup.exe" class="list-item sub-item">
+                        <div class="list-item-content">
+                            <span class="list-item-title" data-i18n="dl_win">DOWNLOAD FOR WINDOWS</span>
+                            <div class="url-marquee-container"><div class="url-marquee">
+                                <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup.exe</span>
+                                <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup.exe</span>
+                            </div></div>
+                        </div>
+                    </a>
+                    <a href="https://tankionline.com/desktop/TankiOnlineSetup-win7-x64.exe" class="list-item sub-item">
+                        <div class="list-item-content">
+                            <span class="list-item-title" data-i18n="dl_win7">DOWNLOAD FOR WINDOWS 8.1, 8, 7</span>
+                            <div class="url-marquee-container"><div class="url-marquee">
+                                <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup-win7-x64.exe</span>
+                                <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup-win7-x64.exe</span>
+                            </div></div>
+                        </div>
+                    </a>
+                </div>
+
+                <a href="https://tankionline.com/desktop/TankiOnlineSetup.dmg" class="list-item">
+                    <img src="https://testanki1.github.io/logos/mac.svg" alt="Mac">
+                    <div class="list-item-content">
+                        <span class="list-item-title">Mac</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup.dmg</span>
+                            <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup.dmg</span>
+                        </div></div>
+                    </div>
+                </a>
+
+                <a href="https://tankionline.com/desktop/TankiOnlineSetup-linux-x86_64.AppImage" class="list-item">
+                    <img src="https://testanki1.github.io/logos/linux.svg" alt="Linux">
+                    <div class="list-item-content">
+                        <span class="list-item-title">Linux</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup-linux-x86_64.AppImage</span>
+                            <span class="url-marquee-content">https://tankionline.com/desktop/TankiOnlineSetup-linux-x86_64.AppImage</span>
+                        </div></div>
+                    </div>
+                </a>
+
+                <a href="https://play.google.com/store/apps/details?id=com.tankionline.mobile.production" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/google-play.svg" alt="Google Play">
+                    <div class="list-item-content">
+                        <span class="list-item-title">Google Play</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://play.google.com/store/apps/details?id=com.tankionline.mobile.production</span>
+                            <span class="url-marquee-content">https://play.google.com/store/apps/details?id=com.tankionline.mobile.production</span>
+                        </div></div>
+                    </div>
+                </a>
+
+                <div class="list-item disabled">
+                    <img src="https://testanki1.github.io/logos/rustore.svg" alt="RuStore">
+                    <div class="list-item-content">
+                        <span class="list-item-title">RuStore</span>
+                        <span class="list-item-subtitle" data-i18n="not_available">Coming Soon</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://www.rustore.ru/catalog/app/com.tankionline.mobile.production</span>
+                            <span class="url-marquee-content">https://www.rustore.ru/catalog/app/com.tankionline.mobile.production</span>
+                        </div></div>
+                    </div>
+                </div>
+
+                <a href="https://store.steampowered.com/app/562010/Tanki_Online/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/steam.svg" alt="Steam">
+                    <div class="list-item-content">
+                        <span class="list-item-title">Steam</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://store.steampowered.com/app/562010/Tanki_Online/</span>
+                            <span class="url-marquee-content">https://store.steampowered.com/app/562010/Tanki_Online/</span>
+                        </div></div>
+                    </div>
+                </a>
+
+                <a href="https://www.nintendo.com/us/store/products/tanki-online-switch/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/nintendo.svg" alt="Nintendo Switch">
+                    <div class="list-item-content">
+                        <span class="list-item-title">Nintendo Switch</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://www.nintendo.com/us/store/products/tanki-online-switch/</span>
+                            <span class="url-marquee-content">https://www.nintendo.com/us/store/products/tanki-online-switch/</span>
+                        </div></div>
+                    </div>
+                </a>
+
+                <a href="https://apps.apple.com/us/app/tanki-online-pvp-tank-battle/id6737538964" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/app-store.svg" alt="App Store">
+                    <div class="list-item-content">
+                        <span class="list-item-title">App Store</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://apps.apple.com/us/app/tanki-online-pvp-tank-battle/id6737538964</span>
+                            <span class="url-marquee-content">https://apps.apple.com/us/app/tanki-online-pvp-tank-battle/id6737538964</span>
+                        </div></div>
+                    </div>
+                </a>
             </div>
-            
-            <a href="http://web.7k7k.com/stat/game.php?target=3dtk" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">7k7k</div>
-                    <div class="card-sub">暂不支持全屏</div>
-                </div>
-            </a>
-            
-            <a href="https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">YY</div>
-                </div>
-            </a>
-            
-            <a href="http://wan.baidu.com/game?gameId=23699359" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">百度</div>
-                    <div class="card-sub">暂不支持全屏</div>
-                </div>
-            </a>
-            
-            <a href="http://web.gamersky.com/Games/236.html" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">游民星空</div>
-                    <div class="card-sub">暂不支持全屏</div>
-                </div>
-            </a>
-            
-            <a href="https://wans.ixinyou.com/games/tank/" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">心游</div>
-                    <div class="card-sub">暂不支持全屏</div>
-                </div>
-            </a>
-            
-            <a href="https://game.qzone.qq.com/1102530450" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">QQ空间</div>
-                    <div class="card-sub">需桌面版</div>
-                </div>
-            </a>
-            
-            <a href="https://wan.ludashi.com/yeyou/tk3d?s=1" class="m3-card partner-card">
-                <div class="card-content">
-                    <div class="card-title">鲁大师</div>
-                    <div class="card-sub">暂不支持全屏</div>
-                </div>
-            </a>
         </div>
+
+        <!-- CN Server View -->
+        <div id="view-cn" class="view">
+            <div class="list-group">
+                <a href="https://3dtank.com/play/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/browser.svg" alt="官网">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="official">Official</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://3dtank.com/play/</span>
+                            <span class="url-marquee-content">https://3dtank.com/play/</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://my.4399.com/yxtk/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/4399.png" alt="4399">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_4399">4399</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://my.4399.com/yxtk/</span>
+                            <span class="url-marquee-content">https://my.4399.com/yxtk/</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://g.7k7k.com/games/3dtk/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/7k7k.png" alt="7k7k">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_7k7k">7k7k</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://g.7k7k.com/games/3dtk/</span>
+                            <span class="url-marquee-content">https://g.7k7k.com/games/3dtk/</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/yy.svg" alt="YY">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_yy">YY Games</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1</span>
+                            <span class="url-marquee-content">https://udblogin.yy.com/login.do?game=TKRJ&webyygame&hideNav=1&server=s1</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="http://wan.baidu.com/game?gameId=23699359" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/baidu-wan.png" alt="Baidu">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_baidu">Baidu Games</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">http://wan.baidu.com/game?gameId=23699359</span>
+                            <span class="url-marquee-content">http://wan.baidu.com/game?gameId=23699359</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="http://web.gamersky.com/Games/236.html" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/gamersky.svg" alt="Gamersky">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_gamersky">Gamersky</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">http://web.gamersky.com/Games/236.html</span>
+                            <span class="url-marquee-content">http://web.gamersky.com/Games/236.html</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://wans.ixinyou.com/games/tank/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/ixy.png" alt="Xinyou">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_xinyou">Xinyou</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://wans.ixinyou.com/games/tank/</span>
+                            <span class="url-marquee-content">https://wans.ixinyou.com/games/tank/</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://game.qzone.qq.com/1102530450" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/qzone.svg" alt="QZone">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_qzone">QZone</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://game.qzone.qq.com/1102530450</span>
+                            <span class="url-marquee-content">https://game.qzone.qq.com/1102530450</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://wan.ludashi.com/yeyou/tk3d?s=1" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/ludashi-wan.png" alt="Ludashi">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_ludashi">Ludashi</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://wan.ludashi.com/yeyou/tk3d?s=1</span>
+                            <span class="url-marquee-content">https://wan.ludashi.com/yeyou/tk3d?s=1</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://appgallery.huawei.com/app/C101972055" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/huawei.svg" alt="Huawei">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_huawei">Huawei AppGallery</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://appgallery.huawei.com/app/C101972055</span>
+                            <span class="url-marquee-content">https://appgallery.huawei.com/app/C101972055</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://a.4399.cn/game-id-162288.html" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/m4399.png" alt="4399 Mobile">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_m4399">4399 Game Box</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://a.4399.cn/game-id-162288.html</span>
+                            <span class="url-marquee-content">https://a.4399.cn/game-id-162288.html</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/vivo.svg" alt="Vivo">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_vivo">vivo App Store</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145</span>
+                            <span class="url-marquee-content">https://h5coml.vivo.com.cn/h5coml/appdetail_h5/browser_v2/index.html?appId=2900145</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://app.mi.com/details?id=com.tankionline.mi" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/mi.svg" alt="Mi">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_mi">Xiaomi App Store</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://app.mi.com/details?id=com.tankionline.mi</span>
+                            <span class="url-marquee-content">https://app.mi.com/details?id=com.tankionline.mi</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://store.oppomobile.com/" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/oppo.svg" alt="Oppo">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_oppo">OPPO App Store</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://store.oppomobile.com/</span>
+                            <span class="url-marquee-content">https://store.oppomobile.com/</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/honor.svg" alt="Honor">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_honor">Honor App Market</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640</span>
+                            <span class="url-marquee-content">https://appmarket-h5.cloud.honor.com/h5/share/latest/index.html?shareId=1818327235548016640</span>
+                        </div></div>
+                    </div>
+                </a>
+                <a href="https://www.ldmnq.com/app/8762.html" target="_blank" class="list-item">
+                    <img src="https://testanki1.github.io/logos/ld.svg" alt="LDPlayer">
+                    <div class="list-item-content">
+                        <span class="list-item-title" data-i18n="p_ld">LDPlayer</span>
+                        <div class="url-marquee-container"><div class="url-marquee">
+                            <span class="url-marquee-content">https://www.ldmnq.com/app/8762.html</span>
+                            <span class="url-marquee-content">https://www.ldmnq.com/app/8762.html</span>
+                        </div></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // UI Elements
-        const views = {
-            main: document.getElementById('mainContent'),
-            partners: document.getElementById('partnersContent')
-        };
-        const buttons = {
-            status: document.getElementById('mainServerStatusButton'),
-            about: document.getElementById('mainAboutButton'),
-            settings: document.getElementById('mainSettingsButton'),
-            back: document.getElementById('partnersBackButton'),
-            mobile: document.getElementById('partnersMobileButton')
-        };
-        const popups = {
-            settings: document.getElementById('settingsPopup'),
-            mobile: document.getElementById('mobilePlatformsPopup')
-        };
+        const translations = {
+            zh: {
+                page_title: "3D坦克服务器列表",
+                app_title: "3D坦克",
+                select_server: "选择服务器",
+                server_global: "外服",
+                server_cn: "国服",
+                server_test: "测试服",
+                web_client: "官网",
+                dl_win: "下载 Windows 版",
+                dl_win7: "下载 Windows 8.1, 8, 7 版",
+                not_available: "即将推出",
+                
+                // CN Platforms
+                official: "官网",
+                p_4399: "4399",
+                p_7k7k: "7k7k",
+                p_yy: "YY 游戏",
+                p_baidu: "百度游戏",
+                p_gamersky: "游民星空",
+                p_xinyou: "心游",
+                p_qzone: "QQ 空间",
+                p_ludashi: "鲁大师游戏",
+                p_huawei: "华为应用市场",
+                p_m4399: "4399 游戏盒",
+                p_vivo: "vivo 应用商店",
+                p_mi: "小米应用商店",
+                p_oppo: "OPPO 软件商店",
+                p_honor: "荣耀应用市场",
+                p_ld: "雷电模拟器"
+            },
+            en: {
+                page_title: "Tanki Online Server List",
+                app_title: "Tanki Online",
+                select_server: "Select Server",
+                server_global: "Global",
+                server_cn: "China",
+                server_test: "Test",
+                web_client: "Web",
+                dl_win: "DOWNLOAD FOR WINDOWS",
+                dl_win7: "DOWNLOAD FOR WINDOWS 8.1, 8, 7",
+                not_available: "Coming Soon",
 
-        // Helper: Dialog Functions
-        function openDialog(id) {
-            const el = document.getElementById(id);
-            el.style.display = 'flex'; // needed for flex layout
-            // Trigger reflow
-            void el.offsetWidth; 
-            el.classList.add('open');
-        }
-        
-        function closeDialog(id) {
-            const el = document.getElementById(id);
-            el.classList.remove('open');
-            setTimeout(() => {
-                el.style.display = 'none';
-            }, 200); // Match transition duration
-        }
-
-        // Helper: Switch Toggle
-        function toggleSwitch(switchId) {
-            const switchEl = document.getElementById(switchId + 'El');
-            const checkbox = switchEl.querySelector('input');
-            checkbox.checked = !checkbox.checked;
-            
-            if(checkbox.checked) {
-                switchEl.classList.add('checked');
-            } else {
-                switchEl.classList.remove('checked');
+                // CN Platforms
+                official: "Official",
+                p_4399: "4399",
+                p_7k7k: "7k7k",
+                p_yy: "YY Games",
+                p_baidu: "Baidu Games",
+                p_gamersky: "Gamersky",
+                p_xinyou: "Xinyou",
+                p_qzone: "QZone",
+                p_ludashi: "Ludashi",
+                p_huawei: "Huawei AppGallery",
+                p_m4399: "4399 Game Box",
+                p_vivo: "vivo App Store",
+                p_mi: "Xiaomi App Store",
+                p_oppo: "OPPO App Store",
+                p_honor: "Honor App Market",
+                p_ld: "LDPlayer"
             }
+        };
+
+        let currentLang = 'en';
+
+        function setLanguage() {
+            const browserLang = navigator.language || navigator.userLanguage;
+            currentLang = browserLang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+
+            const strings = translations[currentLang];
             
-            // Trigger change event manually
-            const event = new Event('change');
-            checkbox.dispatchEvent(event);
-        }
-
-        // --- Navigation Logic ---
-        document.getElementById('navigateToPartners').addEventListener('click', function(e) {
-            e.preventDefault();
-            views.main.style.display = 'none';
-            views.partners.style.display = 'flex'; 
-            document.title = "3D坦克服务器列表 联运服";
-
-            buttons.status.style.display = 'none';
-            buttons.about.style.display = 'none';
-            buttons.settings.style.display = 'none';
-            buttons.back.style.display = 'inline-flex'; 
-            buttons.mobile.style.display = 'inline-flex'; 
-        });
-
-        buttons.back.addEventListener('click', function() {
-            views.partners.style.display = 'none';
-            views.main.style.display = 'flex'; 
-            document.title = "3D坦克服务器列表";
+            // Update Page Title
+            document.title = strings.page_title;
             
-            buttons.status.style.display = 'inline-flex'; 
-            buttons.about.style.display = 'inline-flex'; 
-            buttons.settings.style.display = 'inline-flex'; 
-            buttons.back.style.display = 'none';
-            buttons.mobile.style.display = 'none';
-        });
-
-        // --- Popup Logic ---
-        buttons.settings.addEventListener('click', () => openDialog('settingsPopup'));
-        buttons.mobile.addEventListener('click', () => openDialog('mobilePlatformsPopup'));
-
-        document.getElementById('closeSettingsPopup').addEventListener('click', () => closeDialog('settingsPopup'));
-        document.getElementById('closeMobilePopup').addEventListener('click', () => closeDialog('mobilePlatformsPopup'));
-
-        // Close when clicking outside
-        window.addEventListener('click', function(event) {
-            if (event.target.classList.contains('dialog-scrim')) {
-                closeDialog(event.target.id);
-            }
-        });
-
-        document.getElementById('redirectButton').addEventListener('click', function() {
-            var customUrl = document.getElementById('customUrl').value;
-            if (customUrl.trim() !== '') {
-                if (!customUrl.startsWith('http://') && !customUrl.startsWith('https://')) {
-                    customUrl = 'http://' + customUrl;
+            // Update elements with data-i18n
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (strings[key]) {
+                    el.innerText = strings[key];
                 }
-                window.location.href = customUrl;
+            });
+
+            // Update Header if visible
+            const activeView = document.querySelector('.view.active');
+            if (activeView && activeView.id !== 'view-home') {
+                const pageId = activeView.id.replace('view-', '');
+                updateHeaderTitle(pageId);
             }
-        });
+        }
 
-        // --- Chinese Mode Logic ---
-        const waifuLink = document.getElementById('waifuLink'); 
-        const originalWaifuHref = waifuLink.href; 
+        function updateHeaderTitle(pageId) {
+            const strings = translations[currentLang];
+            const titles = {
+                'global': strings.server_global,
+                'cn': strings.server_cn
+            };
+            if (titles[pageId]) {
+                document.getElementById('page-title').innerText = titles[pageId];
+            }
+        }
 
-        function updateWaifuLink(chineseModeEnabled) {
-            const baseLink = originalWaifuHref.split('?')[0];
-            const existingParams = originalWaifuHref.split('?')[1] ? new URLSearchParams(originalWaifuHref.split('?')[1]) : new URLSearchParams();
-
-            if (chineseModeEnabled) {
-                existingParams.set('locale', 'zh');
+        function goTo(pageId) {
+            // Hide all views
+            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+            
+            // Show header if not home
+            if (pageId !== 'home') {
+                document.getElementById('main-header').classList.remove('hidden');
+                document.getElementById('view-' + pageId).classList.add('active');
+                updateHeaderTitle(pageId);
             } else {
-                existingParams.delete('locale');
+                document.getElementById('main-header').classList.add('hidden');
+                document.getElementById('view-home').classList.add('active');
             }
-            
-            let newHref = baseLink;
-            if (existingParams.toString()) {
-                newHref += '?' + existingParams.toString();
-            }
-            waifuLink.href = newHref;
+
+            // Scroll to top
+            window.scrollTo(0, 0);
         }
+
+        function goHome() {
+            // Reset state
+            document.querySelectorAll('.sub-menu').forEach(el => el.classList.remove('open'));
+            document.querySelectorAll('.expand-icon').forEach(el => el.style.transform = 'rotate(0deg)');
+            goTo('home');
+        }
+
+        function toggleWindowsMenu(element) {
+            const submenu = document.getElementById('windows-submenu');
+            const arrow = element.querySelector('.expand-icon');
+            
+            submenu.classList.toggle('open');
+            if (submenu.classList.contains('open')) {
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Initialize logic
+        // 1. Set Language immediately
+        setLanguage();
+
+        // 2. Wait for fonts, then reveal UI
+        document.fonts.ready.then(() => {
+            document.body.classList.add('loaded');
+        });
         
-        window.addEventListener('DOMContentLoaded', function() {
-            var checkbox = document.getElementById('chineseCheckbox');
-            var switchEl = document.getElementById('chineseSwitchEl');
-            var chineseModeEnabled = localStorage.getItem('chineseModeEnabled') === 'true';
-            
-            checkbox.checked = chineseModeEnabled;
-            if(chineseModeEnabled) switchEl.classList.add('checked');
-            
-            updateWaifuLink(chineseModeEnabled); 
-
-            // Mobile Guofu Link
-            var guofuLink = document.getElementById('guofuLink');
-            if (isMobileDevice()) {
-                if (guofuLink.href.includes('?')) {
-                    guofuLink.href += '&distribution=generic_mobile_china';
-                } else {
-                    guofuLink.href += '?distribution=generic_mobile_china';
-                }
-            }
-        });
-
-        document.getElementById('chineseCheckbox').addEventListener('change', function() {
-            var chineseModeEnabled = this.checked;
-            updateWaifuLink(chineseModeEnabled);
-            localStorage.setItem('chineseModeEnabled', chineseModeEnabled);
-        });
-
-        // --- Mobile Device Detection ---
-        function isMobileDevice() {
-            return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        }
-
+        // Fallback if fonts take too long (e.g. 2s)
+        setTimeout(() => {
+            document.body.classList.add('loaded');
+        }, 2000);
     </script>
 </body>
 </html>
