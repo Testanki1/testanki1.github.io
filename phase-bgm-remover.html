@@ -489,11 +489,17 @@
 
         function performAutoAlign() {
             const sampleRate = mixBuffer.sampleRate;
-            // 取中间或前段样本分析
+            // 增加分析时长到 10 秒以提高音量匹配的准确度（避开只有人声的间隙）
             const startSec = Math.min(10, mixBuffer.duration / 2);
-            const len = 5 * sampleRate;
+            const len = 10 * sampleRate; // 取10秒数据
             const startIdx = Math.floor(startSec * sampleRate);
             
+            // 边界检查，防止超出长度
+            if (startIdx + len > mixBuffer.length) {
+                // 如果音频太短，就回退
+                return; 
+            }
+
             const mixData = mixBuffer.getChannelData(0);
             const bgmData = bgmBuffer.getChannelData(0);
             
@@ -504,14 +510,17 @@
             const bgmEnd = Math.min(bgmData.length, startIdx + len + searchWindow);
             const bgmChunk = bgmData.slice(bgmStart, bgmEnd);
             
+            // --- 步骤1: 时间对齐 (互相关) ---
+            
             // 粗略搜索
             let bestOffset = 0;
             let maxCorr = -Infinity;
-            const step = 2;
+            const step = 5; // 稍微增加步长加快速度
             
             for (let i = 0; i < bgmChunk.length - mixChunk.length; i += step) {
                 let sum = 0;
-                for (let j = 0; j < mixChunk.length; j += 50) {
+                // 降采样计算以提高速度
+                for (let j = 0; j < mixChunk.length; j += 100) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
                 if (sum > maxCorr) {
@@ -520,16 +529,17 @@
                 }
             }
             
-            // 精细搜索
+            // 精细搜索 (在粗略位置附近逐点搜索)
             let refinedOffset = bestOffset;
             let refinedMax = -Infinity;
-            const range = 200; 
+            const range = 500; 
             const fineStart = Math.max(0, bestOffset - range);
             const fineEnd = Math.min(bgmChunk.length - mixChunk.length, bestOffset + range);
             
             for (let i = fineStart; i < fineEnd; i++) {
                 let sum = 0;
-                for (let j = 0; j < mixChunk.length; j += 10) {
+                // 这里增加精度
+                for (let j = 0; j < mixChunk.length; j += 20) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
                 if (sum > refinedMax) {
@@ -539,19 +549,35 @@
             }
 
             const bgmMatchIdx = bgmStart + refinedOffset;
-            // offsetSamples = Mix的时间 - BGM的时间
             const offsetSamples = startIdx - bgmMatchIdx;
             
-            // 幅度计算
-            let sumMixSq = 0, sumBgmSq = 0;
-            for(let k=0; k < len; k+=10) {
-                sumMixSq += mixChunk[k]*mixChunk[k];
-                sumBgmSq += bgmChunk[refinedOffset+k]*bgmChunk[refinedOffset+k];
+            // --- 步骤2: 音量匹配 (最小二乘法 / 投影法) ---
+            // 这就是你想要的“使抵消后总音量最小”的算法
+            // 公式：A = sum(Mix * BGM) / sum(BGM * BGM)
+            
+            let dotProduct = 0; // Mix 和 BGM 的相关性（人声与BGM不相关，会被过滤掉）
+            let sumBgmSq = 0;   // BGM 自身的能量
+            
+            // 遍历对齐后的片段
+            for(let k = 0; k < mixChunk.length; k++) {
+                const m = mixChunk[k];
+                const b = bgmChunk[refinedOffset + k];
+                
+                dotProduct += m * b;
+                sumBgmSq += b * b;
             }
-            let estAmp = sumBgmSq > 0 ? Math.sqrt(sumMixSq/sumBgmSq) : 1.0;
+            
+            // 计算最佳音量倍率
+            // 如果 sumBgmSq 为 0 (BGM静音)，则倍率为 1
+            let estAmp = sumBgmSq > 0 ? (dotProduct / sumBgmSq) : 1.0;
+
+            console.log("计算出的最佳音量倍率:", estAmp);
 
             offsetTime = offsetSamples / sampleRate;
-            amplitude = estAmp;
+            
+            // estAmp 可能是负数（如果原文件相位是反的），我们取绝对值
+            // 播放器逻辑里会再次取反来消除
+            amplitude = Math.abs(estAmp);
         }
 
         // --- Playback Logic ---
