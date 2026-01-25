@@ -32,7 +32,6 @@
             --md-sys-elevation-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
             --md-sys-shape-corner-medium: 12px;
             --md-sys-shape-corner-large: 16px;
-            --md-sys-shape-corner-xl: 28px;
             
             /* Typography */
             --md-sys-typescale-headline-large: 400 32px/40px 'Roboto', sans-serif;
@@ -229,7 +228,7 @@
 
         .progress-bar-container {
             width: 100%;
-            height: 32px; /* Touch target */
+            height: 32px;
             display: flex;
             align-items: center;
             cursor: pointer;
@@ -304,11 +303,6 @@
         }
         .status-msg.success { color: var(--md-sys-color-success); }
         .status-msg.error { color: var(--md-sys-color-error); }
-
-        .spinner {
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
 
         .hidden { display: none !important; }
 
@@ -386,7 +380,7 @@
     </div>
 
     <script>
-        // Font loading handler
+        // Font loading
         document.fonts.ready.then(() => {
             document.body.classList.add('loaded');
         });
@@ -411,7 +405,7 @@
         const exportBtn = document.getElementById('exportBtn');
         const exportStatus = document.getElementById('exportStatus');
 
-        // Audio Logic Variables
+        // Audio Variables
         let audioCtx;
         let mixBuffer = null;
         let bgmBuffer = null;
@@ -419,20 +413,20 @@
         let bgmSource = null;
         let bgmGain = null;
         let masterGain = null;
-        let mixDelayNode = null;
-        let bgmDelayNode = null;
         
         let isPlaying = false;
         let startTime = 0;
         let pauseTime = 0;
         let animationFrameId;
         
-        // Processing Parameters (calculated automatically)
+        // Processing Parameters
+        // offsetTime > 0: Mix 滞后 (BGM 需要延迟开始)
+        // offsetTime < 0: Mix 超前 (BGM 需要跳过开头)
         let offsetTime = 0;
         let amplitude = 1.0;
         let invertPhase = true;
 
-        // --- Audio Context & Loading ---
+        // --- Audio Loading ---
 
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100});
@@ -466,7 +460,7 @@
             }
         });
 
-        // --- Auto Align Logic ---
+        // --- Alignment Logic ---
 
         autoAlignBtn.addEventListener('click', () => {
             if (!mixBuffer || !bgmBuffer) return;
@@ -475,7 +469,6 @@
             statusText.textContent = "正在计算对齐...";
             statusText.className = "status-msg";
             
-            // Allow UI to update
             setTimeout(() => {
                 try {
                     performAutoAlign();
@@ -496,6 +489,7 @@
 
         function performAutoAlign() {
             const sampleRate = mixBuffer.sampleRate;
+            // 取中间或前段样本分析
             const startSec = Math.min(10, mixBuffer.duration / 2);
             const len = 5 * sampleRate;
             const startIdx = Math.floor(startSec * sampleRate);
@@ -510,7 +504,7 @@
             const bgmEnd = Math.min(bgmData.length, startIdx + len + searchWindow);
             const bgmChunk = bgmData.slice(bgmStart, bgmEnd);
             
-            // Coarse Search
+            // 粗略搜索
             let bestOffset = 0;
             let maxCorr = -Infinity;
             const step = 2;
@@ -526,7 +520,7 @@
                 }
             }
             
-            // Fine Search
+            // 精细搜索
             let refinedOffset = bestOffset;
             let refinedMax = -Infinity;
             const range = 200; 
@@ -545,9 +539,10 @@
             }
 
             const bgmMatchIdx = bgmStart + refinedOffset;
+            // offsetSamples = Mix的时间 - BGM的时间
             const offsetSamples = startIdx - bgmMatchIdx;
             
-            // Amplitude Calculation
+            // 幅度计算
             let sumMixSq = 0, sumBgmSq = 0;
             for(let k=0; k < len; k+=10) {
                 sumMixSq += mixChunk[k]*mixChunk[k];
@@ -578,53 +573,51 @@
             bgmSource = audioCtx.createBufferSource();
             bgmSource.buffer = bgmBuffer;
             
-            mixDelayNode = audioCtx.createDelay(5.0); 
-            bgmDelayNode = audioCtx.createDelay(5.0);
-            
             bgmGain = audioCtx.createGain();
             masterGain = audioCtx.createGain();
             
-            // Anti-pop: start silent
+            // Anti-pop
             masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
-            // Phase Inversion & Amp
+            // Phase Inversion
             const val = invertPhase ? -amplitude : amplitude;
             bgmGain.gain.value = val;
 
-            // Graph Connection
-            mixSource.connect(mixDelayNode);
-            mixDelayNode.connect(masterGain);
-            
-            bgmSource.connect(bgmDelayNode);
-            bgmDelayNode.connect(bgmGain);
+            // Connections
+            // Mix 直接走，不加延迟，保证视频同步
+            mixSource.connect(masterGain);
+            // BGM 走 Gain
+            bgmSource.connect(bgmGain);
             bgmGain.connect(masterGain);
             
             masterGain.connect(audioCtx.destination);
             
-            // Apply Delays
             const now = audioCtx.currentTime;
-            if (offsetTime >= 0) {
-                mixDelayNode.delayTime.value = 0;
-                bgmDelayNode.delayTime.value = offsetTime;
-            } else {
-                mixDelayNode.delayTime.value = Math.abs(offsetTime);
-                bgmDelayNode.delayTime.value = 0;
-            }
-
-            // Sync start time (add small buffer for browser to prepare)
-            const syncTime = now + 0.05;
+            const syncTime = now + 0.05; 
             const playDuration = mixBuffer.duration - pauseTime;
             
             if (playDuration > 0) {
+                // 1. 启动 Mix (绝对基准)
                 mixSource.start(syncTime, pauseTime, playDuration);
-                bgmSource.start(syncTime, pauseTime, playDuration);
+
+                // 2. 计算 BGM 在当前 Mix 进度下的对应位置
+                // 公式: BGM时间 = Mix时间 - offset
+                const bgmCurrentTime = pauseTime - offsetTime;
+
+                if (bgmCurrentTime >= 0) {
+                    // BGM 已经开始，跳过前面部分
+                    if (bgmCurrentTime < bgmBuffer.duration) {
+                        bgmSource.start(syncTime, bgmCurrentTime, playDuration);
+                    }
+                } else {
+                    // BGM 还没开始，需要等待
+                    const waitTime = Math.abs(bgmCurrentTime);
+                    bgmSource.start(syncTime + waitTime, 0, Math.max(0, playDuration - waitTime));
+                }
                 
                 // Anti-pop fade in
-                const alignmentGap = Math.abs(offsetTime);
-                const muteDuration = Math.max(0.02, alignmentGap);
-                
-                masterGain.gain.setValueAtTime(0, syncTime + muteDuration);
-                masterGain.gain.linearRampToValueAtTime(1.0, syncTime + muteDuration + 0.04);
+                masterGain.gain.setValueAtTime(0, syncTime);
+                masterGain.gain.linearRampToValueAtTime(1.0, syncTime + 0.05);
             }
 
             startTime = syncTime - pauseTime;
@@ -665,7 +658,6 @@
 
         function progressLoop() {
             if (!isPlaying) return;
-            // Don't fight with the drag event for UI updates
             if (!isDragging) {
                 const current = audioCtx.currentTime - startTime;
                 updateProgressUI(current);
@@ -687,84 +679,53 @@
             if (sec < 0) sec = 0;
             const m = Math.floor(sec / 60);
             const s = Math.floor(sec % 60);
-            const ms = Math.floor((sec % 1) * 100);
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
-        // Seeking & Dragging Logic
+        // --- Seek / Drag ---
         let isDragging = false;
         let wasPlayingBeforeDrag = false;
 
         function handleSeek(e) {
             if (!mixBuffer) return;
             const rect = progressContainer.getBoundingClientRect();
-            let x = e.clientX - rect.left;
+            let x = (e.clientX || e.touches[0].clientX) - rect.left;
             x = Math.max(0, Math.min(x, rect.width));
             
             const percent = x / rect.width;
             const seekTime = percent * mixBuffer.duration;
-            
-            // Update UI immediately
             updateProgressUI(seekTime);
-            
             return seekTime;
         }
 
-        // Fix: Pause on Drag Start to prevent conflicts and glitches
-        progressContainer.addEventListener('mousedown', (e) => {
+        function startDrag(e) {
             if (!mixBuffer) return;
             isDragging = true;
             wasPlayingBeforeDrag = isPlaying;
-            if (isPlaying) {
-                pause(); // Pause immediately when drag starts
-            }
-            pauseTime = handleSeek(e); // Update pauseTime immediately
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging || !mixBuffer) return;
-            e.preventDefault();
-            pauseTime = handleSeek(e); // Track drag position
-        });
-
-        document.addEventListener('mouseup', (e) => {
-            if (!isDragging) return;
-            
-            // Final seek position check
+            if (isPlaying) pause();
             pauseTime = handleSeek(e);
-            
-            if (wasPlayingBeforeDrag) {
-                play();
-            }
-            // If it wasn't playing, we just leave it paused at the new time
-            
-            isDragging = false;
-        });
+        }
 
-        // Touch support for mobile (also with Pause on Drag)
-        progressContainer.addEventListener('touchstart', (e) => {
-            if (!mixBuffer) return;
-            isDragging = true;
-            wasPlayingBeforeDrag = isPlaying;
-            if (isPlaying) {
-                pause();
-            }
-            pauseTime = handleSeek(e.touches[0]);
-        }, {passive: false});
-
-        document.addEventListener('touchmove', (e) => {
+        function onDrag(e) {
             if (!isDragging || !mixBuffer) return;
             e.preventDefault();
-            pauseTime = handleSeek(e.touches[0]);
-        }, {passive: false});
+            pauseTime = handleSeek(e);
+        }
 
-        document.addEventListener('touchend', (e) => {
+        function endDrag(e) {
             if (!isDragging) return;
-            if (wasPlayingBeforeDrag) {
-                play();
-            }
+            pauseTime = handleSeek(e); // Final position
+            if (wasPlayingBeforeDrag) play();
             isDragging = false;
-        });
+        }
+
+        progressContainer.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', endDrag);
+        
+        progressContainer.addEventListener('touchstart', startDrag, {passive: false});
+        document.addEventListener('touchmove', onDrag, {passive: false});
+        document.addEventListener('touchend', endDrag);
 
         togglePlayBtn.addEventListener('click', togglePlay);
 
@@ -774,8 +735,6 @@
             if (!mixBuffer || !bgmBuffer) return;
             
             exportStatus.classList.remove('hidden');
-            
-            // Allow UI update
             await new Promise(r => setTimeout(r, 50));
 
             const length = mixBuffer.length;
@@ -787,28 +746,29 @@
             const offBgm = offlineCtx.createBufferSource();
             offBgm.buffer = bgmBuffer;
             
-            const offMixDelay = offlineCtx.createDelay(5.0);
-            const offBgmDelay = offlineCtx.createDelay(5.0);
             const offBgmGain = offlineCtx.createGain();
-
-            if (offsetTime >= 0) {
-                offMixDelay.delayTime.value = 0;
-                offBgmDelay.delayTime.value = offsetTime;
-            } else {
-                offMixDelay.delayTime.value = Math.abs(offsetTime);
-                offBgmDelay.delayTime.value = 0;
-            }
-
             offBgmGain.gain.value = invertPhase ? -amplitude : amplitude;
 
-            offMix.connect(offMixDelay);
-            offMixDelay.connect(offlineCtx.destination);
-            offBgm.connect(offBgmDelay);
-            offBgmDelay.connect(offBgmGain);
+            // Mix: 直接连接，从0开始
+            offMix.connect(offlineCtx.destination);
+            
+            // BGM: 连接 Gain -> Destination
+            offBgm.connect(offBgmGain);
             offBgmGain.connect(offlineCtx.destination);
             
             offMix.start(0);
-            offBgm.start(0);
+
+            // BGM 对齐计算
+            // PauseTime = 0, so bgmTime = -offsetTime
+            const bgmStartTime = -offsetTime;
+
+            if (bgmStartTime >= 0) {
+                // BGM 跳过开头 (Skip)
+                offBgm.start(0, bgmStartTime);
+            } else {
+                // BGM 延迟开始 (Delay)
+                offBgm.start(Math.abs(bgmStartTime), 0);
+            }
             
             const renderedBuffer = await offlineCtx.startRendering();
             const wav = audioBufferToWav(renderedBuffer);
