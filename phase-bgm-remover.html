@@ -492,77 +492,92 @@
 
             const sampleRate = mixBuffer.sampleRate;
             
-            // 1. 选材：取音频中间 5 秒进行分析（避免开头静音或结尾淡出）
-            // 如果总时长超过20秒，从第10秒开始取；否则取中间
-            const startSec = mixBuffer.duration > 20 ? 10 : mixBuffer.duration / 2;
-            const len = 5 * sampleRate; 
-            const startIdx = Math.floor(startSec * sampleRate);
+            // 1. 选取特征明显的片段
+            // 取中间 10 秒，时间越长，抗人声干扰能力越强
+            const analysisDuration = 10; 
+            const startSec = mixBuffer.duration / 2 - (analysisDuration / 2);
+            // 确保起始点不小于0
+            const safeStartSec = Math.max(0, startSec);
             
-            // 越界保护
-            if (startIdx + len >= mixBuffer.length) return;
+            const len = Math.floor(analysisDuration * sampleRate); 
+            const startIdx = Math.floor(safeStartSec * sampleRate);
+            
+            // 边界检查
+            if (startIdx + len >= mixBuffer.length) {
+                console.error("音频太短无法分析");
+                return;
+            }
 
             const mixData = mixBuffer.getChannelData(0);
             const bgmData = bgmBuffer.getChannelData(0);
             
-            // 截取混合音频片段
+            // Mix片段
             const mixChunk = mixData.slice(startIdx, startIdx + len);
             
-            // BGM 搜索范围：前后各放宽 5 秒
-            const searchWindow = 5.0 * sampleRate; 
-            const bgmStart = Math.max(0, startIdx - searchWindow);
-            const bgmEnd = Math.min(bgmData.length, startIdx + len + searchWindow);
-            const bgmChunk = bgmData.slice(bgmStart, bgmEnd);
+            // BGM 搜索窗口：在 Mix 位置的前后各找 5 秒
+            const searchWindowSec = 5.0;
+            const searchWindowSamples = Math.floor(searchWindowSec * sampleRate);
             
-            // --- 阶段一：粗略对齐 (Coarse Search) ---
+            const bgmStartIdx = Math.max(0, startIdx - searchWindowSamples);
+            const bgmEndIdx = Math.min(bgmData.length, startIdx + len + searchWindowSamples);
+            const bgmChunk = bgmData.slice(bgmStartIdx, bgmEndIdx);
+            
+            // --- 第一步：粗略对齐 (Coarse Alignment) ---
+            // 目的：快速找到大致位置
             let bestOffset = 0;
-            let maxCorr = -Infinity;
-            // 步长设为 2，保证不漏掉波峰
-            const coarseStep = 2; 
+            let maxAbsCorr = -1; // 注意：我们要找绝对值最大的
             
-            for (let i = 0; i < bgmChunk.length - mixChunk.length; i += coarseStep) {
+            // 步长 10 (降低精度换速度)
+            for (let i = 0; i < bgmChunk.length - mixChunk.length; i += 10) {
                 let sum = 0;
-                // 内部采样间隔 50 (降低CPU负担，但足够粗对齐)
+                // 内部采样步长 50
                 for (let j = 0; j < mixChunk.length; j += 50) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
-                if (sum > maxCorr) {
-                    maxCorr = sum;
+                
+                // 关键修改：取绝对值 Math.abs(sum)
+                // 这样无论相位是正还是反，都能找到对齐点
+                if (Math.abs(sum) > maxAbsCorr) {
+                    maxAbsCorr = Math.abs(sum);
                     bestOffset = i;
                 }
             }
             
-            // --- 阶段二：微秒级精确对齐 (Fine Search) ---
+            // --- 第二步：精细对齐 (Fine Alignment) ---
+            // 目的：在粗略点附近精确定位到 1 个采样点
             let refinedOffset = bestOffset;
-            let refinedMax = -Infinity;
-            // 在粗略点前后 500 个采样范围内，进行逐点扫描
+            let refinedMaxAbs = -1;
+            
+            // 搜索范围：粗略点前后 500 采样
             const fineRange = 500; 
             const fineStart = Math.max(0, bestOffset - fineRange);
             const fineEnd = Math.min(bgmChunk.length - mixChunk.length, bestOffset + fineRange);
             
             for (let i = fineStart; i < fineEnd; i++) {
                 let sum = 0;
-                // 必须逐点计算 (step=1) 且内部采样加密 (step=10) 才能锁定相位
+                // 精度提高：内部步长 10
                 for (let j = 0; j < mixChunk.length; j += 10) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
-                if (sum > refinedMax) {
-                    refinedMax = sum;
+                
+                if (Math.abs(sum) > refinedMaxAbs) {
+                    refinedMaxAbs = Math.abs(sum);
                     refinedOffset = i;
                 }
             }
 
-            const bgmMatchIdx = bgmStart + refinedOffset;
-            const offsetSamples = startIdx - bgmMatchIdx;
+            // 计算最终的时间偏移
+            const finalBgmIndex = bgmStartIdx + refinedOffset;
+            const offsetSamples = startIdx - finalBgmIndex;
             
-            // --- 阶段三：基于最小二乘法的音量计算 (Least Squares) ---
-            // 此时已完全对齐，我们可以计算投影分量
+            // --- 第三步：最小二乘法计算最佳抵消音量 ---
+            // 此时已经逐点对齐，我们计算这一段的线性回归系数
             
-            let dotProduct = 0;
-            let sumBgmSq = 0;
+            let dotProduct = 0; // Mix · BGM
+            let sumBgmSq = 0;   // BGM · BGM
             
-            // 遍历对齐后的片段，计算 (Mix · BGM) 和 (BGM · BGM)
-            // step=5 既保证了大量数据样本参与计算，又不会卡死浏览器
-            for(let k = 0; k < mixChunk.length; k += 5) {
+            // 使用较高的采样率计算音量，确保准确
+            for(let k = 0; k < mixChunk.length; k += 2) {
                 const m = mixChunk[k];
                 const b = bgmChunk[refinedOffset + k];
                 
@@ -570,15 +585,40 @@
                 sumBgmSq += b * b;
             }
             
-            // 公式：BestAmplitude = (Mix · BGM) / |BGM|^2
-            // 这就是你要的“穷举法求最小总音量”的数学解析解
-            let estAmp = sumBgmSq > 0 ? (dotProduct / sumBgmSq) : 0;
-
-            console.log("对齐偏差(秒):", offsetSamples / sampleRate);
-            console.log("最佳抵消音量:", estAmp);
-
+            // 公式：alpha = (A·B) / (B·B)
+            // 如果 alpha 是正数，说明相位相同；如果是负数，说明相位相反
+            let rawAmp = sumBgmSq > 0 ? (dotProduct / sumBgmSq) : 0;
+            
+            console.log("-----------------------");
+            console.log("对齐偏移(样本):", offsetSamples);
+            console.log("对齐偏移(秒):", offsetSamples / sampleRate);
+            console.log("原始计算倍率:", rawAmp);
+            
             offsetTime = offsetSamples / sampleRate;
-            amplitude = Math.abs(estAmp); // 应用计算出的最佳音量
+            
+            // 这里的逻辑很重要：
+            // 如果 rawAmp 是正数（例如 0.8），说明 BGM 正相，我们需要反相(-0.8)来抵消。
+            // 如果 rawAmp 是负数（例如 -0.8），说明 BGM 已经是反相的，我们需要同相(+0.8)来抵消。
+            // 播放器逻辑中使用了 `invertPhase ? -amplitude : amplitude`。
+            // 为了配合播放器逻辑，我们把 amplitude 设为绝对值。
+            // 此时无论 rawAmp 正负，只要 invertPhase 为 true，我们可能需要根据 rawAmp 的符号动态调整 invertPhase。
+            
+            amplitude = Math.abs(rawAmp);
+            
+            // 自动判断是否需要反相
+            // 如果计算出 rawAmp 是正的，说明两个波形方向一致，需要反相相加才能抵消 -> invertPhase = true
+            // 如果计算出 rawAmp 是负的，说明两个波形方向相反，直接相加就能抵消（或者说需要反相一个负数）-> invertPhase = false
+            // 但为了兼容你的播放器逻辑 (val = invertPhase ? -amp : amp)，我们这样设定：
+            
+            if (rawAmp > 0) {
+                invertPhase = true; // 正正得负，抵消
+            } else {
+                invertPhase = false; // 已经是反的了，直接加
+            }
+            
+            console.log("最终应用音量:", amplitude);
+            console.log("是否反相:", invertPhase);
+            console.log("-----------------------");
         }
         // --- Playback Logic ---
 
