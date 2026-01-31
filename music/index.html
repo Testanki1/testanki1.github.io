@@ -121,6 +121,12 @@
             50% { transform: scale(1.1); opacity: 0.9; }
         }
 
+        /* 加载动画 */
+        .loading-icon {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+
         .player-ui { display: flex; align-items: center; gap: 10px; width: 100%; }
 
         .play-btn {
@@ -129,7 +135,9 @@
             color: var(--md-sys-color-on-primary);
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; flex-shrink: 0; outline: none;
+            transition: transform 0.1s;
         }
+        .play-btn:active { transform: scale(0.95); }
         .play-btn .material-symbols-rounded { font-size: 28px; }
 
         .download-btn {
@@ -150,6 +158,7 @@
             -webkit-appearance: none; width: 100%; height: 4px;
             background: rgba(191, 213, 255, 0.2); border-radius: 2px;
             outline: none; margin: 0; display: block;
+            cursor: pointer;
         }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; width: 12px; height: 12px;
@@ -163,8 +172,6 @@
             text-align: right; font-variant-numeric: tabular-nums; margin-right: 2px;
         }
 
-        audio { display: none; }
-
         @media (max-width: 600px) {
             body { padding: 12px; }
             h1 { font-size: 2.2rem; margin: 20px 0 30px 0; }
@@ -177,7 +184,6 @@
 <body>
 
     <h1 id="page-title">Tanki Online Music</h1>
-    
     <div class="grid-container" id="music-container"></div>
 
     <script>
@@ -187,22 +193,15 @@
             const lines = lrcText.split('\n');
             const result = [];
             const timeReg = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
-
             lines.forEach(line => {
                 const match = timeReg.exec(line);
                 if (match) {
                     const minutes = parseInt(match[1], 10);
                     const seconds = parseInt(match[2], 10);
-                    
                     const msStr = match[3];
                     let ms = parseInt(msStr, 10);
-
-                    if (msStr.length === 2) {
-                        ms = ms * 10; 
-                    } else if (msStr.length === 1) {
-                        ms = ms * 100;
-                    }
-
+                    if (msStr.length === 2) ms = ms * 10;
+                    else if (msStr.length === 1) ms = ms * 100;
                     const totalSeconds = minutes * 60 + seconds + (ms / 1000);
                     const content = line.replace(timeReg, '').trim();
                     result.push({ time: totalSeconds, text: content });
@@ -210,6 +209,24 @@
             });
             return result;
         }
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        
+        // 状态变量
+        let currentSource = null;    
+        let currentBuffer = null;    
+        let startAt = 0;             
+        let pauseAt = 0;             
+        let isPlaying = false;
+        
+        // --- 关键修改：用于解决竞争的变量 ---
+        let activeCardId = null;       // 当前正在播放（或已暂停）的卡片ID
+        let loadingTargetId = null;    // 当前正在等待加载的卡片ID
+        
+        let animationFrameId = null; 
+        const bufferCache = {};
+        const lrcCache = {};
 
         const musicList = [
             { zh: "3D坦克", en: "Tanki Online", artist: null, file: "tankionline.mp3" },
@@ -220,19 +237,10 @@
             { zh: "神秘", en: "Mysterious", artist: null, file: "TankiOnline_Ringtone_Mysterious.mp3" },
             { zh: "英勇", en: "Heroic", artist: null, file: "TankiOnline_Ringtone_Heroic.mp3" },
             { zh: "主要", en: "Main Theme", artist: null, file: "TankiOnline_Ringtone_Main.mp3" },
-            
             { zh: "8 位", en: "8-bit", artist: "Pago", file: "TankiOnline_Ringtone_8bit.mp3" },
             { zh: "3D坦克新年主题", en: "Tanki Online New Year Theme", artist: "Vospi", file: "Vospi - Tanki Online New Year Theme.mp3" },
             { zh: "3D坦克暗物质主题", en: "Tanki Online Dark Matter Theme", artist: "Vospi", file: "Vospi - Tanki Online Dark Matter Theme.mp3" },
-            
-            { 
-                zh: "Bounce（赛博坦克主题）", 
-                en: "Bounce (CyberTank Theme)", 
-                artist: "Vospi", 
-                file: "Vospi - Bounce.mp3",
-                lrc: "Vospi - Bounce.lrc" 
-            },
-            
+            { zh: "Bounce（赛博坦克主题）", en: "Bounce (CyberTank Theme)", artist: "Vospi", file: "Vospi - Bounce.mp3", lrc: "Vospi - Bounce.lrc" },
             { zh: "专家战场", en: "PRO Battles", artist: null, file: "pro_battles.mp3" },
             { zh: "专家战场限制", en: "PRO Battles Limit", artist: null, file: "pro_battles_limit.mp3" },
             { zh: "商店环境音", en: "Shop Ambience", artist: null, file: "ambient_shop.mp3" },
@@ -251,14 +259,16 @@
 
             const container = document.getElementById('music-container');
             
-            musicList.forEach(item => {
+            musicList.forEach((item, index) => {
+                const fileId = `track-${index}`;
                 const fullUrl = musicBaseUrl + item.file;
                 const displayName = isChinese ? item.zh : item.en;
                 const artistHtml = item.artist ? `<div class="track-artist">${item.artist}</div>` : '';
-                const lrcHtml = item.lrc ? `<div class="lyrics-display" id="lyrics-${item.file.replace(/[^a-zA-Z0-9]/g, '')}"></div>` : '';
+                const lrcHtml = item.lrc ? `<div class="lyrics-display" id="lyrics-${fileId}"></div>` : '';
 
                 const card = document.createElement('div');
                 card.className = 'card';
+                card.id = fileId;
                 
                 card.innerHTML = `
                     <div class="track-info">
@@ -267,169 +277,264 @@
                     </div>
                     ${lrcHtml}
                     <div class="player-ui">
-                        <button class="play-btn"><span class="material-symbols-rounded">play_arrow</span></button>
+                        <button class="play-btn" data-url="${fullUrl}" data-id="${fileId}">
+                            <span class="material-symbols-rounded">play_arrow</span>
+                        </button>
                         <div class="controls-area">
-                            <input type="range" min="0" max="100" value="0" step="0.1">
+                            <input type="range" class="seek-slider" min="0" max="100" value="0" step="0.1">
                             <div class="time-display">0:00 / 0:00</div>
                         </div>
                         <a href="${fullUrl}" download class="download-btn" title="Download">
                             <span class="material-symbols-rounded">download</span>
                         </a>
-                        <audio loop src="${fullUrl}" preload="metadata"></audio>
                     </div>
                 `;
                 container.appendChild(card);
                 
                 if (item.lrc) {
-                    const lrcUrl = musicBaseUrl + item.lrc;
-                    const audio = card.querySelector('audio');
-                    
-                    fetch(lrcUrl)
-                        .then(response => {
-                            if (!response.ok) throw new Error("LRC load failed");
-                            return response.text();
-                        })
-                        .then(text => {
-                            audio.lrcData = parseLRC(text);
-                        })
-                        .catch(err => console.log('No lyrics found for', item.file));
+                    fetch(musicBaseUrl + item.lrc)
+                        .then(r => r.text())
+                        .then(text => { lrcCache[fileId] = parseLRC(text); })
+                        .catch(e => console.error("LRC Error", e));
                 }
-            });
 
-            const players = document.querySelectorAll('.player-ui');
-            const allAudios = document.querySelectorAll('audio');
+                const btn = card.querySelector('.play-btn');
+                const range = card.querySelector('.seek-slider');
 
-            players.forEach(player => {
-                const audio = player.querySelector('audio');
-                const btn = player.querySelector('.play-btn');
-                const icon = btn.querySelector('span');
-                const range = player.querySelector('input[type="range"]');
-                const timeDisplay = player.querySelector('.time-display');
-                const lyricsDiv = player.parentElement.querySelector('.lyrics-display');
+                btn.addEventListener('click', () => handlePlayClick(btn, fullUrl, fileId));
                 
-                // 用于存储 requestAnimationFrame 的 ID，以便停止循环
-                let animationFrameId;
-
-                function formatTime(seconds) {
-                    if (isNaN(seconds)) return "0:00";
-                    const m = Math.floor(seconds / 60);
-                    const s = Math.floor(seconds % 60);
-                    return `${m}:${s < 10 ? '0' : ''}${s}`;
-                }
-
-                // 核心渲染逻辑
-                function updateUI() {
-                    const current = audio.currentTime;
-                    const duration = audio.duration || 0;
-                    timeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
-                    
-                    // 只有当用户没有在拖动进度条时，才自动更新进度条位置
-                    if (document.activeElement !== range) {
-                        range.value = (current / duration) * 100 || 0;
-                        updateRangeBackground(range);
-                    }
-
-                    if (lyricsDiv && audio.lrcData) {
-                        let currentLineText = "";
-                        
-                        for (let i = 0; i < audio.lrcData.length; i++) {
-                            if (audio.lrcData[i].time <= current) {
-                                currentLineText = audio.lrcData[i].text;
-                            } else {
-                                break;
-                            }
-                        }
-
-                        if (currentLineText && currentLineText.trim() !== "") {
-                            lyricsDiv.textContent = currentLineText;
-                            lyricsDiv.classList.add('active');
-                        } else {
-                            if (!audio.paused) {
-                                if (!lyricsDiv.querySelector('.placeholder-icon')) {
-                                    lyricsDiv.innerHTML = '<span class="material-symbols-rounded placeholder-icon">music_note</span>';
-                                }
-                                lyricsDiv.classList.add('active');
-                            } else {
-                                lyricsDiv.classList.remove('active');
-                            }
-                        }
-                    }
-                }
-
-                // --- 新增：循环渲染函数 ---
-                function renderLoop() {
-                    updateUI();
-                    // 如果音乐正在播放，请求下一帧
-                    if (!audio.paused) {
-                        animationFrameId = requestAnimationFrame(renderLoop);
-                    }
-                }
-                
-                function updateRangeBackground(input) {
-                    const value = input.value;
-                    input.style.background = `linear-gradient(to right, #76FF33 0%, #76FF33 ${value}%, rgba(191, 213, 255, 0.2) ${value}%, rgba(191, 213, 255, 0.2) 100%)`;
-                }
-
-                btn.addEventListener('click', () => {
-                    if (audio.paused) {
-                        // 暂停其他所有播放器
-                        allAudios.forEach(a => {
-                            if (a !== audio) {
-                                a.pause();
-                                const otherIcon = a.parentElement.querySelector('.play-btn span');
-                                if(otherIcon) otherIcon.textContent = 'play_arrow';
-                                // 注意：其他播放器的 pause 事件会自动触发它们的 cancelAnimationFrame
-                            }
-                        });
-                        
-                        audio.play();
-                        icon.textContent = 'pause';
-                        
-                        // 开始高频渲染循环
-                        cancelAnimationFrame(animationFrameId); // 防止重复开启
-                        renderLoop();
-                    } else {
-                        audio.pause();
-                        icon.textContent = 'play_arrow';
-                        
-                        // 停止循环 (pause事件也会触发停止，双重保险)
-                        cancelAnimationFrame(animationFrameId);
-                        updateUI(); // 最后更新一次确保状态正确
-                    }
-                });
-
                 range.addEventListener('input', () => {
-                    if (audio.duration) {
-                        audio.currentTime = (range.value / 100) * audio.duration;
+                    if (activeCardId === fileId && currentBuffer) {
                         updateRangeBackground(range);
-                        updateUI(); // 拖动时立即更新文字和歌词
+                        const seekTime = (range.value / 100) * currentBuffer.duration;
+                        playAudio(currentBuffer, seekTime); 
                     }
                 });
-
-                // 初始化 UI
-                audio.addEventListener('loadedmetadata', updateUI);
-                
-                // 监听 pause 事件以确保外部原因暂停时也能停止循环
-                audio.addEventListener('pause', () => {
-                    cancelAnimationFrame(animationFrameId);
-                    updateUI();
-                });
-
-                audio.addEventListener('ended', () => {
-                   cancelAnimationFrame(animationFrameId); // 停止循环
-                   if(!audio.loop) {
-                       icon.textContent = 'play_arrow';
-                       range.value = 0;
-                       updateRangeBackground(range);
-                       if(lyricsDiv) {
-                           lyricsDiv.classList.remove('active');
-                       }
-                   }
-                });
-
-                updateRangeBackground(range);
             });
         });
+
+        async function handlePlayClick(btn, url, fileId) {
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            // 情况1：点击正在加载中的按钮 -> 取消加载
+            if (loadingTargetId === fileId) {
+                loadingTargetId = null; // 取消标记
+                setLoadingState(btn, false);
+                return;
+            }
+
+            // 情况2：点击当前正在播放/暂停的歌曲 -> 切换播放状态
+            if (activeCardId === fileId && loadingTargetId === null) {
+                if (isPlaying) {
+                    pauseAudio();
+                } else {
+                    playAudio(currentBuffer, pauseAt);
+                }
+                return;
+            }
+
+            // 情况3：点击了一首新歌
+            
+            // 如果之前有正在加载的，先重置它的UI
+            if (loadingTargetId) {
+                const prevLoadingCard = document.getElementById(loadingTargetId);
+                if (prevLoadingCard) {
+                    setLoadingState(prevLoadingCard.querySelector('.play-btn'), false);
+                }
+            }
+
+            // 停止当前播放的
+            stopAudio();
+            resetUI(activeCardId);
+            
+            // 设置新的加载目标
+            activeCardId = null; // 在加载完成前，没有 active
+            loadingTargetId = fileId;
+            setLoadingState(btn, true);
+
+            try {
+                // 检查缓存
+                let audioBuffer;
+                if (bufferCache[url]) {
+                    audioBuffer = bufferCache[url];
+                } else {
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                    bufferCache[url] = audioBuffer;
+                }
+                
+                // --- 关键检查：加载完成后，用户是否还想听这首？---
+                if (loadingTargetId !== fileId) {
+                    // 用户在加载过程中点了别的，或者取消了
+                    return; // 退出，不播放
+                }
+
+                // 加载成功且用户未取消
+                currentBuffer = audioBuffer;
+                activeCardId = fileId; 
+                loadingTargetId = null; // 加载完成
+                setLoadingState(btn, false);
+                playAudio(currentBuffer, 0);
+
+            } catch (err) {
+                if (loadingTargetId === fileId) {
+                    console.error("Load failed:", err);
+                    setLoadingState(btn, false);
+                    loadingTargetId = null;
+                    alert("Loading failed or aborted.");
+                }
+            }
+        }
+
+        function playAudio(buffer, offset) {
+            if (currentSource) {
+                currentSource.stop();
+                currentSource = null;
+            }
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.loop = true;
+            source.connect(audioCtx.destination);
+            
+            startAt = audioCtx.currentTime - offset;
+            pauseAt = offset;
+            
+            source.start(0, offset % buffer.duration);
+            currentSource = source;
+            isPlaying = true;
+
+            updatePlayIcon(activeCardId, 'pause');
+            
+            if (!animationFrameId) renderLoop();
+        }
+
+        function pauseAudio() {
+            if (currentSource) {
+                currentSource.stop();
+                currentSource = null;
+            }
+            pauseAt = (audioCtx.currentTime - startAt) % currentBuffer.duration;
+            isPlaying = false;
+            updatePlayIcon(activeCardId, 'play_arrow');
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+
+        function stopAudio() {
+            if (currentSource) {
+                currentSource.stop();
+                currentSource = null;
+            }
+            isPlaying = false;
+            pauseAt = 0;
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+
+        function renderLoop() {
+            if (!isPlaying || !activeCardId || !currentBuffer) return;
+
+            const elapsed = audioCtx.currentTime - startAt;
+            const currentTime = elapsed % currentBuffer.duration;
+            const duration = currentBuffer.duration;
+
+            const card = document.getElementById(activeCardId);
+            if (!card) return;
+
+            const range = card.querySelector('.seek-slider');
+            const timeDisplay = card.querySelector('.time-display');
+            const lyricsDiv = card.querySelector('.lyrics-display');
+
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+
+            if (document.activeElement !== range) {
+                range.value = (currentTime / duration) * 100;
+                updateRangeBackground(range);
+            }
+
+            if (lyricsDiv && lrcCache[activeCardId]) {
+                const lrcData = lrcCache[activeCardId];
+                let currentLineText = "";
+                
+                for (let i = 0; i < lrcData.length; i++) {
+                    if (lrcData[i].time <= currentTime) {
+                        currentLineText = lrcData[i].text;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (currentLineText && currentLineText.trim() !== "") {
+                    lyricsDiv.textContent = currentLineText;
+                    lyricsDiv.classList.add('active');
+                    const icon = lyricsDiv.querySelector('.placeholder-icon');
+                    if(icon) icon.remove();
+                } else {
+                    if(lyricsDiv.textContent.trim() === "" || lyricsDiv.querySelector('.placeholder-icon')) {
+                         if (!lyricsDiv.querySelector('.placeholder-icon')) {
+                            lyricsDiv.innerHTML = '<span class="material-symbols-rounded placeholder-icon">music_note</span>';
+                        }
+                        lyricsDiv.classList.add('active');
+                    }
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        function setLoadingState(btn, isLoading) {
+            const icon = btn.querySelector('span');
+            if (isLoading) {
+                // 使用 sync 图标代替 refresh，看起来更像缓冲
+                icon.textContent = 'sync'; 
+                icon.classList.add('loading-icon');
+                btn.style.opacity = '0.7';
+            } else {
+                icon.classList.remove('loading-icon');
+                btn.style.opacity = '1';
+                // 恢复图标由 updatePlayIcon 或 resetUI 处理
+                // 如果是取消加载，这里需要手动恢复 play_arrow
+                if (!isPlaying) icon.textContent = 'play_arrow';
+            }
+        }
+
+        function updatePlayIcon(id, iconName) {
+            if (!id) return;
+            const card = document.getElementById(id);
+            const icon = card.querySelector('.play-btn span');
+            icon.textContent = iconName;
+            icon.classList.remove('loading-icon');
+        }
+
+        function resetUI(id) {
+            if (!id) return;
+            const card = document.getElementById(id);
+            const range = card.querySelector('.seek-slider');
+            const timeDisplay = card.querySelector('.time-display');
+            const icon = card.querySelector('.play-btn span');
+            const lyricsDiv = card.querySelector('.lyrics-display');
+
+            icon.textContent = 'play_arrow';
+            icon.classList.remove('loading-icon');
+            range.value = 0;
+            updateRangeBackground(range);
+            timeDisplay.textContent = "0:00 / 0:00";
+            if(lyricsDiv) lyricsDiv.classList.remove('active');
+        }
+
+        function updateRangeBackground(input) {
+            const value = input.value;
+            input.style.background = `linear-gradient(to right, #76FF33 0%, #76FF33 ${value}%, rgba(191, 213, 255, 0.2) ${value}%, rgba(191, 213, 255, 0.2) 100%)`;
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
     </script>
 </body>
 </html>
