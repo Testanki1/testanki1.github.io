@@ -92,7 +92,7 @@
             font-size: 1rem;
             color: var(--md-sys-color-primary);
             text-align: center;
-            height: 3.4em; /* 固定高度 */
+            height: 3.4em;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -110,7 +110,6 @@
             opacity: 1;
         }
 
-        /* 占位符图标动画 */
         .placeholder-icon {
             font-size: 24px;
             opacity: 0.7;
@@ -194,10 +193,18 @@
                 if (match) {
                     const minutes = parseInt(match[1], 10);
                     const seconds = parseInt(match[2], 10);
-                    const milliseconds = parseInt(match[3], 10);
-                    const totalSeconds = minutes * 60 + seconds + (milliseconds / 1000);
+                    
+                    const msStr = match[3];
+                    let ms = parseInt(msStr, 10);
+
+                    if (msStr.length === 2) {
+                        ms = ms * 10; 
+                    } else if (msStr.length === 1) {
+                        ms = ms * 100;
+                    }
+
+                    const totalSeconds = minutes * 60 + seconds + (ms / 1000);
                     const content = line.replace(timeReg, '').trim();
-                    // 保留空内容行，用于清空歌词
                     result.push({ time: totalSeconds, text: content });
                 }
             });
@@ -268,7 +275,7 @@
                         <a href="${fullUrl}" download class="download-btn" title="Download">
                             <span class="material-symbols-rounded">download</span>
                         </a>
-                        <audio loop src="${fullUrl}"></audio>
+                        <audio loop src="${fullUrl}" preload="metadata"></audio>
                     </div>
                 `;
                 container.appendChild(card);
@@ -284,7 +291,6 @@
                         })
                         .then(text => {
                             audio.lrcData = parseLRC(text);
-                            // 初始化时不添加 active，因为默认是暂停的
                         })
                         .catch(err => console.log('No lyrics found for', item.file));
                 }
@@ -300,6 +306,9 @@
                 const range = player.querySelector('input[type="range"]');
                 const timeDisplay = player.querySelector('.time-display');
                 const lyricsDiv = player.parentElement.querySelector('.lyrics-display');
+                
+                // 用于存储 requestAnimationFrame 的 ID，以便停止循环
+                let animationFrameId;
 
                 function formatTime(seconds) {
                     if (isNaN(seconds)) return "0:00";
@@ -308,17 +317,18 @@
                     return `${m}:${s < 10 ? '0' : ''}${s}`;
                 }
 
+                // 核心渲染逻辑
                 function updateUI() {
                     const current = audio.currentTime;
                     const duration = audio.duration || 0;
                     timeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
                     
+                    // 只有当用户没有在拖动进度条时，才自动更新进度条位置
                     if (document.activeElement !== range) {
                         range.value = (current / duration) * 100 || 0;
                         updateRangeBackground(range);
                     }
 
-                    // --- 歌词更新逻辑 ---
                     if (lyricsDiv && audio.lrcData) {
                         let currentLineText = "";
                         
@@ -330,24 +340,28 @@
                             }
                         }
 
-                        // 状态机逻辑
                         if (currentLineText && currentLineText.trim() !== "") {
-                            // 1. 如果有文字：无论播放还是暂停，都显示文字
                             lyricsDiv.textContent = currentLineText;
                             lyricsDiv.classList.add('active');
                         } else {
-                            // 2. 如果没文字（间奏/前奏）
                             if (!audio.paused) {
-                                // 2a. 正在播放：显示占位符
                                 if (!lyricsDiv.querySelector('.placeholder-icon')) {
                                     lyricsDiv.innerHTML = '<span class="material-symbols-rounded placeholder-icon">music_note</span>';
                                 }
                                 lyricsDiv.classList.add('active');
                             } else {
-                                // 2b. 暂停中：隐藏一切
                                 lyricsDiv.classList.remove('active');
                             }
                         }
+                    }
+                }
+
+                // --- 新增：循环渲染函数 ---
+                function renderLoop() {
+                    updateUI();
+                    // 如果音乐正在播放，请求下一帧
+                    if (!audio.paused) {
+                        animationFrameId = requestAnimationFrame(renderLoop);
                     }
                 }
                 
@@ -358,18 +372,29 @@
 
                 btn.addEventListener('click', () => {
                     if (audio.paused) {
+                        // 暂停其他所有播放器
                         allAudios.forEach(a => {
                             if (a !== audio) {
                                 a.pause();
                                 const otherIcon = a.parentElement.querySelector('.play-btn span');
                                 if(otherIcon) otherIcon.textContent = 'play_arrow';
+                                // 注意：其他播放器的 pause 事件会自动触发它们的 cancelAnimationFrame
                             }
                         });
+                        
                         audio.play();
                         icon.textContent = 'pause';
+                        
+                        // 开始高频渲染循环
+                        cancelAnimationFrame(animationFrameId); // 防止重复开启
+                        renderLoop();
                     } else {
                         audio.pause();
                         icon.textContent = 'play_arrow';
+                        
+                        // 停止循环 (pause事件也会触发停止，双重保险)
+                        cancelAnimationFrame(animationFrameId);
+                        updateUI(); // 最后更新一次确保状态正确
                     }
                 });
 
@@ -377,23 +402,27 @@
                     if (audio.duration) {
                         audio.currentTime = (range.value / 100) * audio.duration;
                         updateRangeBackground(range);
+                        updateUI(); // 拖动时立即更新文字和歌词
                     }
                 });
 
+                // 初始化 UI
                 audio.addEventListener('loadedmetadata', updateUI);
-                audio.addEventListener('timeupdate', updateUI);
                 
-                // 监听 play 和 pause 事件，以便状态改变时立刻刷新 UI (隐藏/显示占位符)
-                audio.addEventListener('play', updateUI);
-                audio.addEventListener('pause', updateUI);
+                // 监听 pause 事件以确保外部原因暂停时也能停止循环
+                audio.addEventListener('pause', () => {
+                    cancelAnimationFrame(animationFrameId);
+                    updateUI();
+                });
 
                 audio.addEventListener('ended', () => {
+                   cancelAnimationFrame(animationFrameId); // 停止循环
                    if(!audio.loop) {
                        icon.textContent = 'play_arrow';
                        range.value = 0;
                        updateRangeBackground(range);
                        if(lyricsDiv) {
-                           lyricsDiv.classList.remove('active'); // 结束播放，隐藏歌词栏
+                           lyricsDiv.classList.remove('active');
                        }
                    }
                 });
