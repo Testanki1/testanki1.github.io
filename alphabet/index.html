@@ -3,11 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克字母表游戏</title>
+    <title>Tanki Online Alphabet</title>
     <style>
-        /* (Your CSS - Changes to .known-letter-box and .known-letter-box-container) */
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0');
+
+        :root {
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-on-primary: #001926;
+            --md-sys-color-background: #001926;
+            --md-sys-color-surface: #002b36;
+            --md-sys-color-secondary-container: #BFD5FF;
+            --md-sys-color-on-secondary-container: #001926;
+            --md-sys-color-error: #FF6666;
+            --md-border-radius-large: 24px;
+            --md-border-radius-pill: 50px;
+        }
 
         * {
             -webkit-tap-highlight-color: transparent;
@@ -17,538 +29,597 @@
         }
 
         body {
-            background-color: #001926;
+            background-color: var(--md-sys-color-background);
             color: white;
-            font-family: 'Rubik', 'M PLUS 1p';
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
-            padding: 20px;
+            min-height: 100vh;
+            padding: 30px 10px; /* 减小两侧 padding 以留更多空间给长单词 */
             text-align: center;
+            opacity: 0; 
+            transition: opacity 0.5s ease-in-out;
+            overflow-x: hidden; /* 防止因为细微计算误差出现横向滚动条 */
+        }
+
+        body.loaded {
+            opacity: 1;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            user-select: none;
         }
 
         h1 {
             font-size: 2rem;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            color: var(--md-sys-color-primary);
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(118, 255, 51, 0.3);
         }
 
-        /* Tab Styles */
+        /* --- Tabs --- */
         .tabs {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-            width: 100%;
+            display: inline-flex;
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 5px;
+            border-radius: var(--md-border-radius-pill);
+            margin-bottom: 25px;
+            border: 1px solid rgba(118, 255, 51, 0.2);
         }
 
         .tab {
-            padding: 10px 20px;
-            margin: 0 10px;
+            padding: 10px 25px;
             cursor: pointer;
-            font-size: 1.2rem;
-            background-color: #00303b;
-            color: white;
-            border: 2px solid #00303b;
-            border-radius: 8px;
-        }
-
-        .tab:hover {
-            background-color: #64e629;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: var(--md-border-radius-pill);
+            color: var(--md-sys-color-secondary-container);
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            background-color: transparent;
+            border: none;
         }
 
         .tab.active {
-            background-color: #76FF33;
-            color: #001926;
-            border-color: #76FF33;
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            box-shadow: 0 4px 12px rgba(118, 255, 51, 0.4);
         }
 
-        /* Section Styles */
+        /* --- Sections --- */
         .section {
             display: none;
             width: 100%;
             max-width: 600px;
-            margin-top: 20px;
+            animation: fadeIn 0.4s ease-out;
         }
 
         .section.active {
             display: block;
         }
 
-        label {
-            font-size: 1.1rem;
-            margin-bottom: 5px;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        input, button, select {
-            padding: 12px;
-            margin: 10px 0;
-            font-size: 1rem;
-            border-radius: 8px;
-            border: 2px solid #76FF33;
-            background-color: #002b36;
-            color: white;
-            transition: all 0.3s ease;
-        }
-
-        input {
-            width: 100%;
-            max-width: 320px;
-        }
-
-        select {
-            width: 100%;
-            max-width: 320px;
-        }
-
-        input:focus, select:focus {
-            border-color: #64e629;
-            outline: none;
-            box-shadow: 0 0 8px rgba(103, 255, 51, 0.5);
-        }
-
-        button {
-            background-color: #76FF33;
-            color: #001926;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        button:hover {
-            background-color: #64e629;
-        }
-
-        .result {
-            color: #76FF33;
-            font-weight: bold;
-            font-size: 1.5rem;
-            margin-top: 20px;
-        }
-
-        .error {
-            color: red;
-            font-size: 1.2rem;
-            margin-top: 20px;
-        }
-
-        .results-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .result p {
-            margin: 10px 0;
-        }
-
-        .reproduce-section {
-            background-color: #002b36;
-            color: #76FF33;
-            padding: 20px;
-            border-radius: 8px;
-            font-size: 1.2rem;
+        /* --- Inputs --- */
+        .wordlist-select-container {
+            margin-bottom: 20px;
             text-align: left;
         }
 
-        #lettersList button {
-            margin: 5px;
-            padding: 10px;
-            background-color: #00303b;
+        label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: var(--md-sys-color-secondary-container);
+        }
+
+        input[type="number"],
+        input[type="text"]:not(.known-letter-box),
+        select {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 1rem;
+            border-radius: var(--md-border-radius-large);
+            border: 1px solid transparent;
+            background-color: var(--md-sys-color-surface);
             color: white;
-            border: 2px solid #00303b;
-            border-radius: 8px;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--md-sys-color-primary);
+            background-color: rgba(118, 255, 51, 0.05);
+        }
+
+        button {
+            padding: 14px 28px;
+            font-size: 1rem;
+            border-radius: var(--md-border-radius-pill);
+            border: none;
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            font-weight: 700;
             cursor: pointer;
-            font-size: 1.1rem;
+            transition: transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-
-        #lettersList button:hover {
-            background-color: #BFD5FF;
-        }
-
-        #lettersList button:disabled {
-            background-color: #444;
+        button:active { transform: scale(0.96); }
+        button:disabled {
+            background-color: rgba(255,255,255,0.1) !important;
+            color: rgba(255,255,255,0.3) !important;
+            border-color: transparent !important;
             cursor: not-allowed;
         }
 
-        #wordDisplay {
-            font-size: 1.5rem;
-            letter-spacing: 10px;
-            margin-top: 20px;
-            font-weight: bold;
+        /* --- 核心修复区域：强制一行 + 自动缩放 --- */
+        
+        #wordDisplayContainer, 
+        #knownLettersDisplay {
+            display: flex;
+            /* 1. 强制不换行 */
+            flex-wrap: nowrap;
+            justify-content: center;
+            width: 100%;
+            gap: 4px; /* 稍微减小间距 */
+            margin: 20px 0;
+            padding: 0;
         }
 
-        #attempts {
-            font-size: 1.2rem;
-            font-weight: bold;
+        /* 定义计算后的动态尺寸变量 */
+        #wordDisplayContainer, 
+        #knownLettersDisplay {
+            /* 核心算法：
+               1. 屏幕宽度 (92vw) - 预留一些边距。
+               2. 除以字母数量 var(--char-count)。
+               3. 减去 gap 的大小，防止总宽度溢出。
+               4. 使用 min(60px, ...) 确保字母少时方块不会无限大，最大限制在60px。
+            */
+            --calculated-size: min(60px, calc( (92vw / var(--char-count, 8)) - 4px ));
+        }
+
+        /* 游戏方块通用样式 */
+        .game-tile {
+            /* 应用动态计算的宽度和高度 */
+            width: var(--calculated-size);
+            height: var(--calculated-size);
+            
+            /* 字体大小随方块大小变化：设置为方块大小的 60% */
+            font-size: calc(var(--calculated-size) * 0.6);
+            
+            font-weight: 700;
+            border: 2px solid var(--md-sys-color-primary);
+            border-radius: 15%; /* 使用百分比圆角，这样小方块圆角也会变小 */
+            background-color: transparent;
+            color: var(--md-sys-color-primary);
+            
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            text-transform: uppercase;
+            padding: 0;
+            margin: 0;
+            flex-shrink: 0; /* 防止 flex 布局挤压导致比例失调 */
+        }
+
+        /* --- 单词解谜的输入框特殊处理 --- */
+        .known-letter-box-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: var(--calculated-size); /* 容器宽度也同步 */
+            flex-shrink: 0;
+        }
+        
+        input.game-tile {
+            width: 100%; 
+            height: var(--calculated-size);
+            /* 输入框字体也同步 */
+            font-size: calc(var(--calculated-size) * 0.6); 
+        }
+
+        .game-tile.filled {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+        }
+
+        .game-tile:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(118, 255, 51, 0.3);
+        }
+
+        .delete-letter-btn {
+            background: transparent;
+            color: var(--md-sys-color-error);
+            border: none;
+            padding: 0;
+            margin-top: 4px;
+            width: 100%;
+            height: 20px; /* 固定删除按钮高度 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        /* 删除按钮图标大小也需要随之动态变化，或者是设一个小一点的固定值 */
+        .delete-letter-btn .material-symbols-rounded {
+            font-size: min(20px, var(--calculated-size)); 
+        }
+        
+        .delete-letter-btn:hover {
+            background-color: rgba(255, 102, 102, 0.1);
+            border-radius: 4px;
+        }
+
+        /* --- 游戏再现部分 --- */
+        .reproduce-section {
+            background-color: var(--md-sys-color-surface);
+            padding: 20px;
+            border-radius: var(--md-border-radius-large);
+            border: 1px solid rgba(118, 255, 51, 0.1);
+        }
+
+        .icon-btn-refresh {
+            margin-top: 20px;
+            width: 56px;
+            height: 56px;
+            padding: 0;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--md-sys-color-primary);
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        
+        .icon-btn-refresh:hover {
+            background-color: rgba(118, 255, 51, 0.2);
+            transform: rotate(180deg);
         }
 
         #lettersList {
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 10px;
-            justify-items: center;
+            grid-template-columns: repeat(8, 1fr); 
+            gap: 6px;
+            margin: 20px auto;
+            max-width: 100%;
         }
 
-        .wordlist-select-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        #addKnownLetterBtn {
-            margin-top: 10px;
-        }
-
-        #knownLettersDisplay {
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #76FF33;
+        #lettersList button {
+            padding: 0;
+            width: 100%;
+            aspect-ratio: 1; 
+            font-size: clamp(0.8rem, 2.5vw, 1.2rem);
+            background-color: rgba(255,255,255,0.05);
+            color: var(--md-sys-color-secondary-container);
+            border: 1px solid rgba(191, 213, 255, 0.2);
             border-radius: 8px;
-            min-height: 30px; /* Ensure it's visible even when empty */
-            display: flex; /* Use flexbox for layout */
-            flex-wrap: wrap; /* Allow wrapping */
-            gap: 5px; /* Spacing between boxes */
-        }
-       .known-letter-box-container {
-          display: flex;
-          flex-direction: column; /* Stack elements vertically */
-          align-items: center; /* Center items horizontally */
-          margin-bottom: 10px; /* Add some vertical spacing */
         }
 
-        .known-letter-box {
-            width: 50px; /* Even Larger */
-            height: 50px; /* Even Larger */
-            border: 2px solid #76FF33;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.6rem; /* Even Larger */
+        #lettersList button:hover:not(:disabled) {
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+
+        #guessResult {
+            font-size: 1.2rem;
             font-weight: bold;
-            text-transform: uppercase;
-            margin: 2px;
-            text-align: center;
-            transition: background-color 0.2s, color 0.2s; /* Smooth transition */
-        }
-        .known-letter-box.filled {
-            background-color: #76FF33; /* Green background */
-            color: #001926;          /* Black text */
+            height: 24px;
+            margin-bottom: 10px;
         }
 
-        .letter-position-input {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
+        .result {
+            color: var(--md-sys-color-primary);
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(118, 255, 51, 0.05);
+            border-radius: 12px;
+            word-break: break-all;
         }
-
-        .letter-position-input input[type="text"] {
-            margin-right: 5px;
-            padding: 5px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            width: 40px; /* Adjust width as needed */
-            text-align: center;
-        }
-
-        .letter-position-input input.invalid {
-            border: 2px solid red;
-        }
-
-        .letter-position-input .positions-input {
-            flex-grow: 1; /* Allow positions input to take remaining space */
-            margin-right: 5px;
-            padding: 5px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-
-        .letter-position-input button {
-            padding: 5px 10px;
-            background-color: #FF6666;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-         .delete-letter-btn {
-            background-color: #FF6666;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            padding: 5px 10px;
-            margin-top: 5px;
-        }
-
-        #knownLetterInputs {
-            margin-top: 10px;
-        }
-        #createLetterBoxesBtn {
-            margin-top:10px;
-        }
-
-        /* Style for word display in reproduce section */
-        #wordDisplayContainer {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 20px;
-        }
-
-        .reproduce-letter-box {
-            width: 50px;
-            height: 50px;
-            border: 2px solid #76FF33;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.6rem;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin: 2px;
-            text-align: center;
-            transition: background-color 0.2s, color 0.2s;
-        }
-          .reproduce-letter-box.filled {
-            background-color: #76FF33;
-            color: #001926;
-        }
+        
+        .error { color: var(--md-sys-color-error); }
 
     </style>
 </head>
 <body>
 
-<h1>3D坦克字母表游戏</h1>
+<h1 data-i18n="title">3D坦克字母表游戏</h1>
 
-<!-- 标签页 -->
 <div class="tabs">
-    <div class="tab active" id="puzzleTab" onclick="switchTab('puzzle')">单词解谜</div>
-    <div class="tab" id="reproduceTab" onclick="switchTab('reproduce')">游戏再现</div>
+    <button class="tab active" id="puzzleTab" onclick="switchTab('puzzle')" data-i18n="tab_puzzle">单词解谜</button>
+    <button class="tab" id="reproduceTab" onclick="switchTab('reproduce')" data-i18n="tab_reproduce">游戏再现</button>
 </div>
 
-<!-- 解谜部分 -->
 <div class="section active" id="puzzleSection">
     <div class="wordlist-select-container">
-        <label for="wordlistSelect">选择词库：</label>
+        <label for="wordlistSelect" data-i18n="label_wordlist">选择词库</label>
         <select id="wordlistSelect">
-            <option value="https://testanki1.github.io/alphabet/words.txt">词库 1</option>
-            <option value="https://testanki1.github.io/alphabet/words_2.txt">词库 2</option>
-            <option value="https://testanki1.github.io/alphabet/words_3.txt">词库 3</option>
+            <option value="https://testanki1.github.io/alphabet/words.txt" data-i18n="wordlist_1">词库 1</option>
+            <option value="https://testanki1.github.io/alphabet/words_2.txt" data-i18n="wordlist_2">词库 2</option>
+            <option value="https://testanki1.github.io/alphabet/words_3.txt" data-i18n="wordlist_3">词库 3</option>
         </select>
     </div>
-    <label for="length">请输入单词的长度：</label>
-    <input type="number" id="length" placeholder="单词长度" min="1">
-    <!-- Removed the button -->
-    </br>
-    <label for="letters">请输入该单词中可能含有的字母：</label>
-    <input type="text" id="letters" placeholder="字母输入">
-    </br>
-    <!-- Removed addKnownLetterBtn and related elements -->
 
-    <div id="knownLetterInputs"></div>
+    <label for="length" data-i18n="label_length">单词长度</label>
+    <input type="number" id="length" placeholder="4" min="1">
+    
+    <label for="letters" data-i18n="label_letters">可能含有的字母</label>
+    <input type="text" id="letters" placeholder="ABC...">
+    
     <div id="knownLettersDisplay"></div>
 
-    <button onclick="solvePuzzle()">解谜！</button>
+    <button onclick="solvePuzzle()">
+        <span class="material-symbols-rounded">search</span>
+        <span data-i18n="btn_solve">解谜！</span>
+    </button>
 
     <div id="result" class="results-container"></div>
 </div>
 
-<!-- 游戏再现部分 -->
 <div class="section" id="reproduceSection">
     <div class="wordlist-select-container">
-        <label for="wordlistSelectReproduce">选择词库：</label>
+        <label for="wordlistSelectReproduce" data-i18n="label_wordlist">选择词库</label>
         <select id="wordlistSelectReproduce">
-            <option value="https://testanki1.github.io/alphabet/words.txt">词库 1</option>
-            <option value="https://testanki1.github.io/alphabet/words_2.txt">词库 2</option>
-            <option value="https://testanki1.github.io/alphabet/words_3.txt">词库 3</option>
+            <option value="https://testanki1.github.io/alphabet/words.txt" data-i18n="wordlist_1">词库 1</option>
+            <option value="https://testanki1.github.io/alphabet/words_2.txt" data-i18n="wordlist_2">词库 2</option>
+            <option value="https://testanki1.github.io/alphabet/words_3.txt" data-i18n="wordlist_3">词库 3</option>
         </select>
     </div>
+    
     <div class="reproduce-section">
-        <h3>游戏再现</h3>
-        <p>选择字母并猜出单词！</p>
+        <div id="wordDisplayContainer"></div> 
+        
+        <p id="guessResult"></p>
+        <p style="color: #BFD5FF; margin-bottom: 10px;">
+            <span data-i18n="label_attempts">选择次数：</span>
+            <span id="attempts" style="color: white; font-weight: bold;">0</span>
+        </p>
+        
         <div id="letterContainer">
-            <p>字母选择：</p>
             <div id="lettersList"></div>
         </div>
-        <div id="wordDisplayContainer"></div>  <!-- Container for the letter boxes -->
-        <p id="guessResult"></p>
-        <p>选择次数：<span id="attempts">0</span></p>
-        <button onclick="startGame()">开始新游戏</button>
+        
+        <button onclick="startGame()" class="icon-btn-refresh" aria-label="Restart Game">
+            <span class="material-symbols-rounded" style="font-size: 32px;">refresh</span>
+        </button>
     </div>
 </div>
 
 <script>
+    // --- 国际化配置 (I18n) ---
+    const i18nData = {
+        'zh': {
+            title: '3D坦克字母表游戏',
+            tab_puzzle: '单词解谜',
+            tab_reproduce: '游戏再现',
+            label_wordlist: '选择词库',
+            wordlist_1: '词库 1',
+            wordlist_2: '词库 2',
+            wordlist_3: '词库 3',
+            label_length: '单词长度',
+            label_letters: '可能含有的字母',
+            btn_solve: '解谜！',
+            label_attempts: '选择次数：',
+            msg_no_length: '请输入单词长度。',
+            msg_result_title: '符合条件的单词：',
+            msg_no_match: '没有找到符合条件的单词。',
+            msg_error: '出错了，请稍后再试。',
+            msg_empty_lib: '词库为空。',
+            msg_correct: '正确！',
+            msg_wrong: '错误！',
+            msg_congrats: '恭喜你，猜对了！'
+        },
+        'en': {
+            title: 'Tanki Online Alphabet',
+            tab_puzzle: 'Word Solver',
+            tab_reproduce: 'Guessing Game',
+            label_wordlist: 'Select Wordlist',
+            wordlist_1: 'Wordlist 1',
+            wordlist_2: 'Wordlist 2',
+            wordlist_3: 'Wordlist 3',
+            label_length: 'Word Length',
+            label_letters: 'Available Letters',
+            btn_solve: 'Solve',
+            label_attempts: 'Attempts: ',
+            msg_no_length: 'Please enter word length.',
+            msg_result_title: 'Matching words:',
+            msg_no_match: 'No matching words found.',
+            msg_error: 'An error occurred.',
+            msg_empty_lib: 'Wordlist is empty.',
+            msg_correct: 'Correct!',
+            msg_wrong: 'Wrong!',
+            msg_congrats: 'Solved!',
+        }
+    };
+
+    let currentLang = 'zh';
+
+    function initLanguage() {
+        const sysLang = navigator.language || navigator.userLanguage;
+        if (!sysLang.startsWith('zh')) {
+            currentLang = 'en';
+            document.documentElement.lang = 'en';
+        } else {
+            currentLang = 'zh';
+        }
+        applyLanguage();
+    }
+
+    function applyLanguage() {
+        const text = i18nData[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (text[key]) {
+                el.textContent = text[key];
+            }
+        });
+        
+        if (currentLang === 'en') {
+            document.getElementById('length').placeholder = 'Number';
+            document.getElementById('letters').placeholder = 'Type letters...';
+        }
+    }
+
+    window.addEventListener('load', () => {
+        document.fonts.ready.then(() => {
+            initLanguage();
+            document.body.classList.add('loaded');
+            if(document.getElementById('reproduceSection').classList.contains('active')){
+                startGame();
+            }
+        });
+    });
+
+    // --- 游戏逻辑 ---
     let targetWord = '';
     let wordLength = 0;
     let guessedLetters = [];
     let attempts = 0;
     let usedLetters = [];
     const lettersListDiv = document.getElementById('lettersList');
-    const wordDisplayContainer = document.getElementById('wordDisplayContainer'); // Changed to container
+    const wordDisplayContainer = document.getElementById('wordDisplayContainer'); 
     const attemptsSpan = document.getElementById('attempts');
     const guessResult = document.getElementById('guessResult');
 
-    // Input validation for letters
     document.getElementById('letters').addEventListener('input', function (e) {
         const inputValue = this.value.toUpperCase();
         this.value = inputValue.split('').filter((letter, index, self) => self.indexOf(letter) === index).join('');
         this.value = this.value.replace(/[^A-Za-z]/g, '');
     });
 
-    // 异步获取单词列表的函数
-    async function fetchWords(wordFileURL) { // 现在接受 URL
+    async function fetchWords(wordFileURL) { 
         try {
-            const response = await fetch(wordFileURL); // 使用 URL
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const response = await fetch(wordFileURL); 
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const text = await response.text();
             return text.split('\n').map(word => word.trim()).filter(word => word.length > 0);
         } catch (error) {
             console.error("Could not fetch words:", error);
-            document.getElementById('result').innerHTML = `<p class="error">无法加载词库: ${error.message}</p>`;
+            document.getElementById('result').innerHTML = `<p class="error">${i18nData[currentLang].msg_error}</p>`;
             return [];
         }
     }
 
     let knownLetterPositions = {};
-    let hasInvalidInput = false; // Flag to track input errors
 
-   function createLetterBoxes() {
-        const wordLength = parseInt(document.getElementById('length').value, 10);
-        if (isNaN(wordLength) || wordLength <= 0) {
-            alert("请先输入有效的单词长度。");
+    function createLetterBoxes() {
+        const wordLengthVal = parseInt(document.getElementById('length').value, 10);
+        if (isNaN(wordLengthVal) || wordLengthVal <= 0) {
+            document.getElementById('knownLettersDisplay').innerHTML = '';
             return;
         }
 
         const container = document.getElementById('knownLettersDisplay');
-        container.innerHTML = ''; // Clear previous boxes
-        knownLetterPositions = {}; // Reset known letters
+        container.innerHTML = ''; 
+        knownLetterPositions = {}; 
 
-        for (let i = 0; i < wordLength; i++) {
-             const boxContainer = document.createElement('div');
+        // --- 核心 JS 修复：设置变量告诉 CSS 有多少个字母 ---
+        container.style.setProperty('--char-count', wordLengthVal);
+        // --------------------------------------------------
+
+        for (let i = 0; i < wordLengthVal; i++) {
+            const boxContainer = document.createElement('div');
             boxContainer.classList.add('known-letter-box-container');
 
             const box = document.createElement('input');
             box.type = 'text';
             box.maxLength = 1;
-            box.classList.add('known-letter-box');
+            box.classList.add('game-tile', 'known-letter-box'); 
             box.dataset.index = i;
-            box.addEventListener('input', handleLetterBoxInput);
-            // Select all text on focus (for easy replacement)
-            box.addEventListener('focus', (event) => {
-                event.target.select();
+            
+            box.addEventListener('input', (e) => {
+                const val = e.target.value.toUpperCase();
+                if (val.match(/[A-Z]/)) {
+                    e.target.value = val;
+                    knownLetterPositions[i] = val;
+                    e.target.classList.add('filled');
+                    const next = document.querySelector(`.known-letter-box[data-index="${i + 1}"]`);
+                    if(next) next.focus();
+                } else {
+                    e.target.value = '';
+                    delete knownLetterPositions[i];
+                    e.target.classList.remove('filled');
+                }
             });
-
+            
+            box.addEventListener('focus', (e) => e.target.select());
 
             const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'X';
+            deleteBtn.innerHTML = '<span class="material-symbols-rounded">close</span>';
             deleteBtn.classList.add('delete-letter-btn');
-            deleteBtn.onclick = () => deleteLetterBox(i);
+            deleteBtn.onclick = () => {
+                box.value = '';
+                delete knownLetterPositions[i];
+                box.classList.remove('filled');
+                box.focus();
+            };
 
             boxContainer.appendChild(box);
-            boxContainer.appendChild(deleteBtn); //deleteBtn is now below box
+            boxContainer.appendChild(deleteBtn);
             container.appendChild(boxContainer);
         }
     }
-    function deleteLetterBox(index) {
-        const container = document.getElementById('knownLettersDisplay');
-        const box = container.querySelector(`.known-letter-box[data-index="${index}"]`);
 
-        if (box) {
-            box.value = ''; // Clear the letter
-            delete knownLetterPositions[index]; // Remove from the object
-            box.classList.remove('filled'); // Remove the filled class
-        }
-    }
-
-     function handleLetterBoxInput(event) {
-        const box = event.target;
-        const index = parseInt(box.dataset.index, 10);
-        const letter = box.value.toUpperCase();
-
-        if (letter.match(/[A-Z]/)) {
-            knownLetterPositions[index] = letter;
-            box.style.borderColor = '#76FF33';
-            box.classList.add('filled'); // Add the filled class
-
-        } else if (letter === "") {
-            delete knownLetterPositions[index];
-            box.style.borderColor = '#76FF33';
-            box.classList.remove('filled'); // Remove filled class
-        } else {
-            box.style.borderColor = 'red';
-            delete knownLetterPositions[index];
-             box.classList.remove('filled');
-        }
-    }
-
-    // Removed the event listener for the button, added to length input
     document.getElementById('length').addEventListener('input', createLetterBoxes);
 
-
-    // 解谜函数
     async function solvePuzzle() {
-        const wordLength = parseInt(document.getElementById('length').value);
+        const len = parseInt(document.getElementById('length').value);
         const lettersInput = document.getElementById('letters').value.trim().toLowerCase();
         const resultDiv = document.getElementById('result');
         resultDiv.innerHTML = '';
 
-        if (!wordLength) {
-            resultDiv.innerHTML = '<p class="error">请输入单词长度。</p>';
+        if (!len) {
+            resultDiv.innerHTML = `<p class="error">${i18nData[currentLang].msg_no_length}</p>`;
             return;
         }
 
         try {
             const wordlistSelect = document.getElementById('wordlistSelect');
-            const selectedWordFileURL = wordlistSelect.value;
-            const words = await fetchWords(selectedWordFileURL);
+            const words = await fetchWords(wordlistSelect.value);
             const lettersSet = new Set(lettersInput.split(''));
 
             const matchingWords = words.filter(word => {
-                if (word.length !== wordLength) return false;
-
+                if (word.length !== len) return false;
                 const lowerCaseWord = word.toLowerCase();
 
-                if (lettersInput && ![...lowerCaseWord].every(char => lettersSet.has(char))) {
-                    return false;
-                }
+                if (lettersInput && ![...lowerCaseWord].every(char => lettersSet.has(char))) return false;
 
-                // Strict matching: Check known letter positions.
-                for (let i = 0; i < wordLength; i++) {
-                    if (knownLetterPositions[i] && knownLetterPositions[i].toLowerCase() !== lowerCaseWord[i]) {
-                        return false; // Letter at this position doesn't match.
-                    }
-                    // Check if a letter *not* in knownLetterPositions appears where it shouldn't.
-                    if(!knownLetterPositions[i] && Object.values(knownLetterPositions).includes(lowerCaseWord[i].toUpperCase())) {
-                        return false;
-                    }
+                for (let i = 0; i < len; i++) {
+                    if (knownLetterPositions[i] && knownLetterPositions[i].toLowerCase() !== lowerCaseWord[i]) return false;
+                    if(!knownLetterPositions[i] && Object.values(knownLetterPositions).includes(lowerCaseWord[i].toUpperCase())) return false;
                 }
-
                 return true;
             });
 
             if (matchingWords.length > 0) {
-                resultDiv.innerHTML = '<h3>符合条件的单词：</h3>';
+                resultDiv.innerHTML = `<p style="color:#BFD5FF; margin-bottom:10px;">${i18nData[currentLang].msg_result_title}</p>`;
                 matchingWords.forEach(word => {
-                    const wordElement = document.createElement('p');
-                    wordElement.classList.add('result');
-                    wordElement.textContent = word;
-                    resultDiv.appendChild(wordElement);
+                    const el = document.createElement('div');
+                    el.classList.add('result');
+                    el.textContent = word;
+                    resultDiv.appendChild(el);
                 });
             } else {
-                resultDiv.innerHTML = '<p class="error">没有找到符合条件的单词。</p>';
+                resultDiv.innerHTML = `<p class="error">${i18nData[currentLang].msg_no_match}</p>`;
             }
         } catch (error) {
-            resultDiv.innerHTML = '<p class="error">获取单词列表时出错，请稍后再试。</p>';
-            console.error(error);
+            resultDiv.innerHTML = `<p class="error">${i18nData[currentLang].msg_error}</p>`;
         }
     }
 
-    // 随机选择单词
     function chooseRandomWord(words) {
         if (words.length === 0) {
-            wordDisplayContainer.innerHTML = "词库为空，请选择其他词库。"; // Use container
+            wordDisplayContainer.innerHTML = `<p class='error'>${i18nData[currentLang].msg_empty_lib}</p>`;
             disableAllButtons();
             return;
         }
@@ -556,30 +627,34 @@
         targetWord = randomWord;
         wordLength = randomWord.length;
         guessedLetters = new Array(wordLength).fill('_');
-        updateWordDisplay(); // Update the display with boxes
+        
+        updateWordDisplay(); 
         usedLetters = [];
     }
 
-     // 更新单词显示 (using boxes)
     function updateWordDisplay() {
-        wordDisplayContainer.innerHTML = ''; // Clear previous boxes
+        wordDisplayContainer.innerHTML = ''; 
+        
+        // --- 核心 JS 修复：设置变量告诉 CSS 有多少个字母 ---
+        wordDisplayContainer.style.setProperty('--char-count', wordLength);
+        // --------------------------------------------------
+
         for (let i = 0; i < wordLength; i++) {
             const box = document.createElement('div');
-            box.classList.add('reproduce-letter-box');
-            box.textContent = guessedLetters[i];
+            box.classList.add('game-tile', 'reproduce-letter-box');
             if (guessedLetters[i] !== '_') {
+                box.textContent = guessedLetters[i];
                 box.classList.add('filled');
+            } else {
+                box.textContent = '';
             }
             wordDisplayContainer.appendChild(box);
         }
     }
 
-    // 开始新游戏
     function startGame() {
         const wordlistSelect = document.getElementById('wordlistSelectReproduce');
-        const selectedWordFileURL = wordlistSelect.value; // 获取 URL
-
-        fetchWords(selectedWordFileURL).then(words => { // 传递 URL
+        fetchWords(wordlistSelect.value).then(words => {
             chooseRandomWord(words);
             attempts = 0;
             attemptsSpan.textContent = attempts;
@@ -588,25 +663,30 @@
         });
     }
 
-    // 设置字母选择按钮
     function setupLetterButtons() {
         const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        const targetLetters = Array.from(new Set(targetWord.split('')));
-        const remainingLetters = letters.split('').filter(letter => !targetLetters.includes(letter));
+        const targetLettersSet = new Set(targetWord.split(''));
+        const targetLettersArr = Array.from(targetLettersSet);
+        
+        const remainingLetters = letters.split('').filter(letter => !targetLettersSet.has(letter));
 
-        const randomLetters = [];
-        while (randomLetters.length < 16 - targetLetters.length) {
-            const randomIndex = Math.floor(Math.random() * remainingLetters.length);
-            randomLetters.push(remainingLetters[randomIndex]);
-            remainingLetters.splice(randomIndex, 1);
+        const totalSlots = 16;
+        const fillersNeeded = Math.max(0, totalSlots - targetLettersArr.length);
+        
+        const randomFillers = [];
+        for (let i = 0; i < fillersNeeded; i++) {
+            if (remainingLetters.length > 0) {
+                const randomIndex = Math.floor(Math.random() * remainingLetters.length);
+                randomFillers.push(remainingLetters[randomIndex]);
+                remainingLetters.splice(randomIndex, 1);
+            }
         }
 
-        const allLetters = [...targetLetters, ...randomLetters];
-        allLetters.sort();
-
+        let gameLetters = [...targetLettersArr, ...randomFillers];
+        gameLetters.sort();
 
         lettersListDiv.innerHTML = '';
-        allLetters.forEach(letter => {
+        gameLetters.forEach(letter => {
             const button = document.createElement('button');
             button.textContent = letter;
             button.onclick = () => handleLetterClick(button, letter);
@@ -614,7 +694,6 @@
         });
     }
 
-    // 处理字母点击
     function handleLetterClick(button, letter) {
         if (button.disabled || usedLetters.includes(letter)) return;
 
@@ -626,54 +705,46 @@
             }
         }
 
-        updateWordDisplay(); // Update with boxes
+        updateWordDisplay(); 
         attempts++;
         attemptsSpan.textContent = attempts;
         usedLetters.push(letter);
 
         if (correctGuess) {
-            guessResult.textContent = '正确！';
+            guessResult.textContent = i18nData[currentLang].msg_correct;
+            guessResult.style.color = '#76FF33';
             button.style.backgroundColor = '#76FF33';
+            button.style.color = '#001926';
+            button.style.borderColor = '#76FF33';
         } else {
-            guessResult.textContent = '错误！';
-            button.style.backgroundColor = '#FF6666';
+            guessResult.textContent = i18nData[currentLang].msg_wrong;
+            guessResult.style.color = '#FF6666';
+            button.style.backgroundColor = 'transparent';
+            button.style.color = '#FF6666';
+            button.style.borderColor = '#FF6666';
         }
         button.disabled = true;
 
-
         if (!guessedLetters.includes('_')) {
-            guessResult.textContent = '恭喜你，猜对了！';
+            guessResult.textContent = i18nData[currentLang].msg_congrats;
+            guessResult.style.color = '#76FF33';
             disableAllButtons();
         }
     }
 
-    // 禁用所有字母按钮
     function disableAllButtons() {
         const allButtons = document.querySelectorAll('#lettersList button');
-        allButtons.forEach(button => {
-            button.disabled = true;
-        });
+        allButtons.forEach(button => button.disabled = true);
     }
 
-    // 切换标签页
     function switchTab(tab) {
-        const puzzleTab = document.getElementById('puzzleTab');
-        const reproduceTab = document.getElementById('reproduceTab');
-        const puzzleSection = document.getElementById('puzzleSection');
-        const reproduceSection = document.getElementById('reproduceSection');
+        document.getElementById('puzzleTab').classList.toggle('active', tab === 'puzzle');
+        document.getElementById('reproduceTab').classList.toggle('active', tab === 'reproduce');
+        document.getElementById('puzzleSection').classList.toggle('active', tab === 'puzzle');
+        document.getElementById('reproduceSection').classList.toggle('active', tab === 'reproduce');
 
-        puzzleTab.classList.remove('active');
-        reproduceTab.classList.remove('active');
-        puzzleSection.classList.remove('active');
-        reproduceSection.classList.remove('active');
-
-        if (tab === 'puzzle') {
-            puzzleTab.classList.add('active');
-            puzzleSection.classList.add('active');
-        } else {
-            reproduceTab.classList.add('active');
-            reproduceSection.classList.add('active');
-            startGame();
+        if (tab === 'reproduce' && wordLength === 0) {
+             startGame();
         }
     }
 </script>
