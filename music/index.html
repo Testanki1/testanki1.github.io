@@ -86,7 +86,6 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        /* 歌词区域 */
         .lyrics-display {
             font-family: var(--font-stack);
             font-size: 1rem;
@@ -106,9 +105,7 @@
             transition: opacity 0.3s ease;
         }
         
-        .lyrics-display.active {
-            opacity: 1;
-        }
+        .lyrics-display.active { opacity: 1; }
 
         .placeholder-icon {
             font-size: 24px;
@@ -121,10 +118,7 @@
             50% { transform: scale(1.1); opacity: 0.9; }
         }
 
-        /* 加载动画 */
-        .loading-icon {
-            animation: spin 1s linear infinite;
-        }
+        .loading-icon { animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
 
         .player-ui { display: flex; align-items: center; gap: 10px; width: 100%; }
@@ -213,18 +207,18 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
         
-        // 状态变量
         let currentSource = null;    
         let currentBuffer = null;    
         let startAt = 0;             
         let pauseAt = 0;             
         let isPlaying = false;
-        
-        // --- 关键修改：用于解决竞争的变量 ---
-        let activeCardId = null;       // 当前正在播放（或已暂停）的卡片ID
-        let loadingTargetId = null;    // 当前正在等待加载的卡片ID
-        
+        let activeCardId = null;     
+        let loadingTargetId = null;  
         let animationFrameId = null; 
+        
+        // --- 关键修改：引入 isDragging 变量 ---
+        let isDragging = false;
+
         const bufferCache = {};
         const lrcCache = {};
 
@@ -303,27 +297,40 @@
 
                 btn.addEventListener('click', () => handlePlayClick(btn, fullUrl, fileId));
                 
+                // --- 优化的进度条事件 ---
+                // 1. 开始触摸/按下：标记为正在拖动，停止自动更新
+                range.addEventListener('mousedown', () => isDragging = true);
+                range.addEventListener('touchstart', () => isDragging = true);
+
+                // 2. 移动中：只更新视觉（背景色），不更新音频，避免爆音
                 range.addEventListener('input', () => {
-                    if (activeCardId === fileId && currentBuffer) {
-                        updateRangeBackground(range);
-                        const seekTime = (range.value / 100) * currentBuffer.duration;
-                        playAudio(currentBuffer, seekTime); 
-                    }
+                    updateRangeBackground(range);
                 });
+
+                // 3. 结束触摸/松开：标记为结束拖动，跳转音频
+                // 处理 change (鼠标松开) 和 touchend (手指松开)
+                const onSeekEnd = () => {
+                    isDragging = false;
+                    if (activeCardId === fileId && currentBuffer) {
+                        const seekTime = (range.value / 100) * currentBuffer.duration;
+                        playAudio(currentBuffer, seekTime);
+                    }
+                };
+                range.addEventListener('change', onSeekEnd);
+                range.addEventListener('touchend', onSeekEnd);
+                range.addEventListener('mouseup', onSeekEnd);
             });
         });
 
         async function handlePlayClick(btn, url, fileId) {
             if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-            // 情况1：点击正在加载中的按钮 -> 取消加载
             if (loadingTargetId === fileId) {
-                loadingTargetId = null; // 取消标记
+                loadingTargetId = null; 
                 setLoadingState(btn, false);
                 return;
             }
 
-            // 情况2：点击当前正在播放/暂停的歌曲 -> 切换播放状态
             if (activeCardId === fileId && loadingTargetId === null) {
                 if (isPlaying) {
                     pauseAudio();
@@ -333,9 +340,6 @@
                 return;
             }
 
-            // 情况3：点击了一首新歌
-            
-            // 如果之前有正在加载的，先重置它的UI
             if (loadingTargetId) {
                 const prevLoadingCard = document.getElementById(loadingTargetId);
                 if (prevLoadingCard) {
@@ -343,17 +347,14 @@
                 }
             }
 
-            // 停止当前播放的
             stopAudio();
             resetUI(activeCardId);
             
-            // 设置新的加载目标
-            activeCardId = null; // 在加载完成前，没有 active
+            activeCardId = null; 
             loadingTargetId = fileId;
             setLoadingState(btn, true);
 
             try {
-                // 检查缓存
                 let audioBuffer;
                 if (bufferCache[url]) {
                     audioBuffer = bufferCache[url];
@@ -364,16 +365,13 @@
                     bufferCache[url] = audioBuffer;
                 }
                 
-                // --- 关键检查：加载完成后，用户是否还想听这首？---
                 if (loadingTargetId !== fileId) {
-                    // 用户在加载过程中点了别的，或者取消了
-                    return; // 退出，不播放
+                    return; 
                 }
 
-                // 加载成功且用户未取消
                 currentBuffer = audioBuffer;
                 activeCardId = fileId; 
-                loadingTargetId = null; // 加载完成
+                loadingTargetId = null; 
                 setLoadingState(btn, false);
                 playAudio(currentBuffer, 0);
 
@@ -449,7 +447,8 @@
 
             timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
 
-            if (document.activeElement !== range) {
+            // --- 核心修复：只在用户没有拖动/按住进度条时自动更新 ---
+            if (!isDragging) {
                 range.value = (currentTime / duration) * 100;
                 updateRangeBackground(range);
             }
@@ -467,15 +466,13 @@
                 }
 
                 if (currentLineText && currentLineText.trim() !== "") {
-                    lyricsDiv.textContent = currentLineText;
-                    lyricsDiv.classList.add('active');
-                    const icon = lyricsDiv.querySelector('.placeholder-icon');
-                    if(icon) icon.remove();
+                    if (lyricsDiv.textContent !== currentLineText) {
+                         lyricsDiv.textContent = currentLineText;
+                         lyricsDiv.classList.add('active');
+                    }
                 } else {
-                    if(lyricsDiv.textContent.trim() === "" || lyricsDiv.querySelector('.placeholder-icon')) {
-                         if (!lyricsDiv.querySelector('.placeholder-icon')) {
-                            lyricsDiv.innerHTML = '<span class="material-symbols-rounded placeholder-icon">music_note</span>';
-                        }
+                    if (!lyricsDiv.querySelector('.placeholder-icon')) {
+                        lyricsDiv.innerHTML = '<span class="material-symbols-rounded placeholder-icon">music_note</span>';
                         lyricsDiv.classList.add('active');
                     }
                 }
@@ -487,15 +484,12 @@
         function setLoadingState(btn, isLoading) {
             const icon = btn.querySelector('span');
             if (isLoading) {
-                // 使用 sync 图标代替 refresh，看起来更像缓冲
                 icon.textContent = 'sync'; 
                 icon.classList.add('loading-icon');
                 btn.style.opacity = '0.7';
             } else {
                 icon.classList.remove('loading-icon');
                 btn.style.opacity = '1';
-                // 恢复图标由 updatePlayIcon 或 resetUI 处理
-                // 如果是取消加载，这里需要手动恢复 play_arrow
                 if (!isPlaying) icon.textContent = 'play_arrow';
             }
         }
