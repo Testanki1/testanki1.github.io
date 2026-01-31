@@ -183,6 +183,13 @@
     <script>
         const musicBaseUrl = "https://testanki1.github.io/music/";
         
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
         function parseLRC(lrcText) {
             const lines = lrcText.split('\n');
             const result = [];
@@ -216,12 +223,13 @@
         let loadingTargetId = null;  
         let animationFrameId = null; 
         
-        // --- 关键修改：引入 isDragging 变量 ---
-        let isDragging = false;
+        let isDragging = false; 
 
         const bufferCache = {};
         const lrcCache = {};
+        const trackStates = {}; // 记忆播放位置
 
+        // --- 删除了所有手写的 duration，完全依赖加载后获取 ---
         const musicList = [
             { zh: "3D坦克", en: "Tanki Online", artist: null, file: "tankionline.mp3" },
             { zh: "3D坦克 2", en: "Tanki Online 2", artist: null, file: "tankionline2.mp3" },
@@ -234,13 +242,27 @@
             { zh: "8 位", en: "8-bit", artist: "Pago", file: "TankiOnline_Ringtone_8bit.mp3" },
             { zh: "3D坦克新年主题", en: "Tanki Online New Year Theme", artist: "Vospi", file: "Vospi - Tanki Online New Year Theme.mp3" },
             { zh: "3D坦克暗物质主题", en: "Tanki Online Dark Matter Theme", artist: "Vospi", file: "Vospi - Tanki Online Dark Matter Theme.mp3" },
-            { zh: "Bounce（赛博坦克主题）", en: "Bounce (CyberTank Theme)", artist: "Vospi", file: "Vospi - Bounce.mp3", lrc: "Vospi - Bounce.lrc" },
+            { 
+                zh: "Bounce（赛博坦克主题）", 
+                en: "Bounce (CyberTank Theme)", 
+                artist: "Vospi", 
+                file: "Vospi - Bounce.mp3",
+                lrc: "Vospi - Bounce.lrc"
+            },
             { zh: "专家战场", en: "PRO Battles", artist: null, file: "pro_battles.mp3" },
             { zh: "专家战场限制", en: "PRO Battles Limit", artist: null, file: "pro_battles_limit.mp3" },
             { zh: "商店环境音", en: "Shop Ambience", artist: null, file: "ambient_shop.mp3" },
             { zh: "疯狂思维空间", en: "Madness", artist: null, file: "madness.mp3" },
             { zh: "万圣节环境音", en: "Halloween Ambience", artist: null, file: "halloween_ambience.mp3" }
         ];
+
+        // 辅助：获取时长（只从缓存或当前播放获取）
+        function getDuration(url) {
+            if (bufferCache[url]) {
+                return bufferCache[url].duration;
+            }
+            return 0; // 未加载则为0
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             const lang = navigator.language || navigator.userLanguage; 
@@ -259,11 +281,12 @@
                 const displayName = isChinese ? item.zh : item.en;
                 const artistHtml = item.artist ? `<div class="track-artist">${item.artist}</div>` : '';
                 const lrcHtml = item.lrc ? `<div class="lyrics-display" id="lyrics-${fileId}"></div>` : '';
-
+                
                 const card = document.createElement('div');
                 card.className = 'card';
                 card.id = fileId;
                 
+                // 初始状态下时长全部为 0:00
                 card.innerHTML = `
                     <div class="track-info">
                         <div class="track-title">${displayName}</div>
@@ -294,26 +317,55 @@
 
                 const btn = card.querySelector('.play-btn');
                 const range = card.querySelector('.seek-slider');
+                const timeDisplay = card.querySelector('.time-display');
 
                 btn.addEventListener('click', () => handlePlayClick(btn, fullUrl, fileId));
                 
-                // --- 优化的进度条事件 ---
-                // 1. 开始触摸/按下：标记为正在拖动，停止自动更新
-                range.addEventListener('mousedown', () => isDragging = true);
-                range.addEventListener('touchstart', () => isDragging = true);
+                const startDrag = () => isDragging = true;
+                range.addEventListener('mousedown', startDrag);
+                range.addEventListener('touchstart', startDrag);
 
-                // 2. 移动中：只更新视觉（背景色），不更新音频，避免爆音
+                // --- 拖动时：动态计算预览 ---
                 range.addEventListener('input', () => {
                     updateRangeBackground(range);
+                    const duration = getDuration(fullUrl);
+                    
+                    // 只有当加载过（duration > 0）时才能拖动显示时间
+                    if (duration > 0) {
+                        const previewTime = (range.value / 100) * duration;
+                        timeDisplay.textContent = `${formatTime(previewTime)} / ${formatTime(duration)}`;
+                    } else {
+                        // 没加载过，强制归零
+                        range.value = 0;
+                        updateRangeBackground(range);
+                        timeDisplay.textContent = "0:00 / 0:00";
+                    }
                 });
 
-                // 3. 结束触摸/松开：标记为结束拖动，跳转音频
-                // 处理 change (鼠标松开) 和 touchend (手指松开)
+                // --- 拖动结束 ---
                 const onSeekEnd = () => {
                     isDragging = false;
+                    const duration = getDuration(fullUrl);
+
+                    // 如果没加载过，无法拖动，直接退出
+                    if (duration === 0) {
+                        range.value = 0;
+                        updateRangeBackground(range);
+                        return;
+                    }
+
+                    const seekTime = (range.value / 100) * duration;
+
                     if (activeCardId === fileId && currentBuffer) {
-                        const seekTime = (range.value / 100) * currentBuffer.duration;
+                        // 正在播放/暂停当前歌曲 -> 调整音频
                         playAudio(currentBuffer, seekTime);
+                    } else {
+                        // 其他歌曲 -> 仅保存进度
+                        trackStates[fileId] = {
+                            currentTime: seekTime,
+                            duration: duration
+                        };
+                        timeDisplay.textContent = `${formatTime(seekTime)} / ${formatTime(duration)}`;
                     }
                 };
                 range.addEventListener('change', onSeekEnd);
@@ -348,7 +400,7 @@
             }
 
             stopAudio();
-            resetUI(activeCardId);
+            resetUI(activeCardId); 
             
             activeCardId = null; 
             loadingTargetId = fileId;
@@ -373,7 +425,10 @@
                 activeCardId = fileId; 
                 loadingTargetId = null; 
                 setLoadingState(btn, false);
-                playAudio(currentBuffer, 0);
+                
+                const savedState = trackStates[fileId];
+                const startOffset = savedState ? savedState.currentTime : 0;
+                playAudio(currentBuffer, startOffset);
 
             } catch (err) {
                 if (loadingTargetId === fileId) {
@@ -438,6 +493,11 @@
             const currentTime = elapsed % currentBuffer.duration;
             const duration = currentBuffer.duration;
 
+            trackStates[activeCardId] = {
+                currentTime: currentTime,
+                duration: duration
+            };
+
             const card = document.getElementById(activeCardId);
             if (!card) return;
 
@@ -447,7 +507,6 @@
 
             timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
 
-            // --- 核心修复：只在用户没有拖动/按住进度条时自动更新 ---
             if (!isDragging) {
                 range.value = (currentTime / duration) * 100;
                 updateRangeBackground(range);
@@ -512,22 +571,34 @@
 
             icon.textContent = 'play_arrow';
             icon.classList.remove('loading-icon');
-            range.value = 0;
+            
+            // --- 核心逻辑：从缓存/状态中恢复时长 ---
+            const index = parseInt(id.replace('track-', ''));
+            const fullUrl = musicBaseUrl + musicList[index].file;
+            const cachedDuration = getDuration(fullUrl);
+            
+            // 如果缓存里有，就显示时长；否则 0:00
+            const durationText = cachedDuration > 0 ? formatTime(cachedDuration) : "0:00";
+            
+            // 恢复进度
+            const savedState = trackStates[id];
+            if (savedState && cachedDuration > 0) {
+                const pct = (savedState.currentTime / savedState.duration) * 100;
+                range.value = pct;
+                timeDisplay.textContent = `${formatTime(savedState.currentTime)} / ${durationText}`;
+            } else {
+                range.value = 0;
+                timeDisplay.textContent = `0:00 / ${durationText}`;
+            }
+            
             updateRangeBackground(range);
-            timeDisplay.textContent = "0:00 / 0:00";
+
             if(lyricsDiv) lyricsDiv.classList.remove('active');
         }
 
         function updateRangeBackground(input) {
             const value = input.value;
             input.style.background = `linear-gradient(to right, #76FF33 0%, #76FF33 ${value}%, rgba(191, 213, 255, 0.2) ${value}%, rgba(191, 213, 255, 0.2) 100%)`;
-        }
-
-        function formatTime(seconds) {
-            if (isNaN(seconds)) return "0:00";
-            const m = Math.floor(seconds / 60);
-            const s = Math.floor(seconds % 60);
-            return `${m}:${s < 10 ? '0' : ''}${s}`;
         }
     </script>
 </body>
