@@ -2,102 +2,474 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>ID/路径转换与分析工具集</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ID/Path Toolkit</title>
+
+<!-- 引入 Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+
 <style>
-  body { font-family: sans-serif; margin: 20px; background-color: #fdfdfd; }
-  h1 { text-align: center; color: #333; }
-  h2 { border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 40px; }
-  label { display: inline-block; width: 120px; margin-bottom: 5px; font-weight: bold; }
-  input[type="text"] { width: 350px; margin-bottom: 10px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
-  button { padding: 8px 15px; margin-right: 10px; margin-bottom: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-  button:hover { background-color: #0056b3; }
-  button.secondary { background-color: #28a745; }
-  button.secondary:hover { background-color: #218838; }
-  .result-box { margin-top: 15px; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 4px; min-height: 20px; white-space: pre-wrap; word-break: break-all; }
-  .error { color: red; font-weight: bold; }
-  hr { margin: 40px 0; border: 0; border-top: 2px solid #ddd; }
-  .explanation-box { margin-top: 15px; background-color: #eef; padding: 15px; border-radius: 4px; border-left: 5px solid #66d; }
-  .explanation-box h3 { margin-top: 0; }
-  .explanation-box ul { margin: 0; padding-left: 20px; list-style-type: none; }
-  .explanation-box li { margin-bottom: 8px; }
-  .explanation-box strong { color: #0056b3; }
-  .full-range { color: #218838; font-style: italic; }
+  * {
+        -webkit-tap-highlight-color: transparent;
+  }
+  :root {
+    /* 定义核心变量 */
+    --md-sys-color-primary: #76FF33;
+    --md-sys-color-on-primary: #001926;
+    --md-sys-color-surface: #001926;
+    --md-sys-color-surface-container: #0d2b3d;
+    --md-sys-color-on-surface: #BFD5FF;
+    --md-sys-color-outline: #BFD5FF;
+    --md-sys-color-error: #ffb4ab;
+    
+    /* 圆角与间距 */
+    --radius-l: 24px;
+    --radius-m: 12px;
+    --radius-s: 4px;
+    --radius-pill: 50px;
+  }
+
+  body {
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    font-family: 'M PLUS 1p', sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  /* 字体层级定义 */
+  h1, h2, h3, h4, .label-text {
+    font-family: 'Rubik', sans-serif;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 900px;
+    padding: 40px 20px;
+    box-sizing: border-box;
+  }
+
+  /* 标题样式 */
+  h1 {
+    text-align: center;
+    color: var(--md-sys-color-primary);
+    font-size: 2.5rem;
+    margin-bottom: 40px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  h2 {
+    color: var(--md-sys-color-on-surface);
+    font-size: 1.5rem;
+    margin-top: 0;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(191, 213, 255, 0.2);
+    padding-bottom: 10px;
+  }
+
+  h3 {
+    color: var(--md-sys-color-primary);
+    font-size: 1.1rem;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    font-weight: 500;
+  }
+
+  /* 卡片容器 (M3 Surface) */
+  .card {
+    background-color: var(--md-sys-color-surface-container);
+    border-radius: var(--radius-l);
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  /* 输入框组 */
+  .input-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  label {
+    font-size: 0.9rem;
+    color: var(--md-sys-color-on-surface);
+    margin-bottom: 8px;
+    font-weight: 500;
+    opacity: 0.9;
+  }
+
+  /* M3 风格输入框 */
+  input[type="text"] {
+    background-color: transparent;
+    border: 1px solid rgba(191, 213, 255, 0.4);
+    border-radius: var(--radius-s);
+    color: var(--md-sys-color-on-surface);
+    padding: 12px 16px;
+    font-family: 'M PLUS 1p', monospace;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--md-sys-color-primary);
+    outline: none;
+    box-shadow: 0 0 0 1px var(--md-sys-color-primary);
+  }
+
+  input[type="text"]::placeholder {
+    color: rgba(191, 213, 255, 0.3);
+    font-family: 'M PLUS 1p', sans-serif;
+  }
+
+  /* 按钮区域 */
+  .action-bar {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  /* M3 风格按钮 */
+  button {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 500;
+    font-size: 0.95rem;
+    padding: 12px 24px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s, background-color 0.2s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 主要按钮 (Primary) */
+  button.primary-btn {
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+  }
+  
+  button.primary-btn:hover {
+    box-shadow: 0 4px 12px rgba(118, 255, 51, 0.3);
+    transform: translateY(-1px);
+  }
+
+  /* 次要按钮 (Secondary/Tonal) */
+  button.secondary-btn {
+    background-color: var(--md-sys-color-on-surface);
+    color: var(--md-sys-color-surface);
+  }
+
+  button.secondary-btn:hover {
+    background-color: #dbeaff;
+    box-shadow: 0 4px 12px rgba(191, 213, 255, 0.3);
+    transform: translateY(-1px);
+  }
+
+  button:active {
+    transform: translateY(0);
+  }
+
+  /* 结果显示框 */
+  .result-box {
+    margin-top: 20px;
+    font-family: 'M PLUS 1p', monospace;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-left: 4px solid var(--md-sys-color-primary);
+    padding: 15px;
+    border-radius: 0 var(--radius-m) var(--radius-m) 0;
+    min-height: 24px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--md-sys-color-on-surface);
+    display: none; /* 默认隐藏，有内容时JS显示 */
+  }
+  
+  /* 错误信息 */
+  .error {
+    color: var(--md-sys-color-error);
+    font-weight: bold;
+    display: block;
+    margin-top: 5px;
+  }
+
+  /* 说明盒子 */
+  .explanation-box {
+    margin-top: 25px;
+    background-color: rgba(191, 213, 255, 0.05);
+    padding: 20px;
+    border-radius: var(--radius-m);
+    border: 1px solid rgba(191, 213, 255, 0.1);
+  }
+
+  .explanation-box ul {
+    margin: 0;
+    padding-left: 20px;
+    list-style-type: none;
+  }
+  
+  .explanation-box li {
+    margin-bottom: 12px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(191, 213, 255, 0.3);
+  }
+
+  .explanation-box strong {
+    color: var(--md-sys-color-primary);
+  }
+  
+  code {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'M PLUS 1p', monospace;
+    color: #fff;
+  }
+
+  .full-range {
+    color: var(--md-sys-color-primary);
+    font-style: italic;
+    opacity: 0.8;
+    font-size: 0.9em;
+  }
+
+  /* 响应式调整 */
+  @media (max-width: 600px) {
+    .container { padding: 20px 10px; }
+    .card { padding: 20px; }
+    button { width: 100%; margin-bottom: 10px; }
+    .action-bar { flex-direction: column; gap: 0; }
+  }
 </style>
 </head>
 <body>
 
-  <h1>ID/路径转换与分析工具集</h1>
+<div class="container">
+  <h1 data-i18n="mainTitle">ID/路径转换与分析工具集</h1>
 
   <!-- ==================================================================== -->
-  <!-- 工具一: 来自第一个文件的 ResourceURL (ID + Version) 转换器 -->
+  <!-- 工具一 -->
   <!-- ==================================================================== -->
-  <h2>工具一：ResourceURL 路径 (ID + Version)</h2>
+  <div class="card">
+    <h2 data-i18n="tool1Title">工具一：ResourceURL 路径 (ID + Version)</h2>
 
-  <h3>路径生成器 (5级)</h3>
-  <div>
-    <label for="inputId_v">ID (long):</label>
-    <input type="text" id="inputId_v" placeholder="输入一个长整型数字 (例如 1234567890123456789)">
-  </div>
-  <div>
-    <label for="inputVersion_v">Version (long):</label>
-    <input type="text" id="inputVersion_v" placeholder="输入一个长整型数字 (例如 123)">
-  </div>
-  <button onclick="generatePath_v()">生成路径</button>
-  <div id="resultGenerate_v" class="result-box"></div>
+    <h3 data-i18n="genPath5">路径生成器 (5级)</h3>
+    <div class="input-group">
+      <label for="inputId_v" data-i18n="labelId">ID (Long)</label>
+      <input type="text" id="inputId_v" data-placeholder="phLong">
+    </div>
+    <div class="input-group">
+      <label for="inputVersion_v" data-i18n="labelVer">Version (Long)</label>
+      <input type="text" id="inputVersion_v" data-placeholder="phLongVer">
+    </div>
+    <div class="action-bar">
+      <button class="primary-btn" onclick="generatePath_v()" data-i18n="btnGen">生成路径</button>
+    </div>
+    <div id="resultGenerate_v" class="result-box"></div>
 
-  <h3>路径解析器 (5级)</h3>
-  <div>
-    <label for="inputPath_v">5级路径:</label>
-    <input type="text" id="inputPath_v" placeholder="输入5级路径字符串 (例如 2215053170/115274/336/360/167)">
+    <h3 data-i18n="parsePath5">路径解析器 (5级)</h3>
+    <div class="input-group">
+      <label for="inputPath_v" data-i18n="labelPath5">5级路径字符串</label>
+      <input type="text" id="inputPath_v" data-placeholder="phPath5">
+    </div>
+    <div class="action-bar">
+      <button class="primary-btn" onclick="parsePath_v()" data-i18n="btnParse">解析路径</button>
+    </div>
+    <div id="resultParse_v" class="result-box"></div>
   </div>
-  <button onclick="parsePath_v()">解析路径</button>
-  <div id="resultParse_v" class="result-box"></div>
-
-  <hr>
 
   <!-- ==================================================================== -->
-  <!-- 工具二: 来自第二个文件的 4级 ID 路径与范围分析器 -->
+  <!-- 工具二 -->
   <!-- ==================================================================== -->
-  <h2>工具二：4级 ID 路径与范围分析</h2>
+  <div class="card">
+    <h2 data-i18n="tool2Title">工具二：4级 ID 路径与范围分析</h2>
 
-  <h3>ID 到 4级路径 生成器</h3>
-  <div>
-    <label for="inputId1_4">ID 1 (范围起点):</label>
-    <input type="text" id="inputId1_4" placeholder="输入第一个长整型 ID">
+    <h3 data-i18n="genIdPath4">ID 到 4级路径 生成器</h3>
+    <div class="input-group">
+      <label for="inputId1_4" data-i18n="labelId1">ID 1 (范围起点)</label>
+      <input type="text" id="inputId1_4" data-placeholder="phLong">
+    </div>
+    <div class="input-group">
+      <label for="inputId2_4" data-i18n="labelId2">ID 2 (范围终点)</label>
+      <input type="text" id="inputId2_4" data-placeholder="phLongOpt">
+    </div>
+    
+    <div class="action-bar">
+      <button class="primary-btn" onclick="generatePaths_4()" data-i18n="btnGenForId">为 ID 生成路径</button>
+      <button class="secondary-btn" onclick="analyzeRange_4()" data-i18n="btnAnalyze">分析范围路径可能</button>
+    </div>
+    <div id="resultGenerate_4" class="result-box"></div>
+
+
+    <h3 data-i18n="rangeResultTitle">范围路径可能性分析结果</h3>
+    <div id="rangeAnalysisResult" class="explanation-box" data-i18n="rangeInstruction">
+      请在上方输入两个 ID 作为范围，然后点击“分析范围路径可能”按钮。
+    </div>
+
+    <h3 data-i18n="parsePath4">4级路径 到 ID 解析器</h3>
+    <div class="input-group">
+      <label for="inputPath_4" data-i18n="labelPath4">4级路径字符串</label>
+      <input type="text" id="inputPath_4" data-placeholder="phPath4">
+    </div>
+    <div class="action-bar">
+      <button class="primary-btn" onclick="parsePath_4()" data-i18n="btnParseId">解析 ID</button>
+    </div>
+    <div id="resultParse_4" class="result-box"></div>
   </div>
-  <div>
-    <label for="inputId2_4">ID 2 (范围终点):</label>
-    <input type="text" id="inputId2_4" placeholder="输入第二个长整型 ID">
-  </div>
-  <button onclick="generatePaths_4()">为单个ID生成路径</button>
-  <button onclick="analyzeRange_4()" class="secondary">分析范围路径可能</button>
-  <div id="resultGenerate_4" class="result-box"></div>
-
-
-  <h3>范围路径可能性分析结果</h3>
-  <div id="rangeAnalysisResult" class="explanation-box">
-    请在上方输入两个ID作为范围，然后点击“分析范围路径可能”按钮。
-  </div>
-
-
-  <h3>4级路径 到 ID 解析器</h3>
-  <div>
-    <label for="inputPath_4">4级路径:</label>
-    <input type="text" id="inputPath_4" placeholder="输入4级路径字符串 (例如 303345470/125553/337/360)">
-  </div>
-  <button onclick="parsePath_4()">解析ID</button>
-  <div id="resultParse_4" class="result-box"></div>
-
+</div>
 
 <script>
+  // --- 国际化配置 (I18n) ---
+  
+  const translations = {
+    zh: {
+      mainTitle: "ID/路径转换与分析工具集",
+      tool1Title: "工具一：ResourceURL 路径 (ID + Version)",
+      genPath5: "路径生成器 (5级)",
+      labelId: "ID (Long)",
+      labelVer: "Version (Long)",
+      btnGen: "生成路径",
+      parsePath5: "路径解析器 (5级)",
+      labelPath5: "5级路径字符串",
+      btnParse: "解析路径",
+      tool2Title: "工具二：4级 ID 路径与范围分析",
+      genIdPath4: "ID 到 4级路径 生成器",
+      labelId1: "ID 1 (范围起点)",
+      labelId2: "ID 2 (范围终点)",
+      btnGenForId: "为 ID 生成路径",
+      btnAnalyze: "分析范围路径可能",
+      rangeResultTitle: "范围路径可能性分析结果",
+      rangeInstruction: "请在上方输入两个 ID 作为范围，然后点击“分析范围路径可能”按钮。",
+      parsePath4: "4级路径 到 ID 解析器",
+      labelPath4: "4级路径字符串",
+      btnParseId: "解析 ID",
+      // Placeholders
+      phLong: "请输入长整型数值",
+      phLongVer: "请输入长整型版本号",
+      phPath5: "请输入五级路径字符串 (以斜杠分隔)",
+      phLongOpt: "请输入第二个长整型 ID (可选)",
+      phPath4: "请输入四级路径字符串 (以斜杠分隔)",
+      // JS Dynamic Messages
+      errIdVerEmpty: "ID 和 Version 都不能为空！",
+      resGenPath: "生成的路径",
+      errGen: "生成错误",
+      errValidInt: "请确保输入的是有效的整数。",
+      errPathEmpty: "路径字符串不能为空！",
+      resParse: "解析结果",
+      errParse: "解析错误",
+      pathFor: "路径",
+      errId: "错误",
+      errOneId: "请至少输入一个 ID。",
+      rangeAnalysis: "范围分析",
+      rangeErrInput: "请输入两个 ID 以定义分析范围。",
+      rangePossible: "路径可能性",
+      rangeOf: "ID 范围",
+      level: "级", // Level
+      decRange: "十进制范围",
+      octRange: "八进制范围",
+      fullRange: "覆盖所有可能值",
+      to: "到"
+    },
+    en: {
+      mainTitle: "ID/Path Conversion & Analysis Toolkit",
+      tool1Title: "Tool 1: ResourceURL Path (ID + Version)",
+      genPath5: "Path Generator (Level 5)",
+      labelId: "ID (Long)",
+      labelVer: "Version (Long)",
+      btnGen: "Generate Path",
+      parsePath5: "Path Parser (Level 5)",
+      labelPath5: "Level 5 Path String",
+      btnParse: "Parse Path",
+      tool2Title: "Tool 2: Level 4 ID Path & Range Analysis",
+      genIdPath4: "ID to Level 4 Path Generator",
+      labelId1: "ID 1 (Start of Range)",
+      labelId2: "ID 2 (End of Range)",
+      btnGenForId: "Generate Path for ID",
+      btnAnalyze: "Analyze Range Possibilities",
+      rangeResultTitle: "Range Path Analysis Results",
+      rangeInstruction: "Please enter two IDs above to define a range, then click 'Analyze Range Possibilities'.",
+      parsePath4: "Level 4 Path to ID Parser",
+      labelPath4: "Level 4 Path String",
+      btnParseId: "Parse ID",
+      // Placeholders
+      phLong: "Enter long integer value",
+      phLongVer: "Enter long integer version",
+      phPath5: "Enter 5-level path string (slash separated)",
+      phLongOpt: "Enter second long ID (Optional)",
+      phPath4: "Enter 4-level path string (slash separated)",
+      // JS Dynamic Messages
+      errIdVerEmpty: "ID and Version cannot be empty!",
+      resGenPath: "Generated Path",
+      errGen: "Generation Error",
+      errValidInt: "Please ensure input is a valid integer.",
+      errPathEmpty: "Path string cannot be empty!",
+      resParse: "Parse Result",
+      errParse: "Parse Error",
+      pathFor: "Path",
+      errId: "Error",
+      errOneId: "Please enter at least one ID.",
+      rangeAnalysis: "Range Analysis",
+      rangeErrInput: "Please enter two IDs to define the analysis range.",
+      rangePossible: "Path Possibilities",
+      rangeOf: "ID Range",
+      level: "Level", // Level
+      decRange: "Decimal Range",
+      octRange: "Octal Range",
+      fullRange: "Covers full range",
+      to: "to"
+    }
+  };
+
+  // 语言检测
+  let currentLang = 'zh'; // 默认中文
+  const userLang = navigator.language || navigator.userLanguage;
+  if (!userLang.startsWith('zh')) {
+    currentLang = 'en';
+    document.documentElement.lang = 'en';
+  }
+
+  // 获取文本辅助函数
+  function t(key) {
+    return translations[currentLang][key] || key;
+  }
+
+  // 初始化页面文本
+  function initI18n() {
+    // 替换文本内容
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (translations[currentLang][key]) {
+        el.textContent = translations[currentLang][key];
+      }
+    });
+
+    // 替换 Placeholder
+    document.querySelectorAll('[data-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-placeholder');
+      if (translations[currentLang][key]) {
+        el.placeholder = translations[currentLang][key];
+      }
+    });
+  }
+
+
   // --- 通用核心函数 ---
 
-  // 模拟 Kotlin 的 (long ushr 32).toInt()
   function getHighInt(longValBigInt) {
     return Number(longValBigInt >> 32n);
   }
 
-  // 模拟 Kotlin 的 long.toInt()
   function getLowInt(longValBigInt) {
     return Number(longValBigInt & 0xFFFFFFFFn);
   }
@@ -105,9 +477,6 @@
 
   // --- 工具一: ResourceURL (ID + Version) ---
 
-  /**
-   * [工具一] 根据ID和Version生成5级路径
-   */
   function toPath_v(id, version) {
     const idBigInt = BigInt(id);
     const versionBigInt = BigInt(version);
@@ -123,23 +492,14 @@
     ].join("/");
   }
 
-  /**
-   * [工具一] 从5级路径字符串反向解析出ID和Version
-   */
   function fromPath_v(pathStr) {
-    if (!pathStr || typeof pathStr !== 'string') {
-      throw new Error("输入路径不能为空且必须是字符串。");
-    }
+    if (!pathStr || typeof pathStr !== 'string') throw new Error("Input invalid.");
     const parts = pathStr.split('/');
-    if (parts.length !== 5) {
-      throw new Error("路径格式无效，必须有5个部分由'/'分隔。");
-    }
+    if (parts.length !== 5) throw new Error("Invalid format (needs 5 parts).");
 
     const parsedOctalParts = parts.map((part, index) => {
       const num = parseInt(part, 8);
-      if (isNaN(num)) {
-        throw new Error(`路径部分 "${part}" (索引 ${index}) 不是有效的八进制数。`);
-      }
+      if (isNaN(num)) throw new Error(`Invalid octal part: "${part}"`);
       return num;
     });
 
@@ -155,58 +515,51 @@
     return { id, version };
   }
   
-  /**
-   * [工具一] UI事件: 生成路径
-   */
   function generatePath_v() {
-    const idStr = document.getElementById('inputId_v').value;
-    const versionStr = document.getElementById('inputVersion_v').value;
+    const idStr = document.getElementById('inputId_v').value.trim();
+    const versionStr = document.getElementById('inputVersion_v').value.trim();
     const resultDiv = document.getElementById('resultGenerate_v');
 
+    resultDiv.style.display = 'block';
+
     if (!idStr || !versionStr) {
-      resultDiv.innerHTML = '<span class="error">ID 和 Version 都不能为空！</span>';
+      resultDiv.innerHTML = `<span class="error">${t('errIdVerEmpty')}</span>`;
       return;
     }
 
     try {
       const generatedPath = toPath_v(idStr, versionStr);
-      resultDiv.textContent = "生成的路径: " + generatedPath;
-      resultDiv.classList.remove('error');
+      resultDiv.innerHTML = `<strong>${t('resGenPath')}:</strong><br>${generatedPath}`;
       document.getElementById('inputPath_v').value = generatedPath;
     } catch (e) {
-      resultDiv.innerHTML = '<span class="error">生成错误: ' + e.message + '. 请确保输入的是有效的整数。</span>';
+      resultDiv.innerHTML = `<span class="error">${t('errGen')}: ${e.message} ${t('errValidInt')}</span>`;
     }
   }
 
-  /**
-   * [工具一] UI事件: 解析路径
-   */
   function parsePath_v() {
-    const pathStr = document.getElementById('inputPath_v').value;
+    const pathStr = document.getElementById('inputPath_v').value.trim();
     const resultDiv = document.getElementById('resultParse_v');
 
+    resultDiv.style.display = 'block';
+
     if (!pathStr) {
-      resultDiv.innerHTML = '<span class="error">路径字符串不能为空！</span>';
+      resultDiv.innerHTML = `<span class="error">${t('errPathEmpty')}</span>`;
       return;
     }
 
     try {
       const { id, version } = fromPath_v(pathStr);
-      resultDiv.textContent = `解析结果: ID = ${id.toString()}, Version = ${version.toString()}`;
-      resultDiv.classList.remove('error');
+      resultDiv.innerHTML = `<strong>${t('resParse')}:</strong><br>ID = ${id.toString()}<br>Version = ${version.toString()}`;
       document.getElementById('inputId_v').value = id.toString();
       document.getElementById('inputVersion_v').value = version.toString();
     } catch (e) {
-      resultDiv.innerHTML = '<span class="error">解析错误: ' + e.message + '</span>';
+      resultDiv.innerHTML = `<span class="error">${t('errParse')}: ${e.message}</span>`;
     }
   }
 
 
   // --- 工具二: 4级 ID 路径 ---
 
-  /**
-   * [工具二] 根据ID生成4级路径
-   */
   function toPath_4(id) {
     const idBigInt = BigInt(id);
     const highId = getHighInt(idBigInt);
@@ -220,23 +573,14 @@
     ].join("/");
   }
 
-  /**
-   * [工具二] 从4级路径字符串反向解析出ID
-   */
   function fromPath_4(pathStr) {
-    if (!pathStr || typeof pathStr !== 'string') {
-        throw new Error("输入路径不能为空且必须是字符串。");
-    }
+    if (!pathStr || typeof pathStr !== 'string') throw new Error("Input invalid.");
     const parts = pathStr.split('/');
-    if (parts.length !== 4) {
-      throw new Error("路径格式无效，必须有4个部分由'/'分隔。");
-    }
+    if (parts.length !== 4) throw new Error("Invalid format (needs 4 parts).");
 
     const parsedOctalParts = parts.map((part, index) => {
       const num = parseInt(part, 8);
-      if (isNaN(num)) {
-        throw new Error(`路径部分 "${part}" (索引 ${index}) 不是有效的八进制数。`);
-      }
+      if (isNaN(num)) throw new Error(`Invalid octal part: "${part}"`);
       return num;
     });
 
@@ -251,16 +595,13 @@
     return { id };
   }
 
-  /**
-   * [工具二] UI事件: 生成路径
-   */
   function generatePaths_4() {
     const idStr1 = document.getElementById('inputId1_4').value.trim();
     const idStr2 = document.getElementById('inputId2_4').value.trim();
     const resultDiv = document.getElementById('resultGenerate_4');
 
     resultDiv.innerHTML = '';
-    resultDiv.classList.remove('error');
+    resultDiv.style.display = 'block';
 
     let outputHtml = '';
     let generatedPathForParser = '';
@@ -268,10 +609,10 @@
     if (idStr1) {
         try {
             const path1 = toPath_4(idStr1);
-            outputHtml += `<div><strong>ID 1 (${idStr1}) 路径:</strong> ${path1}</div>`;
+            outputHtml += `<div><strong>ID 1 (${idStr1}) ${t('pathFor')}:</strong><br>${path1}</div>`;
             generatedPathForParser = path1;
         } catch (e) {
-            outputHtml += `<div><strong>ID 1 (${idStr1}) 错误:</strong> <span class="error">${e.message}</span></div>`;
+            outputHtml += `<div><strong>ID 1 ${t('errId')}:</strong> <span class="error">${e.message}</span></div>`;
         }
     }
 
@@ -279,15 +620,15 @@
         if (idStr1) outputHtml += '<br>';
         try {
             const path2 = toPath_4(idStr2);
-            outputHtml += `<div><strong>ID 2 (${idStr2}) 路径:</strong> ${path2}</div>`;
+            outputHtml += `<div><strong>ID 2 (${idStr2}) ${t('pathFor')}:</strong><br>${path2}</div>`;
             if (!generatedPathForParser) generatedPathForParser = path2;
         } catch (e) {
-            outputHtml += `<div><strong>ID 2 (${idStr2}) 错误:</strong> <span class="error">${e.message}</span></div>`;
+            outputHtml += `<div><strong>ID 2 ${t('errId')}:</strong> <span class="error">${e.message}</span></div>`;
         }
     }
     
     if (!idStr1 && !idStr2) {
-         outputHtml = '请至少输入一个 ID。';
+         outputHtml = `<span class="error">${t('errOneId')}</span>`;
     }
 
     resultDiv.innerHTML = outputHtml;
@@ -296,39 +637,34 @@
     }
   }
 
-  /**
-   * [工具二] UI事件: 解析路径
-   */
   function parsePath_4() {
     const pathStr = document.getElementById('inputPath_4').value.trim();
     const resultDiv = document.getElementById('resultParse_4');
 
+    resultDiv.style.display = 'block';
+
     if (!pathStr) {
-      resultDiv.innerHTML = '<span class="error">路径字符串不能为空！</span>';
+      resultDiv.innerHTML = `<span class="error">${t('errPathEmpty')}</span>`;
       return;
     }
 
     try {
       const { id } = fromPath_4(pathStr);
-      resultDiv.textContent = `解析结果: ID = ${id.toString()}`;
-      resultDiv.classList.remove('error');
+      resultDiv.innerHTML = `<strong>${t('resParse')}:</strong><br>ID = ${id.toString()}`;
       document.getElementById('inputId1_4').value = id.toString();
-      document.getElementById('inputId2_4').value = '';
+      document.getElementById('inputId2_4').value = ''; 
     } catch (e) {
-      resultDiv.innerHTML = '<span class="error">解析错误: ' + e.message + '</span>';
+      resultDiv.innerHTML = `<span class="error">${t('errParse')}: ${e.message}</span>`;
     }
   }
 
-  /**
-   * [工具二] UI事件: 分析范围
-   */
   function analyzeRange_4() {
       const idStr1 = document.getElementById('inputId1_4').value.trim();
       const idStr2 = document.getElementById('inputId2_4').value.trim();
       const resultDiv = document.getElementById('rangeAnalysisResult');
 
       if (!idStr1 || !idStr2) {
-          resultDiv.innerHTML = '<h3>范围分析</h3><span class="error">请输入两个ID以定义分析范围。</span>';
+          resultDiv.innerHTML = `<h3>${t('rangeAnalysis')}</h3><span class="error">${t('rangeErrInput')}</span>`;
           return;
       }
 
@@ -338,83 +674,60 @@
           const startId = id1 < id2 ? id1 : id2;
           const endId = id1 < id2 ? id2 : id1;
           
-          let html = `<h3>ID范围 [${startId}, ${endId}] 的路径可能性：</h3><ul>`;
+          let html = `<h3>${t('rangeOf')} [${startId}, ${endId}] ${t('rangePossible')}：</h3><ul>`;
 
           const l1_min = startId >> 32n;
           const l1_max = endId >> 32n;
-          html += formatRangeResult_4("第一级", l1_min, l1_max, (l1_max - l1_min) > 1000);
+          html += formatRangeResult_4(`${t('level')} 1`, l1_min, l1_max, (l1_max - l1_min) > 1000);
 
           if (l1_min < l1_max) {
-              html += formatRangeResult_4("第二级", 0, 65535, true);
-              html += formatRangeResult_4("第三级", 0, 255, true);
-              html += formatRangeResult_4("第四级", 0, 255, true);
+              html += formatRangeResult_4(`${t('level')} 2`, 0, 65535, true);
+              html += formatRangeResult_4(`${t('level')} 3`, 0, 255, true);
+              html += formatRangeResult_4(`${t('level')} 4`, 0, 255, true);
           } else {
               const low_start = Number(startId & 0xFFFFFFFFn);
               const low_end = Number(endId & 0xFFFFFFFFn);
 
               const l2_min = (low_start >>> 16) & 0xFFFF;
               const l2_max = (low_end >>> 16) & 0xFFFF;
-              html += formatRangeResult_4("第二级", l2_min, l2_max, l2_min === 0 && l2_max === 65535);
+              html += formatRangeResult_4(`${t('level')} 2`, l2_min, l2_max, l2_min === 0 && l2_max === 65535);
 
               if (l2_min < l2_max) {
-                  html += formatRangeResult_4("第三级", 0, 255, true);
+                  html += formatRangeResult_4(`${t('level')} 3`, 0, 255, true);
               } else {
                   const l3_min = (low_start >>> 8) & 0xFF;
                   const l3_max = (low_end >>> 8) & 0xFF;
-                  html += formatRangeResult_4("第三级", l3_min, l3_max);
+                  html += formatRangeResult_4(`${t('level')} 3`, l3_min, l3_max);
               }
 
               if ((low_start >>> 8) < (low_end >>> 8)) {
-                  html += formatRangeResult_4("第四级", 0, 255, true);
+                  html += formatRangeResult_4(`${t('level')} 4`, 0, 255, true);
               } else {
                   const l4_min = low_start & 0xFF;
                   const l4_max = low_end & 0xFF;
-                  html += formatRangeResult_4("第四级", l4_min, l4_max);
+                  html += formatRangeResult_4(`${t('level')} 4`, l4_min, l4_max);
               }
           }
 
           html += '</ul>';
           resultDiv.innerHTML = html;
       } catch (e) {
-          resultDiv.innerHTML = `<h3>范围分析</h3><span class="error">分析错误: ${e.message}</span>`;
+          resultDiv.innerHTML = `<h3>${t('rangeAnalysis')}</h3><span class="error">${t('errParse')}: ${e.message}</span>`;
       }
   }
 
-  /**
-   * [工具二] 格式化范围分析结果
-   */
   function formatRangeResult_4(levelName, minVal, maxVal, isFullRange = false) {
-    let fullRangeText = isFullRange ? ` <span class="full-range">(覆盖所有可能值)</span>` : "";
+    let fullRangeText = isFullRange ? ` <span class="full-range">(${t('fullRange')})</span>` : "";
     return `<li>
               <strong>${levelName}:</strong>
-              <div>十进制范围: <code>${minVal.toString()}</code> to <code>${maxVal.toString()}</code>${fullRangeText}</div>
-              <div>八进制范围: <code>${BigInt(minVal).toString(8)}</code> to <code>${BigInt(maxVal).toString(8)}</code></div>
+              <div>${t('decRange')}: <code>${minVal.toString()}</code> ${t('to')} <code>${maxVal.toString()}</code>${fullRangeText}</div>
+              <div>${t('octRange')}: <code>${BigInt(minVal).toString(8)}</code> ${t('to')} <code>${BigInt(maxVal).toString(8)}</code></div>
             </li>`;
   }
 
-
-  // --- 页面加载初始化 ---
-  
-  function initTool_v() {
-    const defaultId = "1311768467294899696"; // 0x123456789ABCDEF0
-    const defaultVersion = "119";             // 0x77
-    document.getElementById('inputId_v').value = defaultId;
-    document.getElementById('inputVersion_v').value = defaultVersion;
-    generatePath_v();
-  }
-
-  function initTool_4() {
-    const defaultId1 = "1311768467294899696"; // 普通ID
-    const defaultId2 = "1311768467299194096"; // 同一个 L1/L2 块，但跨越了 L3/L4
-    document.getElementById('inputId1_4').value = defaultId1;
-    document.getElementById('inputId2_4').value = defaultId2;
-    generatePaths_4();
-    analyzeRange_4();
-  }
-
+  // 页面加载时执行翻译
   window.onload = function() {
-    initTool_v();
-    initTool_4();
+    initI18n();
   }
 
 </script>
