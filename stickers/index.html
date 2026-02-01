@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sticker Pack</title>
+    
+    <!-- 引入字体: Rubik 和 M PLUS 1p -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- 引入图标 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+    <!-- 引入打包库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        /* 去除移动端点击高亮 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-color: #001926;
+            --border-color: #FFFFFF40; /* 25% 不透明度的白色 */
+            --text-color-dim: #FFFFFF40;
+            --text-color-bright: #FFFFFF;
+            --header-height: 60px;
+            --footer-height: 40px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+            color: var(--text-color-bright);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* --- 头部区域 --- */
+        header {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* 左右两端对齐 */
+            padding: 0 20px;
+        }
+
+        /* 标题样式 */
+        h1 {
+            margin: 0;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        /* 头部右侧容器：包含下载按钮和Logo */
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* 按钮和Logo之间的间距 */
+        }
+
+        /* Logo 样式 */
+        .brand-logo {
+            height: 32px; /* 控制Logo高度 */
+            width: auto;
+            object-fit: contain;
+        }
+
+        /* --- 下载按钮 --- */
+        .download-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color-bright);
+            border-radius: 50%;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: var(--text-color-bright);
+        }
+
+        .download-btn:active {
+            transform: scale(0.90);
+        }
+
+        .material-symbols-rounded {
+            font-size: 22px;
+        }
+
+        /* 加载旋转动画 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .download-btn.loading .material-symbols-rounded {
+            animation: spin 1s linear infinite;
+        }
+        .download-btn.loading {
+            cursor: wait;
+            opacity: 0.8;
+        }
+
+        /* --- 主体网格区域 --- */
+        main {
+            flex: 1; /* 占据剩余空间 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            overflow-y: auto;
+        }
+
+        .sticker-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            width: 100%;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            border-left: 1px solid var(--border-color); 
+        }
+
+        /* 单个贴纸卡片 */
+        .card {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px;
+            background-color: var(--bg-color);
+            transition: background-color 0.2s;
+        }
+
+        .card:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* 左上角 Label */
+        .label {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-color-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+        }
+
+        /* 坦克图片 */
+        .tank-img {
+            width: 65%;
+            height: 65%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        /* 右下角 Emoji */
+        .emoji-icon {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 16px;
+            line-height: 1;
+            pointer-events: none;
+        }
+
+        /* --- 底部页脚 --- */
+        footer {
+            height: var(--footer-height);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 12px;
+        }
+        
+        .footer-text {
+            font-weight: 400;
+            color: #FFFFFF; /* 纯白色 */
+        }
+
+        /* --- 响应式调整 --- */
+        @media (max-width: 900px) {
+            .sticker-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        @media (max-width: 600px) {
+            .sticker-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            header, footer {
+                padding: 0 15px;
+            }
+            /* 移动端 Logo 稍微缩小一点 */
+            .brand-logo {
+                height: 28px;
+            }
+            .header-right {
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <!-- 左侧标题 -->
+        <h1 id="page-title">STICKER PACK</h1>
+        
+        <!-- 右侧：下载按钮 + Logo -->
+        <div class="header-right">
+            <button class="download-btn" id="dl-btn" onclick="downloadAllStickers()" aria-label="Download ZIP">
+                <span class="material-symbols-rounded" id="dl-icon">download</span>
+            </button>
+            <img src="https://testanki1.github.io/logos/logo.svg" alt="Logo" class="brand-logo">
+        </div>
+    </header>
+
+    <main>
+        <div class="sticker-grid" id="grid">
+            <!-- 内容由 JS 生成 -->
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-text" id="footer-text">Tanki Online Branding • Character</div>
+    </footer>
+
+    <script>
+        const baseURL = "https://testanki1.github.io/stickers/";
+
+        const stickers = [
+            { label_en: "Winky Face", label_cn: "眨眼", file: "😉.png", emoji: "😉" },
+            { label_en: "Laughing", label_cn: "大笑", file: "😆😂.png", emoji: "😆" },
+            { label_en: "Strong", label_cn: "强壮", file: "💪.png", emoji: "💪" },
+            { label_en: "Angry Face", label_cn: "生气", file: "😡🤬.png", emoji: "😡" },
+            { label_en: "Heart Face", label_cn: "喜爱", file: "😍❤.png", emoji: "😍" },
+            
+            { label_en: "Crying Face", label_cn: "哭泣", file: "😭.png", emoji: "😭" },
+            { label_en: "Fearful Face", label_cn: "恐惧", file: "😨😰.png", emoji: "😨" },
+            { label_en: "Happy Devil", label_cn: "恶魔", file: "😈.png", emoji: "😈" },
+            { label_en: "Begging", label_cn: "请求", file: "🥺.png", emoji: "🥺" },
+            { label_en: "Raised Eyebrow", label_cn: "挑眉", file: "🤨.png", emoji: "🤨" },
+            
+            { label_en: "Cool", label_cn: "酷", file: "😎.png", emoji: "😎" },
+            { label_en: "Excited", label_cn: "兴奋", file: "🤩.png", emoji: "🤩" },
+            { label_en: "Facepalm", label_cn: "扶额", file: "🤦‍♂🤦🤦‍♀.png", emoji: "🤦‍♂️" },
+            { label_en: "Confused", label_cn: "困惑", file: "😕🙁☹.png", emoji: "😕" },
+            { label_en: "Sleeping", label_cn: "睡觉", file: "😴💤🛌.png", emoji: "😴" },
+            
+            { label_en: "Screaming", label_cn: "尖叫", file: "😱.png", emoji: "😱" },
+            { label_en: "Disgust", label_cn: "恶心", file: "🤢.png", emoji: "🤢" },
+            { label_en: "Swearing", label_cn: "咒骂", file: "🤬.png", emoji: "🤬" },
+            { label_en: "Shrugging", label_cn: "耸肩", file: "🤷‍♂🤷‍♀🤷.png", emoji: "🤷‍♂️" },
+            { label_en: "Party Face", label_cn: "派对", file: "🥳🎉.png", emoji: "🥳" }
+        ];
+
+        // 语言检测
+        const userLang = navigator.language || navigator.userLanguage; 
+        const isChinese = userLang.startsWith('zh');
+
+        // 获取 DOM 元素
+        const titleElement = document.getElementById('page-title');
+        const footerElement = document.getElementById('footer-text');
+
+        // 设置文本
+        if (isChinese) {
+            titleElement.innerText = "贴纸包";
+            footerElement.innerText = "3D坦克品牌视觉 • 角色";
+            document.title = "贴纸包";
+        } else {
+            titleElement.innerText = "STICKER PACK";
+            footerElement.innerText = "Tanki Online Branding • Character";
+            document.title = "STICKER PACK";
+        }
+
+        // 生成网格
+        const gridContainer = document.getElementById('grid');
+        stickers.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            const labelText = isChinese ? item.label_cn : item.label_en;
+            const imgPath = baseURL + encodeURI(item.file);
+
+            card.innerHTML = `
+                <span class="label">${labelText}</span>
+                <img src="${imgPath}" class="tank-img" alt="${labelText}" loading="lazy">
+                <span class="emoji-icon">${item.emoji}</span>
+            `;
+            gridContainer.appendChild(card);
+        });
+
+        // 下载功能
+        async function downloadAllStickers() {
+            const btn = document.getElementById('dl-btn');
+            const icon = document.getElementById('dl-icon');
+            
+            if(btn.classList.contains('loading')) return;
+
+            try {
+                // UI: 开始加载
+                btn.classList.add('loading');
+                icon.innerText = 'sync'; 
+
+                const zip = new JSZip();
+                const folder = zip.folder("Tanki_Stickers");
+
+                const promises = stickers.map(async (item) => {
+                    const imgUrl = baseURL + encodeURI(item.file);
+                    try {
+                        const response = await fetch(imgUrl);
+                        if (!response.ok) throw new Error("Net Err");
+                        const blob = await response.blob();
+                        folder.file(item.file, blob);
+                    } catch (err) {
+                        console.error(err);
+                    }
+                });
+
+                await Promise.all(promises);
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, "Stickers_Pack.zip");
+
+            } catch (error) {
+                console.error("Download failed:", error);
+                alert(isChinese ? "下载失败" : "Download failed");
+            } finally {
+                // UI: 恢复
+                btn.classList.remove('loading');
+                icon.innerText = 'download';
+            }
+        }
+    </script>
+</body>
+</html>
