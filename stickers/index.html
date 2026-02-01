@@ -1,349 +1,514 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sticker Pack</title>
-    
-    <!-- 引入字体 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- 引入图标 -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Testanki 的网站</title>
+<link rel="stylesheet" href="https://3dtank.com/wp-content/themes/mainsite/style.css" />
+<style>
+    /* 页面基础布局样式 */
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap');
 
-    <!-- 引入打包库 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    body {
+        margin: 0;
+        padding-top: 30px; 
+        font-family: 'Rubik', 'M PLUS 1p';
+        /* 恢复原来的网页背景色 */
+        background-color: #001926; 
+    }
 
-    <style>
-        /* 去除移动端点击高亮 */
-        * {
-            -webkit-tap-highlight-color: transparent;
-            box-sizing: border-box;
-        }
+    .logo-container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px; 
+    }
 
-        :root {
-            --bg-color: #001926;
-            --border-color: #FFFFFF40; /* 25% 不透明度的白色 */
-            --text-color-dim: #FFFFFF40;
-            --text-color-bright: #FFFFFF;
-            --header-height: 80px;
-            --footer-height: 50px;
-            --page-padding: 40px; 
-        }
+    .logo {
+        width: 200px;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-            color: var(--text-color-bright);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
+    * {
+        -webkit-tap-highlight-color: transparent;
+        box-sizing: border-box;
+    }
 
-        /* --- 头部区域 --- */
-        header {
-            height: var(--header-height);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 var(--page-padding); 
-        }
+    .button-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
 
-        h1 {
-            margin: 0;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-size: 20px;
-            line-height: 1;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .brand-logo {
-            height: 32px;
-            width: auto;
-            object-fit: contain;
-        }
-
-        /* --- 下载按钮 --- */
-        .download-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            background-color: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-color-bright);
-            border-radius: 50%;
-            cursor: pointer;
-            padding: 0;
-            transition: all 0.3s ease;
-        }
-
-        .download-btn:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-color: var(--text-color-bright);
-        }
-
-        .download-btn:active {
-            transform: scale(0.90);
-        }
-
-        .material-symbols-rounded {
-            font-size: 22px;
-        }
-
-        .download-btn.loading .material-symbols-rounded {
-            animation: spin 1s linear infinite;
-        }
-        .download-btn.loading {
-            cursor: wait;
-            opacity: 0.8;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* --- 主体网格区域 --- */
-        main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            overflow-y: auto;
-        }
-
-        .sticker-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            margin: 0 var(--page-padding); 
-            
-            /* 修改处：移除了 border-bottom，解决线条变粗的问题 */
-            border-top: 1px solid var(--border-color);
-            border-left: 1px solid var(--border-color); 
-        }
-
-        /* 单个贴纸卡片 */
-        .card {
-            position: relative;
-            aspect-ratio: 1 / 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            
-            /* 卡片自身带有右边框和底边框 */
-            border-right: 1px solid var(--border-color);
-            border-bottom: 1px solid var(--border-color);
-            
-            padding: 10px;
-            background-color: var(--bg-color);
-            transition: background-color 0.2s;
-        }
-
-        .card:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .label {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            font-size: 10px;
-            font-weight: 700;
-            color: var(--text-color-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            pointer-events: none;
-        }
-
-        .tank-img {
-            width: 65%;
-            height: 65%;
-            object-fit: contain;
-            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
-        }
-
-        .emoji-icon {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            font-size: 16px;
-            line-height: 1;
-            pointer-events: none;
-        }
-
-        /* --- 底部页脚 --- */
-        footer {
-            height: var(--footer-height);
-            display: flex;
-            align-items: center;
-            padding: 0 var(--page-padding);
-            font-size: 12px;
-        }
+    /* --- 按钮样式 --- */
+    .button {
+        /* 基础样式属性 */
+        scrollbar-color: rgba(191, 213, 255, 0.3) rgba(191, 213, 255, 0.1);
+        scrollbar-width: thin;
+        -webkit-font-smoothing: antialiased;
+        position: relative;
+        border-radius: 6.25rem;
         
-        .footer-text {
-            font-weight: 400;
-            color: #FFFFFF;
-        }
+        border: none; 
+        
+        /* 大按钮尺寸 */
+        padding: 0 3.5rem;
+        color: rgb(0, 25, 38);
+        font-size: 1.1rem;
+        line-height: 1.1rem;
+        height: 4rem;
+        
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        text-decoration: none;
+        align-self: center;
 
-        /* --- 响应式调整 --- */
-        @media (max-width: 900px) {
-            .sticker-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-        @media (max-width: 600px) {
-            :root {
-                --page-padding: 20px; 
-            }
-            .sticker-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .brand-logo {
-                height: 28px;
-            }
-            .header-right {
-                gap: 15px;
-            }
-        }
-    </style>
+        background-color: #76FF33;
+        margin: 10px; 
+        display: inline-flex; 
+        justify-content: center;
+        align-items: center;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .button:hover {
+        background-color: #62d926;
+        transform: scale(1.05);
+    }
+
+    .button:active {
+        background-color: #4caf50;
+        transform: scale(0.98);
+    }
+    /* ---------------------- */
+
+    /* --- 页脚样式修改 --- */
+    .footer {
+        color: rgba(255, 255, 255, 0.6); /* 修改为半透明白色 */
+        font-size: 12px;
+        margin-bottom: 30px;
+        text-align: center;
+        line-height: 1.6; /* 增加行高，多行文本更易读 */
+        padding: 0 10px;
+    }
+
+    /* 弹窗内部按钮样式 */
+    .popup .content .popup-btn-container {
+        padding: 0 1.5rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    .popup .content .popup-btn-container .button {
+        margin: 0;
+        width: 100%;
+        height: 3rem;
+        font-size: 0.875rem;
+        padding: 0 2.25rem;
+    }
+</style>
 </head>
 <body>
+<div class="logo-container">
+    <img src="https://testanki1.github.io/logo.svg" alt="Testanki" class="logo" />
+</div>
 
-    <header>
-        <h1 id="page-title">STICKER PACK</h1>
-        <div class="header-right">
-            <button class="download-btn" id="dl-btn" onclick="downloadAllStickers()" aria-label="Download ZIP">
-                <span class="material-symbols-rounded" id="dl-icon">download</span>
-            </button>
-            <img src="https://testanki1.github.io/logos/logo.svg" alt="Logo" class="brand-logo">
+<!-- 顶部按钮行 -->
+
+<div class="button-row">
+    <a href="https://testanki1.github.io/servers" class="button" data-translate="server_list">服务器列表</a>
+</div>
+
+<section class="additional-links">
+    <div class="links">
+        <a href="https://space.bilibili.com/1670766752/lists/245461?type=series" class="link" data-translate-link="video_log_link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <video preload="auto" autoplay="true" loop="true" playsinline="" muted="muted">
+                        <source src="https://web-cdn.tankionline.com/tanki-online/img/videoblog.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="info">
+                    <h3 data-translate="video_log_title">视频日志</h3>
+                    <p data-translate="video_log_desc">来自开发领域的最新消息，以视频形式展示。</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://3dtankwiki.github.io/" class="link" data-translate-link="wiki_link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://tankionline.com/en/wp-content/themes/tanki2023/img/wiki.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="wiki_title">Wiki</h3>
+                    <p data-translate="wiki_desc">3D坦克的知识库，关于游戏的大量信息</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://testanki1.github.io/ratings" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://tankionline.com/en/wp-content/themes/tanki2023/img/ratings.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="ratings_title">排行榜</h3>
+                    <p data-translate="ratings_desc">个人统计、排行榜和成就系统允许您查看您和其他人的战绩统计数据，争夺每周排行榜的排名，并获得令人难忘的成就“奖牌”</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://pages.tankionline.com/challenge-accepted?lang=en" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://tankionline.com/en/wp-content/themes/tanki2023/img/challenge-accepted.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="challenge_title">已接受的星级挑战（外服排行榜）</h3>
+                    <p data-translate="challenge_desc">完成 60 个具有挑战性的等级，获得 300 颗星星，并获得有价值的奖励，包括数千颗水晶、堆积如山的道具和幸运礼盒钥匙。</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://testanki1.github.io/status" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://s21.ax1x.com/2024/12/15/pAqgSJA.png" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="status_title">服务器状态页面</h3>
+                    <p data-translate="status_desc">实时查看服务器在线人数，目前只能查看国服的，无法查看外服的服务器状态。</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://testanki1.github.io/V-LOG_subtitles/search" class="link zh-only">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://i.ibb.co/qZ4h8VP/Screenshot-2026-0121-165722.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3>视频日志字幕搜索（中文）</h3>
+                    <p>在往期视频日志字幕中快速查找内容。</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://testanki1.github.io/alphabet/" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://tankionline.com/en/wp-content/uploads/2025/02/alphabet_1920_1080_web.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="alphabet_title">字母表游戏（英文）</h3>
+                    <p data-translate="alphabet_desc">3D坦克字母表单词解谜与游戏再现。游戏再现：对于每个单词，您可以从一组 16 个可能的字母中选择一个字母。注意：所有单词都与游戏和坦克/战斗有关。</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://testanki1.github.io/translate" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://s21.ax1x.com/2024/12/15/pAqgnWn.png" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="translator_title">物品名称中英互译</h3>
+                    <p data-translate="translator_desc">支持游戏内物品名称的中英互译，包括炮塔、底盘、无人机、道具、防御模块、地图、等级名称等，目前不支持翻译整句。</p>
+                </div>
+            </div>
+        </a>
+
+        <!-- 装备图标拼接 -->
+        <a href="https://testanki1.github.io/augments_icon/custom_splicer" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://s21.ax1x.com/2024/12/15/pAq29k4.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="splicer_title">装备改造图标拼接器</h3>
+                    <p data-translate="splicer_desc">自定义装备改造图标，可将装备与装备改造的图标部分自由组合，可保存为图片，也可保存为矢量图。</p>
+                </div>
+            </div>
+        </a>
+        
+        <a href="https://testanki1.github.io/models/" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://i.ibb.co/cXtqCrYs/Polish-20260104-174130468.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="models_title">游戏模型展示</h3>
+                    <p data-translate="models_desc">游戏模型展示，可自由组装。</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="https://testanki1.github.io/music" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://tankionline.com/en/wp-content/uploads/2024/11/music.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="music_title">音乐</h3>
+                    <p data-translate="music_desc">3D坦克的音乐，包括官方主题音乐、游戏背景音乐、迷你游戏背景音乐。</p>
+                </div>
+            </div>
+        </a>
+        
+        <a href="https://testanki1.github.io/stickers/" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://ru-cache.tankionline.com/wp-content/uploads/2022/02/image_720.png" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="stickers_title">贴纸</h3>
+                    <p data-translate="stickers_desc">3D坦克拥有自己的贴纸！总共有 20 个，它们非常酷！使用这些贴纸并与您的好友分享，让3D坦克与他们更亲近！</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="https://drive.google.com/drive/folders/1W8Du0WnT8EdsMBhVjAzp8F5n7-q_IHbK?usp=sharing" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://s21.ax1x.com/2024/12/15/pAqg8wF.png" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="promo_title">皮肤、地图宣传视频</h3>
+                    <p data-translate="promo_desc">观看由官方制作的皮肤首发视频与地图特制视频，也可以原画质下载视频保存。</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://testanki1.github.io/page-icons/" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://s21.ax1x.com/2024/12/15/pAqgQyV.png" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="resources_title">网页图标浏览</h3>
+                    <p data-translate="resources_desc">查看游戏内的图标资源，从网页源代码中提取。</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 国服屏蔽词替换器 (zh-only, 位于分析器前) -->
+        <a href="https://testanki1.github.io/chinese-words-replacer" class="link zh-only">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://i.ibb.co/B5Q4yyFD/Screenshot-2026-0202-000655.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3>国服屏蔽词替换器</h3>
+                    <p>解决国服聊天屏蔽词过多导致无法正常交流的问题。</p>
+                </div>
+            </div>
+        </a>
+
+        <!-- 中文地图高频词分析 -->
+        <a href="https://testanki1.github.io/chinese-map-name-analyzer" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://i.ibb.co/Q2P4VbJ/Screenshot-2026-0121-145310.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="map_analysis_title">中文地图高频词分析</h3>
+                    <p data-translate="map_analysis_desc">中文地图高频命名规律探索</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 战斗字体渲染器 -->
+        <a href="https://testanki1.github.io/font-renderer/" class="link">
+            <div class="filler"></div>
+            <div class="content-wrapper">
+                <div class="image">
+                    <img src="https://i.ibb.co/Xx2Trmp0/Screenshot-2026-0121-145115.jpg" alt="">
+                </div>
+                <div class="info">
+                    <h3 data-translate="font_renderer_title">战斗字体渲染器</h3>
+                    <p data-translate="font_renderer_desc">战斗聊天字体渲染，输入内容即可显示结果</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</section>
+
+<!-- 无关页面按钮 -->
+
+<div class="button-row" style="margin-bottom: 3rem;">
+    <a href="javascript:void(0);" class="button" onclick="togglePopup('unrelated-popup')" data-translate="unrelated_btn">无关页面</a>
+</div>
+
+<section class="social-links">
+    <h2 data-translate="social_title">社交网络</h2>
+    <div class="social-links-wrapper">
+        <a href="https://space.bilibili.com/1670766752" class="social-link">
+            <div class="inner">
+                <div class="icon">
+                    <img src="https://testanki1.github.io/bilibili.svg" alt="">
+                </div>
+                <div class="info">
+                    <div class="name">哔哩哔哩</div>
+                    <p data-translate="social_goto">前往</p>
+                </div>
+            </div>
+        </a>
+        <a href="https://pd.qq.com/g/r55527p1mb" class="social-link">
+            <div class="inner">
+                <div class="icon">
+                    <img src="https://testanki1.github.io/qq-pd.svg" alt="">
+                </div>
+                <div class="info">
+                    <div class="name">腾讯频道</div>
+                    <p data-translate="social_goto">前往</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</section>
+
+<!-- 更新后的页脚 -->
+<div class="footer" data-translate="footer_note">
+    本站提供与3D坦克游戏相关的内容和工具。<br>
+    注：本站为玩家制作，与3D坦克官方无关。联系邮箱：testanki@qq.com。
+</div>
+
+<!-- 无关页面弹窗 -->
+
+<div class="popup" id="unrelated-popup">
+    <div class="close-wrapper" onclick="togglePopup('unrelated-popup')"></div>
+    <div class="content" style="width: auto; min-width: 300px; max-width: 90vw;">
+        <div class="heading">
+            <div class="title" data-translate="unrelated_title">无关页面</div>
+            <div class="close-icon" onclick="togglePopup('unrelated-popup')"></div>
         </div>
-    </header>
-
-    <main>
-        <div class="sticker-grid" id="grid">
-            <!-- 内容由 JS 生成 -->
+        <div class="popup-btn-container">
+            <a href="https://testanki1.github.io/video-capture" class="button" data-translate="video_capture">视频帧提取器</a>
+            <a href="https://testanki1.github.io/html-editor" class="button" data-translate="html_editor">HTML 编辑器</a>
+            <a href="https://testanki1.github.io/solar-time" class="button" data-translate="solar_time">实时真太阳时</a>
+            <a href="https://testanki1.github.io/emoji-picker" class="button" data-translate="emoji_picker">Emoji 选择器</a>
         </div>
-    </main>
+    </div>
+</div>
 
-    <footer>
-        <div class="footer-text" id="footer-text">Tanki Online Branding • Character</div>
-    </footer>
-
-    <script>
-        const baseURL = "https://testanki1.github.io/stickers/";
-
-        const stickers = [
-            { label_en: "Winky Face", label_cn: "眨眼", file: "😉.png", emoji: "😉" },
-            { label_en: "Laughing", label_cn: "大笑", file: "😆😂.png", emoji: "😆" },
-            { label_en: "Strong", label_cn: "强壮", file: "💪.png", emoji: "💪" },
-            { label_en: "Angry Face", label_cn: "生气", file: "😡🤬.png", emoji: "😡" },
-            { label_en: "Heart Face", label_cn: "喜爱", file: "😍❤.png", emoji: "😍" },
-            
-            { label_en: "Crying Face", label_cn: "哭泣", file: "😭.png", emoji: "😭" },
-            { label_en: "Fearful Face", label_cn: "恐惧", file: "😨😰.png", emoji: "😨" },
-            { label_en: "Happy Devil", label_cn: "恶魔", file: "😈.png", emoji: "😈" },
-            { label_en: "Begging", label_cn: "请求", file: "🥺.png", emoji: "🥺" },
-            { label_en: "Raised Eyebrow", label_cn: "挑眉", file: "🤨.png", emoji: "🤨" },
-            
-            { label_en: "Cool", label_cn: "酷", file: "😎.png", emoji: "😎" },
-            { label_en: "Excited", label_cn: "兴奋", file: "🤩.png", emoji: "🤩" },
-            { label_en: "Facepalm", label_cn: "扶额", file: "🤦‍♂🤦🤦‍♀.png", emoji: "🤦‍♂️" },
-            { label_en: "Confused", label_cn: "困惑", file: "😕🙁☹.png", emoji: "😕" },
-            { label_en: "Sleeping", label_cn: "睡觉", file: "😴💤🛌.png", emoji: "😴" },
-            
-            { label_en: "Screaming", label_cn: "尖叫", file: "😱.png", emoji: "😱" },
-            { label_en: "Disgust", label_cn: "恶心", file: "🤢.png", emoji: "🤢" },
-            { label_en: "Swearing", label_cn: "咒骂", file: "🤬.png", emoji: "🤬" },
-            { label_en: "Shrugging", label_cn: "耸肩", file: "🤷‍♂🤷‍♀🤷.png", emoji: "🤷‍♂️" },
-            { label_en: "Party Face", label_cn: "派对", file: "🥳🎉.png", emoji: "🥳" }
-        ];
-
-        // 语言检测
-        const userLang = navigator.language || navigator.userLanguage; 
-        const isChinese = userLang.startsWith('zh');
-
-        // 获取 DOM 元素
-        const titleElement = document.getElementById('page-title');
-        const footerElement = document.getElementById('footer-text');
-
-        // 设置文本
-        if (isChinese) {
-            titleElement.innerText = "贴纸包";
-            footerElement.innerText = "3D坦克品牌视觉 • 角色";
-            document.title = "贴纸包";
-        } else {
-            titleElement.innerText = "STICKER PACK";
-            footerElement.innerText = "Tanki Online Branding • Character";
-            document.title = "STICKER PACK";
+<script>
+    // 弹窗控制函数
+    function togglePopup(popupId) {
+        const popup = document.getElementById(popupId);
+        if (popup) {
+            popup.classList.toggle('active');
         }
+    }
 
-        // 生成网格
-        const gridContainer = document.getElementById('grid');
-        stickers.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'card';
-            const labelText = isChinese ? item.label_cn : item.label_en;
-            const imgPath = baseURL + encodeURI(item.file);
-
-            card.innerHTML = `
-                <span class="label">${labelText}</span>
-                <img src="${imgPath}" class="tank-img" alt="${labelText}" loading="lazy">
-                <span class="emoji-icon">${item.emoji}</span>
-            `;
-            gridContainer.appendChild(card);
-        });
-
-        // 下载功能
-        async function downloadAllStickers() {
-            const btn = document.getElementById('dl-btn');
-            const icon = document.getElementById('dl-icon');
+    const translations = {
+        en: {
+            server_list: "Server List",
+            unrelated_btn: "Unrelated Pages",
+            unrelated_title: "Unrelated Pages",
+            video_capture: "Video Frame Capture",
+            html_editor: "HTML Editor",
+            solar_time: "Real-time Solar Time",
+            emoji_picker: "Emoji Picker",
             
-            if(btn.classList.contains('loading')) return;
+            video_log_title: "V-LOG",
+            video_log_desc: "Fresh news from the development field in video format.",
+            wiki_title: "Wiki",
+            wiki_desc: "Tanki Online's knowledge base, a huge range of information about the game",
+            ratings_title: "Rating",
+            ratings_desc: "The system of personal statistics, ratings and achievements allows you to get check the performance statistics of you and others, compete for spots in weekly ratings and receive memorable “medals” for achievements",
+            challenge_title: "Challenge Accepted (European Server)",
+            challenge_desc: "Complete 60 challenging levels, earn 300 stars and receive valuable prizes including thousands of crystals, mountains of supplies and keys for containers.",
+            status_title: "Server Status Page",
+            status_desc: "View the number of online players on the server in real-time. Currently, it can only view the server status of the Chinese server, not the European servers.",
+            alphabet_title: "Alphabet (EN)",
+            alphabet_desc: "Tanki Online alphabet word puzzle and game reproduction. Game reproduction: For each word, you can choose one letter from a set of 16 possible letters. Note: All words are related to the game and tanks/combat.",
+            
+            translator_title: "Item Name Translator (CN/EN)",
+            translator_desc: "Supports mutual translation of in-game item names between Chinese and English, including turrets, hulls, drones, supplies, protection modules, maps, rank names, etc. Currently does not support translating sentences.",
+            
+            splicer_title: "Augment Icon Splicer",
+            splicer_desc: "Customize augment icons. You can freely combine the icon parts of equipment and augments, and save them as images or vector graphics.",
+            models_title: "Game Model Showcase",
+            models_desc: "Game models featuring modular assembly.",
+            
+            music_title: "Music",
+            music_desc: "Music from Tanki Online, including the official theme music, in-game background music, minigame background music.",
+            
+            stickers_title: "Stickers",
+            stickers_desc: "Tanki Online have their own stickers! There are 20 of them, and they are very cool! Use these stickers and share them with your friends, let Tanki become even closer to them!",
+            
+            promo_title: "Skins and Maps Promotional Videos",
+            promo_desc: "Watch the debut videos of skins and special videos of maps produced by the developers. You can also download the videos in original quality.",
+            resources_title: "Page Icon Browser",
+            resources_desc: "View the in-game page icons, extracted from the web page source code.",
+            
+            // 更新后的页脚翻译
+            footer_note: "This site provides content and tools related to Tanki Online.<br>Note: This site is made by a player and is not affiliated with the official Tanki Online.",
+            
+            social_title: "Social Networks",
+            social_goto: "Go",
 
-            try {
-                btn.classList.add('loading');
-                icon.innerText = 'sync'; 
+            map_analysis_title: "Chinese Map Name Analysis",
+            map_analysis_desc: "Exploration of high-frequency naming patterns in Chinese maps.",
+            font_renderer_title: "Battle Font Renderer",
+            font_renderer_desc: "Battle chat font rendering, enter content to display the result."
+        }
+    };
 
-                const zip = new JSZip();
-                const folder = zip.folder("Tanki_Stickers");
+    function setLanguage(lang) {
+        if (lang.startsWith('en')) {
+            document.documentElement.lang = 'en';
+            document.title = "Testanki's Website";
 
-                const promises = stickers.map(async (item) => {
-                    const imgUrl = baseURL + encodeURI(item.file);
-                    try {
-                        const response = await fetch(imgUrl);
-                        if (!response.ok) throw new Error("Net Err");
-                        const blob = await response.blob();
-                        folder.file(item.file, blob);
-                    } catch (err) {
-                        console.error(err);
-                    }
-                });
-
-                await Promise.all(promises);
-                const content = await zip.generateAsync({ type: "blob" });
-                saveAs(content, "Stickers_Pack.zip");
-
-            } catch (error) {
-                console.error("Download failed:", error);
-                alert(isChinese ? "下载失败" : "Download failed");
-            } finally {
-                btn.classList.remove('loading');
-                icon.innerText = 'download';
+            // Update links
+            const videoLink = document.querySelector('[data-translate-link="video_log_link"]');
+            if (videoLink) {
+                videoLink.href = 'https://www.youtube.com/@tankionline';
             }
+            const wikiLink = document.querySelector('[data-translate-link="wiki_link"]');
+            if (wikiLink) {
+                wikiLink.href = 'https://en.tankiwiki.com';
+            }
+
+            // Translate text content (supports HTML in translation string)
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.getAttribute('data-translate');
+                if (translations.en[key]) {
+                    el.innerHTML = translations.en[key]; // Use innerHTML to handle <br>
+                }
+            });
+
+            // Remove social links section
+            const socialLinksSection = document.querySelector('.social-links');
+            if (socialLinksSection) {
+                socialLinksSection.remove();
+            }
+
+            // 移除仅中文显示的元素
+            document.querySelectorAll('.zh-only').forEach(el => el.remove());
         }
-    </script>
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const userLang = navigator.language || navigator.userLanguage;
+        if (!userLang.startsWith('zh')) {
+            setLanguage('en');
+        }
+    });
+</script>
+
 </body>
 </html>
