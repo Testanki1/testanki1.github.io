@@ -9,29 +9,7 @@
     <title>Augment Icon Splicer</title>
     <style>
         :root {
-            --md-sys-color-background: #fdfdf5;
-            --md-sys-color-on-background: #1a1c19;
-            --md-sys-color-surface: #fdfdf5;
-            --md-sys-color-surface-container: #f0f1eb;
-            --md-sys-color-surface-container-high: #ebece6;
-            --md-sys-color-primary: #386a20;
-            --md-sys-color-on-primary: #ffffff;
-            --md-sys-color-primary-container: #b7f397;
-            --md-sys-color-on-primary-container: #042100;
-            --md-sys-color-secondary-container: #dce5d6;
-            --md-sys-color-on-secondary-container: #161e17;
-            --md-sys-color-outline: #74796d;
-            --md-sys-color-outline-variant: #c3c8bb;
-            --md-sys-color-error: #ba1a1a;
-            --md-sys-color-on-error: #ffffff;
-            --md-sys-color-error-container: #ffdad6;
-            --md-sys-color-on-error-container: #410002;
-
-            --radius-l: 24px; --radius-m: 16px; --radius-s: 8px;
-            --elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
-            --elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
-        }
-        [data-theme="dark"] {
+            /* 直接使用之前的 Dark Mode 变量作为默认根变量 */
             --md-sys-color-background: #001926;
             --md-sys-color-on-background: #ffffff;
             --md-sys-color-surface: #001926;
@@ -49,9 +27,14 @@
             --md-sys-color-on-error: #690005;
             --md-sys-color-error-container: #93000a;
             --md-sys-color-on-error-container: #ffdad6;
+
+            --radius-l: 24px; --radius-m: 16px; --radius-s: 8px;
+            --elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
+            --elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
         }
+        
         * { font-family: 'Rubik', 'M PLUS 1p', sans-serif; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--md-sys-color-background); color: var(--md-sys-color-on-background); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; transition: background-color 0.3s; }
+        body { background-color: var(--md-sys-color-background); color: var(--md-sys-color-on-background); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
 
         header { width: 100%; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; background-color: var(--md-sys-color-surface); position: sticky; top: 0; z-index: 10; }
         h1 { font-size: 22px; margin: 0; font-weight: 500; }
@@ -110,7 +93,7 @@
         .btn-secondary { background-color: transparent; border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-primary); }
         .btn-secondary:hover { background-color: var(--md-sys-color-secondary-container); }
 
-        .btn-reset-all { background-color: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); margin-top: 16px; }
+        .btn-reset-all { background-color: #FF6666; color: var(--md-sys-color-on-primary); margin-top: 16px; }
         .btn-reset-all:hover { filter: brightness(0.95); }
 
         .results-container { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; animation: fadeIn 0.5s; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 24px; }
@@ -118,17 +101,14 @@
         .m3-input { background-color: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-on-surface); padding: 12px; border-radius: 8px; width: 90px; text-align: center; font-size: 16px; }
 
         #loading { position: absolute; background: rgba(0,0,0,0.6); color: white; padding: 8px 16px; border-radius: 16px; backdrop-filter: blur(4px); top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
-        [data-theme="dark"] .btn-reset-all { background-color: #FF6666; color: var(--md-sys-color-on-primary); }
     </style>
 </head>
-<body data-theme="dark">
+<body>
 
     <header>
         <!-- 这里的文字会被 JS 自动替换 -->
         <h1 id="ui-header">Augment Icon Splicer</h1>
-        <button class="icon-btn" id="themeToggle" aria-label="Toggle Theme">
-            <span class="material-symbols-rounded">light_mode</span>
-        </button>
+        <!-- 移除了主题切换按钮 -->
     </header>
 
     <div id="appContainer">
@@ -387,14 +367,6 @@
         const groupedBackgroundColors = { "来自装备改造图标": ["蓝紫色", "蓝粉渐变色", "红色", "浅蓝色", "深蓝色", "粉色", "紫色", "黄色", "橙色", "火红色", "蓝色", "绿色", "黑色"], "来自射击颜色图标": ["爆破手（红）", "爆破手（绿）", "电", "毒（1）", "毒（2）", "粉红色", "寒冷", "黑暗", "幻影黑", "火", "金", "魔法", "日食", "珊瑚礁", "深红色", "神秘的红色", "水", "太阳", "天空", "天空蓝", "虚空", "雪", "血液", "岩浆", "正午", "紫罗兰色", "暴力", "暗月", "烟雾"] };
         
         const fileCache = {};
-        const themeToggle = document.getElementById('themeToggle');
-        
-        themeToggle.addEventListener('click', () => {
-            const current = document.body.getAttribute('data-theme');
-            const next = current === 'dark' ? 'light' : 'dark';
-            document.body.setAttribute('data-theme', next);
-            themeToggle.querySelector('span').textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
-        });
 
         // Modal Logic
         const modal = document.getElementById('selectionModal');
