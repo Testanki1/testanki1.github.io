@@ -116,7 +116,6 @@ jobs:
               
               page = await context.newPage();
               
-              // 注意：如果页面无限刷新，这里可能会抛出 Timeout 错误
               const response = await page.goto(targetUrl, { 
                 waitUntil: 'networkidle', 
                 timeout: 45000 
@@ -126,9 +125,18 @@ jobs:
                 return { url, status: 'Offline', httpStatus: response?.status() || 0 };
               }
               
-              await page.waitForTimeout(5000);
+              // === 关键修改：稳定性压力测试 ===
+              // 既然网页在不停刷新，我们就在这里多读几次。
+              // 如果它在循环，这三次读取中大概率会有一次撞上 "navigating" 错误。
+              await page.waitForTimeout(3000); // 先等3秒
+              await page.content(); // 第1次读取探测
               
-              // 并行检测，如果页面在此期间导航，page.content() 会抛出你提到的那个错误
+              await page.waitForTimeout(2000); // 再等2秒
+              await page.content(); // 第2次读取探测
+              
+              await page.waitForTimeout(2000); // 再等2秒（最后一次检测逻辑会读第3次）
+              
+              // 并行检测
               const checks = await Promise.all([
                 page.locator('text=/invitation/i').count().catch(() => 0),
                 page.locator('text=/邀请/i').count().catch(() => 0),
@@ -147,9 +155,7 @@ jobs:
             } catch (e) {
               const msg = e.message ? e.message.toLowerCase() : "";
               
-              // --- 增强的错误匹配逻辑 ---
-              // 匹配: navigating, content, destroyed (execution context), loop, timeout
-              // 只要包含这些词，说明服务器活着，但是页面极其不稳定，归类为 Error
+              // 匹配错误特征：只要出现页面导航中断、上下文销毁，即判定为 Error
               if (
                 msg.includes('navigating') || 
                 msg.includes('retrieve content') || 
@@ -158,11 +164,10 @@ jobs:
                 msg.includes('timeout') ||
                 msg.includes('redirect') 
               ) {
-                 console.log(`[${getTime()}] 判定为 Error (Online) - ${url}: ${e.message}`);
+                 console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
                  return { url, status: 'Error', error: e.message };
               }
 
-              // 其他未知错误才算 Offline
               console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
               return { url, status: 'Offline', error: e.message };
             } finally {
@@ -289,8 +294,6 @@ jobs:
                     finalStatus = 'Closed'; 
                   }
                   
-                  // 只要不是 Offline (Curl 不通)，我们都使用最新的 Hash
-                  // 这样 Open/Closed/Error 状态下如果代码变了都能监测到
                   const hashToSave = (finalStatus === 'Offline') && oldEntry.hash 
                     ? oldEntry.hash 
                     : hash;
@@ -300,7 +303,7 @@ jobs:
                 }
               }
 
-              // Phase 3: 状态比对与通知生成
+              // Phase 3: 状态比对
               for (const url of urls) {
                 const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
                 const committedEntry = committedStatusJson[url] || {};
@@ -331,11 +334,9 @@ jobs:
 
                     let message = "";
                     
-                    // 1. 首次发现
                     if (!oldStatus && finalStatus !== "Offline") {
                       message = `首次发现服务器 (状态: ${displayStatusBold})`;
                     }
-                    // 2. 状态变化
                     else if (oldStatus && finalStatus !== oldStatus) {
                       if (oldStatus === "Offline") {
                         if (finalStatus === "Error") {
@@ -355,7 +356,6 @@ jobs:
                         message = `服务器已下线 (原状态: ${oldDisplay})`;
                       }
                       else {
-                         // Open <-> Closed <-> Error
                          let oldDisplay = oldStatus;
                          if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
                          if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
@@ -363,7 +363,6 @@ jobs:
                          message = `服务器状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
                       }
                     }
-                    // 3. 状态没变，但 Hash 变了 (适用于 Open, Closed, Error)
                     else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
                       message = `网页代码已更新 (状态: ${displayStatusBold})`;
                     }
