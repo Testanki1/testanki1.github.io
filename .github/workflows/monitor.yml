@@ -42,13 +42,12 @@ jobs:
 
           // --- 配置 ---
           const STATE_FILE = 'server_status.json';
-          const CHECK_INTERVAL = 3 * 60 * 1000; // 3分钟
-          const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // 5.8小时
+          const CHECK_INTERVAL = 3 * 60 * 1000; 
+          const MAX_RUNTIME = 5.8 * 60 * 60 * 1000;
           const START_TIME = Date.now();
           const BROWSER_CONCURRENCY = 3; 
           const CONFIRMATION_THRESHOLD = 2; 
 
-          // 记录检测次数
           let pendingChanges = {};
 
           const transporter = nodemailer.createTransport({
@@ -103,7 +102,6 @@ jobs:
             });
           }
 
-          // 【修复】增强稳定性的浏览器检测函数
           async function checkBrowserPage(browser, url) {
             let page = null;
             const context = await browser.newContext({
@@ -119,54 +117,49 @@ jobs:
               
               page = await context.newPage();
               
-              // 1. 访问页面
               const response = await page.goto(targetUrl, { 
-                waitUntil: 'commit', // 改为 commit，避免一直等待 networkidle 超时
-                timeout: 45000 
+                waitUntil: 'commit', 
+                timeout: 40000 
               });
               
               if (!response || response.status() >= 400) {
                 return { url, status: 'Offline', httpStatus: response?.status() || 0 };
               }
               
-              // 2. 等待加载稳定
               try {
-                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-                await page.waitForTimeout(3000); 
-              } catch (e) {}
+                await page.waitForLoadState('domcontentloaded', { timeout: 5000 });
+              } catch(e) {}
 
-              // 3. 多维度检测邀请界面 (增加异常处理)
-              const checks = await Promise.all([
-                // Locator 检测 (自动重试，较稳定)
-                page.locator('text=/invitation/i').count().catch(() => 0),
-                page.locator('text=/邀请/i').count().catch(() => 0),
-                page.locator('[class*="invitation"]').count().catch(() => 0),
+              // 3. 多维度检测
+              try {
+                const checks = await Promise.all([
+                  page.locator('text=/invitation/i').count().catch(() => 0),
+                  page.locator('text=/邀请/i').count().catch(() => 0),
+                  page.locator('[class*="invitation"]').count().catch(() => 0),
+                  page.content().then(html => /invitation|邀请码|invite/i.test(html))
+                ]);
                 
-                // 【修复】page.content() 包裹 try-catch，防止页面跳转时报错崩溃
-                (async () => {
-                  try {
-                    const html = await page.content();
-                    return /invitation|邀请码|invite/i.test(html);
-                  } catch (err) {
-                    // 页面正在跳转或销毁，忽略此次 content 检查
-                    return false; 
-                  }
-                })()
-              ]);
-              
-              const hasInvitation = checks.some(c => c > 0 || c === true);
-              
-              return { 
-                url, 
-                status: hasInvitation ? 'Closed' : 'Open',
-                httpStatus: response.status()
-              };
+                const hasInvitation = checks.some(c => c > 0 || c === true);
+                
+                return { 
+                  url, 
+                  status: hasInvitation ? 'Closed' : 'Open',
+                  httpStatus: response.status()
+                };
+
+              } catch (innerError) {
+                // 【修改】如果页面正在跳转或销毁，标记为 Error
+                if (innerError.message.includes('navigating') || innerError.message.includes('destroyed')) {
+                  console.log(`[${getTime()}] 页面检测到 Navigation 错误 (标记为 Error): ${url}`);
+                  return { url, status: 'Error', httpStatus: 200 };
+                }
+                throw innerError; 
+              }
               
             } catch (e) {
-              console.log(`[${getTime()}] 浏览器检测错误 ${url}: ${e.message}`);
-              // 如果出错但不是离线，为了安全起见标记为 Closed (或者根据你的需求标记为 Offline)
-              // 这里返回 Offline 并带上错误信息
-              return { url, status: 'Offline', error: e.message };
+              console.log(`[${getTime()}] 浏览器检测异常 ${url}: ${e.message}`);
+              // 如果浏览器检测彻底失败（超时或其他错误），也标记为 Error
+              return { url, status: 'Error', error: e.message };
             } finally {
               await context.close().catch(() => {});
             }
@@ -245,12 +238,10 @@ jobs:
             let notifications = [];
             let availableServers = [];
             let browser = null;
-            
-            // 初始化结果容器，避免 ReferenceError
             let currentResults = {};
 
             try {
-              // Phase 1: Curl 快速筛选
+              // Phase 1: Curl
               console.log(`[${getTime()}] Phase 1: Curl 检测 ${urls.length} 个 URL...`);
               const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
               
@@ -258,21 +249,16 @@ jobs:
 
               for (const res of curlResults) {
                 const { url, isAlive, hash, statusCode, dataLength } = res;
-                
                 if (isAlive) {
                   candidatesForBrowser.push({ url, hash });
                   console.log(`[${getTime()}] Curl 存活: ${url} (状态: ${statusCode}, 大小: ${dataLength})`);
                 } else {
                   const oldEntry = committedStatusJson[url] || {};
-                  // Curl 失败直接标记为 Offline
-                  currentResults[url] = { 
-                    status: "Offline", 
-                    hash: oldEntry.hash || hash 
-                  };
+                  currentResults[url] = { status: "Offline", hash: oldEntry.hash || hash };
                 }
               }
 
-              // Phase 2: 浏览器深度检测
+              // Phase 2: Browser
               if (candidatesForBrowser.length > 0) {
                 console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
                 
@@ -292,33 +278,25 @@ jobs:
                 const browserResults = await Promise.all(browserPromises);
                 
                 for (const res of browserResults) {
-                  const { url, status, hash, error } = res;
+                  const { url, status, hash } = res;
                   const oldEntry = committedStatusJson[url] || {};
                   
-                  let finalStatus = status;
-                  // 如果浏览器检测报错但 curl 是活的，我们不能确定它是否 Closed
-                  // 这里做一个保守策略：如果报错了，大概率是页面加载太慢或跳转太乱，暂时视为 Closed 防止漏报
-                  if (status === 'Offline' && !error) {
-                    finalStatus = 'Closed';
-                  }
-                  
-                  const hashToSave = finalStatus === 'Offline' && oldEntry.hash 
+                  const hashToSave = status === 'Offline' && oldEntry.hash 
                     ? oldEntry.hash 
                     : hash;
                   
-                  currentResults[url] = { status: finalStatus, hash: hashToSave };
-                  console.log(`[${getTime()}] 浏览器结果: ${url} -> ${finalStatus}`);
+                  currentResults[url] = { status: status, hash: hashToSave };
+                  console.log(`[${getTime()}] 浏览器结果: ${url} -> ${status}`);
                 }
               }
 
-              // 状态确认逻辑
+              // 状态确认
               let hasConfirmedChanges = false;
 
               for (const url of urls) {
                 const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
                 const committedEntry = committedStatusJson[url] || {};
                 
-                // 状态未变
                 if (isStateEqual(currentEntry, committedEntry)) {
                   if (pendingChanges[url]) {
                     delete pendingChanges[url];
@@ -327,7 +305,6 @@ jobs:
                   continue;
                 }
 
-                // 状态变化，检查确认计数
                 const pending = pendingChanges[url];
                 
                 if (pending && isStateEqual(pending.entry, currentEntry)) {
@@ -343,10 +320,12 @@ jobs:
                     const finalStatus = currentEntry.status;
                     const hash = currentEntry.hash;
 
+                    // 【修改】增加 Error 状态的显示文本
                     let displayStatus = "";
                     let displayStatusBold = "";
                     if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
-                    if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+                    else if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+                    else if (finalStatus === "Error") { displayStatus = "异常"; displayStatusBold = "<b>异常(Error)</b>"; }
 
                     let message = "";
                     if (!oldStatus && finalStatus !== "Offline") {
@@ -354,16 +333,17 @@ jobs:
                     }
                     else if (oldStatus && finalStatus !== oldStatus) {
                       if (oldStatus === "Offline") {
-                        let baseMsg = finalStatus === "Open" ? "服务器已上线并<b>开放</b>" : "服务器已上线，当前为<b>封闭</b>状态";
-                        let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
-                        message = baseMsg + hashMsg;
+                        // 上线
+                        message = `服务器已上线 (状态: ${displayStatusBold})`;
                       } 
                       else if (finalStatus === "Offline") {
-                        let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                        // 下线
+                        let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : (oldStatus === 'Closed' ? '<b>封闭</b>' : '<b>异常</b>');
                         message = `服务器已下线 (原状态: ${oldDisplay})`;
                       }
                       else {
-                        let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                        // 状态变更 (Open <-> Closed <-> Error)
+                        let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : (oldStatus === 'Closed' ? '<b>封闭</b>' : '<b>异常</b>');
                         message = `服务器状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
                       }
                     }
@@ -386,26 +366,29 @@ jobs:
                 }
               }
 
-              // 生成可用服务器列表
+              // 生成列表 (包含 Open, Closed 和 Error)
               for (const url of urls) {
                 const statusEntry = finalStatusJson[url];
                 if (statusEntry && statusEntry.status && statusEntry.status !== "Offline") {
-                  const disp = statusEntry.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                  let disp = '未知';
+                  if (statusEntry.status === 'Open') disp = '<b>开放</b>';
+                  else if (statusEntry.status === 'Closed') disp = '<b>封闭</b>';
+                  else if (statusEntry.status === 'Error') disp = '<b>异常</b>';
+                  
                   availableServers.push(`<a href="${url}">${url}</a> (状态: ${disp})`);
                 }
               }
 
-              // 处理通知和 Git
               if (notifications.length > 0) {
                 console.log(`[${getTime()}] 发送 ${notifications.length} 条通知...`);
                 fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
                 
                 if (commitAndPush()) {
                   const changeDetails = notifications.join('<br>');
-                  const availableListHeader = `<br><hr><b>当前已上线的服务器列表 (${availableServers.length} 个):</b><br>`;
+                  const availableListHeader = `<br><hr><b>当前在线服务器列表 (${availableServers.length} 个):</b><br>`;
                   const availableListBody = availableServers.length > 0 
                     ? availableServers.join('<br>') 
-                    : "目前没有已上线的服务器。";
+                    : "目前没有在线服务器。";
                   const fullBody = `检测到以下服务器状态发生变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
                   await sendEmail(fullBody);
                 }
@@ -415,7 +398,6 @@ jobs:
                 const pendingMsg = pendingCount > 0 ? ` (有 ${pendingCount} 个状态待确认)` : "";
                 console.log(`[${getTime()}] 无已确认的状态变化。${pendingMsg} (耗时: ${duration}秒)`);
                 
-                // 清理过期的待确认状态
                 const now = Date.now();
                 for (const [url, data] of Object.entries(pendingChanges)) {
                   if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
