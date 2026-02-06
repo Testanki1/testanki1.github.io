@@ -245,7 +245,8 @@ jobs:
               const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
               
               const candidatesForBrowser = [];
-              const curlOfflineUrls = new Set();
+              // 【修复: 这里提前定义 currentResults 避免 ReferenceError】
+              const currentResults = {};
 
               for (const res of curlResults) {
                 const { url, isAlive, hash, statusCode, dataLength } = res;
@@ -254,7 +255,6 @@ jobs:
                   candidatesForBrowser.push({ url, hash });
                   console.log(`[${getTime()}] Curl 存活: ${url} (状态: ${statusCode}, 大小: ${dataLength})`);
                 } else {
-                  curlOfflineUrls.add(url);
                   const oldEntry = committedStatusJson[url] || {};
                   // 离线时保留旧 hash 用于后续对比
                   currentResults[url] = { 
@@ -265,8 +265,6 @@ jobs:
               }
 
               // Phase 2: 浏览器深度检测
-              const currentResults = { ...curlOfflineUrls }; // 预填充离线结果
-              
               if (candidatesForBrowser.length > 0) {
                 console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
                 
@@ -300,6 +298,7 @@ jobs:
                     ? oldEntry.hash 
                     : hash;
                   
+                  // 将浏览器检测结果写入 currentResults
                   currentResults[url] = { status: finalStatus, hash: hashToSave };
                   console.log(`[${getTime()}] 浏览器结果: ${url} -> ${finalStatus}`);
                 }
