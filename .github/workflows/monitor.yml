@@ -49,7 +49,6 @@ jobs:
           const CONFIRMATION_THRESHOLD = 2; // 需要连续2次相同才确认
 
           // 改进的待确认状态管理：记录检测次数
-          // 格式: { "url": { entry: {...}, count: 1 } }
           let pendingChanges = {};
 
           const transporter = nodemailer.createTransport({
@@ -66,7 +65,6 @@ jobs:
             return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
           }
 
-          // 【修复1】改进的 Curl 检测，更严格的存活判断
           function checkCurl(url) {
             return new Promise((resolve) => {
               const req = https.get(url, { 
@@ -80,7 +78,6 @@ jobs:
                 let data = '';
                 res.on('data', (chunk) => data += chunk);
                 res.on('end', () => {
-                  // 【修复】只有 2xx 状态码才算存活，且内容非空
                   const isAlive = statusCode >= 200 && statusCode < 300 && data.length > 100;
                   const hash = isAlive ? crypto.createHash('sha256').update(data).digest('hex') : '';
                   resolve({ 
@@ -106,7 +103,6 @@ jobs:
             });
           }
 
-          // 【修复2】改进的浏览器检测，更可靠的页面加载判断
           async function checkBrowserPage(browser, url) {
             let page = null;
             const context = await browser.newContext({
@@ -121,21 +117,17 @@ jobs:
               
               page = await context.newPage();
               
-              // 【修复】使用 networkidle 确保页面资源加载完成
               const response = await page.goto(targetUrl, { 
                 waitUntil: 'networkidle', 
                 timeout: 45000 
               });
               
-              // 检查 HTTP 状态
               if (!response || response.status() >= 400) {
                 return { url, status: 'Offline', httpStatus: response?.status() || 0 };
               }
               
-              // 额外等待确保游戏脚本执行
               await page.waitForTimeout(5000);
               
-              // 【修复】多维度检测邀请界面
               const checks = await Promise.all([
                 page.locator('text=/invitation/i').count().catch(() => 0),
                 page.locator('text=/邀请/i').count().catch(() => 0),
@@ -159,12 +151,9 @@ jobs:
             }
           }
 
-          // 【修复3】原子化的 Git 操作，避免竞态
           function commitAndPush() {
             try {
-              // 先拉取最新状态，避免冲突
               execSync('git pull --rebase origin main || git pull --rebase origin master || true', { stdio: 'pipe' });
-              
               execSync('git config --global user.name "github-actions[bot]"');
               execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
               execSync(`git add ${STATE_FILE}`);
@@ -197,7 +186,6 @@ jobs:
             }
           }
 
-          // 【修复4】改进的状态对比逻辑
           function isStateEqual(a, b) {
             if (!a || !b) return false;
             return a.status === b.status && a.hash === b.hash;
@@ -207,7 +195,6 @@ jobs:
             const loopStart = Date.now();
             console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-            // 构建 URL 列表
             const urls = [];
             for (let i = 1; i <= 10; i++) {
               urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
@@ -217,7 +204,6 @@ jobs:
               "https://tankiclassic.com/play/"
             );
 
-            // 读取已保存的状态（带重试）
             let committedStatusJson = {};
             let retries = 3;
             while (retries > 0) {
@@ -238,6 +224,9 @@ jobs:
             let notifications = [];
             let availableServers = [];
             let browser = null;
+            
+            // 【修复关键点】在此处提前初始化 currentResults
+            let currentResults = {};
 
             try {
               // Phase 1: Curl 快速筛选
@@ -245,7 +234,6 @@ jobs:
               const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
               
               const candidatesForBrowser = [];
-              const curlOfflineUrls = new Set();
 
               for (const res of curlResults) {
                 const { url, isAlive, hash, statusCode, dataLength } = res;
@@ -254,9 +242,8 @@ jobs:
                   candidatesForBrowser.push({ url, hash });
                   console.log(`[${getTime()}] Curl 存活: ${url} (状态: ${statusCode}, 大小: ${dataLength})`);
                 } else {
-                  curlOfflineUrls.add(url);
                   const oldEntry = committedStatusJson[url] || {};
-                  // 离线时保留旧 hash 用于后续对比
+                  // 现在 currentResults 已经定义，可以安全赋值
                   currentResults[url] = { 
                     status: "Offline", 
                     hash: oldEntry.hash || hash 
@@ -265,8 +252,6 @@ jobs:
               }
 
               // Phase 2: 浏览器深度检测
-              const currentResults = { ...curlOfflineUrls }; // 预填充离线结果
-              
               if (candidatesForBrowser.length > 0) {
                 console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
                 
@@ -289,13 +274,11 @@ jobs:
                   const { url, status, hash, error } = res;
                   const oldEntry = committedStatusJson[url] || {};
                   
-                  // 如果浏览器检测失败但 curl 成功，标记为 Closed（可能是邀请界面）
                   let finalStatus = status;
                   if (status === 'Offline' && !error) {
-                    finalStatus = 'Closed'; // 保守判断：能访问但检测失败，可能是封闭状态
+                    finalStatus = 'Closed';
                   }
                   
-                  // 离线时保留旧 hash
                   const hashToSave = finalStatus === 'Offline' && oldEntry.hash 
                     ? oldEntry.hash 
                     : hash;
@@ -305,14 +288,13 @@ jobs:
                 }
               }
 
-              // 【修复5】改进的双重确认机制（带计数器）
+              // 状态确认逻辑
               let hasConfirmedChanges = false;
 
               for (const url of urls) {
                 const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
                 const committedEntry = committedStatusJson[url] || {};
                 
-                // 状态相同：清除待确认
                 if (isStateEqual(currentEntry, committedEntry)) {
                   if (pendingChanges[url]) {
                     delete pendingChanges[url];
@@ -321,20 +303,16 @@ jobs:
                   continue;
                 }
 
-                // 状态不同：检查待确认
                 const pending = pendingChanges[url];
                 
                 if (pending && isStateEqual(pending.entry, currentEntry)) {
-                  // 连续相同，增加计数
                   pending.count++;
                   
                   if (pending.count >= CONFIRMATION_THRESHOLD) {
-                    // 【确认变化】
                     hasConfirmedChanges = true;
                     finalStatusJson[url] = currentEntry;
                     delete pendingChanges[url];
                     
-                    // 生成通知
                     const oldStatus = committedEntry.status || null;
                     const oldHash = committedEntry.hash || null;
                     const finalStatus = currentEntry.status;
@@ -374,18 +352,15 @@ jobs:
                     }
                   } else {
                     console.log(`[${getTime()}] 待确认 ${pending.count}/${CONFIRMATION_THRESHOLD}: ${url}`);
-                    // 保持原状，不写入文件
                     finalStatusJson[url] = committedEntry;
                   }
                 } else {
-                  // 首次发现变化或变化不一致，重置计数
                   console.log(`[${getTime()}] 发现潜在变化: ${url} (原: ${committedEntry.status} -> 新: ${currentEntry.status})`);
                   pendingChanges[url] = { entry: currentEntry, count: 1 };
                   finalStatusJson[url] = committedEntry;
                 }
               }
 
-              // 构建可用服务器列表（基于已确认的状态）
               for (const url of urls) {
                 const statusEntry = finalStatusJson[url];
                 if (statusEntry && statusEntry.status && statusEntry.status !== "Offline") {
@@ -394,7 +369,6 @@ jobs:
                 }
               }
 
-              // 发送通知
               if (notifications.length > 0) {
                 console.log(`[${getTime()}] 发送 ${notifications.length} 条通知...`);
                 fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
@@ -414,7 +388,6 @@ jobs:
                 const pendingMsg = pendingCount > 0 ? ` (有 ${pendingCount} 个状态待确认)` : "";
                 console.log(`[${getTime()}] 无已确认的状态变化。${pendingMsg} (耗时: ${duration}秒)`);
                 
-                // 【修复6】定期清理过期的 pendingChanges，防止内存泄漏
                 const now = Date.now();
                 for (const [url, data] of Object.entries(pendingChanges)) {
                   if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
@@ -435,23 +408,16 @@ jobs:
             }
           }
 
-          // 启动监测
           (async () => {
             console.log(`[${getTime()}] 监测器启动，运行时间限制: ${MAX_RUNTIME/3600000}小时`);
-            
-            // 立即执行第一次
             await main();
-            
-            // 设置定时器
             const intervalId = setInterval(async () => {
               const elapsed = Date.now() - START_TIME;
-              
               if (elapsed > MAX_RUNTIME) {
-                console.log(`[${getTime()}] 运行时间接近限制 (${(elapsed/3600000).toFixed(2)}小时)，退出...`);
+                console.log(`[${getTime()}] 运行时间接近限制，退出...`);
                 clearInterval(intervalId);
                 process.exit(0);
               }
-              
               await main();
             }, CHECK_INTERVAL);
           })();
