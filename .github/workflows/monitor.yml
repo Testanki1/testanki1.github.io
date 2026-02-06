@@ -48,7 +48,7 @@ jobs:
           const BROWSER_CONCURRENCY = 3; 
           const CONFIRMATION_THRESHOLD = 2; 
 
-          // 待确认状态缓存
+          // 记录检测次数
           let pendingChanges = {};
 
           const transporter = nodemailer.createTransport({
@@ -91,18 +91,19 @@ jobs:
               });
               
               req.on('error', (err) => {
-                // 静默处理常见网络错误，避免日志刷屏
+                console.log(`[${getTime()}] Curl 错误 ${url}: ${err.message}`);
                 resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 });
               });
               
               req.on('timeout', () => {
                 req.destroy();
+                console.log(`[${getTime()}] Curl 超时 ${url}`);
                 resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 });
               });
             });
           }
 
-          // 【修复重点】增强鲁棒性的浏览器检测函数
+          // 【修复】增强稳定性的浏览器检测函数
           async function checkBrowserPage(browser, url) {
             let page = null;
             const context = await browser.newContext({
@@ -118,40 +119,42 @@ jobs:
               
               page = await context.newPage();
               
-              // 1. 导航 (允许一定的跳转)
+              // 1. 访问页面
               const response = await page.goto(targetUrl, { 
-                waitUntil: 'domcontentloaded', // 放宽条件，避免一直等待 networkidle
+                waitUntil: 'commit', // 改为 commit，避免一直等待 networkidle 超时
                 timeout: 45000 
-              }).catch(e => null); // 捕获导航错误
+              });
               
               if (!response || response.status() >= 400) {
-                // 如果导航直接失败，尝试再次检查 URL 是否通过 Curl 可达，如果可达则可能是超时而非离线
                 return { url, status: 'Offline', httpStatus: response?.status() || 0 };
               }
               
-              // 2. 等待稳定
+              // 2. 等待加载稳定
               try {
-                // 等待一下可能的重定向，但不强制
-                await page.waitForTimeout(5000);
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await page.waitForTimeout(3000); 
               } catch (e) {}
 
-              // 3. 并行检测 (对每个检测项单独捕获错误，防止 page.content 在导航时崩溃整个流程)
-              const checkPromises = [
-                // Locator 检测比较稳定
+              // 3. 多维度检测邀请界面 (增加异常处理)
+              const checks = await Promise.all([
+                // Locator 检测 (自动重试，较稳定)
                 page.locator('text=/invitation/i').count().catch(() => 0),
                 page.locator('text=/邀请/i').count().catch(() => 0),
                 page.locator('[class*="invitation"]').count().catch(() => 0),
-                // 【修复核心】单独捕获 page.content 的导航冲突错误
-                page.content()
-                  .then(html => /invitation|邀请码|invite/i.test(html))
-                  .catch(e => {
-                    // console.log(`[Debug] Content check skipped due to nav: ${url}`);
+                
+                // 【修复】page.content() 包裹 try-catch，防止页面跳转时报错崩溃
+                (async () => {
+                  try {
+                    const html = await page.content();
+                    return /invitation|邀请码|invite/i.test(html);
+                  } catch (err) {
+                    // 页面正在跳转或销毁，忽略此次 content 检查
                     return false; 
-                  })
-              ];
+                  }
+                })()
+              ]);
               
-              const results = await Promise.all(checkPromises);
-              const hasInvitation = results.some(r => r > 0 || r === true);
+              const hasInvitation = checks.some(c => c > 0 || c === true);
               
               return { 
                 url, 
@@ -161,7 +164,8 @@ jobs:
               
             } catch (e) {
               console.log(`[${getTime()}] 浏览器检测错误 ${url}: ${e.message}`);
-              // 出错时保守返回 Offline，但带上 hash 避免误报变化
+              // 如果出错但不是离线，为了安全起见标记为 Closed (或者根据你的需求标记为 Offline)
+              // 这里返回 Offline 并带上错误信息
               return { url, status: 'Offline', error: e.message };
             } finally {
               await context.close().catch(() => {});
@@ -212,7 +216,6 @@ jobs:
             const loopStart = Date.now();
             console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-            // 定义 URL
             const urls = [];
             for (let i = 1; i <= 10; i++) {
               urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
@@ -222,24 +225,32 @@ jobs:
               "https://tankiclassic.com/play/"
             );
 
-            // 读取状态
             let committedStatusJson = {};
-            try {
-              if (fs.existsSync(STATE_FILE)) {
-                committedStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+            let retries = 3;
+            while (retries > 0) {
+              try {
+                if (fs.existsSync(STATE_FILE)) {
+                  const content = fs.readFileSync(STATE_FILE, 'utf8');
+                  committedStatusJson = JSON.parse(content);
+                }
+                break;
+              } catch (e) {
+                console.error(`[${getTime()}] 读取状态文件失败，重试...`);
+                retries--;
+                await new Promise(r => setTimeout(r, 1000));
               }
-            } catch (e) { console.error("读取状态文件出错，使用空状态"); }
+            }
 
             let finalStatusJson = { ...committedStatusJson };
             let notifications = [];
             let availableServers = [];
             let browser = null;
             
-            // 确保 currentResults 已初始化
+            // 初始化结果容器，避免 ReferenceError
             let currentResults = {};
 
             try {
-              // Phase 1: Curl
+              // Phase 1: Curl 快速筛选
               console.log(`[${getTime()}] Phase 1: Curl 检测 ${urls.length} 个 URL...`);
               const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
               
@@ -247,16 +258,21 @@ jobs:
 
               for (const res of curlResults) {
                 const { url, isAlive, hash, statusCode, dataLength } = res;
+                
                 if (isAlive) {
                   candidatesForBrowser.push({ url, hash });
                   console.log(`[${getTime()}] Curl 存活: ${url} (状态: ${statusCode}, 大小: ${dataLength})`);
                 } else {
                   const oldEntry = committedStatusJson[url] || {};
-                  currentResults[url] = { status: "Offline", hash: oldEntry.hash || hash };
+                  // Curl 失败直接标记为 Offline
+                  currentResults[url] = { 
+                    status: "Offline", 
+                    hash: oldEntry.hash || hash 
+                  };
                 }
               }
 
-              // Phase 2: Browser
+              // Phase 2: 浏览器深度检测
               if (candidatesForBrowser.length > 0) {
                 console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
                 
@@ -267,10 +283,10 @@ jobs:
                 
                 const limit = pLimit(BROWSER_CONCURRENCY);
                 const browserPromises = candidatesForBrowser.map(candidate => 
-                  limit(async () => {
-                    const res = await checkBrowserPage(browser, candidate.url);
-                    return { ...res, hash: candidate.hash };
-                  })
+                  limit(() => checkBrowserPage(browser, candidate.url).then(res => ({
+                    ...res,
+                    hash: candidate.hash
+                  })))
                 );
                 
                 const browserResults = await Promise.all(browserPromises);
@@ -280,112 +296,154 @@ jobs:
                   const oldEntry = committedStatusJson[url] || {};
                   
                   let finalStatus = status;
-                  // 如果浏览器检测报错但Curl是通的，为了不误报Offline，倾向于判定为Closed或保持上一次状态
-                  if (status === 'Offline' && error) {
-                     if (oldEntry.status && oldEntry.status !== 'Offline') {
-                         // 降级策略：如果之前在线，现在浏览器报错，暂且认为它保持原样（或者封闭），避免因为浏览器不稳导致频繁上下线
-                         finalStatus = 'Closed'; 
-                     }
+                  // 如果浏览器检测报错但 curl 是活的，我们不能确定它是否 Closed
+                  // 这里做一个保守策略：如果报错了，大概率是页面加载太慢或跳转太乱，暂时视为 Closed 防止漏报
+                  if (status === 'Offline' && !error) {
+                    finalStatus = 'Closed';
                   }
                   
-                  const hashToSave = finalStatus === 'Offline' && oldEntry.hash ? oldEntry.hash : hash;
+                  const hashToSave = finalStatus === 'Offline' && oldEntry.hash 
+                    ? oldEntry.hash 
+                    : hash;
+                  
                   currentResults[url] = { status: finalStatus, hash: hashToSave };
                   console.log(`[${getTime()}] 浏览器结果: ${url} -> ${finalStatus}`);
                 }
               }
 
-              // 对比逻辑
+              // 状态确认逻辑
               let hasConfirmedChanges = false;
 
               for (const url of urls) {
                 const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
                 const committedEntry = committedStatusJson[url] || {};
                 
+                // 状态未变
                 if (isStateEqual(currentEntry, committedEntry)) {
-                  if (pendingChanges[url]) delete pendingChanges[url];
+                  if (pendingChanges[url]) {
+                    delete pendingChanges[url];
+                  }
                   finalStatusJson[url] = committedEntry;
                   continue;
                 }
 
+                // 状态变化，检查确认计数
                 const pending = pendingChanges[url];
+                
                 if (pending && isStateEqual(pending.entry, currentEntry)) {
                   pending.count++;
+                  
                   if (pending.count >= CONFIRMATION_THRESHOLD) {
                     hasConfirmedChanges = true;
                     finalStatusJson[url] = currentEntry;
                     delete pendingChanges[url];
                     
-                    const oldStatus = committedEntry.status;
+                    const oldStatus = committedEntry.status || null;
+                    const oldHash = committedEntry.hash || null;
                     const finalStatus = currentEntry.status;
-                    
-                    // 生成通知文案 (仅在确实变化时)
-                    let message = "";
-                    const dispBold = s => s === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
-                    
-                    if (!oldStatus && finalStatus !== "Offline") {
-                      message = `首次发现服务器 (状态: ${dispBold(finalStatus)})`;
-                    } else if (oldStatus && finalStatus !== oldStatus) {
-                      if (oldStatus === 'Offline') message = `服务器已上线 (状态: ${dispBold(finalStatus)})`;
-                      else if (finalStatus === 'Offline') message = `服务器已下线`;
-                      else message = `状态变更: ${dispBold(oldStatus)} -> ${dispBold(finalStatus)}`;
-                    } else if (currentEntry.hash !== committedEntry.hash && finalStatus !== 'Offline') {
-                      message = `网页内容更新 (状态: ${dispBold(finalStatus)})`;
-                    }
+                    const hash = currentEntry.hash;
 
+                    let displayStatus = "";
+                    let displayStatusBold = "";
+                    if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
+                    if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+
+                    let message = "";
+                    if (!oldStatus && finalStatus !== "Offline") {
+                      message = `首次发现服务器 (状态: ${displayStatusBold})`;
+                    }
+                    else if (oldStatus && finalStatus !== oldStatus) {
+                      if (oldStatus === "Offline") {
+                        let baseMsg = finalStatus === "Open" ? "服务器已上线并<b>开放</b>" : "服务器已上线，当前为<b>封闭</b>状态";
+                        let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
+                        message = baseMsg + hashMsg;
+                      } 
+                      else if (finalStatus === "Offline") {
+                        let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                        message = `服务器已下线 (原状态: ${oldDisplay})`;
+                      }
+                      else {
+                        let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                        message = `服务器状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
+                      }
+                    }
+                    else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+                      message = `网页代码已更新 (状态: ${displayStatusBold})`;
+                    }
+                    
                     if (message) {
                       notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
                       console.log(`[${getTime()}] 【确认变化】${url}: ${message}`);
                     }
                   } else {
                     console.log(`[${getTime()}] 待确认 ${pending.count}/${CONFIRMATION_THRESHOLD}: ${url}`);
-                    finalStatusJson[url] = committedEntry; // 保持旧状态
+                    finalStatusJson[url] = committedEntry;
                   }
                 } else {
-                  console.log(`[${getTime()}] 发现变化: ${url} (${committedEntry.status || 'New'} -> ${currentEntry.status})`);
-                  pendingChanges[url] = { entry: currentEntry, count: 1, timestamp: Date.now() };
-                  finalStatusJson[url] = committedEntry; // 保持旧状态
+                  console.log(`[${getTime()}] 发现潜在变化: ${url} (原: ${committedEntry.status} -> 新: ${currentEntry.status})`);
+                  pendingChanges[url] = { entry: currentEntry, count: 1 };
+                  finalStatusJson[url] = committedEntry;
                 }
               }
 
-              // 构建列表
+              // 生成可用服务器列表
               for (const url of urls) {
-                const s = finalStatusJson[url];
-                if (s && s.status && s.status !== "Offline") {
-                  const disp = s.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
+                const statusEntry = finalStatusJson[url];
+                if (statusEntry && statusEntry.status && statusEntry.status !== "Offline") {
+                  const disp = statusEntry.status === 'Open' ? '<b>开放</b>' : '<b>封闭</b>';
                   availableServers.push(`<a href="${url}">${url}</a> (状态: ${disp})`);
                 }
               }
 
-              // 发送
+              // 处理通知和 Git
               if (notifications.length > 0) {
+                console.log(`[${getTime()}] 发送 ${notifications.length} 条通知...`);
                 fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
+                
                 if (commitAndPush()) {
-                  const body = `状态变化：<br>${notifications.join('<br>')}<br><hr><b>在线服务器:</b><br>${availableServers.length ? availableServers.join('<br>') : '无'}`;
-                  await sendEmail(body);
+                  const changeDetails = notifications.join('<br>');
+                  const availableListHeader = `<br><hr><b>当前已上线的服务器列表 (${availableServers.length} 个):</b><br>`;
+                  const availableListBody = availableServers.length > 0 
+                    ? availableServers.join('<br>') 
+                    : "目前没有已上线的服务器。";
+                  const fullBody = `检测到以下服务器状态发生变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
+                  await sendEmail(fullBody);
                 }
               } else {
-                console.log(`[${getTime()}] 无已确认变化 (耗时: ${((Date.now()-loopStart)/1000).toFixed(1)}s)`);
-              }
-              
-              // 清理过期 Pending
-              const now = Date.now();
-              for (const k in pendingChanges) {
-                if (now - pendingChanges[k].timestamp > 15 * 60 * 1000) delete pendingChanges[k];
+                const pendingCount = Object.keys(pendingChanges).length;
+                const duration = ((Date.now() - loopStart) / 1000).toFixed(1);
+                const pendingMsg = pendingCount > 0 ? ` (有 ${pendingCount} 个状态待确认)` : "";
+                console.log(`[${getTime()}] 无已确认的状态变化。${pendingMsg} (耗时: ${duration}秒)`);
+                
+                // 清理过期的待确认状态
+                const now = Date.now();
+                for (const [url, data] of Object.entries(pendingChanges)) {
+                  if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
+                    delete pendingChanges[url];
+                    console.log(`[${getTime()}] 清理过期待确认: ${url}`);
+                  } else if (!data.timestamp) {
+                    pendingChanges[url].timestamp = now;
+                  }
+                }
               }
 
             } catch (err) {
-              console.error(`[${getTime()}] 主循环异常:`, err);
+              console.error(`[${getTime()}] 主循环错误:`, err);
             } finally {
-              if (browser) await browser.close().catch(() => {});
+              if (browser) {
+                await browser.close().catch(() => {});
+              }
             }
           }
 
           (async () => {
-            console.log(`[${getTime()}] 启动监测 (限时 ${MAX_RUNTIME/3600000}h)`);
+            console.log(`[${getTime()}] 监测器启动，运行时间限制: ${MAX_RUNTIME/3600000}小时`);
             await main();
-            const timer = setInterval(async () => {
-              if (Date.now() - START_TIME > MAX_RUNTIME) {
-                clearInterval(timer);
+            const intervalId = setInterval(async () => {
+              const elapsed = Date.now() - START_TIME;
+              if (elapsed > MAX_RUNTIME) {
+                console.log(`[${getTime()}] 运行时间接近限制，退出...`);
+                clearInterval(intervalId);
                 process.exit(0);
               }
               await main();
