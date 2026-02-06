@@ -115,28 +115,48 @@ jobs:
                 : url + '?skipEntranceAnyKey';
               
               page = await context.newPage();
+
+              // === 修改开始：直接检测自动刷新 ===
               
+              // 1. 设置监听器，记录主框架的导航事件
+              let refreshCount = 0;
+              const navListener = (frame) => {
+                // 排除 about:blank，只监听主框架的实际跳转
+                if (frame === page.mainFrame() && frame.url() !== 'about:blank') {
+                  refreshCount++;
+                }
+              };
+              page.on('framenavigated', navListener);
+
+              // 2. 初始加载
+              // 使用 domcontentloaded 以防页面一直在转圈加载
               const response = await page.goto(targetUrl, { 
-                waitUntil: 'networkidle', 
+                waitUntil: 'domcontentloaded', 
                 timeout: 45000 
               });
               
               if (!response || response.status() >= 400) {
                 return { url, status: 'Offline', httpStatus: response?.status() || 0 };
               }
+
+              // 3. 稳定期等待与重置
+              // 等待2秒让初始重定向（如果有）完成，然后重置计数器
+              await page.waitForTimeout(2000);
+              refreshCount = 0; 
+
+              // 4. 观察期
+              // 等待 5 秒，看页面是否会自动刷新
+              await page.waitForTimeout(5000);
+
+              // 5. 判定结果
+              if (refreshCount > 0) {
+                 console.log(`[${getTime()}] 检测到自动刷新循环 - ${url} (5秒内刷新了 ${refreshCount} 次)`);
+                 return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
+              }
               
-              // === 关键修改：稳定性压力测试 ===
-              // 既然网页在不停刷新，我们就在这里多读几次。
-              // 如果它在循环，这三次读取中大概率会有一次撞上 "navigating" 错误。
-              await page.waitForTimeout(3000); // 先等3秒
-              await page.content(); // 第1次读取探测
-              
-              await page.waitForTimeout(2000); // 再等2秒
-              await page.content(); // 第2次读取探测
-              
-              await page.waitForTimeout(2000); // 再等2秒（最后一次检测逻辑会读第3次）
-              
-              // 并行检测
+              // === 修改结束 ===
+
+              // 如果没有自动刷新，进行常规内容检测
               const checks = await Promise.all([
                 page.locator('text=/invitation/i').count().catch(() => 0),
                 page.locator('text=/邀请/i').count().catch(() => 0),
