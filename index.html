@@ -2,9 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Testanki 的网站</title>
 <link rel="stylesheet" href="https://3dtank.com/wp-content/themes/mainsite/style.css" />
+<!-- 引入 Material Symbols Rounded 字体 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
 <style>
@@ -12,6 +13,7 @@
     @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@300;400;500;700&display=swap');
 
+    /* --- Material Symbols Rounded 通用设置 --- */
     .material-symbols-rounded {
       font-variation-settings:
       'FILL' 0,
@@ -31,7 +33,10 @@
 
     body {
         padding-top: 30px; 
-        background-color: #001926; 
+        background-color: #001926;
+        /* 防止主页面横向滚动 */
+        overflow-x: hidden;
+        width: 100%;
     }
 
     .logo-container {
@@ -102,6 +107,8 @@
         position: relative;
         padding-bottom: 5rem;
         transition: 0.6s ease-out;
+        width: 100%;
+        overflow: hidden; /* 防止父容器溢出 */
     }
 
     .news-heading {
@@ -119,9 +126,18 @@
         padding-left: 20px;
         overflow-x: auto;
         padding-bottom: 10px; 
-        scrollbar-color: rgba(191, 213, 255, 0.3) rgba(191, 213, 255, 0.1);
-        scrollbar-width: thin;
         -webkit-overflow-scrolling: touch;
+        
+        /* --- 隐藏滚动条的核心代码 --- */
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE 10+ */
+    }
+    
+    /* 针对 Chrome, Safari, Edge 隐藏滚动条 */
+    .news-scroller::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
     }
 
     .news-card {
@@ -368,13 +384,18 @@
     /* 阅读器内容滚动区域 */
     .news-reader-scroll-area {
         flex: 1;
+        /* 关键修复：允许垂直滚动，但禁止水平滚动 */
         overflow-y: auto;
+        overflow-x: hidden;
+        
         padding: 0 20px 60px 20px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        scrollbar-color: rgba(191, 213, 255, 0.3) rgba(191, 213, 255, 0.1);
+        
+        /* 隐藏滚动条但保留功能 */
         scrollbar-width: thin;
+        scrollbar-color: rgba(191, 213, 255, 0.3) rgba(191, 213, 255, 0.1);
     }
 
     .news-reader-preview {
@@ -463,6 +484,13 @@
         margin: 0px 0px 1.5rem;
         padding: 0px;
         color: rgb(255, 255, 255);
+    }
+    
+    /* 确保内容中的图片不超出容器 */
+    .news-reader-content img,
+    .news-reader-content video {
+        max-width: 100%;
+        height: auto;
     }
 
     /* --- 分享区域样式 --- */
