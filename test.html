@@ -93,6 +93,12 @@
             padding-top: 20px;
         }
 
+        /* 
+           修改点：
+           1. .button-container 是一个 <a> 标签，作为整体点击区域。
+           2. 移除了原来内部 .button/.server-label 的样式。
+           3. 新增 .server-name 样式来美化纯文字标题。
+        */
         .button-container {
             display: flex;
             align-items: center;
@@ -100,11 +106,14 @@
             width: 90%;
             background-color: var(--md-sys-color-surface);
             margin: 8px 0;
-            padding: 12px 16px; /* 稍微增加内边距 */
+            padding: 16px 24px; /* 稍微增加内边距，让卡片看起来更像一个整体 */
             border-radius: 16px;
             transition: background-color 0.2s, transform 0.2s;
             animation: fadeIn 0.5s var(--md-sys-motion-easing);
             border: 1px solid transparent;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
         }
 
         @keyframes fadeIn {
@@ -115,38 +124,23 @@
         .button-container:hover {
             background-color: var(--md-sys-color-surface-variant);
             border-color: rgba(118, 255, 51, 0.2);
+            transform: translateY(-2px);
         }
 
-        .button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 16px;
-            height: 36px;
-            background-color: rgba(0, 0, 0, 0.2);
-            color: var(--md-sys-color-primary);
-            border: 1px solid rgba(118, 255, 51, 0.3);
-            text-decoration: none;
-            border-radius: 18px;
+        /* 新增：纯文字标题样式 */
+        .server-name {
+            font-size: 1.1rem;
             font-weight: 500;
-            font-size: 14px;
-            transition: all 0.3s;
-            flex-shrink: 0;
-            margin-right: 12px;
-        }
-
-        .button:hover {
-            background-color: var(--md-sys-color-primary);
-            color: var(--md-sys-color-on-primary);
-            box-shadow: 0 0 15px rgba(118, 255, 51, 0.3);
+            color: var(--md-sys-color-primary);
+            letter-spacing: 0.5px;
         }
 
         /* Right Side Info Layout - Horizontal */
         .info-wrapper {
             display: flex;
-            flex-direction: row; /* 水平排列 */
-            align-items: center; /* 垂直居中 */
-            gap: 12px; /* 数据和图标之间的间距 */
+            flex-direction: row; 
+            align-items: center; 
+            gap: 12px; 
             justify-content: flex-end;
             min-width: 100px;
         }
@@ -156,7 +150,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 28px; /* 稍微大一点的容器，确保对齐 */
+            width: 28px; 
             height: 28px;
             flex-shrink: 0;
         }
@@ -170,23 +164,12 @@
         /* Stats Text Container */
         .stats-wrapper {
             display: flex;
-            flex-direction: column; /* 文字依然保持上下两行，看起来更整洁 */
-            align-items: flex-end; /* 文字靠右对齐 */
+            flex-direction: column; 
+            align-items: flex-end; 
             font-size: 11px;
             color: var(--md-sys-color-on-surface);
             opacity: 0.8;
             line-height: 1.3;
-        }
-
-        .button.back-button {
-            position: fixed;
-            top: 110px;
-            left: 20px;
-            z-index: 900;
-            background: rgba(0, 25, 38, 0.9);
-            border-color: var(--md-sys-color-on-surface);
-            color: var(--md-sys-color-on-surface);
-            backdrop-filter: blur(4px);
         }
 
         .loader {
@@ -250,14 +233,12 @@
         const texts = {
             title: isChinese ? '测试服务器' : 'Test Server',
             subtitle: isChinese ? '主页重新设计' : 'Homepage Redesign',
-            back: isChinese ? '返回' : 'Back',
             loading: isChinese ? '...' : '...',
             online: isChinese ? '在线: ' : 'Online: ',
             inbattles: isChinese ? '战斗中: ' : 'In Battles: ',
             noServers: isChinese ? '当前暂无服务器' : 'No servers available currently'
         };
 
-        // --- SVG 图标常量 (稍作优化，移除冗余) ---
         const svgs = {
             error: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle opacity="0.4" cx="16" cy="16" r="16" fill="#FF6666"/><circle cx="16" cy="16" r="12" fill="#FF6666"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 22V20H18V22H14ZM14 10L14 18H15.3333C16.8061 18 18 16.8061 18 15.3333V10H14Z" fill="#001926"/></svg>`,
             open: `<svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="15" cy="15" r="8" fill="#76FF33"/><circle cx="15" cy="15" r="11.5" stroke="#76FF33" stroke-opacity="0.25" stroke-width="7"/></svg>`,
@@ -272,20 +253,6 @@
 
         if (!isChinese) {
             document.documentElement.lang = "en";
-        }
-
-        if (document.referrer.includes('testanki1.github.io')) {
-            const backButton = document.createElement('a');
-            backButton.href = '#';
-            backButton.className = 'button back-button'; 
-            backButton.textContent = texts.back; 
-            document.body.appendChild(backButton);
-            document.body.style.paddingTop = "160px"; 
-
-            backButton.addEventListener('click', function(event) {
-                event.preventDefault(); 
-                window.history.back(); 
-            });
         }
 
         // --- JSON 状态获取逻辑 ---
@@ -315,20 +282,22 @@
             }
         }
 
+        // --- 修改点：创建按钮元素的逻辑 ---
         function createButtonElement(label, link) {
-            const container = document.createElement('div');
+            const container = document.createElement('a');
             container.className = 'button-container';
+            container.href = link; 
             
-            const button = document.createElement('a');
-            button.href = link;
-            button.textContent = label;
-            button.className = 'button';
+            // 这里不再创建有背景色的 span，而是创建一个普通的文字 span
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = label;
+            nameSpan.className = 'server-name'; // 应用新样式
             
-            // 右侧信息包裹容器 (Horizontal Flex)
+            // 右侧信息包裹容器
             const infoWrapper = document.createElement('div');
             infoWrapper.className = 'info-wrapper';
 
-            // 1. 数据统计 (靠左)
+            // 1. 数据统计
             const statsWrapper = document.createElement('div');
             statsWrapper.className = 'stats-wrapper';
 
@@ -343,15 +312,16 @@
             statsWrapper.appendChild(onlineCount);
             statsWrapper.appendChild(inbattlesCount);
 
-            // 2. 状态图标 (靠右)
+            // 2. 状态图标
             const statusIcon = document.createElement('span');
             statusIcon.className = 'status-icon';
 
-            // 添加顺序：先数据，再图标
+            // 添加顺序
             infoWrapper.appendChild(statsWrapper);
             infoWrapper.appendChild(statusIcon);
 
-            container.appendChild(button);
+            // 组装卡片
+            container.appendChild(nameSpan);
             container.appendChild(infoWrapper);
             
             return container;
@@ -396,7 +366,7 @@
             element.querySelector('.online-count').textContent = `${texts.online}${onlineCount}`;
             element.querySelector('.inbattles-count').textContent = `${texts.inbattles}${inbattlesCount}`;
 
-            // 更新状态 (仅图标)
+            // 更新状态
             const statusIconEl = element.querySelector('.status-icon');
             
             let serverInfo = serverStatusData[targetUrl];
