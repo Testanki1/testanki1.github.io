@@ -4,22 +4,24 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-const pLimit = require('p-limit').default || require('p-limit');
+const pLimit = require('p-limit');
 
-// --- 基础配置 ---
+// --- 配置 ---
 const STATE_FILE = 'server_status.json';
-const CHECK_INTERVAL = 60 * 1000; 
-const MAX_RUNTIME = 4.8 * 60 * 60 * 1000; 
+const CHECK_INTERVAL = 60 * 1000;
+const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // GitHub Actions 限制运行 6 小时，预留缓冲
 const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; 
 
 let pendingChanges = {};
 
+// 邮件发送器配置
 const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
+  // 强制使用 IPv4 家族，解决 GitHub Actions 环境下 IPv6 路由不可达导致的 ENETUNREACH 报错
   family: 4, 
   auth: {
     user: process.env.MAIL_USERNAME,
@@ -46,38 +48,59 @@ function checkCurl(url) {
       res.on('end', () => {
         const isAlive = statusCode >= 200 && statusCode < 300 && data.length > 100;
         const hash = isAlive ? crypto.createHash('sha256').update(data).digest('hex') : '';
-        resolve({ url, statusCode, hash, isAlive });
+        resolve({ 
+          url, 
+          statusCode, 
+          hash, 
+
+          isAlive,
+          dataLength: data.length 
+        });
       });
     });
     
-    req.on('error', () => resolve({ url, statusCode: 0, hash: '', isAlive: false }));
+    req.on('error', (err) => {
+      console.log(`[${getTime()}] Curl 错误 ${url}: ${err.message}`);
+      resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 });
+    });
+    
+    req.on('timeout', () => {
+      req.destroy();
+      console.log(`[${getTime()}] Curl 超时 ${url}`);
+      resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 });
+    });
   });
 }
 
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.0',
     viewport: { width: 1280, height: 720 }
   });
   
   try {
-    const targetUrl = url.includes('?') ? url + '&skipEntranceAnyKey' : url + '?skipEntranceAnyKey';
+    const targetUrl = url.includes('?') 
+      ? url + '&skipEntranceAnyKey' 
+      : url + '?skipEntranceAnyKey';
+    
     page = await context.newPage();
 
+    // === 检测自动刷新 ===
     let refreshCount = 0;
-    page.on('framenavigated', (frame) => {
+    const navListener = (frame) => {
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') {
         refreshCount++;
       }
-    });
+    };
+    page.on('framenavigated', navListener);
 
     const response = await page.goto(targetUrl, { 
       waitUntil: 'domcontentloaded', 
       timeout: 45000 
     });
     
-    if (!response || response.status() < 200 || response.status() >= 300) {
+    if (!response || response.status() >= 400) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
@@ -86,74 +109,67 @@ async function checkBrowserPage(browser, url) {
     await page.waitForTimeout(5000);
 
     if (refreshCount > 0) {
-      return { url, status: 'Error', error: `监测到页面自动刷新 ${refreshCount} 次` };
+       console.log(`[${getTime()}] 检测到自动刷新循环 - ${url} (5秒内刷新了 ${refreshCount} 次)`);
+       return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
-
-    const content = await page.content();
-    const hasInvitation = /invitation|邀请码|invite/i.test(content);
-    const hasCanvas = content.includes('<canvas');
     
-    let finalStatus = 'Closed';
-    if (!hasInvitation && hasCanvas) {
-      finalStatus = 'Open';
-    } else if (hasInvitation) {
-      finalStatus = 'Closed';
-    } else {
-      finalStatus = 'Closed';
-    }
-
-    return { url, status: finalStatus, httpStatus: response.status() };
+    // === 常规内容检测 ===
+    const checks = await Promise.all([
+      page.locator('text=/invitation/i').count().catch(() => 0),
+      page.locator('text=/邀请/i').count().catch(() => 0),
+      page.locator('[class*="invitation"]').count().catch(() => 0),
+      page.content().then(html => /invitation|邀请码|invite/i.test(html))
+    ]);
+    
+    const hasInvitation = checks.some(c => c > 0 || c === true);
+    
+    return { 
+      url, 
+      status: hasInvitation ? 'Closed' : 'Open',
+      httpStatus: response.status()
+    };
     
   } catch (e) {
-    return { url, status: 'Error', error: e.message };
+    const msg = e.message ? e.message.toLowerCase() : "";
+    
+    if (
+      msg.includes('navigating') || 
+      msg.includes('retrieve content') || 
+
+      msg.includes('execution context') || 
+      msg.includes('destroyed') ||
+      msg.includes('timeout') ||
+      msg.includes('redirect') 
+    ) {
+       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
+       return { url, status: 'Error', error: e.message };
+    }
+
+    console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
+    return { url, status: 'Offline', error: e.message };
   } finally {
-    if (context) await context.close().catch(() => {});
+    await context.close().catch(() => {});
   }
 }
 
-/**
- * 将变更推送到 GitHub 仓库
- * 修复：增加自动拉取代码逻辑，解决 push rejected 问题
- */
 function commitAndPush() {
   try {
-    // 1. 配置 Git 用户
+    // 确保拉取最新代码避免冲突
+    execSync('git pull --rebase origin main || git pull --rebase origin master || true', { stdio: 'pipe' });
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
-    
-    // 2. 添加文件
     execSync(`git add ${STATE_FILE}`);
     
-    // 3. 检查是否有变动
     const status = execSync('git status --porcelain').toString();
     if (status) {
-      // 4. 提交变动
-      execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
-      
-      try {
-        // 5. 尝试直接推送
-        execSync('git push');
-      } catch (pushError) {
-        console.log(`[${getTime()}] 推送被拒绝，尝试同步远程代码 (git pull --rebase)...`);
-        
-        // --- 核心修复逻辑 ---
-        // 如果推送失败，说明远程有新提交。
-        // 使用 --rebase 模式拉取，这样可以将我们的提交“接”在远程提交之后，保持提交记录整洁
-        try {
-          execSync('git pull --rebase');
-          execSync('git push'); // 再次尝试推送
-        } catch (rebaseError) {
-           console.error(`[${getTime()}] 同步并推送依然失败: ${rebaseError.message}`);
-           return false;
-        }
-      }
-
-      console.log(`[${getTime()}] 成功推送状态至仓库`);
+      execSync('git commit -m "chore: 更新服务器状态文件 [skip ci]"');
+      execSync('git push');
+      console.log(`[${getTime()}] Git 状态已更新并推送。`);
       return true;
     }
     return false;
   } catch (e) {
-    console.error(`[${getTime()}] Git 操作严重失败: ${e.message}`);
+    console.error(`[${getTime()}] Git 提交失败:`, e.message);
     return false;
   }
 }
@@ -161,31 +177,26 @@ function commitAndPush() {
 async function sendEmail(body) {
   try {
     await transporter.sendMail({
-      from: `"3D坦克监测" <${process.env.MAIL_USERNAME}>`,
+      from: `"3D坦克测试服监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
-      subject: "【状态变更】3D坦克测试服监测报告",
-      html: `<div style="font-family: sans-serif;">
-              <h3>检测到服务器状态变动：</h3>
-              <p>${body}</p>
-              <hr />
-              <p style="font-size: 12px; color: #666;">监测时间：${getTime()}</p>
-            </div>`
+      subject: "3D坦克测试服务器状态更新",
+      html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
     });
-    console.log(`[${getTime()}] 通知邮件已发送`);
+    console.log(`[${getTime()}] 邮件已发送。`);
   } catch (error) {
-    console.error(`[${getTime()}] 邮件发送失败:`, error.message);
+    console.error(`[${getTime()}] 邮件发送失败:`, error);
   }
 }
 
 function isStateEqual(a, b) {
   if (!a || !b) return false;
-  // 核心逻辑：只有状态（Open/Closed/Offline）发生改变才算变更，忽略 Hash 差异
-  return a.status === b.status;
+  return a.status === b.status && a.hash === b.hash;
 }
 
 async function main() {
-  console.log(`[${getTime()}] 开始监测循环...`);
-  
+  const loopStart = Date.now();
+  console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
+
   const urls = [];
   for (let i = 1; i <= 10; i++) {
     urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
@@ -195,90 +206,206 @@ async function main() {
     "https://tankiclassic.com/play/"
   );
 
-  let oldStatus = {};
-  if (fs.existsSync(STATE_FILE)) {
+  let committedStatusJson = {};
+  let retries = 3;
+  while (retries > 0) {
     try {
-      oldStatus = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    } catch (e) { oldStatus = {}; }
+      if (fs.existsSync(STATE_FILE)) {
+        const content = fs.readFileSync(STATE_FILE, 'utf8');
+        committedStatusJson = JSON.parse(content);
+      }
+      break;
+    } catch (e) {
+      console.error(`[${getTime()}] 读取状态文件失败，重试...`);
+      retries--;
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
-  const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
-  const browserCandidates = curlResults.filter(r => r.isAlive);
-  
-  const currentResults = {};
-  curlResults.filter(r => !r.isAlive).forEach(r => {
-    currentResults[r.url] = { status: 'Offline', hash: r.hash };
-  });
-
-  if (browserCandidates.length > 0) {
-    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-    const limit = pLimit(BROWSER_CONCURRENCY);
-    
-    const browserResults = await Promise.all(browserCandidates.map(c => 
-      limit(() => checkBrowserPage(browser, c.url).then(res => ({ ...res, hash: c.hash })))
-    ));
-
-    browserResults.forEach(r => {
-      currentResults[r.url] = { status: r.status, hash: r.hash };
-    });
-    await browser.close();
-  }
-
+  let finalStatusJson = { ...committedStatusJson };
   let notifications = [];
-  let hasUpdate = false;
+  let availableServers = [];
+  let browser = null;
+  let currentResults = {};
 
-  for (const url of urls) {
-    const current = currentResults[url];
-    const previous = oldStatus[url] || { status: 'Offline', hash: '' };
+  try {
+    // Phase 1: Curl
+    console.log(`[${getTime()}] Phase 1: Curl 检测 ${urls.length} 个 URL...`);
+    const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
+    const candidatesForBrowser = [];
 
-    // 1. 如果新旧状态完全一致，清空该 URL 的待定状态
-    if (isStateEqual(current, previous)) {
-      delete pendingChanges[url];
-      continue;
-    }
-
-    // 2. 只有当涉及到 Open 状态的变入或变出时，才进行下一步确认
-    // 逻辑：如果之前不是 Open，现在也不是 Open（比如从 Offline 变到 Closed），则跳过提示
-    if (previous.status !== 'Open' && current.status !== 'Open') {
-      oldStatus[url] = current; // 更新记录但不开通知
-      hasUpdate = true;
-      continue;
-    }
-
-    // 3. 状态确认机制
-    if (!pendingChanges[url] || !isStateEqual(pendingChanges[url].entry, current)) {
-      pendingChanges[url] = { entry: current, count: 1 };
-    } else {
-      pendingChanges[url].count++;
-      if (pendingChanges[url].count >= CONFIRMATION_THRESHOLD) {
-        notifications.push(`<b>${url}</b>: ${previous.status} -> <span style="color:red">${current.status}</span>`);
-        oldStatus[url] = current;
-        hasUpdate = true;
-        delete pendingChanges[url];
+    for (const res of curlResults) {
+      const { url, isAlive, hash, statusCode } = res;
+      if (isAlive) {
+        candidatesForBrowser.push({ url, hash });
+        console.log(`[${getTime()}] Curl 存活: ${url} (${statusCode})`);
+      } else {
+        const oldEntry = committedStatusJson[url] || {};
+        currentResults[url] = { status: "Offline", hash: oldEntry.hash || hash };
       }
     }
-  }
 
-  if (hasUpdate) {
-    fs.writeFileSync(STATE_FILE, JSON.stringify(oldStatus, null, 2));
-    // 只有当存在需要通知的变更（涉及 Open 状态）时才发邮件
+    // Phase 2: Browser
+    if (candidatesForBrowser.length > 0) {
+      console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
+      browser = await chromium.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      
+      const limit = pLimit(BROWSER_CONCURRENCY);
+      const browserPromises = candidatesForBrowser.map(candidate => 
+        limit(() => checkBrowserPage(browser, candidate.url).then(res => ({
+          ...res,
+          hash: candidate.hash
+        })))
+      );
+      
+      const browserResults = await Promise.all(browserPromises);
+      
+      for (const res of browserResults) {
+        const { url, status, hash, error } = res;
+        const oldEntry = committedStatusJson[url] || {};
+        
+        let finalStatus = status;
+        if (status === 'Offline' && !error) {
+          finalStatus = 'Closed'; 
+        }
+        
+        const hashToSave = (finalStatus === 'Offline') && oldEntry.hash 
+          ? oldEntry.hash 
+          : hash;
+        
+        currentResults[url] = { status: finalStatus, hash: hashToSave };
+        console.log(`[${getTime()}] 浏览器结果: ${url} -> ${finalStatus}`);
+      }
+    }
+
+    // Phase 3: 状态比对
+    for (const url of urls) {
+      const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
+      const committedEntry = committedStatusJson[url] || {};
+      
+      if (isStateEqual(currentEntry, committedEntry)) {
+        if (pendingChanges[url]) delete pendingChanges[url];
+        finalStatusJson[url] = committedEntry;
+        continue;
+      }
+
+      const pending = pendingChanges[url];
+      if (pending && isStateEqual(pending.entry, currentEntry)) {
+        pending.count++;
+        if (pending.count >= CONFIRMATION_THRESHOLD) {
+          finalStatusJson[url] = currentEntry;
+          delete pendingChanges[url];
+          
+          const oldStatus = committedEntry.status || null;
+          const oldHash = committedEntry.hash || null;
+          const finalStatus = currentEntry.status;
+          const hash = currentEntry.hash;
+
+          let displayStatus = "";
+          let displayStatusBold = "";
+          if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
+          else if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+          else if (finalStatus === "Error") { displayStatus = "错误"; displayStatusBold = "<b>错误</b>"; }
+
+          let message = "";
+          
+          if (!oldStatus && finalStatus !== "Offline") {
+            message = `首次发现服务器 (状态: ${displayStatusBold})`;
+          }
+          else if (oldStatus && finalStatus !== oldStatus) {
+            if (oldStatus === "Offline") {
+              if (finalStatus === "Error") {
+                   let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
+                   message = `服务器已上线但出现<b>错误</b>${hashMsg}`;
+              } else {
+                   let baseMsg = finalStatus === "Open" ? "服务器已上线并<b>开放</b>" : "服务器已上线，当前为<b>封闭</b>状态";
+                   let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
+                   message = baseMsg + hashMsg;
+              }
+            } 
+            else if (finalStatus === "Offline") {
+              let oldDisplay = oldStatus; 
+              if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
+              if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
+              if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
+              message = `服务器已下线 (原状态: ${oldDisplay})`;
+            }
+            else {
+               let oldDisplay = oldStatus;
+               if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
+               if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
+               if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
+               message = `服务器状态已从${oldDisplay}变为${displayStatusBold}`;
+            }
+          }
+          else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+            message = `网页代码已更新（状态: ${displayStatusBold}）`;
+          }
+          
+          if (message) {
+            notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
+          }
+        } else {
+          console.log(`[${getTime()}] 待确认 ${pending.count}/${CONFIRMATION_THRESHOLD}: ${url} -> ${currentEntry.status}`);
+          finalStatusJson[url] = committedEntry;
+        }
+      } else {
+        console.log(`[${getTime()}] 发现潜在变化: ${url} (原: ${committedEntry.status} -> 新: ${currentEntry.status})`);
+        pendingChanges[url] = { entry: currentEntry, count: 1 };
+        finalStatusJson[url] = committedEntry;
+      }
+    }
+
+    for (const url of urls) {
+      const statusEntry = finalStatusJson[url];
+      if (statusEntry && statusEntry.status && statusEntry.status !== "Offline") {
+        let disp = '<b>未知</b>';
+        if (statusEntry.status === 'Open') disp = '<b>开放</b>';
+        else if (statusEntry.status === 'Closed') disp = '<b>封闭</b>';
+        else if (statusEntry.status === 'Error') disp = '<b>错误</b>';
+        
+        availableServers.push(`<a href="${url}">${url}</a> (状态: ${disp})`);
+      }
+    }
+
     if (notifications.length > 0) {
+      fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       if (commitAndPush()) {
-        await sendEmail(notifications.join('<br>'));
+        const changeDetails = notifications.join('<br>');
+        const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
+        const availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
+        const fullBody = `检测到状态变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
+        await sendEmail(fullBody);
       }
     } else {
-      // 仅仅是静默更新仓库中的状态文件（比如 Offline 变 Closed）
-      commitAndPush();
+      const now = Date.now();
+      for (const [url, data] of Object.entries(pendingChanges)) {
+        if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
+          delete pendingChanges[url];
+        } else if (!data.timestamp) {
+          pendingChanges[url].timestamp = now;
+        }
+      }
+      console.log(`[${getTime()}] 无已确认的状态变化。`);
     }
+
+  } catch (err) {
+    console.error(`[${getTime()}] 主循环错误:`, err);
+  } finally {
+    if (browser) await browser.close().catch(() => {});
   }
 }
 
+// 启动逻辑
 (async () => {
+  console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
-  const timer = setInterval(async () => {
+  const intervalId = setInterval(async () => {
     if (Date.now() - START_TIME > MAX_RUNTIME) {
-      clearInterval(timer);
-      console.log("达到最大运行时间，正常退出。");
+      clearInterval(intervalId);
       process.exit(0);
     }
     await main();
