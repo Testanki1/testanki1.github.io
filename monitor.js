@@ -80,8 +80,8 @@ async function checkBrowserPage(browser, url) {
   
   try {
     const targetUrl = url.includes('?') 
-      ? url + '&skipEntranceAnyKey' 
-      : url + '?skipEntranceAnyKey';
+      ? url + '&skipEntranceAnyKey&locale=en' 
+      : url + '?skipEntranceAnyKey&locale=en';
     
     page = await context.newPage();
 
