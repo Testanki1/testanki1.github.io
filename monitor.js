@@ -4,7 +4,6 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-// 兼容 ESM 模块导出
 const pLimit = require('p-limit').default || require('p-limit');
 
 // --- 基础配置 ---
@@ -153,7 +152,8 @@ async function sendEmail(body) {
 
 function isStateEqual(a, b) {
   if (!a || !b) return false;
-  return a.status === b.status && a.hash === b.hash;
+  // 核心逻辑：只有状态（Open/Closed/Offline）发生改变才算变更，忽略 Hash 差异
+  return a.status === b.status;
 }
 
 async function main() {
@@ -202,13 +202,23 @@ async function main() {
 
   for (const url of urls) {
     const current = currentResults[url];
-    const previous = oldStatus[url] || { status: 'Unknown', hash: '' };
+    const previous = oldStatus[url] || { status: 'Offline', hash: '' };
 
+    // 1. 如果新旧状态完全一致，清空该 URL 的待定状态
     if (isStateEqual(current, previous)) {
       delete pendingChanges[url];
       continue;
     }
 
+    // 2. 只有当涉及到 Open 状态的变入或变出时，才进行下一步确认
+    // 逻辑：如果之前不是 Open，现在也不是 Open（比如从 Offline 变到 Closed），则跳过提示
+    if (previous.status !== 'Open' && current.status !== 'Open') {
+      oldStatus[url] = current; // 更新记录但不开通知
+      hasUpdate = true;
+      continue;
+    }
+
+    // 3. 状态确认机制
     if (!pendingChanges[url] || !isStateEqual(pendingChanges[url].entry, current)) {
       pendingChanges[url] = { entry: current, count: 1 };
     } else {
@@ -224,8 +234,14 @@ async function main() {
 
   if (hasUpdate) {
     fs.writeFileSync(STATE_FILE, JSON.stringify(oldStatus, null, 2));
-    if (commitAndPush()) {
-      await sendEmail(notifications.join('<br>'));
+    // 只有当存在需要通知的变更（涉及 Open 状态）时才发邮件
+    if (notifications.length > 0) {
+      if (commitAndPush()) {
+        await sendEmail(notifications.join('<br>'));
+      }
+    } else {
+      // 仅仅是静默更新仓库中的状态文件（比如 Offline 变 Closed）
+      commitAndPush();
     }
   }
 }
