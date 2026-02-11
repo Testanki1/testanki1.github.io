@@ -1,37 +1,39 @@
-name: 3D坦克测试服监测器
+name: 3D坦克测试服监测
 
 on:
   schedule:
+    # 每5小时自动启动一次，配合脚本内的循环实现近乎全天候监测
     - cron: '0 */5 * * *'
-  workflow_dispatch:
+  workflow_dispatch: # 支持手动触发
 
 jobs:
-  continuous-monitor:
+  monitor:
     runs-on: ubuntu-latest
+    # 授予写入权限，以便脚本可以更新 server_status.json 并推送到仓库
     permissions:
       contents: write
     
     steps:
-      - name: Checkout repository
+      - name: 检出代码
         uses: actions/checkout@v4
         with:
-          # 确保拉取到所有历史，有助于防止 push 冲突，虽然后面脚本有 rebase
-          fetch-depth: 0
+          persist-credentials: true
 
-      - name: Setup Node.js
+      - name: 设置 Node.js 环境
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install dependencies
-        # 安装脚本运行所需的库
+      - name: 安装依赖
         run: |
-          npm i playwright nodemailer p-limit@3
-          npx playwright install --with-deps chromium
+          npm install playwright nodemailer p-limit
+          npx playwright install chromium
 
-      - name: Run Monitor
+      - name: 运行监测器
         env:
+          # 必须在仓库 Settings -> Secrets -> Actions 中配置以下变量
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+        # 运行独立的脚本文件
         run: node monitor.js
