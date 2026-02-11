@@ -111,22 +111,49 @@ async function checkBrowserPage(browser, url) {
   }
 }
 
+/**
+ * 将变更推送到 GitHub 仓库
+ * 修复：增加自动拉取代码逻辑，解决 push rejected 问题
+ */
 function commitAndPush() {
   try {
+    // 1. 配置 Git 用户
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
+    
+    // 2. 添加文件
     execSync(`git add ${STATE_FILE}`);
     
+    // 3. 检查是否有变动
     const status = execSync('git status --porcelain').toString();
     if (status) {
+      // 4. 提交变动
       execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
-      execSync('git push');
+      
+      try {
+        // 5. 尝试直接推送
+        execSync('git push');
+      } catch (pushError) {
+        console.log(`[${getTime()}] 推送被拒绝，尝试同步远程代码 (git pull --rebase)...`);
+        
+        // --- 核心修复逻辑 ---
+        // 如果推送失败，说明远程有新提交。
+        // 使用 --rebase 模式拉取，这样可以将我们的提交“接”在远程提交之后，保持提交记录整洁
+        try {
+          execSync('git pull --rebase');
+          execSync('git push'); // 再次尝试推送
+        } catch (rebaseError) {
+           console.error(`[${getTime()}] 同步并推送依然失败: ${rebaseError.message}`);
+           return false;
+        }
+      }
+
       console.log(`[${getTime()}] 成功推送状态至仓库`);
       return true;
     }
     return false;
   } catch (e) {
-    console.error(`[${getTime()}] Git 推送失败: ${e.message}`);
+    console.error(`[${getTime()}] Git 操作严重失败: ${e.message}`);
     return false;
   }
 }
