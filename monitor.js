@@ -4,13 +4,11 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-// 删除旧的 require 引用
-// const pLimit = require('p-limit'); 
 
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
 const CHECK_INTERVAL = 60 * 1000;
-const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // GitHub Actions 限制运行 6 小时，预留缓冲
+const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; 
 const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; 
@@ -22,7 +20,6 @@ const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
-  // 强制使用 IPv4 家族，解决 GitHub Actions 环境下 IPv6 路由不可达导致的 ENETUNREACH 报错
   family: 4, 
   auth: {
     user: process.env.MAIL_USERNAME,
@@ -53,7 +50,6 @@ function checkCurl(url) {
           url, 
           statusCode, 
           hash, 
-
           isAlive,
           dataLength: data.length 
         });
@@ -73,11 +69,13 @@ function checkCurl(url) {
   });
 }
 
+// === 修改核心检测逻辑 ===
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.0',
-    viewport: { width: 1280, height: 720 }
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 },
+    ignoreHTTPSErrors: true // 忽略证书错误，增加稳定性
   });
   
   try {
@@ -105,25 +103,59 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    await page.waitForTimeout(2000);
+    // 等待网络空闲，确保动态内容加载完毕
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    } catch (e) {}
+
+    await page.waitForTimeout(3000); // 额外的强制等待，确保 UI 渲染
     refreshCount = 0; 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
     if (refreshCount > 0) {
-       console.log(`[${getTime()}] 检测到自动刷新循环 - ${url} (5秒内刷新了 ${refreshCount} 次)`);
+       console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    // === 常规内容检测 ===
-    const checks = await Promise.all([
-      page.locator('text=/invitation/i').count().catch(() => 0),
-      page.locator('text=/邀请/i').count().catch(() => 0),
-      page.locator('[class*="invitation"]').count().catch(() => 0),
-      page.content().then(html => /invitation|邀请码|invite/i.test(html))
-    ]);
+    // === 增强版内容检测 ===
+    // 1. 获取主页面可见文本
+    const visibleText = await page.innerText('body').catch(() => '');
     
-    const hasInvitation = checks.some(c => c > 0 || c === true);
+    // 2. 获取主页面 HTML 源码
+    const htmlContent = await page.content().catch(() => '');
     
+    // 3. 专门获取所有输入框的 placeholder (常用于 invite code 输入框)
+    const inputPlaceholders = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll('input, textarea'))
+            .map(el => el.getAttribute('placeholder') || '')
+            .join(' ');
+    }).catch(() => '');
+
+    // 4. 获取所有 iframe 内部的文本 (有些游戏 UI 嵌在 iframe 里)
+    let frameTexts = '';
+    for (const frame of page.frames()) {
+        try {
+            if (frame !== page.mainFrame()) {
+                frameTexts += await frame.content();
+            }
+        } catch(e) {}
+    }
+
+    // 合并所有内容源并转小写
+    const fullContentBuffer = (visibleText + htmlContent + inputPlaceholders + frameTexts).toLowerCase();
+
+    // 定义关键词列表
+    const keywords = ['invitation', '邀请', 'invite code', 'activation code'];
+    
+    // 检测
+    const hasInvitation = keywords.some(key => fullContentBuffer.includes(key));
+    
+    if (hasInvitation) {
+        // 二次确认：如果是 Closed，打印一下是匹配到了哪个词，方便调试
+        // const matchedKey = keywords.find(key => fullContentBuffer.includes(key));
+        // console.log(`[${getTime()}] ${url} 匹配到关键字: ${matchedKey}`);
+    }
+
     return { 
       url, 
       status: hasInvitation ? 'Closed' : 'Open',
@@ -136,7 +168,6 @@ async function checkBrowserPage(browser, url) {
     if (
       msg.includes('navigating') || 
       msg.includes('retrieve content') || 
-
       msg.includes('execution context') || 
       msg.includes('destroyed') ||
       msg.includes('timeout') ||
@@ -155,44 +186,29 @@ async function checkBrowserPage(browser, url) {
 
 function commitAndPush() {
   try {
-    // 1. 配置用户信息
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
-    
-    // 2. 暂存状态文件
     execSync(`git add ${STATE_FILE}`);
     
-    // 3. 检查是否有实际内容变更
     const status = execSync('git status --porcelain').toString();
     if (!status) {
       console.log(`[${getTime()}] 没有检测到状态文件变更，跳过推送。`);
       return false;
     }
 
-    // 4. 提交变更
     execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
-
-    // 5. 核心修复：推送前先拉取远程更新并变基，解决 [rejected] 冲突
-    // --rebase 可以保持提交记录呈线性，避免产生无意义的 Merge branch 记录
     console.log(`[${getTime()}] 正在同步远程仓库...`);
     execSync('git pull --rebase origin main', { stdio: 'pipe' });
-    
-    // 6. 推送
     execSync('git push origin main');
     console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
     return true;
   } catch (e) {
     console.error(`[${getTime()}] Git 操作失败:`, e.message);
-    
-    // 如果 rebase 过程中出现冲突，清理现场防止阻塞后续循环
-    try {
-      execSync('git rebase --abort');
-    } catch (abortErr) {
-      // 忽略中止失败的情况
-    }
+    try { execSync('git rebase --abort'); } catch (abortErr) {}
     return false;
   }
 }
+
 async function sendEmail(body) {
   try {
     await transporter.sendMail({
@@ -272,10 +288,8 @@ async function main() {
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
-      // === 修复开始: 使用动态 import 导入 p-limit ===
       const { default: pLimit } = await import('p-limit');
       const limit = pLimit(BROWSER_CONCURRENCY);
-      // === 修复结束 ===
       
       const browserPromises = candidatesForBrowser.map(candidate => 
         limit(() => checkBrowserPage(browser, candidate.url).then(res => ({
@@ -422,7 +436,6 @@ async function main() {
   }
 }
 
-// 启动逻辑
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
