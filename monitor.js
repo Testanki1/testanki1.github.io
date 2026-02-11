@@ -4,15 +4,13 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-// 兼容新版 p-limit 的 CommonJS 引入方式
-const pLimit = require('p-limit').default || require('p-limit');
 
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
 const CHECK_INTERVAL = 60 * 1000;
 const MAX_RUNTIME = 5.8 * 60 * 60 * 1000;
 const START_TIME = Date.now();
-const BROWSER_CONCURRENCY = 3; 
+const BROWSER_CONCURRENCY = 3; // 限制同时启动 3 个浏览器上下文
 const CONFIRMATION_THRESHOLD = 2; 
 
 let pendingChanges = {};
@@ -21,7 +19,7 @@ const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
-  family: 4, // 修复 ENETUNREACH 报错
+  family: 4, 
   auth: {
     user: process.env.MAIL_USERNAME,
     pass: process.env.MAIL_PASSWORD
@@ -50,7 +48,6 @@ function checkCurl(url) {
         resolve({ url, statusCode, hash, isAlive, dataLength: data.length });
       });
     });
-    
     req.on('error', () => resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 }));
     req.on('timeout', () => { req.destroy(); resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 }); });
   });
@@ -94,11 +91,7 @@ function commitAndPush() {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
-    
-    // 强制同步远程仓库，避免 [rejected] 错误
-    // 即使本地没有变更，先 pull 也是安全的
     execSync('git pull --rebase origin main || true', { stdio: 'pipe' });
-    
     execSync(`git add ${STATE_FILE}`);
     const status = execSync('git status --porcelain').toString();
     if (status) {
@@ -134,6 +127,25 @@ function isStateEqual(a, b) {
   return a.status === b.status && a.hash === b.hash;
 }
 
+/**
+ * 手动实现并发池，不再依赖 p-limit 库
+ */
+async function asyncPool(iterable, iteratorFn) {
+  const results = [];
+  const executing = new Set();
+  for (const item of iterable) {
+    const p = Promise.resolve().then(() => iteratorFn(item));
+    results.push(p);
+    executing.add(p);
+    const clean = () => executing.delete(p);
+    p.then(clean).catch(clean);
+    if (executing.size >= BROWSER_CONCURRENCY) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.all(results);
+}
+
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
   const urls = [];
@@ -158,10 +170,12 @@ async function main() {
 
   if (candidatesForBrowser.length > 0) {
     const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-    const limit = pLimit(BROWSER_CONCURRENCY);
-    const browserResults = await Promise.all(candidatesForBrowser.map(c => 
-      limit(() => checkBrowserPage(browser, c.url).then(res => ({ ...res, hash: c.hash })))
-    ));
+    
+    // 使用手写的并发控制函数，避开 p-limit 模块化问题
+    const browserResults = await asyncPool(candidatesForBrowser, (c) => 
+      checkBrowserPage(browser, c.url).then(res => ({ ...res, hash: c.hash }))
+    );
+    
     browserResults.forEach(res => { currentResults[res.url] = { status: res.status, hash: res.hash }; });
     await browser.close();
   }
@@ -198,20 +212,16 @@ async function main() {
   }
 }
 
-// 使用递归函数代替 setInterval，确保前一个 main 跑完才开始下一个计时
 async function runRecursive() {
   if (Date.now() - START_TIME > MAX_RUNTIME) {
     console.log("达到最大运行时间，正常退出。");
     process.exit(0);
   }
-  
   await main();
-  
-  // 确保在上一次 main 完成后，才等待 CHECK_INTERVAL 毫秒
   setTimeout(runRecursive, CHECK_INTERVAL);
 }
 
 (async () => {
-  console.log(`[${getTime()}] 监测器启动 (Sequential Mode)...`);
+  console.log(`[${getTime()}] 监测器启动 (Standalone & Sequential Mode)...`);
   await runRecursive();
 })();
