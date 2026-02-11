@@ -4,25 +4,23 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-const pLimit = require('p-limit');
+// 兼容 ESM 模块导出
+const pLimit = require('p-limit').default || require('p-limit');
 
 // --- 基础配置 ---
 const STATE_FILE = 'server_status.json';
-const CHECK_INTERVAL = 60 * 1000; // 1分钟轮询一次
-const MAX_RUNTIME = 4.8 * 60 * 60 * 1000; // 运行4.8小时后自动退出，给下一次Action留出缓存时间
+const CHECK_INTERVAL = 60 * 1000; 
+const MAX_RUNTIME = 4.8 * 60 * 60 * 1000; 
 const START_TIME = Date.now();
-const BROWSER_CONCURRENCY = 3; // 浏览器并发数
-const CONFIRMATION_THRESHOLD = 2; // 状态需连续两次一致才确认为变更
+const BROWSER_CONCURRENCY = 3; 
+const CONFIRMATION_THRESHOLD = 2; 
 
-// 暂存未确认的状态变化
 let pendingChanges = {};
 
-// 邮件发送配置
 const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
-  // 核心修复：强制使用 IPv4，防止 GitHub Actions 环境下出现 connect ENETUNREACH IPv6 错误
   family: 4, 
   auth: {
     user: process.env.MAIL_USERNAME,
@@ -30,17 +28,10 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-/**
- * 获取当前上海时间字符串
- */
 function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-/**
- * Phase 1: 使用 Curl (https.get) 进行初步扫描
- * 目的：获取页面 Hash 并根据状态码排除明显离线的服务器
- */
 function checkCurl(url) {
   return new Promise((resolve) => {
     const req = https.get(url, { 
@@ -54,8 +45,6 @@ function checkCurl(url) {
       let data = '';
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
-        // 核心修复：只有状态码在 200-299 之间且内容不为空才视为可能存活
-        // 避免将 404, 502 等报错页面误判为 Open
         const isAlive = statusCode >= 200 && statusCode < 300 && data.length > 100;
         const hash = isAlive ? crypto.createHash('sha256').update(data).digest('hex') : '';
         resolve({ url, statusCode, hash, isAlive });
@@ -66,10 +55,6 @@ function checkCurl(url) {
   });
 }
 
-/**
- * Phase 2: 使用 Playwright 模拟浏览器访问
- * 目的：检测页面是否存在邀请码限制或死循环刷新
- */
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
@@ -78,7 +63,6 @@ async function checkBrowserPage(browser, url) {
   });
   
   try {
-    // 注入特殊参数尝试跳过可能的欢迎弹窗
     const targetUrl = url.includes('?') ? url + '&skipEntranceAnyKey' : url + '?skipEntranceAnyKey';
     page = await context.newPage();
 
@@ -94,34 +78,28 @@ async function checkBrowserPage(browser, url) {
       timeout: 45000 
     });
     
-    // 再次确认 HTTP 状态码，如果浏览器访问返回非 2xx，则判定为离线
     if (!response || response.status() < 200 || response.status() >= 300) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 等待页面脚本执行
     await page.waitForTimeout(2000);
     refreshCount = 0; 
     await page.waitForTimeout(5000);
 
-    // 如果 5 秒内页面多次跳转，判定为维护模式或错误
     if (refreshCount > 0) {
-      return { url, status: 'Error', error: `Detected ${refreshCount} refreshes` };
+      return { url, status: 'Error', error: `监测到页面自动刷新 ${refreshCount} 次` };
     }
 
-    // 搜索邀请码关键字
     const content = await page.content();
     const hasInvitation = /invitation|邀请码|invite/i.test(content);
-    
-    // 增加正向校验：如果没有邀请码，但也完全没加载出游戏画布，可能也是异常页面
     const hasCanvas = content.includes('<canvas');
+    
     let finalStatus = 'Closed';
     if (!hasInvitation && hasCanvas) {
       finalStatus = 'Open';
     } else if (hasInvitation) {
       finalStatus = 'Closed';
     } else {
-      // 既没有邀请码也没加载出画布，可能是空白维护页
       finalStatus = 'Closed';
     }
 
@@ -134,9 +112,6 @@ async function checkBrowserPage(browser, url) {
   }
 }
 
-/**
- * 将变更推送到 GitHub 仓库
- */
 function commitAndPush() {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
@@ -147,7 +122,7 @@ function commitAndPush() {
     if (status) {
       execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
       execSync('git push');
-      console.log(`[${getTime()}] 成功推送状态变更至仓库`);
+      console.log(`[${getTime()}] 成功推送状态至仓库`);
       return true;
     }
     return false;
@@ -157,13 +132,10 @@ function commitAndPush() {
   }
 }
 
-/**
- * 发送邮件通知
- */
 async function sendEmail(body) {
   try {
     await transporter.sendMail({
-      from: `"3D坦克测试服监测" <${process.env.MAIL_USERNAME}>`,
+      from: `"3D坦克监测" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "【状态变更】3D坦克测试服监测报告",
       html: `<div style="font-family: sans-serif;">
@@ -179,17 +151,11 @@ async function sendEmail(body) {
   }
 }
 
-/**
- * 比较两个状态对象是否一致
- */
 function isStateEqual(a, b) {
   if (!a || !b) return false;
   return a.status === b.status && a.hash === b.hash;
 }
 
-/**
- * 主执行函数
- */
 async function main() {
   console.log(`[${getTime()}] 开始监测循环...`);
   
@@ -213,7 +179,6 @@ async function main() {
   const browserCandidates = curlResults.filter(r => r.isAlive);
   
   const currentResults = {};
-  // 先填入离线状态
   curlResults.filter(r => !r.isAlive).forEach(r => {
     currentResults[r.url] = { status: 'Offline', hash: r.hash };
   });
@@ -244,7 +209,6 @@ async function main() {
       continue;
     }
 
-    // 确认机制：防止网络波动导致误报
     if (!pendingChanges[url] || !isStateEqual(pendingChanges[url].entry, current)) {
       pendingChanges[url] = { entry: current, count: 1 };
     } else {
@@ -266,7 +230,6 @@ async function main() {
   }
 }
 
-// 启动持续监测
 (async () => {
   await main();
   const timer = setInterval(async () => {
