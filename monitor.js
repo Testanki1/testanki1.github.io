@@ -154,26 +154,44 @@ async function checkBrowserPage(browser, url) {
 
 function commitAndPush() {
   try {
-    // 确保拉取最新代码避免冲突
-    execSync('git pull --rebase origin main || git pull --rebase origin master || true', { stdio: 'pipe' });
+    // 1. 配置用户信息
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
+    
+    // 2. 暂存状态文件
     execSync(`git add ${STATE_FILE}`);
     
+    // 3. 检查是否有实际内容变更
     const status = execSync('git status --porcelain').toString();
-    if (status) {
-      execSync('git commit -m "chore: 更新服务器状态文件 [skip ci]"');
-      execSync('git push');
-      console.log(`[${getTime()}] Git 状态已更新并推送。`);
-      return true;
+    if (!status) {
+      console.log(`[${getTime()}] 没有检测到状态文件变更，跳过推送。`);
+      return false;
     }
-    return false;
+
+    // 4. 提交变更
+    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
+
+    // 5. 核心修复：推送前先拉取远程更新并变基，解决 [rejected] 冲突
+    // --rebase 可以保持提交记录呈线性，避免产生无意义的 Merge branch 记录
+    console.log(`[${getTime()}] 正在同步远程仓库...`);
+    execSync('git pull --rebase origin main', { stdio: 'pipe' });
+    
+    // 6. 推送
+    execSync('git push origin main');
+    console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
+    return true;
   } catch (e) {
-    console.error(`[${getTime()}] Git 提交失败:`, e.message);
+    console.error(`[${getTime()}] Git 操作失败:`, e.message);
+    
+    // 如果 rebase 过程中出现冲突，清理现场防止阻塞后续循环
+    try {
+      execSync('git rebase --abort');
+    } catch (abortErr) {
+      // 忽略中止失败的情况
+    }
     return false;
   }
 }
-
 async function sendEmail(body) {
   try {
     await transporter.sendMail({
