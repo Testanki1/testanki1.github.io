@@ -4,7 +4,8 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-const pLimit = require('p-limit');
+// 删除旧的 require 引用
+// const pLimit = require('p-limit'); 
 
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
@@ -271,7 +272,11 @@ async function main() {
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
+      // === 修复开始: 使用动态 import 导入 p-limit ===
+      const { default: pLimit } = await import('p-limit');
       const limit = pLimit(BROWSER_CONCURRENCY);
+      // === 修复结束 ===
+      
       const browserPromises = candidatesForBrowser.map(candidate => 
         limit(() => checkBrowserPage(browser, candidate.url).then(res => ({
           ...res,
