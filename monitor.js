@@ -8,7 +8,7 @@ const nodemailer = require('nodemailer');
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
 const CHECK_INTERVAL = 60 * 1000;
-const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; 
+const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // GitHub Actions 限制运行 6 小时
 const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; 
@@ -75,7 +75,7 @@ async function checkBrowserPage(browser, url) {
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 720 },
-    ignoreHTTPSErrors: true // 忽略证书错误，增加稳定性
+    locale: 'en-US' // 强制英文环境，防止多语言干扰
   });
   
   try {
@@ -103,59 +103,41 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 等待网络空闲，确保动态内容加载完毕
-    try {
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    } catch (e) {}
-
-    await page.waitForTimeout(3000); // 额外的强制等待，确保 UI 渲染
+    // 等待更长时间，并尝试等待网络空闲，确保动态内容加载
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(2000); 
+    
     refreshCount = 0; 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000); // 再多等一会
 
     if (refreshCount > 0) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    // === 增强版内容检测 ===
-    // 1. 获取主页面可见文本
-    const visibleText = await page.innerText('body').catch(() => '');
-    
-    // 2. 获取主页面 HTML 源码
-    const htmlContent = await page.content().catch(() => '');
-    
-    // 3. 专门获取所有输入框的 placeholder (常用于 invite code 输入框)
-    const inputPlaceholders = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('input, textarea'))
-            .map(el => el.getAttribute('placeholder') || '')
-            .join(' ');
-    }).catch(() => '');
+    // === 增强版内容检测 (遍历所有 Frames) ===
+    const frames = page.frames();
+    let hasInvitation = false;
+    // 关键词正则：包括 邀请、邀请码、激活码、Invitation Code 等
+    const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
 
-    // 4. 获取所有 iframe 内部的文本 (有些游戏 UI 嵌在 iframe 里)
-    let frameTexts = '';
-    for (const frame of page.frames()) {
+    for (const frame of frames) {
         try {
-            if (frame !== page.mainFrame()) {
-                frameTexts += await frame.content();
+            // 1. 检查 HTML 源码
+            const content = await frame.content();
+            // 2. 检查可见文本 (innerText 通常比 HTML 更准确反映用户看到的)
+            const visibleText = await frame.locator('body').innerText().catch(() => '');
+
+            if (keywordRegex.test(content) || keywordRegex.test(visibleText)) {
+                hasInvitation = true;
+                // console.log(`[${getTime()}] debug: Found keyword in frame: ${frame.url()}`);
+                break; // 只要在一个 frame 里找到，就判定为找到
             }
-        } catch(e) {}
+        } catch (err) {
+            // 忽略跨域 frame 访问失败的情况
+        }
     }
-
-    // 合并所有内容源并转小写
-    const fullContentBuffer = (visibleText + htmlContent + inputPlaceholders + frameTexts).toLowerCase();
-
-    // 定义关键词列表
-    const keywords = ['invitation', '邀请', 'invite code', 'activation code'];
     
-    // 检测
-    const hasInvitation = keywords.some(key => fullContentBuffer.includes(key));
-    
-    if (hasInvitation) {
-        // 二次确认：如果是 Closed，打印一下是匹配到了哪个词，方便调试
-        // const matchedKey = keywords.find(key => fullContentBuffer.includes(key));
-        // console.log(`[${getTime()}] ${url} 匹配到关键字: ${matchedKey}`);
-    }
-
     return { 
       url, 
       status: hasInvitation ? 'Closed' : 'Open',
@@ -305,6 +287,7 @@ async function main() {
         const oldEntry = committedStatusJson[url] || {};
         
         let finalStatus = status;
+        // 如果浏览器报 Offline 但没有明确错误（比如超时），通常维持旧哈希
         if (status === 'Offline' && !error) {
           finalStatus = 'Closed'; 
         }
@@ -396,6 +379,7 @@ async function main() {
       }
     }
 
+    // 生成可用服务器列表
     for (const url of urls) {
       const statusEntry = finalStatusJson[url];
       if (statusEntry && statusEntry.status && statusEntry.status !== "Offline") {
@@ -409,8 +393,11 @@ async function main() {
     }
 
     if (notifications.length > 0) {
-      fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-      if (commitAndPush()) {
+      const success = fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
+      const pushed = commitAndPush();
+      
+      // 只有推送成功才发邮件，或者本地写入成功也发（视需求而定，这里保持原逻辑）
+      if (pushed) {
         const changeDetails = notifications.join('<br>');
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
         const availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
@@ -418,6 +405,7 @@ async function main() {
         await sendEmail(fullBody);
       }
     } else {
+      // 清理过期的 pending 状态
       const now = Date.now();
       for (const [url, data] of Object.entries(pendingChanges)) {
         if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
@@ -436,6 +424,7 @@ async function main() {
   }
 }
 
+// 启动逻辑
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
