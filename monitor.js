@@ -4,7 +4,8 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
-const pLimit = require('p-limit');
+// 兼容新版 p-limit 的 CommonJS 引入方式
+const pLimit = require('p-limit').default || require('p-limit');
 
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
