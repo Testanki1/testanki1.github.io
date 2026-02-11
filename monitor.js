@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
-  family: 4, 
+  family: 4, // 强制 IPv4
   auth: {
     user: process.env.MAIL_USERNAME,
     pass: process.env.MAIL_PASSWORD
@@ -51,40 +51,78 @@ function checkCurl(url) {
       });
     });
     
-    req.on('error', () => resolve({ url, statusCode: 0, hash: '', isAlive: false }));
-    req.on('timeout', () => { req.destroy(); resolve({ url, statusCode: 0, hash: '', isAlive: false }); });
+    req.on('error', (err) => {
+      // 恢复详细日志
+      console.log(`[${getTime()}] Curl 错误 ${url}: ${err.message}`);
+      resolve({ url, statusCode: 0, hash: '', isAlive: false });
+    });
+    req.on('timeout', () => { 
+      req.destroy(); 
+      resolve({ url, statusCode: 0, hash: '', isAlive: false }); 
+    });
   });
 }
 
 async function checkBrowserPage(browser, url) {
   let page = null;
+  // 恢复：更具体的 UserAgent
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 720 }
   });
   
   try {
     const targetUrl = url.includes('?') ? url + '&skipEntranceAnyKey' : url + '?skipEntranceAnyKey';
     page = await context.newPage();
+    
     let refreshCount = 0;
     page.on('framenavigated', (frame) => {
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') refreshCount++;
     });
 
     const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    if (!response || response.status() >= 400) return { url, status: 'Offline', httpStatus: response?.status() || 0 };
+    
+    // 基础 HTTP 状态检查
+    if (!response || response.status() >= 400) {
+      return { url, status: 'Offline', httpStatus: response?.status() || 0 };
+    }
 
     await page.waitForTimeout(2000);
     refreshCount = 0; 
     await page.waitForTimeout(5000);
 
-    if (refreshCount > 0) return { url, status: 'Error', error: 'Auto-refreshes' };
+    if (refreshCount > 0) {
+      console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
+      return { url, status: 'Error', error: 'Auto-refreshes' };
+    }
     
-    const content = await page.content();
-    const hasInvitation = /invitation|邀请码|invite/i.test(content);
+    // 恢复：多重检测机制 (Robust DOM Detection)
+    // 不仅仅依赖 page.content()，还检查特定的选择器
+    const checks = await Promise.all([
+      page.locator('text=/invitation/i').count().catch(() => 0),
+      page.locator('text=/邀请/i').count().catch(() => 0),
+      page.locator('[class*="invitation"]').count().catch(() => 0),
+      page.content().then(html => /invitation|邀请码|invite/i.test(html))
+    ]);
+
+    const hasInvitation = checks.some(c => c > 0 || c === true);
     return { url, status: hasInvitation ? 'Closed' : 'Open', httpStatus: response.status() };
+
   } catch (e) {
-    return { url, status: 'Error', error: e.message };
+    // 恢复：特定的错误分类处理
+    const msg = e.message ? e.message.toLowerCase() : "";
+    if (
+      msg.includes('navigating') || 
+      msg.includes('retrieve content') || 
+      msg.includes('execution context') || 
+      msg.includes('destroyed') ||
+      msg.includes('timeout')
+    ) {
+       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
+       return { url, status: 'Error', error: e.message };
+    }
+    
+    return { url, status: 'Offline', error: e.message };
   } finally {
     await context.close().catch(() => {});
   }
@@ -94,18 +132,25 @@ function commitAndPush() {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
-    execSync('git pull --rebase origin main || true', { stdio: 'pipe' });
+    
     execSync(`git add ${STATE_FILE}`);
+    
     const status = execSync('git status --porcelain').toString();
-    if (status) {
-      execSync('git commit -m "chore: 更新服务器状态文件 [skip ci]"');
-      execSync('git push origin main');
-      console.log(`[${getTime()}] Git 推送成功。`);
-      return true;
-    }
-    return false;
+    if (!status) return false;
+
+    execSync('git commit -m "chore: 更新服务器状态文件 [skip ci]"');
+    
+    // 恢复：更安全的同步机制 (Pull --rebase after commit)
+    console.log(`[${getTime()}] 正在同步远程仓库...`);
+    execSync('git pull --rebase origin main', { stdio: 'pipe' });
+    execSync('git push origin main');
+    
+    console.log(`[${getTime()}] Git 推送成功。`);
+    return true;
   } catch (e) {
     console.error(`[${getTime()}] Git 操作失败:`, e.message);
+    // 恢复：错误恢复机制
+    try { execSync('git rebase --abort'); } catch (err) {}
     return false;
   }
 }
@@ -136,21 +181,35 @@ async function main() {
   urls.push("https://test.ru.tankionline.com/play/", "https://tankiclassic.com/play/");
 
   let committedStatusJson = {};
-  if (fs.existsSync(STATE_FILE)) {
-    try { committedStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) { committedStatusJson = {}; }
+  
+  // 恢复：文件读取重试机制
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      if (fs.existsSync(STATE_FILE)) {
+        committedStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      }
+      break;
+    } catch (e) {
+      retries--;
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
   let finalStatusJson = { ...committedStatusJson };
   let notifications = [];
   let currentResults = {};
 
+  // Phase 1: Curl
   const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
   const candidatesForBrowser = curlResults.filter(res => res.isAlive);
   
   curlResults.filter(res => !res.isAlive).forEach(res => {
+    // 保持旧 hash 以避免误报更新
     currentResults[res.url] = { status: "Offline", hash: (committedStatusJson[res.url] || {}).hash || res.hash };
   });
 
+  // Phase 2: Browser
   if (candidatesForBrowser.length > 0) {
     const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
     const limit = pLimit(BROWSER_CONCURRENCY);
@@ -158,10 +217,17 @@ async function main() {
       limit(() => checkBrowserPage(browser, c.url).then(res => ({ ...res, hash: c.hash })))
     );
     const browserResults = await Promise.all(browserPromises);
-    browserResults.forEach(res => { currentResults[res.url] = { status: res.status, hash: res.hash }; });
+    
+    browserResults.forEach(res => { 
+        // 如果浏览器判断离线但没有具体错误，且之前有hash，则保留hash
+        let finalStatus = res.status;
+        if (res.status === 'Offline' && !res.error) finalStatus = 'Closed'; // 兜底
+        currentResults[res.url] = { status: finalStatus, hash: res.hash }; 
+    });
     await browser.close();
   }
 
+  // Phase 3: 比较与生成消息
   for (const url of urls) {
     const currentEntry = currentResults[url] || { status: 'Offline', hash: '' };
     const committedEntry = committedStatusJson[url] || {};
@@ -176,10 +242,34 @@ async function main() {
     if (pending && isStateEqual(pending.entry, currentEntry)) {
       pending.count++;
       if (pending.count >= CONFIRMATION_THRESHOLD) {
-        // 过滤逻辑：只有涉及 Open 的状态变化才发通知
-        if (committedEntry.status === 'Open' || currentEntry.status === 'Open') {
-          notifications.push(`- <b>${url}</b>: ${committedEntry.status || 'Offline'} -> <span style="color:red">${currentEntry.status}</span>`);
+        // 恢复：详细的 Notification 生成逻辑
+        const oldStatus = committedEntry.status || null;
+        const oldHash = committedEntry.hash || null;
+        const finalStatus = currentEntry.status;
+        const hash = currentEntry.hash;
+
+        let message = "";
+        let displayStatusBold = `<b>${finalStatus === 'Open' ? '开放' : finalStatus === 'Closed' ? '封闭' : finalStatus}</b>`;
+
+        if (!oldStatus && finalStatus !== "Offline") {
+            message = `首次发现服务器 (状态: ${displayStatusBold})`;
+        } else if (oldStatus && finalStatus !== oldStatus) {
+            if (oldStatus === "Offline") {
+                 let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "";
+                 message = `服务器已上线 (状态: ${displayStatusBold})${hashMsg}`;
+            } else if (finalStatus === "Offline") {
+                 message = `服务器已下线`;
+            } else {
+                 message = `服务器状态变更: ${oldStatus} -> ${displayStatusBold}`;
+            }
+        } else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+            message = `网页代码已更新 (状态: ${displayStatusBold})`;
         }
+
+        if (message) {
+            notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
+        }
+        
         finalStatusJson[url] = currentEntry;
         delete pendingChanges[url];
       }
@@ -189,10 +279,17 @@ async function main() {
     }
   }
 
-  // 整理当前在线服务器列表
+  // 恢复：清理过期的 pendingChanges
+  const now = Date.now();
+  for (const [url, data] of Object.entries(pendingChanges)) {
+    if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) delete pendingChanges[url];
+    else if (!data.timestamp) pendingChanges[url].timestamp = now;
+  }
+
+  // 整理在线列表
   let onlineList = [];
   for (const [url, data] of Object.entries(finalStatusJson)) {
-    if (data.status !== 'Offline') {
+    if (data.status && data.status !== 'Offline') {
       let statusText = data.status === 'Open' ? '<b style="color:green">开放</b>' : `<b>${data.status}</b>`;
       onlineList.push(`- <a href="${url}">${url}</a> (${statusText})`);
     }
@@ -216,7 +313,7 @@ async function main() {
 }
 
 (async () => {
-  console.log(`[${getTime()}] 监测器启动 (Standalone & Sequential Mode)...`);
+  console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
   const timer = setInterval(async () => {
     if (Date.now() - START_TIME > MAX_RUNTIME) {
