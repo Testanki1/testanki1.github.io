@@ -4,17 +4,19 @@ const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
+const pLimit = require('p-limit').default || require('p-limit');
 
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
 const CHECK_INTERVAL = 60 * 1000;
-const MAX_RUNTIME = 5.8 * 60 * 60 * 1000;
+const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; 
 const START_TIME = Date.now();
-const BROWSER_CONCURRENCY = 3; // 限制同时启动 3 个浏览器上下文
+const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; 
 
 let pendingChanges = {};
 
+// 邮件发送器配置
 const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
@@ -45,18 +47,19 @@ function checkCurl(url) {
       res.on('end', () => {
         const isAlive = statusCode >= 200 && statusCode < 300 && data.length > 100;
         const hash = isAlive ? crypto.createHash('sha256').update(data).digest('hex') : '';
-        resolve({ url, statusCode, hash, isAlive, dataLength: data.length });
+        resolve({ url, statusCode, hash, isAlive });
       });
     });
-    req.on('error', () => resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 }));
-    req.on('timeout', () => { req.destroy(); resolve({ url, statusCode: 0, hash: '', isAlive: false, dataLength: 0 }); });
+    
+    req.on('error', () => resolve({ url, statusCode: 0, hash: '', isAlive: false }));
+    req.on('timeout', () => { req.destroy(); resolve({ url, statusCode: 0, hash: '', isAlive: false }); });
   });
 }
 
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.0',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     viewport: { width: 1280, height: 720 }
   });
   
@@ -103,7 +106,6 @@ function commitAndPush() {
     return false;
   } catch (e) {
     console.error(`[${getTime()}] Git 操作失败:`, e.message);
-    try { execSync('git rebase --abort'); } catch (err) {}
     return false;
   }
 }
@@ -114,7 +116,7 @@ async function sendEmail(body) {
       from: `"3D坦克监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "3D坦克测试服务器状态更新",
-      html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
+      html: `你好，<br><br>${body}<br><br><small style="color:#666">此邮件由 GitHub Actions 自动监测发送。</small>`
     });
     console.log(`[${getTime()}] 邮件已发送。`);
   } catch (error) {
@@ -125,25 +127,6 @@ async function sendEmail(body) {
 function isStateEqual(a, b) {
   if (!a || !b) return false;
   return a.status === b.status && a.hash === b.hash;
-}
-
-/**
- * 手动实现并发池，不再依赖 p-limit 库
- */
-async function asyncPool(iterable, iteratorFn) {
-  const results = [];
-  const executing = new Set();
-  for (const item of iterable) {
-    const p = Promise.resolve().then(() => iteratorFn(item));
-    results.push(p);
-    executing.add(p);
-    const clean = () => executing.delete(p);
-    p.then(clean).catch(clean);
-    if (executing.size >= BROWSER_CONCURRENCY) {
-      await Promise.race(executing);
-    }
-  }
-  return Promise.all(results);
 }
 
 async function main() {
@@ -170,12 +153,11 @@ async function main() {
 
   if (candidatesForBrowser.length > 0) {
     const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-    
-    // 使用手写的并发控制函数，避开 p-limit 模块化问题
-    const browserResults = await asyncPool(candidatesForBrowser, (c) => 
-      checkBrowserPage(browser, c.url).then(res => ({ ...res, hash: c.hash }))
+    const limit = pLimit(BROWSER_CONCURRENCY);
+    const browserPromises = candidatesForBrowser.map(c => 
+      limit(() => checkBrowserPage(browser, c.url).then(res => ({ ...res, hash: c.hash })))
     );
-    
+    const browserResults = await Promise.all(browserPromises);
     browserResults.forEach(res => { currentResults[res.url] = { status: res.status, hash: res.hash }; });
     await browser.close();
   }
@@ -194,9 +176,12 @@ async function main() {
     if (pending && isStateEqual(pending.entry, currentEntry)) {
       pending.count++;
       if (pending.count >= CONFIRMATION_THRESHOLD) {
+        // 过滤逻辑：只有涉及 Open 的状态变化才发通知
+        if (committedEntry.status === 'Open' || currentEntry.status === 'Open') {
+          notifications.push(`- <b>${url}</b>: ${committedEntry.status || 'Offline'} -> <span style="color:red">${currentEntry.status}</span>`);
+        }
         finalStatusJson[url] = currentEntry;
         delete pendingChanges[url];
-        notifications.push(`- ${url} 状态变为 <b>${currentEntry.status}</b>`);
       }
     } else {
       pendingChanges[url] = { entry: currentEntry, count: 1 };
@@ -204,24 +189,41 @@ async function main() {
     }
   }
 
+  // 整理当前在线服务器列表
+  let onlineList = [];
+  for (const [url, data] of Object.entries(finalStatusJson)) {
+    if (data.status !== 'Offline') {
+      let statusText = data.status === 'Open' ? '<b style="color:green">开放</b>' : `<b>${data.status}</b>`;
+      onlineList.push(`- <a href="${url}">${url}</a> (${statusText})`);
+    }
+  }
+
   if (notifications.length > 0) {
     fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-    if (commitAndPush()) await sendEmail(notifications.join('<br>'));
+    if (commitAndPush()) {
+      const emailBody = `
+        <h3>检测到状态变化：</h3>
+        ${notifications.join('<br>')}
+        <br><hr>
+        <h4>当前在线服务器列表 (${onlineList.length} 个)：</h4>
+        ${onlineList.length > 0 ? onlineList.join('<br>') : '暂无在线服务器'}
+      `;
+      await sendEmail(emailBody);
+    }
   } else {
     console.log(`[${getTime()}] 无已确认的状态变化。`);
   }
 }
 
-async function runRecursive() {
-  if (Date.now() - START_TIME > MAX_RUNTIME) {
-    console.log("达到最大运行时间，正常退出。");
-    process.exit(0);
-  }
-  await main();
-  setTimeout(runRecursive, CHECK_INTERVAL);
-}
-
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone & Sequential Mode)...`);
-  await runRecursive();
+  await main();
+  const timer = setInterval(async () => {
+    if (Date.now() - START_TIME > MAX_RUNTIME) {
+      clearInterval(timer);
+      console.log("达到最大运行时间，正常退出。");
+      process.exit(0);
+    }
+    await main();
+  }, CHECK_INTERVAL);
 })();
