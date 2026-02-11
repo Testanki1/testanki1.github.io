@@ -163,7 +163,7 @@ function commitAndPush() {
 async function sendEmail(body) {
   try {
     await transporter.sendMail({
-      from: `"3D坦克监测" <${process.env.MAIL_USERNAME}>`,
+      from: `"3D坦克测试服监测" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "【状态变更】3D坦克测试服监测报告",
       html: `<div style="font-family: sans-serif;">
