@@ -8,7 +8,7 @@ const nodemailer = require('nodemailer');
 // --- 配置 ---
 const STATE_FILE = 'server_status.json';
 const CHECK_INTERVAL = 60 * 1000;
-const MAX_RUNTIME = 5.8 * 60 * 60 * 1000; // GitHub Actions 限制运行 6 小时
+const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; 
