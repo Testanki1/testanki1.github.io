@@ -103,18 +103,8 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 1. 基础等待：等待网络空闲
+    // 等待网络空闲
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    
-    // 2. 关键修复：等待应用根节点加载 (根据你提供的HTML，根ID是 app-root)
-    // 只要这个出现了，说明JS已经开始渲染了，不再是白屏
-    try {
-        await page.waitForSelector('#app-root', { state: 'attached', timeout: 10000 });
-    } catch (e) {
-        console.log(`[${getTime()}] 警告: #app-root 未在超时内加载 - ${url}`);
-    }
-
-    // 3. 额外的缓冲时间，等待内部组件动画结束
     await page.waitForTimeout(3000); 
 
     if (refreshCount > 0) {
@@ -125,31 +115,38 @@ async function checkBrowserPage(browser, url) {
     // === 增强版检测逻辑 ===
     let hasInvitation = false;
 
-    // 检测方法 A: 精确选择器 (最准确)
-    // 根据你的 HTML，输入框 ID 是 "invite"，标题类名是 "EntranceComponentStyle-title"
-    const isInviteInputVisible = await page.locator('input#invite').count() > 0;
-    const isInviteTitleVisible = await page.locator('.EntranceComponentStyle-title', { hasText: /INVITATION/i }).count() > 0;
+    // 1. 精确元素检测 (基于提供的 HTML)
+    // 检查是否存在 id="invite" 的输入框，或者包含 INVITATION 文本的元素
+    // 使用 locator.count() 或 isVisible() 比 regex 更可靠，因为 Playwright 会自动等待元素出现
+    try {
+        const inviteInput = page.locator('#invite'); // 针对 HTML 中的 <input id="invite">
+        const inviteTitle = page.locator('text=INVITATION'); // 针对 HTML 中的文本
 
-    if (isInviteInputVisible || isInviteTitleVisible) {
-        hasInvitation = true;
-        // console.log(`[${getTime()}] Debug: Detected invitation via Selectors on ${url}`);
-    } else {
-        // 检测方法 B: 关键词兜底 (遍历 Frame)
-        const frames = page.frames();
+        // 给 2 秒钟时间让元素渲染出来
+        const foundInput = await inviteInput.isVisible({ timeout: 2000 }).catch(() => false);
+        const foundTitle = await inviteTitle.isVisible({ timeout: 2000 }).catch(() => false);
+
+        if (foundInput || foundTitle) {
+            hasInvitation = true;
+            // console.log(`[${getTime()}] Detected via DOM Selector: ${url}`);
+        }
+    } catch (e) {
+        // 忽略 DOM 查找错误
+    }
+
+    // 2. 如果 DOM 选择器没找到，回退到原来的全局正则扫描 (双重保险)
+    if (!hasInvitation) {
         const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
-
+        const frames = page.frames();
         for (const frame of frames) {
             try {
-                // 同时检测 HTML 源码和可见文本
                 const content = await frame.content();
                 const visibleText = await frame.locator('body').innerText().catch(() => '');
-
                 if (keywordRegex.test(content) || keywordRegex.test(visibleText)) {
                     hasInvitation = true;
-                    // console.log(`[${getTime()}] Debug: Detected invitation via Text in frame: ${frame.url()}`);
                     break;
                 }
-            } catch (err) { }
+            } catch (err) {}
         }
     }
     
@@ -161,7 +158,6 @@ async function checkBrowserPage(browser, url) {
     
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
-    
     if (
       msg.includes('navigating') || 
       msg.includes('retrieve content') || 
@@ -173,7 +169,6 @@ async function checkBrowserPage(browser, url) {
        console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
        return { url, status: 'Error', error: e.message };
     }
-
     console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
     return { url, status: 'Offline', error: e.message };
   } finally {
@@ -302,7 +297,6 @@ async function main() {
         const oldEntry = committedStatusJson[url] || {};
         
         let finalStatus = status;
-        // 如果浏览器报 Offline 但没有明确错误（比如超时），通常维持旧哈希
         if (status === 'Offline' && !error) {
           finalStatus = 'Closed'; 
         }
@@ -411,7 +405,6 @@ async function main() {
       const success = fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
       
-      // 只有推送成功才发邮件，或者本地写入成功也发（视需求而定，这里保持原逻辑）
       if (pushed) {
         const changeDetails = notifications.join('<br>');
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
@@ -420,7 +413,6 @@ async function main() {
         await sendEmail(fullBody);
       }
     } else {
-      // 清理过期的 pending 状态
       const now = Date.now();
       for (const [url, data] of Object.entries(pendingChanges)) {
         if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
@@ -439,7 +431,6 @@ async function main() {
   }
 }
 
-// 启动逻辑
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
