@@ -1,5 +1,3 @@
-为什么 invitation 没检测到，你改一下相关代码
-
 const { chromium } = require('playwright');
 const fs = require('fs');
 const https = require('https');
