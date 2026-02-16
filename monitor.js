@@ -75,17 +75,18 @@ async function checkBrowserPage(browser, url) {
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 720 },
-    locale: 'en-US' // 强制英文环境
+    locale: 'en-US'
   });
   
   try {
+    // 1. 构建 URL，添加参数跳过动画
     const targetUrl = url.includes('?') 
       ? url + '&skipEntranceAnyKey&locale=en' 
       : url + '?skipEntranceAnyKey&locale=en';
     
     page = await context.newPage();
 
-    // === 检测自动刷新 ===
+    // 2. 监听刷新，但暂时不处理
     let refreshCount = 0;
     const navListener = (frame) => {
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') {
@@ -94,6 +95,7 @@ async function checkBrowserPage(browser, url) {
     };
     page.on('framenavigated', navListener);
 
+    // 3. 访问页面
     const response = await page.goto(targetUrl, { 
       waitUntil: 'domcontentloaded', 
       timeout: 45000 
@@ -103,45 +105,44 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 等待网络空闲
-    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(3000); 
-
-    if (refreshCount > 0) {
-       console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
-       return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
-    }
-    
-    // === 增强版检测逻辑 ===
+    // 4. 智能等待：优先等待 #invite 出现，或者等待网络空闲
+    // 这里的逻辑是：如果 5秒内 #invite 出现了，我们直接认定为 Closed，不需要再等更久
     let hasInvitation = false;
-
-    // 1. 精确元素检测 (基于提供的 HTML)
-    // 检查是否存在 id="invite" 的输入框，或者包含 INVITATION 文本的元素
-    // 使用 locator.count() 或 isVisible() 比 regex 更可靠，因为 Playwright 会自动等待元素出现
+    
     try {
-        const inviteInput = page.locator('#invite'); // 针对 HTML 中的 <input id="invite">
-        const inviteTitle = page.locator('text=INVITATION'); // 针对 HTML 中的文本
-
-        // 给 2 秒钟时间让元素渲染出来
-        const foundInput = await inviteInput.isVisible({ timeout: 2000 }).catch(() => false);
-        const foundTitle = await inviteTitle.isVisible({ timeout: 2000 }).catch(() => false);
-
-        if (foundInput || foundTitle) {
+        // 尝试等待特定的输入框（根据你提供的HTML id="invite"）
+        // .waitForSelector 会一直轮询直到元素出现或超时
+        const inviteInput = await page.waitForSelector('#invite', { state: 'visible', timeout: 6000 });
+        if (inviteInput) {
             hasInvitation = true;
-            // console.log(`[${getTime()}] Detected via DOM Selector: ${url}`);
+            // console.log(`[${getTime()}] 快速检测到邀请码输入框: ${url}`);
         }
     } catch (e) {
-        // 忽略 DOM 查找错误
+        // 如果 6秒内没找到 ID，不报错，继续下面的通用检测
     }
 
-    // 2. 如果 DOM 选择器没找到，回退到原来的全局正则扫描 (双重保险)
+    // 如果还没找到，再尝试等待 "INVITATION" 文本
     if (!hasInvitation) {
-        const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+        try {
+             // 查找包含 INVITATION 文本的 span/div
+             const textLoc = await page.waitForSelector('text=/INVITATION/i', { state: 'visible', timeout: 3000 });
+             if (textLoc) hasInvitation = true;
+        } catch(e) {}
+    }
+
+    // 5. 如果以上 Locator 还没找到，我们才进行常规的页面稳定等待
+    if (!hasInvitation) {
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(2000); 
+        
+        // 最后一次兜底检查：扫描全部 Frame 内容
         const frames = page.frames();
+        const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+        
         for (const frame of frames) {
             try {
-                const content = await frame.content();
-                const visibleText = await frame.locator('body').innerText().catch(() => '');
+                const content = await frame.content(); // HTML 源码
+                const visibleText = await frame.locator('body').innerText().catch(() => ''); // 可见文本
                 if (keywordRegex.test(content) || keywordRegex.test(visibleText)) {
                     hasInvitation = true;
                     break;
@@ -149,12 +150,26 @@ async function checkBrowserPage(browser, url) {
             } catch (err) {}
         }
     }
-    
-    return { 
-      url, 
-      status: hasInvitation ? 'Closed' : 'Open',
-      httpStatus: response.status()
-    };
+
+    // 6. 状态判定
+    // 只要检测到了邀请码，无论是否刷新，都认为是 Closed
+    if (hasInvitation) {
+        return { url, status: 'Closed', httpStatus: response.status() };
+    }
+
+    // 7. 只有在没找到邀请码的情况下，才去检查是不是因为“死循环刷新”导致没加载出来
+    // 重置计数器的逻辑：我们假设此时页面应该已经稳定了
+    // 如果此时还在疯狂刷新，那才是真正的 Error
+    const currentRefreshCount = refreshCount;
+    await page.waitForTimeout(2000);
+    // 如果在等待的2秒内又刷新了超过1次，或者总刷新次数异常高（比如 > 5）
+    if ((refreshCount - currentRefreshCount > 1) || refreshCount > 8) {
+        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url} (Total: ${refreshCount})`);
+        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
+    }
+
+    // 没找到邀请码，也没报错，那就是开放
+    return { url, status: 'Open', httpStatus: response.status() };
     
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
@@ -169,6 +184,7 @@ async function checkBrowserPage(browser, url) {
        console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
        return { url, status: 'Error', error: e.message };
     }
+
     console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
     return { url, status: 'Offline', error: e.message };
   } finally {
