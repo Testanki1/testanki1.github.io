@@ -75,7 +75,7 @@ async function checkBrowserPage(browser, url) {
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 720 },
-    locale: 'en-US' // 强制英文环境，防止多语言干扰
+    locale: 'en-US'
   });
   
   try {
@@ -103,38 +103,60 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 等待更长时间，并尝试等待网络空闲，确保动态内容加载
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(2000); 
+    // 等待网络空闲，确保动态脚本加载完成
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 8000 });
+    } catch (e) {
+      // 网络空闲超时不报错，继续执行，因为有些长连接会导致 networkidle 永远不触发
+    }
+    
+    // 给一点额外的渲染时间
+    await page.waitForTimeout(3000); 
     
     refreshCount = 0; 
-    await page.waitForTimeout(3000); // 再多等一会
+    // 再次简短等待以确认没有疯狂刷新
+    await page.waitForTimeout(2000);
 
     if (refreshCount > 0) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    // === 增强版内容检测 (遍历所有 Frames) ===
-    const frames = page.frames();
+    // === 增强版内容检测 ===
     let hasInvitation = false;
-    // 关键词正则：包括 邀请、邀请码、激活码、Invitation Code 等
-    const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
 
-    for (const frame of frames) {
-        try {
-            // 1. 检查 HTML 源码
-            const content = await frame.content();
-            // 2. 检查可见文本 (innerText 通常比 HTML 更准确反映用户看到的)
-            const visibleText = await frame.locator('body').innerText().catch(() => '');
+    // 策略 1: 精准 DOM 元素检测 (基于你提供的 HTML)
+    // 检测那个 id="invite" 的输入框，这是最铁的证据
+    const inviteInput = page.locator('input#invite');
+    // 检测包含 INVITATION 的标题
+    const inviteTitle = page.locator('.EntranceComponentStyle-title', { hasText: /INVITATION/i });
+    
+    // 只要这两个元素任意一个在页面上可见，就判定为 Closed
+    if ((await inviteInput.isVisible().catch(() => false)) || 
+        (await inviteTitle.isVisible().catch(() => false))) {
+        hasInvitation = true;
+        // console.log(`[${getTime()}] Debug: 通过 DOM 选择器检测到邀请码元素`);
+    }
 
-            if (keywordRegex.test(content) || keywordRegex.test(visibleText)) {
-                hasInvitation = true;
-                // console.log(`[${getTime()}] debug: Found keyword in frame: ${frame.url()}`);
-                break; // 只要在一个 frame 里找到，就判定为找到
+    // 策略 2: 如果策略 1 没抓到，再尝试遍历 Frames 进行文本兜底检测
+    if (!hasInvitation) {
+        const frames = page.frames();
+        // 关键词正则：包括 邀请、邀请码、激活码、Invitation Code 等
+        const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+
+        for (const frame of frames) {
+            try {
+                // 获取可见文本 (innerText 会自动处理换行和空格，比 HTML 源码更准)
+                const visibleText = await frame.locator('body').innerText().catch(() => '');
+                
+                if (keywordRegex.test(visibleText)) {
+                    hasInvitation = true;
+                    // console.log(`[${getTime()}] Debug: 通过文本关键词在 Frame 中检测到邀请状态`);
+                    break;
+                }
+            } catch (err) {
+                // 忽略跨域 frame 访问失败的情况
             }
-        } catch (err) {
-            // 忽略跨域 frame 访问失败的情况
         }
     }
     
