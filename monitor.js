@@ -69,13 +69,13 @@ function checkCurl(url) {
   });
 }
 
-// === 修改核心检测逻辑 ===
+// === 重写：暴力检测逻辑 ===
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 720 },
-    locale: 'en-US' // 强制英文环境
+    locale: 'en-US' // 强制英文
   });
   
   try {
@@ -85,90 +85,76 @@ async function checkBrowserPage(browser, url) {
     
     page = await context.newPage();
 
-    // === 检测自动刷新 ===
+    // 监听重定向或刷新
     let refreshCount = 0;
-    const navListener = (frame) => {
-      if (frame === page.mainFrame() && frame.url() !== 'about:blank') {
-        refreshCount++;
-      }
-    };
-    page.on('framenavigated', navListener);
-
-    const response = await page.goto(targetUrl, { 
-      waitUntil: 'domcontentloaded', 
-      timeout: 45000 
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame() && frame.url() !== 'about:blank') refreshCount++;
     });
+
+    const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     if (!response || response.status() >= 400) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 等待网络空闲和动态渲染
-    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(3000); // 额外等待 JS 执行
-    
-    refreshCount = 0; 
-    await page.waitForTimeout(2000); 
+    // === 暴力等待：确保 JS 完全渲染 ===
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 10000 });
+    } catch (e) {}
+    // 强制死等 5 秒，这对于 Tanki 这种重 JS 的应用很有必要
+    await page.waitForTimeout(5000);
 
-    if (refreshCount > 0) {
-       console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
+    if (refreshCount > 3) { // 放宽刷新限制
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
-    
-    // === 增强版内容检测 (遍历所有 Frames) ===
-    const frames = page.frames();
+
+    // === 暴力扫描 ===
     let hasInvitation = false;
+    // 关键词正则 (不区分大小写)
+    // 涵盖：invitation, invite, code, activation, promo, key, token, enter code
+    const keyRegex = /invit|activat|promo|enter code|input code|access key|邀请|激活|代码/i;
 
-    // 关键词列表 (转为小写匹配)
-    const keywords = [
-        'invitation', 
-        'invite code', 
-        'activation code', 
-        'promo code',
-        'enter code',
-        '邀请码', 
-        '邀请', 
-        '激活码'
-    ];
+    // 1. 扫描可见文本 (innerText 会自动穿透部分 Shadow DOM 并忽略隐藏元素)
+    const visibleText = await page.locator('body').innerText().catch(() => '');
+    if (keyRegex.test(visibleText)) {
+        hasInvitation = true;
+        // console.log(`Debug: Found in visible text - ${url}`);
+    }
 
-    for (const frame of frames) {
-        try {
-            // 在页面上下文中执行检测脚本 (比单纯 grep HTML 更准确)
-            const frameHasKeyword = await frame.evaluate((kwList) => {
-                // 1. 检查可见文本 (innerText)
-                const bodyText = document.body.innerText.toLowerCase();
-                if (kwList.some(k => bodyText.includes(k))) return true;
-
-                // 2. 重点检查输入框的 placeholder (占位符)
-                // 很多时候 "Invitation Code" 是写在输入框灰字里的，innerText 抓不到
-                const inputs = Array.from(document.querySelectorAll('input, textarea'));
-                const hasInputPlaceholder = inputs.some(input => {
-                    const ph = (input.placeholder || '').toLowerCase();
-                    const name = (input.name || '').toLowerCase();
-                    const aria = (input.ariaLabel || '').toLowerCase();
-                    return kwList.some(k => ph.includes(k) || name.includes(k) || aria.includes(k));
-                });
-                
-                if (hasInputPlaceholder) return true;
-
-                return false;
-            }, keywords);
-
-            if (frameHasKeyword) {
+    // 2. 如果文本没找到，扫描页面上所有输入框的属性 (Placeholder/Name/Label)
+    if (!hasInvitation) {
+        // 获取所有 input 和 textarea
+        const inputs = await page.locator('input, textarea').all();
+        for (const input of inputs) {
+            // 获取关键属性
+            const placeholder = await input.getAttribute('placeholder').catch(() => '') || '';
+            const ariaLabel = await input.getAttribute('aria-label').catch(() => '') || '';
+            const name = await input.getAttribute('name').catch(() => '') || '';
+            
+            if (keyRegex.test(placeholder) || keyRegex.test(ariaLabel) || keyRegex.test(name)) {
                 hasInvitation = true;
-                // console.log(`[${getTime()}] debug: Found keyword in frame: ${frame.url()}`);
-                break; 
+                // console.log(`Debug: Found in Input Attribute - ${url}`);
+                break;
             }
-        } catch (err) {
-            // 忽略跨域 frame 访问失败的情况
         }
     }
-    
-    // 如果还没找到，尝试最后的手段：检查 HTML 源码
+
+    // 3. 最后的防线：扫描 HTML 源码
     if (!hasInvitation) {
         const content = await page.content();
-        const regex = /invitation|invite code|activation|邀请码/i;
-        if (regex.test(content)) {
+        if (keyRegex.test(content)) {
+            hasInvitation = true;
+        }
+    }
+
+    // 4. 特殊检测：检测是否存在 "Submit" 按钮且页面上有 input，这通常意味着需要登录/验证码
+    if (!hasInvitation) {
+        const hasInput = (await page.locator('input').count()) > 0;
+        const buttonText = await page.locator('button').allInnerTexts().catch(() => []);
+        const hasSubmitLikeBtn = buttonText.some(t => /play|enter|submit|continue|ok/i.test(t));
+        
+        // 如果有输入框，但没有明显的“开始游戏”大按钮，或者按钮是 "Submit Code"
+        if (hasInput && buttonText.some(t => /redeem|check|activate/i.test(t))) {
             hasInvitation = true;
         }
     }
@@ -181,20 +167,10 @@ async function checkBrowserPage(browser, url) {
     
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
-    
-    if (
-      msg.includes('navigating') || 
-      msg.includes('retrieve content') || 
-      msg.includes('execution context') || 
-      msg.includes('destroyed') ||
-      msg.includes('timeout') ||
-      msg.includes('redirect') 
-    ) {
-       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
+    if (msg.includes('timeout') || msg.includes('navigating') || msg.includes('target closed')) {
+       // 超时如果不严重，通常意味着还在加载，暂定 Error
        return { url, status: 'Error', error: e.message };
     }
-
-    console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
     return { url, status: 'Offline', error: e.message };
   } finally {
     await context.close().catch(() => {});
@@ -322,7 +298,6 @@ async function main() {
         const oldEntry = committedStatusJson[url] || {};
         
         let finalStatus = status;
-        // 如果浏览器报 Offline 但没有明确错误（比如超时），通常维持旧哈希
         if (status === 'Offline' && !error) {
           finalStatus = 'Closed'; 
         }
@@ -373,26 +348,18 @@ async function main() {
           else if (oldStatus && finalStatus !== oldStatus) {
             if (oldStatus === "Offline") {
               if (finalStatus === "Error") {
-                   let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
-                   message = `服务器已上线但出现<b>错误</b>${hashMsg}`;
+                   message = `服务器已上线但出现<b>错误</b>`;
               } else {
                    let baseMsg = finalStatus === "Open" ? "服务器已上线并<b>开放</b>" : "服务器已上线，当前为<b>封闭</b>状态";
-                   let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" : "，且<b>无更新</b>";
-                   message = baseMsg + hashMsg;
+                   message = baseMsg;
               }
             } 
             else if (finalStatus === "Offline") {
-              let oldDisplay = oldStatus; 
-              if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
-              if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
-              if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
+              let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : (oldStatus === 'Closed' ? '<b>封闭</b>' : oldStatus);
               message = `服务器已下线 (原状态: ${oldDisplay})`;
             }
             else {
-               let oldDisplay = oldStatus;
-               if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
-               if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
-               if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
+               let oldDisplay = oldStatus === 'Open' ? '<b>开放</b>' : (oldStatus === 'Closed' ? '<b>封闭</b>' : oldStatus);
                message = `服务器状态已从${oldDisplay}变为${displayStatusBold}`;
             }
           }
@@ -422,17 +389,15 @@ async function main() {
         if (statusEntry.status === 'Open') disp = '<b>开放</b>';
         else if (statusEntry.status === 'Closed') disp = '<b>封闭</b>';
         else if (statusEntry.status === 'Error') disp = '<b>错误</b>';
-        
         availableServers.push(`<a href="${url}">${url}</a> (状态: ${disp})`);
       }
     }
 
     if (notifications.length > 0) {
-      const success = fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
+      fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
       
-      // 不管 push 是否成功，只要有变化就尝试发邮件（根据需要可调整）
-      if (pushed || true) {
+      if (pushed || true) { // 强制有变化就发邮件，防止 Git push 失败不发通知
         const changeDetails = notifications.join('<br>');
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
         const availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
@@ -440,14 +405,10 @@ async function main() {
         await sendEmail(fullBody);
       }
     } else {
-      // 清理过期的 pending 状态
       const now = Date.now();
       for (const [url, data] of Object.entries(pendingChanges)) {
-        if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
-          delete pendingChanges[url];
-        } else if (!data.timestamp) {
-          pendingChanges[url].timestamp = now;
-        }
+        if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) delete pendingChanges[url];
+        else if (!data.timestamp) pendingChanges[url].timestamp = now;
       }
       console.log(`[${getTime()}] 无已确认的状态变化。`);
     }
@@ -459,7 +420,6 @@ async function main() {
   }
 }
 
-// 启动逻辑
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
