@@ -69,7 +69,7 @@ function checkCurl(url) {
   });
 }
 
-// === 修改核心检测逻辑 ===
+// === 修改核心检测逻辑 (修复误判刷新 + 增强邀请码识别) ===
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
@@ -79,79 +79,96 @@ async function checkBrowserPage(browser, url) {
   });
   
   try {
+    // 强制英文环境，避免多语言造成关键词匹配失败
     const targetUrl = url.includes('?') 
       ? url + '&skipEntranceAnyKey&locale=en' 
       : url + '?skipEntranceAnyKey&locale=en';
     
     page = await context.newPage();
 
-    // === 检测自动刷新 ===
+    // === 1. 设置导航监听 ===
     let refreshCount = 0;
     const navListener = (frame) => {
+      // 只监听主框架的非空白页跳转
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') {
         refreshCount++;
       }
     };
     page.on('framenavigated', navListener);
 
+    // === 2. 访问页面 ===
     const response = await page.goto(targetUrl, { 
-      waitUntil: 'domcontentloaded', // 改为 domcontentloaded 加快初步加载
-      timeout: 45000 
+      waitUntil: 'domcontentloaded', 
+      timeout: 60000 // 增加超时时间，游戏加载慢
     });
     
     if (!response || response.status() >= 400) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // 等待网络空闲，确保游戏UI加载
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    
-    // Tanki 的 UI 渲染较慢，强制硬等待确保文字出现
+    // === 3. 智能等待加载 ===
+    // 先尝试等待网络空闲（表明资源加载差不多了）
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+    } catch (e) {
+        // 网络一直不空闲也没关系，继续往下走
+    }
+
+    // 再次硬等待，确保 JS 渲染出 UI
     await page.waitForTimeout(5000); 
 
-    if (refreshCount > 0) {
-       console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
+    // === 4. 检查是否真的死循环 ===
+    // 重置计数器，开始监测“稳定期”后的异常刷新
+    let stabilityCheckCount = 0;
+    // 临时覆盖监听器变量，只统计这 3 秒内的
+    const originalCount = refreshCount; 
+    refreshCount = 0; 
+    
+    await page.waitForTimeout(3000); // 观察 3 秒
+
+    // 如果在页面完全加载后，3秒内还能发生超过 2 次跳转，才算是死循环
+    if (refreshCount > 2) {
+       console.log(`[${getTime()}] 检测到自动刷新循环 (3s内跳转${refreshCount}次) - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    // === 增强版检测逻辑 ===
-    // 定义一个扫描函数，用于多次调用
-    const scanForInvitation = async () => {
-        const frames = page.frames();
-        // 扩充关键词：增加 enter code, promo code 等
-        const keywordRegex = /invitation|invite code|activation code|enter code|promo code|邀请码|邀请|激活码/i;
-        
-        for (const frame of frames) {
-            try {
-                // 1. 检查 Input 输入框的 Placeholder (很多游戏把提示写在输入框里)
-                const inputs = await frame.locator('input').all();
-                for (const input of inputs) {
-                    const ph = await input.getAttribute('placeholder').catch(() => '');
-                    if (ph && keywordRegex.test(ph)) return true;
+    // === 5. 增强版内容检测 (专门针对 Tanki) ===
+    const frames = page.frames();
+    let hasInvitation = false;
+    
+    // 关键词：包括 placeholder 常用的词
+    const keywordRegex = /invitation|invite code|activation code|enter code|promo code|邀请码|激活码/i;
+
+    for (const frame of frames) {
+        try {
+            // A. 检查所有 Input 输入框的 placeholder 属性 (关键修复)
+            const inputs = await frame.locator('input').all();
+            for (const input of inputs) {
+                const placeholder = await input.getAttribute('placeholder').catch(() => '');
+                if (placeholder && keywordRegex.test(placeholder)) {
+                    hasInvitation = true;
+                    // console.log(`[Debug] Found in placeholder: ${placeholder}`);
+                    break;
                 }
-
-                // 2. 检查可见文本 (innerText)
-                const visibleText = await frame.locator('body').innerText().catch(() => '');
-                if (keywordRegex.test(visibleText)) return true;
-
-                // 3. 检查 HTML 源码 (textContent 有时能抓到未渲染完全的文本)
-                const content = await frame.content().catch(() => '');
-                if (keywordRegex.test(content)) return true;
-
-            } catch (err) {
-                // 忽略跨域或 frame 销毁的错误
             }
+            if (hasInvitation) break;
+
+            // B. 检查可见文本
+            const visibleText = await frame.locator('body').innerText().catch(() => '');
+            if (keywordRegex.test(visibleText)) {
+                hasInvitation = true;
+                break;
+            }
+
+            // C. 检查 HTML 源码 (兜底)
+            const content = await frame.content().catch(() => '');
+            if (keywordRegex.test(content)) {
+                hasInvitation = true;
+                break;
+            }
+        } catch (err) {
+            // 忽略跨域 Frame 错误
         }
-        return false;
-    };
-
-    // 第一次扫描
-    let hasInvitation = await scanForInvitation();
-
-    // 如果没扫到，可能是渲染延迟，再给 3 秒重试一次
-    if (!hasInvitation) {
-        await page.waitForTimeout(3000);
-        hasInvitation = await scanForInvitation();
     }
     
     return { 
@@ -163,17 +180,11 @@ async function checkBrowserPage(browser, url) {
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
     
-    if (
-      msg.includes('navigating') || 
-      msg.includes('retrieve content') || 
-      msg.includes('execution context') || 
-      msg.includes('destroyed') ||
-      msg.includes('timeout') ||
-      msg.includes('redirect') 
-    ) {
-       // 这些通常是页面还在加载或跳转中，不一定代表彻底挂了
-       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
-       return { url, status: 'Error', error: e.message };
+    // 过滤常见非致命错误
+    if (msg.includes('timeout') || msg.includes('target closed') || msg.includes('navigating')) {
+       console.log(`[${getTime()}] 页面加载超时或中断 - ${url}`);
+       // 超时通常意味着页面卡住或太慢，视作 Offline 或 Error 均可，这里保持 Error
+       return { url, status: 'Error', error: 'Timeout/Loading Error' };
     }
 
     console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
