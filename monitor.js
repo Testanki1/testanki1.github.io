@@ -69,7 +69,7 @@ function checkCurl(url) {
   });
 }
 
-// === 修改后的核心检测逻辑 ===
+// === 修改核心检测逻辑 ===
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
@@ -95,7 +95,7 @@ async function checkBrowserPage(browser, url) {
     page.on('framenavigated', navListener);
 
     const response = await page.goto(targetUrl, { 
-      waitUntil: 'domcontentloaded', 
+      waitUntil: 'domcontentloaded', // 改为 domcontentloaded 加快初步加载
       timeout: 45000 
     });
     
@@ -103,179 +103,60 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // ====== 关键修改1: 大幅增加等待时间，确保 SPA 完成渲染 ======
+    // 等待网络空闲，确保游戏UI加载
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     
-    // 1) 等待网络空闲（JS/CSS 等资源加载完），超时从 5s → 15s
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
-      console.log(`[${getTime()}] networkidle 等待超时 - ${url}`);
-    });
-    
-    // 2) 等待 React 应用渲染（#app-root 有实际子内容）
-    await page.waitForFunction(() => {
-      const root = document.getElementById('app-root');
-      return root && root.children.length > 0 && root.innerHTML.length > 200;
-    }, { timeout: 15000 }).catch(() => {
-      console.log(`[${getTime()}] #app-root 渲染等待超时 - ${url}`);
-    });
-    
-    // 3) 等待关键 UI 元素出现（invitation 表单、登录输入框、或标题文字等）
-    //    用单个 CSS 选择器等多个目标，任一出现即可
-    await page.waitForSelector(
-      '#invite, input[type="text"], input[type="password"], .EntranceComponentStyle-title, [class*="Invite"], [class*="Registration"], [class*="Login"]', 
-      { timeout: 20000 }
-    ).catch(() => {
-      console.log(`[${getTime()}] 等待表单/标题元素超时 - ${url}`);
-    });
-    
-    // 4) 渲染稳定后再额外等一下
-    await page.waitForTimeout(2000);
-    
-    // === 检测自动刷新 ===
-    refreshCount = 0; 
-    await page.waitForTimeout(3000);
+    // Tanki 的 UI 渲染较慢，强制硬等待确保文字出现
+    await page.waitForTimeout(5000); 
 
     if (refreshCount > 0) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    // ====== 关键修改2: 使用 page.evaluate() 在浏览器上下文中直接检测，最可靠 ======
-    let hasInvitation = false;
-    let detectionMethod = 'none';
-    
-    // --- 方法1: page.evaluate() 直接在浏览器上下文中检查 DOM ---
-    try {
-      const evalResult = await page.evaluate(() => {
-        const result = { found: false, method: '', debug: {} };
+    // === 增强版检测逻辑 ===
+    // 定义一个扫描函数，用于多次调用
+    const scanForInvitation = async () => {
+        const frames = page.frames();
+        // 扩充关键词：增加 enter code, promo code 等
+        const keywordRegex = /invitation|invite code|activation code|enter code|promo code|邀请码|邀请|激活码/i;
         
-        // 1a: 检查 #invite 输入框（最直接的标志）
-        if (document.getElementById('invite')) {
-          result.found = true;
-          result.method = '#invite input found';
-          return result;
+        for (const frame of frames) {
+            try {
+                // 1. 检查 Input 输入框的 Placeholder (很多游戏把提示写在输入框里)
+                const inputs = await frame.locator('input').all();
+                for (const input of inputs) {
+                    const ph = await input.getAttribute('placeholder').catch(() => '');
+                    if (ph && keywordRegex.test(ph)) return true;
+                }
+
+                // 2. 检查可见文本 (innerText)
+                const visibleText = await frame.locator('body').innerText().catch(() => '');
+                if (keywordRegex.test(visibleText)) return true;
+
+                // 3. 检查 HTML 源码 (textContent 有时能抓到未渲染完全的文本)
+                const content = await frame.content().catch(() => '');
+                if (keywordRegex.test(content)) return true;
+
+            } catch (err) {
+                // 忽略跨域或 frame 销毁的错误
+            }
         }
-        
-        // 1b: 检查 class 名中包含 "Invite" 或 "invite" 的元素
-        const inviteClassEls = document.querySelectorAll(
-          '[class*="Invite"], [class*="invite"], [class*="INVITE"]'
-        );
-        if (inviteClassEls.length > 0) {
-          result.found = true;
-          result.method = 'class contains Invite (' + inviteClassEls.length + ' elements)';
-          return result;
-        }
-        
-        // 1c: 用 TreeWalker 遍历所有文本节点，查找 "invitation"
-        const walker = document.createTreeWalker(
-          document.body || document.documentElement,
-          NodeFilter.SHOW_TEXT,
-          null,
-          false
-        );
-        let textNode;
-        while (textNode = walker.nextNode()) {
-          if (/invitation/i.test(textNode.textContent)) {
-            result.found = true;
-            result.method = 'TreeWalker text node: "' + textNode.textContent.trim().substring(0, 50) + '"';
-            return result;
-          }
-        }
-        
-        // 1d: 检查 body.innerText（可见文本）
-        const bodyText = document.body?.innerText || '';
-        if (/invitation/i.test(bodyText)) {
-          result.found = true;
-          result.method = 'body.innerText';
-          return result;
-        }
-        
-        // 1e: 检查完整 HTML 源码（兜底）
-        const html = document.documentElement?.outerHTML || '';
-        if (/invitation/i.test(html)) {
-          result.found = true;
-          result.method = 'outerHTML';
-          return result;
-        }
-        
-        // 如果都没找到，收集调试信息
-        const appRoot = document.getElementById('app-root');
-        result.debug.bodyTextLength = bodyText.length;
-        result.debug.bodyTextSnippet = bodyText.substring(0, 500);
-        result.debug.htmlLength = html.length;
-        result.debug.appRootExists = !!appRoot;
-        result.debug.appRootChildren = appRoot ? appRoot.children.length : 0;
-        result.debug.appRootText = appRoot ? (appRoot.innerText || '').substring(0, 300) : 'NO_APP_ROOT';
-        
-        const inputs = document.querySelectorAll('input');
-        result.debug.inputCount = inputs.length;
-        result.debug.inputDetails = Array.from(inputs).map(i => 
-          `id=${i.id||'?'} name=${i.name||'?'} type=${i.type||'?'}`
-        ).join('; ');
-        
-        return result;
-      });
-      
-      if (evalResult.found) {
-        hasInvitation = true;
-        detectionMethod = `evaluate: ${evalResult.method}`;
-      } else {
-        // 打印调试信息帮助排查
-        console.log(`[${getTime()}] evaluate 未检测到 invitation - ${url}`);
-        console.log(`  bodyTextLength=${evalResult.debug.bodyTextLength}, htmlLength=${evalResult.debug.htmlLength}`);
-        console.log(`  appRoot: exists=${evalResult.debug.appRootExists}, children=${evalResult.debug.appRootChildren}`);
-        console.log(`  inputs: count=${evalResult.debug.inputCount}, details=[${evalResult.debug.inputDetails}]`);
-        console.log(`  appRootText: "${evalResult.debug.appRootText}"`);
-        console.log(`  bodySnippet: "${evalResult.debug.bodyTextSnippet}"`);
-      }
-    } catch (e) {
-      console.log(`[${getTime()}] page.evaluate 异常 - ${url}: ${e.message}`);
-    }
-    
-    // --- 方法2: 遍历子 frames（处理 iframe 嵌套的情况） ---
+        return false;
+    };
+
+    // 第一次扫描
+    let hasInvitation = await scanForInvitation();
+
+    // 如果没扫到，可能是渲染延迟，再给 3 秒重试一次
     if (!hasInvitation) {
-      const frames = page.frames();
-      const keywordRegex = /invitation|invite[\s_-]*code|activation[\s_-]*code|邀请码|邀请/i;
-      
-      for (const frame of frames) {
-        if (frame === page.mainFrame()) continue; // 主 frame 已通过 evaluate 检查
-        try {
-          const frameHtml = await frame.content();
-          if (keywordRegex.test(frameHtml)) {
-            hasInvitation = true;
-            detectionMethod = `子frame content (${frame.url()})`;
-            break;
-          }
-        } catch (err) {
-          // 跨域 frame 无法访问，忽略
-        }
-        try {
-          const frameText = await frame.evaluate(() => document.body?.innerText || '');
-          if (keywordRegex.test(frameText)) {
-            hasInvitation = true;
-            detectionMethod = `子frame innerText (${frame.url()})`;
-            break;
-          }
-        } catch (err) {}
-      }
+        await page.waitForTimeout(3000);
+        hasInvitation = await scanForInvitation();
     }
-    
-    // --- 方法3: Playwright 文本定位器（第三重保险） ---
-    if (!hasInvitation) {
-      try {
-        const count = await page.getByText(/invitation/i).count();
-        if (count > 0) {
-          hasInvitation = true;
-          detectionMethod = 'getByText(/invitation/i)';
-        }
-      } catch (e) {}
-    }
-    
-    const finalStatus = hasInvitation ? 'Closed' : 'Open';
-    console.log(`[${getTime()}] 最终结果: ${url} -> ${finalStatus} (方法: ${detectionMethod})`);
     
     return { 
       url, 
-      status: finalStatus,
+      status: hasInvitation ? 'Closed' : 'Open',
       httpStatus: response.status()
     };
     
@@ -290,6 +171,7 @@ async function checkBrowserPage(browser, url) {
       msg.includes('timeout') ||
       msg.includes('redirect') 
     ) {
+       // 这些通常是页面还在加载或跳转中，不一定代表彻底挂了
        console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${url}: ${e.message}`);
        return { url, status: 'Error', error: e.message };
     }
@@ -397,19 +279,12 @@ async function main() {
       }
     }
 
-    // Phase 2: Browser（关键修改：添加 WebGL 支持参数）
+    // Phase 2: Browser
     if (candidatesForBrowser.length > 0) {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
       browser = await chromium.launch({ 
         headless: true,
-        args: [
-          '--no-sandbox', 
-          '--disable-setuid-sandbox', 
-          '--disable-dev-shm-usage',
-          '--use-gl=swiftshader',
-          '--enable-webgl',
-          '--disable-gpu-sandbox'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
       const { default: pLimit } = await import('p-limit');
@@ -429,6 +304,7 @@ async function main() {
         const oldEntry = committedStatusJson[url] || {};
         
         let finalStatus = status;
+        // 如果浏览器报 Offline 但没有明确错误（比如超时），通常维持旧哈希
         if (status === 'Offline' && !error) {
           finalStatus = 'Closed'; 
         }
@@ -537,6 +413,7 @@ async function main() {
       const success = fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
       
+      // 只有推送成功才发邮件，或者本地写入成功也发（视需求而定，这里保持原逻辑）
       if (pushed) {
         const changeDetails = notifications.join('<br>');
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
@@ -545,6 +422,7 @@ async function main() {
         await sendEmail(fullBody);
       }
     } else {
+      // 清理过期的 pending 状态
       const now = Date.now();
       for (const [url, data] of Object.entries(pendingChanges)) {
         if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
