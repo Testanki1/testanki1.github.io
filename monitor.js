@@ -80,48 +80,43 @@ async function checkBrowserPage(browser, url) {
     const targetUrl = url.includes('?') ? `${url}&locale=en` : `${url}?locale=en`;
     page = await context.newPage();
     
-    const response = await page.goto(targetUrl, { waitUntil: 'commit', timeout: 45000 });
+    const response = await page.goto(targetUrl, { waitUntil: 'load', timeout: 45000 });
     if (!response || response.status() >= 400) return { url, status: 'Offline' };
 
-    // 核心逻辑：在 30 秒内进行高频轮询探测
-    let hasInvitation = false;
+    let hasInvitationStructure = false;
     const pollStart = Date.now();
     const pollTimeout = 30000; 
 
+    // 针对指定 HTML 结构的特征工程探测
     while (Date.now() - pollStart < pollTimeout) {
       const allFrames = page.frames();
       for (const frame of allFrames) {
         try {
           const found = await frame.evaluate(() => {
-            const bodyText = document.body ? document.body.innerText : '';
-            const html = document.documentElement.innerHTML;
-            const keywords = /INVITATION|ENTER CODE|邀请码|激活码|ПРИГЛАШЕНИЕ|ВВЕДИТЕ КОД/i;
-            
-            // 检查文本
-            if (keywords.test(bodyText) || keywords.test(html)) return true;
-            
-            // 检查输入框特征
-            const inputs = Array.from(document.querySelectorAll('input'));
-            return inputs.some(i => {
-              const attrs = (i.id + i.className + i.placeholder + (i.getAttribute('name') || '')).toLowerCase();
-              return attrs.includes('invite') || attrs.includes('code') || attrs.includes('activation');
-            });
+            // 1. 特征类名匹配
+            const hasContainer = !!document.querySelector('.EntranceComponentStyle-ContainerForm');
+            const hasInviteInput = !!document.querySelector('input#invite');
+            const hasNextButton = !!document.querySelector('.EntranceInviteComponentStyle-nextButton');
+            const hasTitleStyle = !!document.querySelector('.EntranceComponentStyle-title');
+
+            // 只要满足其中两个强特征，即可判定为有邀请码
+            return (hasContainer && hasInviteInput) || (hasInviteInput && hasNextButton) || (hasTitleStyle && hasInviteInput);
           });
           
           if (found) {
-            hasInvitation = true;
+            hasInvitationStructure = true;
             break;
           }
         } catch (e) {}
       }
 
-      if (hasInvitation) break;
-      await new Promise(r => setTimeout(r, 1500)); // 每 1.5 秒轮询一次
+      if (hasInvitationStructure) break;
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     return { 
       url, 
-      status: hasInvitation ? 'Closed' : 'Open',
+      status: hasInvitationStructure ? 'Closed' : 'Open',
       httpStatus: response.status()
     };
   } catch (e) {
@@ -137,7 +132,7 @@ function commitAndPush() {
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
     execSync(`git add ${STATE_FILE}`);
     if (!execSync('git status --porcelain').toString()) return false;
-    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
+    execSync('git commit -m "chore: 更新服务器状态 (结构探测模式) [skip ci]"');
     execSync('git pull --rebase origin main');
     execSync('git push origin main');
     return true;
@@ -188,7 +183,7 @@ async function main() {
     });
 
     if (aliveOnes.length > 0) {
-      console.log(`[${getTime()}] 执行深度探测 (轮询模式)...`);
+      console.log(`[${getTime()}] 执行 HTML 结构特征扫描...`);
       const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
       
       const tasks = aliveOnes.map(c => async () => {
@@ -229,7 +224,7 @@ async function main() {
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(committedStatus, null, 2));
       if (commitAndPush()) {
-        await sendEmail(`检测到状态变化：<br>${notifications.join('<br>')}`);
+        await sendEmail(`检测到状态变化 (基于结构匹配)：<br>${notifications.join('<br>')}`);
       }
     } else {
       console.log(`[${getTime()}] 本轮无确认的状态变更。`);
