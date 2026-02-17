@@ -30,7 +30,6 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 自研并发控制池
 async function runPool(tasks, concurrency) {
   const results = [];
   const executing = new Set();
@@ -89,31 +88,51 @@ async function checkBrowserPage(browser, url) {
     const response = await page.goto(targetUrl, { waitUntil: 'commit', timeout: 45000 });
     if (!response || response.status() >= 400) return { url, status: 'Offline' };
 
+    // 针对 deploy3 等站点的深度等待
     try {
       await Promise.race([
-        page.waitForSelector('input#invite', { state: 'attached', timeout: 12000 }),
-        page.waitForSelector('.EntranceComponentStyle-title', { state: 'attached', timeout: 12000 }),
-        page.waitForLoadState('networkidle', { timeout: 15000 })
+        // 监控特定的邀请码输入框 ID
+        page.waitForSelector('input#invite', { state: 'attached', timeout: 15000 }),
+        // 监控通用的渲染完成标志（app 根节点被注入内容）
+        page.waitForFunction(() => {
+          const bodyText = document.body.innerText;
+          return bodyText.length > 200 || /INVITATION|ENTER CODE|邀请码/i.test(bodyText);
+        }, { timeout: 15000 })
       ]);
     } catch (e) {}
 
-    await page.waitForTimeout(3000); 
+    // 给异步加载留出最后的渲染缓冲
+    await page.waitForTimeout(5000); 
 
     if (refreshCount > 5) return { url, status: 'Error', error: '自动刷新循环' };
 
-    const detection = await page.evaluate(() => {
-      const checkText = (el) => /INVITATION|ENTER CODE|邀请码|激活码/i.test(el.innerText || '');
-      const hasInput = !!document.querySelector('input#invite') || !!document.querySelector('input[type="password"]');
-      const hasTitle = Array.from(document.querySelectorAll('*')).some(el => 
-        el.className && typeof el.className === 'string' && el.className.includes('title') && checkText(el)
-      );
-      const bodyTextMatch = checkText(document.body);
-      return hasInput || hasTitle || bodyTextMatch;
-    });
+    // 递归检查所有 Frames（包括嵌入的 Iframe）
+    let hasInvitation = false;
+    const allFrames = page.frames();
+    
+    for (const frame of allFrames) {
+      try {
+        const detection = await frame.evaluate(() => {
+          const checkText = (txt) => /INVITATION|ENTER CODE|邀请码|激活码/i.test(txt || '');
+          // 检查所有输入框
+          const inputs = Array.from(document.querySelectorAll('input'));
+          const hasInviteInput = inputs.some(i => i.id?.includes('invite') || i.placeholder?.includes('code'));
+          // 检查所有按钮和标题
+          const bodyText = document.body.innerText;
+          return hasInviteInput || checkText(bodyText);
+        });
+        if (detection) {
+          hasInvitation = true;
+          break;
+        }
+      } catch (e) {
+        // 忽略跨域 frame 访问限制产生的错误
+      }
+    }
 
     return { 
       url, 
-      status: detection ? 'Closed' : 'Open',
+      status: hasInvitation ? 'Closed' : 'Open',
       httpStatus: response.status()
     };
   } catch (e) {
@@ -209,7 +228,6 @@ async function main() {
       if (cur.status === old.status && cur.hash === old.hash) {
         delete pendingChanges[url];
       } else {
-        // 核心修正：如果旧状态不存在且当前是离线，则静默初始化，不发通知
         if (!old.status && cur.status === 'Offline') {
             committedStatus[url] = cur;
             continue;
@@ -242,7 +260,6 @@ async function main() {
       }
     } else {
       console.log(`[${getTime()}] 本轮无确认的状态变更。`);
-      // 即便没有通知，也更新一下状态文件（用于初始化那些离线的服务器记录）
       fs.writeFileSync(STATE_FILE, JSON.stringify(committedStatus, null, 2));
     }
 
