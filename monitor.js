@@ -30,7 +30,7 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 自研并发池函数
+// 自研并发控制池
 async function runPool(tasks, concurrency) {
   const results = [];
   const executing = new Set();
@@ -53,7 +53,7 @@ function checkCurl(url) {
       rejectUnauthorized: false, 
       timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0 x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     }, (res) => {
       let data = '';
@@ -73,14 +73,14 @@ async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
-    locale: 'en-US'
+    locale: 'en-US',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   });
   
   try {
     const targetUrl = url.includes('?') ? `${url}&locale=en` : `${url}?locale=en`;
     page = await context.newPage();
     
-    // 监控自动刷新
     let refreshCount = 0;
     page.on('framenavigated', frame => {
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') refreshCount++;
@@ -89,8 +89,6 @@ async function checkBrowserPage(browser, url) {
     const response = await page.goto(targetUrl, { waitUntil: 'commit', timeout: 45000 });
     if (!response || response.status() >= 400) return { url, status: 'Offline' };
 
-    // 针对 deploy3 的核心增强：等待关键渲染
-    // 即使 networkidle 没到，只要看到邀请框就立刻锁定
     try {
       await Promise.race([
         page.waitForSelector('input#invite', { state: 'attached', timeout: 12000 }),
@@ -99,18 +97,23 @@ async function checkBrowserPage(browser, url) {
       ]);
     } catch (e) {}
 
-    await page.waitForTimeout(2000); 
+    await page.waitForTimeout(3000); 
 
-    if (refreshCount > 5) return { url, status: 'Error', error: 'Auto-refresh loop' };
+    if (refreshCount > 5) return { url, status: 'Error', error: '自动刷新循环' };
 
-    // 多重证据提取
-    const hasInviteInput = await page.locator('input#invite').count() > 0;
-    const content = await page.innerText('body').catch(() => '');
-    const hasInviteText = /INVITATION|ENTER CODE|邀请码|激活码/i.test(content);
+    const detection = await page.evaluate(() => {
+      const checkText = (el) => /INVITATION|ENTER CODE|邀请码|激活码/i.test(el.innerText || '');
+      const hasInput = !!document.querySelector('input#invite') || !!document.querySelector('input[type="password"]');
+      const hasTitle = Array.from(document.querySelectorAll('*')).some(el => 
+        el.className && typeof el.className === 'string' && el.className.includes('title') && checkText(el)
+      );
+      const bodyTextMatch = checkText(document.body);
+      return hasInput || hasTitle || bodyTextMatch;
+    });
 
     return { 
       url, 
-      status: (hasInviteInput || hasInviteText) ? 'Closed' : 'Open',
+      status: detection ? 'Closed' : 'Open',
       httpStatus: response.status()
     };
   } catch (e) {
@@ -126,11 +129,12 @@ function commitAndPush() {
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
     execSync(`git add ${STATE_FILE}`);
     if (!execSync('git status --porcelain').toString()) return false;
-    execSync('git commit -m "chore: 自动更新状态 [skip ci]"');
+    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
     execSync('git pull --rebase origin main');
     execSync('git push origin main');
     return true;
   } catch (e) {
+    console.error(`[${getTime()}] Git 推送失败: ${e.message}`);
     return false;
   }
 }
@@ -140,82 +144,116 @@ async function sendEmail(body) {
     await transporter.sendMail({
       from: `"3D坦克监测" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
-      subject: "3D坦克状态更新",
-      html: body
+      subject: "3D坦克测试服状态更新",
+      html: `你好，<br><br>${body}<br><br>此邮件由脚本自动发送。`
     });
+    console.log(`[${getTime()}] 邮件已发送。`);
   } catch (e) {
-    console.error("邮件发送失败", e.message);
+    console.error(`[${getTime()}] 邮件发送失败:`, e.message);
   }
 }
 
 async function main() {
   console.log(`[${getTime()}] ========== 监测循环开始 ==========`);
   const urls = Array.from({ length: 10 }, (_, i) => `https://public-deploy${i + 1}.test-eu.tankionline.com/browser-public/index.html`);
-  urls.push("https://test.ru.tankionline.com/play/", "https://tankiclassic.com/play/");
+  urls.push(
+    "https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com",
+    "https://tankiclassic.com/play/"
+  );
 
   let committedStatus = {};
   if (fs.existsSync(STATE_FILE)) {
-    try { committedStatus = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) {}
+    try { 
+      committedStatus = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); 
+    } catch (e) {
+      console.error(`[${getTime()}] 解析状态文件失败`);
+    }
   }
 
-  try {
-    // Phase 1: Curl
-    const curlResults = await Promise.all(urls.map(u => checkCurl(u)));
-    const aliveOnes = curlResults.filter(r => r.isAlive);
-    const currentResults = {};
+  const currentResults = {};
 
-    // 预填离线状态
+  try {
+    console.log(`[${getTime()}] 执行 Phase 1 (Curl)...`);
+    const curlResults = await Promise.all(urls.map(u => checkCurl(u)));
+    const aliveOnes = [];
+
     curlResults.forEach(r => {
-      if (!r.isAlive) currentResults[r.url] = { status: 'Offline', hash: committedStatus[r.url]?.hash || '' };
+      if (r.isAlive) {
+        aliveOnes.push(r);
+      } else {
+        currentResults[r.url] = { status: 'Offline', hash: committedStatus[r.url]?.hash || '' };
+      }
     });
 
-    // Phase 2: Browser
     if (aliveOnes.length > 0) {
-      const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-      const tasks = aliveOnes.map(c => () => checkBrowserPage(browser, c.url).then(r => {
-        currentResults[c.url] = { ...r, hash: c.hash };
-      }));
+      console.log(`[${getTime()}] 执行 Phase 2 (Browser)...`);
+      const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      
+      const tasks = aliveOnes.map(c => async () => {
+        const res = await checkBrowserPage(browser, c.url);
+        currentResults[c.url] = { ...res, hash: c.hash };
+        console.log(`[${getTime()}] - ${c.url} 判定结果: ${res.status}`);
+      });
+
       await runPool(tasks, BROWSER_CONCURRENCY);
       await browser.close();
     }
 
-    // Phase 3: 状态比对与通知
     let notifications = [];
+    let availableServers = [];
+
     for (const url of urls) {
       const cur = currentResults[url] || { status: 'Offline', hash: '' };
       const old = committedStatus[url] || {};
       
       if (cur.status === old.status && cur.hash === old.hash) {
         delete pendingChanges[url];
-        continue;
+      } else {
+        // 核心修正：如果旧状态不存在且当前是离线，则静默初始化，不发通知
+        if (!old.status && cur.status === 'Offline') {
+            committedStatus[url] = cur;
+            continue;
+        }
+
+        if (pendingChanges[url]?.status === cur.status) {
+          pendingChanges[url].count++;
+          if (pendingChanges[url].count >= CONFIRMATION_THRESHOLD) {
+            let changeMsg = `- <a href="${url}">${url}</a>: 从 ${old.status || '未知'} 变为 <b>${cur.status}</b>`;
+            if (cur.hash !== old.hash && old.hash) changeMsg += " (检测到代码更新)";
+            notifications.push(changeMsg);
+            committedStatus[url] = cur;
+            delete pendingChanges[url];
+          }
+        } else {
+          pendingChanges[url] = { status: cur.status, count: 1 };
+        }
       }
 
-      if (pendingChanges[url]?.status === cur.status) {
-        pendingChanges[url].count++;
-        if (pendingChanges[url].count >= CONFIRMATION_THRESHOLD) {
-          committedStatus[url] = cur;
-          notifications.push(`- ${url}: 从 ${old.status || '未知'} 变为 <b>${cur.status}</b>`);
-          delete pendingChanges[url];
-        }
-      } else {
-        pendingChanges[url] = { status: cur.status, count: 1 };
+      if (committedStatus[url]?.status && committedStatus[url].status !== 'Offline') {
+        availableServers.push(`${url} (状态: ${committedStatus[url].status})`);
       }
     }
 
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(committedStatus, null, 2));
       if (commitAndPush()) {
-        await sendEmail(`检测到状态变化：<br>${notifications.join('<br>')}`);
-        console.log(`[${getTime()}] 状态已更新并发送邮件`);
+        const body = `状态变更详情：<br>${notifications.join('<br>')}<br><br>当前在线列表：<br>${availableServers.join('<br>')}`;
+        await sendEmail(body);
       }
+    } else {
+      console.log(`[${getTime()}] 本轮无确认的状态变更。`);
+      // 即便没有通知，也更新一下状态文件（用于初始化那些离线的服务器记录）
+      fs.writeFileSync(STATE_FILE, JSON.stringify(committedStatus, null, 2));
     }
+
   } catch (err) {
-    console.error("循环异常", err);
+    console.error(`[${getTime()}] 主逻辑异常:`, err);
   }
   console.log(`[${getTime()}] ========== 监测循环结束 ==========`);
 }
 
 (async () => {
+  console.log(`[${getTime()}] 监测服务已启动...`);
   await main();
   setInterval(async () => {
     if (Date.now() - START_TIME > MAX_RUNTIME) process.exit(0);
