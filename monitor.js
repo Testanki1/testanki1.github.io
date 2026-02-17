@@ -80,54 +80,43 @@ async function checkBrowserPage(browser, url) {
     const targetUrl = url.includes('?') ? `${url}&locale=en` : `${url}?locale=en`;
     page = await context.newPage();
     
-    let refreshCount = 0;
-    page.on('framenavigated', frame => {
-      if (frame === page.mainFrame() && frame.url() !== 'about:blank') refreshCount++;
-    });
-
     const response = await page.goto(targetUrl, { waitUntil: 'commit', timeout: 45000 });
     if (!response || response.status() >= 400) return { url, status: 'Offline' };
 
-    // 针对 deploy3 等站点的深度等待
-    try {
-      await Promise.race([
-        // 监控特定的邀请码输入框 ID
-        page.waitForSelector('input#invite', { state: 'attached', timeout: 15000 }),
-        // 监控通用的渲染完成标志（app 根节点被注入内容）
-        page.waitForFunction(() => {
-          const bodyText = document.body.innerText;
-          return bodyText.length > 200 || /INVITATION|ENTER CODE|邀请码/i.test(bodyText);
-        }, { timeout: 15000 })
-      ]);
-    } catch (e) {}
-
-    // 给异步加载留出最后的渲染缓冲
-    await page.waitForTimeout(5000); 
-
-    if (refreshCount > 5) return { url, status: 'Error', error: '自动刷新循环' };
-
-    // 递归检查所有 Frames（包括嵌入的 Iframe）
+    // 核心逻辑：在 30 秒内进行高频轮询探测
     let hasInvitation = false;
-    const allFrames = page.frames();
-    
-    for (const frame of allFrames) {
-      try {
-        const detection = await frame.evaluate(() => {
-          const checkText = (txt) => /INVITATION|ENTER CODE|邀请码|激活码/i.test(txt || '');
-          // 检查所有输入框
-          const inputs = Array.from(document.querySelectorAll('input'));
-          const hasInviteInput = inputs.some(i => i.id?.includes('invite') || i.placeholder?.includes('code'));
-          // 检查所有按钮和标题
-          const bodyText = document.body.innerText;
-          return hasInviteInput || checkText(bodyText);
-        });
-        if (detection) {
-          hasInvitation = true;
-          break;
-        }
-      } catch (e) {
-        // 忽略跨域 frame 访问限制产生的错误
+    const pollStart = Date.now();
+    const pollTimeout = 30000; 
+
+    while (Date.now() - pollStart < pollTimeout) {
+      const allFrames = page.frames();
+      for (const frame of allFrames) {
+        try {
+          const found = await frame.evaluate(() => {
+            const bodyText = document.body ? document.body.innerText : '';
+            const html = document.documentElement.innerHTML;
+            const keywords = /INVITATION|ENTER CODE|邀请码|激活码|ПРИГЛАШЕНИЕ|ВВЕДИТЕ КОД/i;
+            
+            // 检查文本
+            if (keywords.test(bodyText) || keywords.test(html)) return true;
+            
+            // 检查输入框特征
+            const inputs = Array.from(document.querySelectorAll('input'));
+            return inputs.some(i => {
+              const attrs = (i.id + i.className + i.placeholder + (i.getAttribute('name') || '')).toLowerCase();
+              return attrs.includes('invite') || attrs.includes('code') || attrs.includes('activation');
+            });
+          });
+          
+          if (found) {
+            hasInvitation = true;
+            break;
+          }
+        } catch (e) {}
       }
+
+      if (hasInvitation) break;
+      await new Promise(r => setTimeout(r, 1500)); // 每 1.5 秒轮询一次
     }
 
     return { 
@@ -153,7 +142,6 @@ function commitAndPush() {
     execSync('git push origin main');
     return true;
   } catch (e) {
-    console.error(`[${getTime()}] Git 推送失败: ${e.message}`);
     return false;
   }
 }
@@ -164,7 +152,7 @@ async function sendEmail(body) {
       from: `"3D坦克监测" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "3D坦克测试服状态更新",
-      html: `你好，<br><br>${body}<br><br>此邮件由脚本自动发送。`
+      html: `你好，<br><br>${body}`
     });
     console.log(`[${getTime()}] 邮件已发送。`);
   } catch (e) {
@@ -182,17 +170,12 @@ async function main() {
 
   let committedStatus = {};
   if (fs.existsSync(STATE_FILE)) {
-    try { 
-      committedStatus = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); 
-    } catch (e) {
-      console.error(`[${getTime()}] 解析状态文件失败`);
-    }
+    try { committedStatus = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) {}
   }
 
   const currentResults = {};
 
   try {
-    console.log(`[${getTime()}] 执行 Phase 1 (Curl)...`);
     const curlResults = await Promise.all(urls.map(u => checkCurl(u)));
     const aliveOnes = [];
 
@@ -205,13 +188,13 @@ async function main() {
     });
 
     if (aliveOnes.length > 0) {
-      console.log(`[${getTime()}] 执行 Phase 2 (Browser)...`);
+      console.log(`[${getTime()}] 执行深度探测 (轮询模式)...`);
       const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
       
       const tasks = aliveOnes.map(c => async () => {
         const res = await checkBrowserPage(browser, c.url);
         currentResults[c.url] = { ...res, hash: c.hash };
-        console.log(`[${getTime()}] - ${c.url} 判定结果: ${res.status}`);
+        console.log(`[${getTime()}] - ${c.url} -> ${res.status}`);
       });
 
       await runPool(tasks, BROWSER_CONCURRENCY);
@@ -219,8 +202,6 @@ async function main() {
     }
 
     let notifications = [];
-    let availableServers = [];
-
     for (const url of urls) {
       const cur = currentResults[url] || { status: 'Offline', hash: '' };
       const old = committedStatus[url] || {};
@@ -232,13 +213,10 @@ async function main() {
             committedStatus[url] = cur;
             continue;
         }
-
         if (pendingChanges[url]?.status === cur.status) {
           pendingChanges[url].count++;
           if (pendingChanges[url].count >= CONFIRMATION_THRESHOLD) {
-            let changeMsg = `- <a href="${url}">${url}</a>: 从 ${old.status || '未知'} 变为 <b>${cur.status}</b>`;
-            if (cur.hash !== old.hash && old.hash) changeMsg += " (检测到代码更新)";
-            notifications.push(changeMsg);
+            notifications.push(`- <a href="${url}">${url}</a>: 从 ${old.status || '未知'} 变为 <b>${cur.status}</b>`);
             committedStatus[url] = cur;
             delete pendingChanges[url];
           }
@@ -246,17 +224,12 @@ async function main() {
           pendingChanges[url] = { status: cur.status, count: 1 };
         }
       }
-
-      if (committedStatus[url]?.status && committedStatus[url].status !== 'Offline') {
-        availableServers.push(`${url} (状态: ${committedStatus[url].status})`);
-      }
     }
 
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(committedStatus, null, 2));
       if (commitAndPush()) {
-        const body = `状态变更详情：<br>${notifications.join('<br>')}<br><br>当前在线列表：<br>${availableServers.join('<br>')}`;
-        await sendEmail(body);
+        await sendEmail(`检测到状态变化：<br>${notifications.join('<br>')}`);
       }
     } else {
       console.log(`[${getTime()}] 本轮无确认的状态变更。`);
@@ -270,7 +243,6 @@ async function main() {
 }
 
 (async () => {
-  console.log(`[${getTime()}] 监测服务已启动...`);
   await main();
   setInterval(async () => {
     if (Date.now() - START_TIME > MAX_RUNTIME) process.exit(0);
