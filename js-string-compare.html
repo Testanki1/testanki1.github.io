@@ -546,7 +546,8 @@
             loading: "正在深度解析...",
             alert_files: "请先选择两个文件！",
             alert_error: "发生错误: ",
-            hidden_more: "... 还有 {n} 条数据已隐藏"
+            hidden_more: "... 还有 {n} 条数据已隐藏",
+            base64_mark: "[Base64 Decoded]"
         },
         en: {
             page_title: "JS String Diff Tool",
@@ -563,7 +564,8 @@
             loading: "Deep Parsing...",
             alert_files: "Please select two files first!",
             alert_error: "Error occurred: ",
-            hidden_more: "... {n} more items hidden"
+            hidden_more: "... {n} more items hidden",
+            base64_mark: "[Base64 Decoded]"
         }
     };
 
@@ -615,8 +617,8 @@
 
     // --- Core Logic ---
     let diffResults = {
-        added: [],
-        removed: [],
+        added:[],
+        removed:[],
         oldFileName: '',
         newFileName: '',
         timestamp: ''
@@ -727,6 +729,41 @@
         return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z');
     }
 
+    // Attempt to decode valid Base64 strings safely
+    function decodeBase64IfValid(str) {
+        // Prevent trivial false positives (e.g. short variable names like "VQ==")
+        if (str.length < 16) return str;
+        
+        // Base64 valid length check
+        if (str.length % 4 !== 0) return str;
+        
+        // Regex for Base64 characters (including URL safe characters)
+        if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(str)) return str;
+
+        try {
+            // Transform URL-safe Base64 to standard Base64
+            const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+            const decodedBytes = atob(b64);
+            
+            // Validate and convert to UTF-8
+            // If the base64 does not decode to a valid UTF-8 text string, this will throw an error and be caught
+            const decodedText = decodeURIComponent(escape(decodedBytes));
+            
+            // Screen out strings that contain unprintable control characters (Allow \t, \n, \r)
+            if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(decodedText)) {
+                return str;
+            }
+
+            // Exclude if it's purely empty or space
+            if (!decodedText.trim()) return str;
+            
+            return decodedText + ' ' + t('base64_mark');
+        } catch (e) {
+            // Not a valid base64 encoded text (either binary data or not UTF-8)
+            return str;
+        }
+    }
+
     function addString(set, raw) {
         try {
             let clean = raw
@@ -739,7 +776,20 @@
                 .replace(/\\\//g, '/');
 
             clean = clean.trim();
-            if (isUseful(clean)) set.add(clean);
+            
+            // Base64 Detection & Decoding
+            let isBase64 = false;
+            let decoded = decodeBase64IfValid(clean);
+            if (decoded !== clean) {
+                clean = decoded;
+                isBase64 = true; // If correctly decoded from Base64, definitively flag for inclusion
+            }
+
+            // If it was Base64 encoded payload, always consider it useful. 
+            // Otherwise, apply general validation
+            if (isBase64 || isUseful(clean)) {
+                set.add(clean);
+            }
         } catch (e) {}
     }
 
@@ -781,7 +831,7 @@
         loading.style.display = 'flex';
         
         renderList('list-added', [], 'count-added');
-        renderList('list-removed', [], 'count-removed');
+        renderList('list-removed',[], 'count-removed');
 
         try {
             await nextTick();
@@ -793,7 +843,7 @@
             ]);
 
             const added = [];
-            const removed = [];
+            const removed =[];
 
             let i = 0;
             for (const s of setNew) {
