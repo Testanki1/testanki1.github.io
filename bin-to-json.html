@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map.bin Parser</title>
+    
+    <!-- 引入第一字体 Rubik 和第二字体 M PLUS 1p -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --md-sys-color-background: #001926;
+            --md-sys-color-primary: #76FF33;
+            --md-sys-color-secondary: #BFD5FF;
+            --md-sys-color-on-primary: #001926;
+            --md-sys-color-surface: rgba(191, 213, 255, 0.06);
+            --md-sys-color-outline: rgba(191, 213, 255, 0.15);
+        }
+
+        * {
+            /* 移除移动端点击高亮，让 M3 的交互反馈更纯粹 */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            font-family: 'Rubik', 'M PLUS 1p', sans-serif; 
+            background: var(--md-sys-color-background); 
+            color: var(--md-sys-color-secondary); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            background: var(--md-sys-color-surface);
+            padding: 48px 40px;
+            border-radius: 32px; /* M3 Expressive 超大圆角 */
+            border: 1px solid var(--md-sys-color-outline);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            max-width: 560px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        h2 { 
+            margin-top: 0; 
+            color: var(--md-sys-color-primary); 
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em; /* Expressive 标题缩进 */
+            margin-bottom: 16px;
+        }
+
+        p { 
+            color: var(--md-sys-color-secondary); 
+            font-size: 1.125rem;
+            margin-bottom: 40px; 
+            line-height: 1.6; 
+            opacity: 0.85;
+        }
+
+        input[type="file"] { 
+            display: none; 
+        }
+
+        .upload-btn {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            padding: 18px 36px;
+            border-radius: 100px; /* M3 完全圆角按钮 */
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 1.125rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+            border: none;
+            outline: none;
+        }
+
+        .upload-btn:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(118, 255, 51, 0.25);
+            filter: brightness(1.05);
+        }
+
+        .upload-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(118, 255, 51, 0.15);
+        }
+
+        #log {
+            margin-top: 32px;
+            color: var(--md-sys-color-secondary);
+            /* 日志使用等宽数字特性，同时继承全局字体 */
+            font-variant-numeric: tabular-nums;
+            white-space: pre-wrap;
+            text-align: left;
+            background: var(--md-sys-color-background);
+            padding: 24px;
+            border-radius: 24px;
+            max-height: 280px;
+            overflow-y: auto;
+            border: 1px solid var(--md-sys-color-outline);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* 滚动条美化 */
+        #log::-webkit-scrollbar {
+            width: 8px;
+        }
+        #log::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #log::-webkit-scrollbar-thumb {
+            background: rgba(191, 213, 255, 0.2);
+            border-radius: 8px;
+        }
+        #log::-webkit-scrollbar-thumb:hover {
+            background: rgba(191, 213, 255, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 id="ui-title">Map.bin 解析器</h2>
+    <p id="ui-desc">该工具会在浏览器本地直接解压并读取3D坦克的二进制 map.bin 文件。解析完成后会自动将其转为 JSON 文件供你下载查看。</p>
+    
+    <label class="upload-btn" tabindex="0">
+        <span id="ui-btn">选择并解析 map.bin</span>
+        <input type="file" id="fileInput" accept=".bin">
+    </label>
+    
+    <div id="log">等待上传...</div>
+</div>
+
+<script>
+// 多语言配置
+const i18n = {
+    zh: {
+        title: "Map.bin 解析器",
+        desc: "该工具会在浏览器本地直接解压并读取3D坦克的二进制 map.bin 文件。解析完成后会自动将其转为 JSON 文件供你下载查看。",
+        btn: "选择并解析 map.bin",
+        logWait: "等待上传...",
+        logStart: "[INFO] 开始读取文件: ",
+        logSize: "[INFO] 文件大小: ",
+        logProc: "[PROC] 正在进行 Zlib 解压并读取数据树...",
+        logDone: "[DONE] 解析完成！准备生成 JSON 文件...",
+        logSuccess: "[SUCCESS] 下载已触发！请检查浏览器的下载记录。",
+        logFail: "[ERROR] 解析失败: "
+    },
+    en: {
+        title: "Map.bin Parser",
+        desc: "This tool decompresses and reads Tanki Online's binary map.bin file locally in your browser. Once parsed, it automatically converts it into a JSON file for you to download and view.",
+        btn: "Select and Parse map.bin",
+        logWait: "Waiting for upload...",
+        logStart: "[INFO] Started reading file: ",
+        logSize: "[INFO] File size: ",
+        logProc: "[PROC] Decompressing Zlib and reading data tree...",
+        logDone: "[DONE] Parsing completed! Generating JSON file...",
+        logSuccess: "[SUCCESS] Download triggered! Please check your browser's download history.",
+        logFail: "[ERROR] Parsing failed: "
+    }
+};
+
+// 自动检测并切换语言
+const isZh = navigator.language.toLowerCase().startsWith('zh');
+const lang = isZh ? 'zh' : 'en';
+const t = i18n[lang];
+
+document.documentElement.lang = isZh ? 'zh-CN' : 'en';
+document.title = t.title;
+document.getElementById('ui-title').innerText = t.title;
+document.getElementById('ui-desc').innerText = t.desc;
+document.getElementById('ui-btn').innerText = t.btn;
+document.getElementById('log').innerText = t.logWait;
+
+// 日志追加函数
+function logMsg(msg) {
+    const logEl = document.getElementById('log');
+    logEl.innerText += '\n' + msg;
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+// 核心：二进制流读取器
+class BinaryStream {
+    constructor(buffer) {
+        this.buffer = new Uint8Array(buffer);
+        this.view = new DataView(this.buffer.buffer, this.buffer.byteOffset, this.buffer.byteLength);
+        this.offset = 0;
+    }
+    readUint8() { const v = this.view.getUint8(this.offset); this.offset += 1; return v; }
+    readUint16(le = false) { const v = this.view.getUint16(this.offset, le); this.offset += 2; return v; }
+    readUint32(le = false) { const v = this.view.getUint32(this.offset, le); this.offset += 4; return v; }
+    readInt32(le = false) { const v = this.view.getInt32(this.offset, le); this.offset += 4; return v; }
+    readFloat32(le = false) { const v = this.view.getFloat32(this.offset, le); this.offset += 4; return v; }
+    readFloat64(le = false) { const v = this.view.getFloat64(this.offset, le); this.offset += 8; return v; }
+    readBytes(len) { const v = this.buffer.subarray(this.offset, this.offset + len); this.offset += len; return v; }
+    readStringLength() {
+        const flags = this.readUint8();
+        if ((flags & 0b10000000) === 0) return flags & 0b01111111;
+        if ((flags & 0b01000000) === 0) return ((flags & 0b00111111) << 8) + this.readUint8();
+        return ((flags & 0b00111111) << 16) + this.readUint16(false);
+    }
+    readString() { return new TextDecoder().decode(this.readBytes(this.readStringLength())); }
+}
+
+// 核心：Zlib 数据解压
+async function decompressZlib(uint8array) {
+    const ds = new DecompressionStream("deflate");
+    const writer = ds.writable.getWriter();
+    writer.write(uint8array);
+    writer.close();
+    return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+
+// 核心：解析数据包包头并自动解压
+async function unwrapPacket(stream) {
+    const flags = stream.readUint8();
+    const compressed = (flags & 0b01000000) > 0;
+    let len = 0;
+    if ((flags & 0b10000000) === 0) {
+        len = stream.readUint8() + ((flags & 0b00111111) << 8);
+    } else {
+        const b1 = stream.readUint8(), b2 = stream.readUint8(), b3 = stream.readUint8();
+        len = (b1 << 16) | (b2 << 8) | b3;
+        len += (flags & 0b00111111) * 16777216;
+    }
+    let data = stream.readBytes(len);
+    if (compressed) data = await decompressZlib(data);
+    return new BinaryStream(data);
+}
+
+// 核心：解析 map.bin 生成对象
+async function parseMapBin(buffer) {
+    const stream = new BinaryStream(buffer);
+    const packet = await unwrapPacket(stream);
+    
+    const optMask =[];
+    const flags = packet.readUint8();
+    if ((flags & 0b10000000) === 0) {
+        const intBits = flags << 3;
+        for (let i = 7; i >= 3; i--) optMask.push((intBits & (1 << i)) === 0);
+        const extCount = (flags & 0b01100000) >> 5;
+        const extBytes = packet.readBytes(extCount);
+        for (let i = 0; i < extBytes.length; i++) for (let b = 7; b >= 0; b--) optMask.push((extBytes[i] & (1 << b)) === 0);
+    } else {
+        let extCount = ((flags & 0b01000000) === 0) ? (flags & 0b00111111) : (((flags & 0b00111111) << 16) + packet.readUint16(false));
+        const extBytes = packet.readBytes(extCount);
+        for (let i = 0; i < extBytes.length; i++) for (let b = 7; b >= 0; b--) optMask.push((extBytes[i] & (1 << b)) === 0);
+    }
+    optMask.reverse();
+
+    const skipObjectArray = (p, cb) => { const len = p.readStringLength(); for(let i=0; i<len; i++) cb(p); };
+    const readV3 = () =>[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
+
+    const result = { props:[], materials: {}, atlases: {} };
+
+    if (optMask.pop()) {
+        const atlasLen = packet.readStringLength();
+        for(let i=0; i<atlasLen; i++) {
+            const aHeight = packet.readInt32(false); 
+            const aName = packet.readString();
+            packet.readUint32(false); 
+            const rects = {};
+            const rectLen = packet.readStringLength();
+            for(let j=0; j<rectLen; j++) {
+                const rHeight = packet.readUint32(false); 
+                const rLib = packet.readString();
+                const rName = packet.readString();
+                const rWidth = packet.readUint32(false);
+                const rx = packet.readUint32(false);
+                const ry = packet.readUint32(false);
+                rects[`${rLib}_${rName}`] = { x: rx, y: ry, w: rWidth, h: rHeight };
+            }
+            const aWidth = packet.readUint32(false);
+            result.atlases[aName] = { width: aWidth, height: aHeight, rects };
+        }
+    }
+
+    if (optMask.pop()) skipObjectArray(packet, p => { p.readUint32(false); p.readString(); p.offset+=12; p.readString(); });
+
+    const skipCols = () => {
+        let len = packet.readStringLength(); for(let i=0; i<len; i++) packet.offset += 36; 
+        let len2 = packet.readStringLength(); for(let i=0; i<len2; i++) { packet.readFloat64(false); packet.offset+=24; packet.readFloat64(false); } 
+        let len3 = packet.readStringLength(); for(let i=0; i<len3; i++) { packet.readFloat64(false); packet.offset+=60; } 
+    };
+    skipCols(); skipCols();
+
+    const matLen = packet.readStringLength();
+    for(let i=0; i<matLen; i++) {
+        const matID = packet.readUint32(false);
+        const matName = packet.readString();
+        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=4; });
+        const shader = packet.readString();
+
+        const texParams =[];
+        const texLen = packet.readStringLength();
+        for(let j=0; j<texLen; j++) {
+            let libName = null;
+            if (optMask.pop()) libName = packet.readString();
+            const texParamName = packet.readString();
+            const texName = packet.readString();
+            texParams.push({ libName, name: texParamName, texName });
+        }
+
+        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=8; });
+        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=12; });
+        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=16; });
+        
+        result.materials[matID] = { name: matName, shader, texParams };
+    }
+
+    if (optMask.pop()) skipObjectArray(packet, p => { p.offset+=28; }); 
+
+    const propLen = packet.readStringLength();
+    for(let i=0; i<propLen; i++) {
+        let grpName = ""; if(optMask.pop()) grpName = packet.readString();
+        const id = packet.readUint32(false);
+        const libName = packet.readString();
+        const matID = packet.readUint32(false);
+        const name = packet.readString();
+        const pos = readV3();
+        const rot = optMask.pop() ? readV3() : [0,0,0];
+        const scale = optMask.pop() ? readV3() : [1,1,1];
+        
+        result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
+    }
+
+    return result;
+}
+
+// 绑定回车键也可触发选择
+const uploadLabel = document.querySelector('.upload-btn');
+uploadLabel.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        document.getElementById('fileInput').click();
+    }
+});
+
+// 事件绑定
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const logEl = document.getElementById('log');
+    logEl.innerText = `${t.logStart}${file.name}`;
+    
+    try {
+        const buffer = await file.arrayBuffer();
+        logMsg(`${t.logSize}${(buffer.byteLength / 1024).toFixed(2)} KB`);
+        
+        logMsg(t.logProc);
+        const result = await parseMapBin(buffer);
+        
+        logMsg(t.logDone);
+        
+        // 转换为排版良好的 JSON 字符串
+        const jsonString = JSON.stringify(result, null, 2);
+        
+        // 生成 Blob 对象并在浏览器自动触发下载
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name.replace('.bin', '.json');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        logMsg(t.logSuccess);
+    } catch (err) {
+        logMsg(`${t.logFail}${err.message}`);
+        console.error(err);
+    }
+    
+    // 清除 value 确保同文件可重复选择
+    e.target.value = '';
+});
+</script>
+</body>
+</html>
