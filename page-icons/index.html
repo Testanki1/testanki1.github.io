@@ -381,6 +381,7 @@
         
         let CONFIG = {
             baseUrl: '', 
+            assetBaseUrl: '', // 新增：分离资源地址以便国际服引用专属静态服务器
             labels: {
                 title: isBrowserChinese ? '3D坦克网页图标浏览' : 'Tanki Online Icon Viewer',
                 step1: isBrowserChinese ? '加载中... (1/4)' : 'Loading... (1/4)',
@@ -464,7 +465,7 @@
             let loaded = 0;
 
             const reader = response.body.getReader();
-            const chunks = [];
+            const chunks =[];
 
             while(true) {
                 const {done, value} = await reader.read();
@@ -508,11 +509,14 @@
                 
                 if (isChina) {
                     CONFIG.baseUrl = 'https://3dtank.com/play/';
+                    CONFIG.assetBaseUrl = 'https://3dtank.com/play/';
                 } else {
                     CONFIG.baseUrl = 'https://tankionline.com/play/';
+                    CONFIG.assetBaseUrl = 'https://s.eu.tankionline.com/'; // 改动：国际服资源拉取地址
                 }
                 
-                document.getElementById('sourceInfo').textContent = CONFIG.labels.source + new URL(CONFIG.baseUrl).hostname;
+                // 将页面底部的数据源变更为实际抓取静态资源的域名，更能真实反映文件来源
+                document.getElementById('sourceInfo').textContent = CONFIG.labels.source + new URL(CONFIG.assetBaseUrl).hostname;
 
                 updateProgress(10, CONFIG.labels.step1); 
                 const html = await fetchSimple(CONFIG.baseUrl);
@@ -561,7 +565,9 @@
                     let path = assetMatch[1].replace('SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED', '');
                     if (!path) continue;
                     
-                    const fullUrl = CONFIG.baseUrl + path;
+                    // 改动：拼接逻辑使用 CONFIG.assetBaseUrl，并自动处理去重 /，以防产生双斜杠
+                    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+                    const fullUrl = CONFIG.assetBaseUrl + cleanPath;
                     const ext = path.split('.').pop().toLowerCase();
                     
                     if (!resources[ext]) resources[ext] = [];
@@ -594,7 +600,7 @@
                 'webm': 19, 'mp4': 20, 'mp3': 30, 'wav': 30, 'ogg': 30
             };
 
-            const ignore = ['js', 'css', 'map', 'json', 'txt', 'xml', '3ds'];
+            const ignore =['js', 'css', 'map', 'json', 'txt', 'xml', '3ds'];
             let extensions = Object.keys(resources).filter(k => !ignore.includes(k));
 
             extensions.sort((a, b) => {
