@@ -1910,22 +1910,36 @@ async function processMap(mapData, buildWorld = false, onProgress = null, lightm
         matName1 = cleanStr(matName1);
         matName2 = cleanStr(matName2);
 
-        const possibleKeys =[
-            matName1, matName2, prop.name, baseName, baseTexName
-        ].filter(Boolean).map(s => s.toLowerCase());
+        const exactKeys = [baseTexName, prop.name, baseName].filter(Boolean).map(s => s.toLowerCase());
+        const fuzzyKeys =[matName1, matName2].filter(Boolean).map(s => s.toLowerCase());
 
         if (mapData.atlases) {
+            let found = false;
             for (const [aName, aInfo] of Object.entries(mapData.atlases)) {
+                
                 for (const [rectKey, rect] of Object.entries(aInfo.rects)) {
                     const lowerKey = rectKey.toLowerCase();
-                    if (possibleKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}` || lowerKey.endsWith(pk))) {
+                    if (exactKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}` || lowerKey.endsWith(`_${pk}`))) {
                         atlasRect = rect;
                         atlasInfo = aInfo;
                         targetTexName = aName; 
+                        found = true;
                         break;
                     }
                 }
-                if (atlasRect) break;
+                if (found) break;
+
+                for (const [rectKey, rect] of Object.entries(aInfo.rects)) {
+                    const lowerKey = rectKey.toLowerCase();
+                    if (fuzzyKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}`)) {
+                        atlasRect = rect;
+                        atlasInfo = aInfo;
+                        targetTexName = aName; 
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
             }
         }
 
