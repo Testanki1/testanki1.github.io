@@ -2381,16 +2381,18 @@
                              const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
                              
                              const pos = new THREE.Vector3();
-                             const quat = new THREE.Quaternion();
-                             rawMatrix.decompose(pos, quat, new THREE.Vector3());
-                             const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
-         
-                             propsToWrite.push({
-                                 ...origProp,
-                                 id: globalIdCounter++,
-                                 pos:[pos.x, pos.y, pos.z],
-                                 rot:[euler.x, euler.y, euler.z]
-                             });
+                            const quat = new THREE.Quaternion();
+                            const scl = new THREE.Vector3();
+                            rawMatrix.decompose(pos, quat, scl);
+                            const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
+
+                            propsToWrite.push({
+                                ...origProp,
+                                id: globalIdCounter++,
+                                pos:[pos.x, pos.y, pos.z],
+                                rot:[euler.x, euler.y, euler.z],
+                                scale:[scl.x, scl.y, scl.z]
+                            });
                          }
                      }
                  }
@@ -2408,22 +2410,23 @@
                          const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
                          
                          const pos = new THREE.Vector3();
-                         const quat = new THREE.Quaternion();
-                         rawMatrix.decompose(pos, quat, new THREE.Vector3());
-                         const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
-         
-                         let outGrpName = origProp.grpName;
-                         if (outGrpName && outGrpName !== "") {
-                             outGrpName = outGrpName + "_inst" + instanceIndex;
-                         }
-                         propsToWrite.push({
-                             ...origProp,
-                             grpName: outGrpName,
-                             id: globalIdCounter++,
-                             pos:[pos.x, pos.y, pos.z],
-                             rot: [euler.x, euler.y, euler.z],
-                             scale: origProp.scale 
-                         });
+                        const quat = new THREE.Quaternion();
+                        const scl = new THREE.Vector3();
+                        rawMatrix.decompose(pos, quat, scl);
+                        const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
+
+                        let outGrpName = origProp.grpName;
+                        if (outGrpName && outGrpName !== "") {
+                            outGrpName = outGrpName + "_inst" + instanceIndex;
+                        }
+                        propsToWrite.push({
+                            ...origProp,
+                            grpName: outGrpName,
+                            id: globalIdCounter++,
+                            pos:[pos.x, pos.y, pos.z],
+                            rot:[euler.x, euler.y, euler.z],
+                            scale: [scl.x, scl.y, scl.z]
+                        });
                      }
                      instanceIndex++;
                  }
@@ -3014,9 +3017,10 @@
                          name = getCleanBaseName(pName);
                      }
                      const rot = selectedObjectForAction.rotation.clone();
-                     const pos = selectedObjectForAction.position.clone();
-                     
-                     window.originalObjectBeingMoved = selectedObjectForAction;
+                    const pos = selectedObjectForAction.position.clone();
+                    const scales = selectedObjectForAction.children.map(c => c.scale.clone());
+                    
+                    window.originalObjectBeingMoved = selectedObjectForAction;
                      window.originalObjectParent = selectedObjectForAction.parent;
                      
                      if (selectedObjectForAction.parent) {
@@ -3031,9 +3035,11 @@
                          window.isGhostLockedToOriginal = true;
                          window.selectPrefab(name);
                          if (ghost) {
-                             ghost.rotation.copy(rot);
-                             ghost.position.copy(pos);
-                             ghost.updateMatrixWorld(true);
+                            ghost.rotation.copy(rot);
+                            ghost.position.copy(pos);
+                 
+                            ghost.children.forEach((c, i) => { if (scales[i]) c.scale.copy(scales[i]); });
+                            ghost.updateMatrixWorld(true);
                              
                              const box = new THREE.Box3().setFromObject(ghost, true);
                              const originalWorldY = editorGroup.localToWorld(pos.clone()).y;
@@ -3088,9 +3094,10 @@
                          name = getCleanBaseName(pName);
                      }
                      const rot = selectedObjectForAction.rotation.clone();
-                     const pos = selectedObjectForAction.position.clone();
-                     
-                     window.originalObjectBeingMoved = null;
+                    const pos = selectedObjectForAction.position.clone();
+                    const scales = selectedObjectForAction.children.map(c => c.scale.clone());
+                    
+                    window.originalObjectBeingMoved = null;
                      window.originalObjectParent = null;
                      
                      if (name) {
@@ -3103,9 +3110,11 @@
                          const copyBtn = document.getElementById('continuous-copy-btn');
                          if (copyBtn) copyBtn.className = 'm3-btn m3-btn-primary';
                          if (ghost) {
-                             ghost.rotation.copy(rot);
-                             ghost.position.copy(pos);
-                             ghost.updateMatrixWorld(true);
+                            ghost.rotation.copy(rot);
+                            ghost.position.copy(pos);
+                 
+                            ghost.children.forEach((c, i) => { if (scales[i]) c.scale.copy(scales[i]); });
+                            ghost.updateMatrixWorld(true);
                              
                              const box = new THREE.Box3().setFromObject(ghost, true);
                              const originalWorldY = editorGroup.localToWorld(pos.clone()).y;
@@ -3311,10 +3320,13 @@
                  if (!isDragging && ghost && (e.button === 0 || e.pointerType === 'touch')) {
                      updateGhost(e.clientX, e.clientY, window.dragMode !== 'none' || window.isGhostLockedToOriginal);
                      const instance = currentPrefabGroup.clone();
-                     instance.position.copy(ghost.position);
-                     instance.rotation.copy(ghost.rotation);
-                     
-                     instance.updateMatrixWorld(true);
+                    instance.position.copy(ghost.position);
+                    instance.rotation.copy(ghost.rotation);
+                    instance.children.forEach((c, i) => {
+                        if (ghost.children[i]) c.scale.copy(ghost.children[i].scale);
+                    });
+                    
+                    instance.updateMatrixWorld(true);
                      instance.userData.worldBox = new THREE.Box3().setFromObject(instance, true);
                      instance.userData.baseName = window.currentBaseName;
                      
