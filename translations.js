@@ -654,7 +654,7 @@ const replacementDict = {
 "Jamming Rounds": "干扰弹",
 "Autocannon": "自动加农炮",
 "Rubberized Rounds": "橡胶炮弹",
-"Explosive Rounds": "爆炸性弹药",
+"Explosive Rounds": "爆炸性炮弹",
 "Sorted Ammunition": "精确弹药装载",
 "Hyperspeed Rounds": "超高速炮弹",
 "Remote rocket explosives": "远程火箭炸药",
