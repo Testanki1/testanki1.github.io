@@ -1123,7 +1123,7 @@
                  const index = stream.readInt32(true);
                  const lightmapIndex = stream.readInt32(true);
                  let lightmapScaleOffset = null;
-                 let uv1 = [], uv2 =[];
+                 let uv1 =[], uv2 =[];
                  
                  if (lightmapIndex >= 0) {
                      lightmapScaleOffset =[
@@ -1304,7 +1304,7 @@
              renderer.setSize(window.innerWidth, window.innerHeight);
              
              renderer.toneMapping = THREE.ACESFilmicToneMapping;
-             renderer.toneMappingExposure = 1.0; 
+             renderer.toneMappingExposure = 1.2; 
              
              renderer.shadowMap.enabled = true;
              renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
@@ -1360,7 +1360,7 @@
              scene.environment = pmremGenerator.fromScene(environment).texture;
              environment.dispose();
              
-             scene.environmentIntensity = 0.8; 
+             scene.environmentIntensity = 0.5; 
          
              hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
              hemiLight.position.set(0, 1000, 0);
@@ -1675,21 +1675,21 @@
              const repeatingTextures = new Set(); 
          
              for (const prop of mapData.props) {
-             const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-             
-             if (!prop.libName) {
-                 uniqueModelToLib.set('models.a3d', null);
-             } else {
-                 let file = (pInfo && pInfo.mesh && pInfo.mesh.file) ? pInfo.mesh.file : (prop.name + ".a3d");
-                 uniqueModelToLib.set(file, prop.libName);
-             }
-             
-             if (pInfo && pInfo.textures) {
-                 for (let t of pInfo.textures) {
-                     if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+                 const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+                 
+                 if (!prop.libName) {
+                     uniqueModelToLib.set('models.a3d', null);
+                 } else {
+                     let file = (pInfo && pInfo.mesh && pInfo.mesh.file) ? pInfo.mesh.file : (prop.name + ".a3d");
+                     uniqueModelToLib.set(file, prop.libName);
+                 }
+                 
+                 if (pInfo && pInfo.textures) {
+                     for (let t of pInfo.textures) {
+                         if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+                     }
                  }
              }
-         }
          
              for (const mat of Object.values(mapData.materials)) {
                  for (const param of mat.texParams) {
@@ -1756,7 +1756,23 @@
                  }
              });
          
-             const allPromises = [...modelPromises, ...texPromises];
+             const lightmapPromises =[];
+             if (lightmapData && lightmapData.lightmaps) {
+                 lightmapData.lightmaps.forEach((lmName) => {
+                     if (!textureCache.has(lmName)) {
+                         const promise = loadTextureDirect(`${window.currentMapBaseUrl}/${lmName}`, true, true, false).then(tex => {
+                             if (tex) {
+                                 tex.flipY = false;
+                                 tex.channel = 1;
+                                 textureCache.set(lmName, tex);
+                             }
+                         });
+                         lightmapPromises.push(promise);
+                     }
+                 });
+             }
+         
+             const allPromises =[...modelPromises, ...texPromises, ...lightmapPromises];
              let completed = 0;
              if (allPromises.length === 0 && onProgress) {
                  onProgress(1);
@@ -1795,35 +1811,41 @@
              const materialCache = new Map();
          
              for (let i = 0; i < mapData.props.length; i++) {
-             const prop = mapData.props[i];
-             let baseName = getCleanBaseName(prop.name);
-             const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-             const file = (pInfo && pInfo.mesh && pInfo.mesh.file) ? pInfo.mesh.file : (prop.name + ".a3d");
+                 const prop = mapData.props[i];
+                 let baseName = getCleanBaseName(prop.name);
+                 const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+                 const file = (pInfo && pInfo.mesh && pInfo.mesh.file) ? pInfo.mesh.file : (prop.name + ".a3d");
+                 
+                 let lmInfo = null;
+                 if (lightmapData && lightmapData.mapObjects) {
+                     lmInfo = lightmapData.mapObjects.find(mo => mo.index === prop.id);
+                 }
+                 const lmIdx = (lmInfo && lmInfo.lightmapIndex >= 0) ? lmInfo.lightmapIndex : -1;
+                 
+                 let geometry = null;
+                 let a3dData = null;
              
-             let geometry = null;
-             let a3dData = null;
-         
-             if (!prop.libName) {
-                 const a3dData = modelCache.get('models.a3d');
-                 if (a3dData && a3dData.namedMeshes) {
-                     geometry = a3dData.namedMeshes[prop.name];
-                     if (!geometry) {
-                         const matchedKey = Object.keys(a3dData.namedMeshes).find(k => k.toLowerCase() === prop.name.toLowerCase());
-                         if (matchedKey) geometry = a3dData.namedMeshes[matchedKey];
+                 if (!prop.libName) {
+                     const a3dData = modelCache.get('models.a3d');
+                     if (a3dData && a3dData.namedMeshes) {
+                         geometry = a3dData.namedMeshes[prop.name];
+                         if (!geometry) {
+                             const matchedKey = Object.keys(a3dData.namedMeshes).find(k => k.toLowerCase() === prop.name.toLowerCase());
+                             if (matchedKey) geometry = a3dData.namedMeshes[matchedKey];
+                         }
+                     }
+                 } else {
+                     a3dData = file ? modelCache.get(file) : null;
+                     if (a3dData) {
+                         if (a3dData.namedMeshes && Object.keys(a3dData.namedMeshes).length > 0) {
+                             geometry = Object.values(a3dData.namedMeshes)[0];
+                         } else if (a3dData.meshes && a3dData.meshes.length > 0) {
+                             geometry = a3dData.meshes[0];
+                         }
                      }
                  }
-             } else {
-                 a3dData = file ? modelCache.get(file) : null;
-                 if (a3dData) {
-                     if (a3dData.namedMeshes && Object.keys(a3dData.namedMeshes).length > 0) {
-                         geometry = Object.values(a3dData.namedMeshes)[0];
-                     } else if (a3dData.meshes && a3dData.meshes.length > 0) {
-                         geometry = a3dData.meshes[0];
-                     }
-                 }
-             }
-         
-             if (!geometry) continue;
+             
+                 if (!geometry) continue;
                  
                  const matInfo = mapData.materials[prop.matID];
                  const isSprite = matInfo && matInfo.shader.includes("Sprite");
@@ -1848,6 +1870,27 @@
                  }
          
                  const instGeo = geometry.clone();
+                 
+                 if (lmInfo && lmInfo.lightmapIndex >= 0 && lmInfo.lightmapScaleOffset) {
+                     const [sx, sy, ox, oy] = lmInfo.lightmapScaleOffset;
+                     
+                     if (instGeo.attributes.uv2) {
+                         const uv2 = instGeo.attributes.uv2.clone();
+                         for (let u = 0; u < uv2.array.length; u += 2) {
+                             uv2.array[u] = uv2.array[u] * sx + ox;
+                             uv2.array[u+1] = uv2.array[u+1] * sy + oy;
+                         }
+                         instGeo.setAttribute('uv2', uv2);
+                     } else if (instGeo.attributes.uv) {
+                         const uv2 = instGeo.attributes.uv.clone();
+                         for (let u = 0; u < uv2.array.length; u += 2) {
+                             uv2.array[u] = uv2.array[u] * sx + ox;
+                             uv2.array[u+1] = uv2.array[u+1] * sy + oy;
+                         }
+                         instGeo.setAttribute('uv2', uv2);
+                     }
+                 }
+                 
                  let mat;
                  const isTerrainMesh = file.toLowerCase().includes('terrain');
                  const hasControlMap = !!controlTexName;
@@ -1911,8 +1954,8 @@
                          if (found) break;
                      }
                  }
-         
-                 const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}`;
+        
+                 const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}_LM${lmIdx}`;
          
                  if (materialCache.has(matCacheKey)) {
                      mat = materialCache.get(matCacheKey);
@@ -2069,6 +2112,16 @@
                              mat.map = defaultTile;
                          }
                      }
+                     
+                     if (lmIdx >= 0 && lightmapData && lightmapData.lightmaps) {
+                         const lmName = lightmapData.lightmaps[lmIdx];
+                         const lmTex = textureCache.get(lmName);
+                         if (lmTex) {
+                             mat.lightMap = lmTex;
+                             mat.lightMapIntensity = 2.0;
+                         }
+                     }
+                     
                      materialCache.set(matCacheKey, mat);
                  }
          
