@@ -582,7 +582,7 @@ const replacementDict = {
 "Pulsar": "脉冲星",
 "Phoenix": "凤凰",
 "Corrosive mix": "腐蚀混合物",
-"Shock freeze": "震动冻结",
+"Shock freeze": "震荡冻结",
 "Stable Mix": "稳定混合物",
 "Broadband radiators": "宽带发射器",
 "Support nanobots": "支援纳米机器人",
