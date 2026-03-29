@@ -257,6 +257,7 @@
 
         // --- JSON 状态获取逻辑 ---
         let serverStatusData = {};
+        let isChecking = false; // 新增：全局状态锁，防止并发请求
 
         async function fetchServerStatus() {
             try {
@@ -282,22 +283,19 @@
             }
         }
 
-        // --- 修改点：创建按钮元素的逻辑 ---
+        // --- 创建按钮元素的逻辑 ---
         function createButtonElement(label, link) {
             const container = document.createElement('a');
             container.className = 'button-container';
             container.href = link; 
             
-            // 这里不再创建有背景色的 span，而是创建一个普通的文字 span
             const nameSpan = document.createElement('span');
             nameSpan.textContent = label;
-            nameSpan.className = 'server-name'; // 应用新样式
+            nameSpan.className = 'server-name';
             
-            // 右侧信息包裹容器
             const infoWrapper = document.createElement('div');
             infoWrapper.className = 'info-wrapper';
 
-            // 1. 数据统计
             const statsWrapper = document.createElement('div');
             statsWrapper.className = 'stats-wrapper';
 
@@ -312,15 +310,12 @@
             statsWrapper.appendChild(onlineCount);
             statsWrapper.appendChild(inbattlesCount);
 
-            // 2. 状态图标
             const statusIcon = document.createElement('span');
             statusIcon.className = 'status-icon';
 
-            // 添加顺序
             infoWrapper.appendChild(statsWrapper);
             infoWrapper.appendChild(statusIcon);
 
-            // 组装卡片
             container.appendChild(nameSpan);
             container.appendChild(infoWrapper);
             
@@ -350,10 +345,12 @@
         }
 
         async function updateOrAddButton(containerId, elementId, label, targetUrl, balancerUrl, sortOrder) {
+            // 修复点 1：先获取耗时数据，获取完毕后再去找 DOM
+            const { onlineCount, inbattlesCount } = await fetchCounts(balancerUrl);
+
+            // 获取到数据后，再检查此时页面上是否已经有这个按钮了
             const container = document.getElementById(containerId);
             let element = document.getElementById(elementId);
-            
-            const { onlineCount, inbattlesCount } = await fetchCounts(balancerUrl);
 
             if (!element) {
                 element = createButtonElement(label, targetUrl);
@@ -398,55 +395,64 @@
         }
 
         async function checkURLs(isInitialLoad = false) {
+            // 修复点 2：防止定时器在前一次请求还没结束时，叠加触发重复的检测
+            if (isChecking) return;
+            isChecking = true;
+
             const loader = document.getElementById('loader');
             const noServersDiv = document.getElementById('no-servers'); 
             
-            if (isInitialLoad) {
-                loader.style.display = 'flex';
-                await fetchServerStatus(); 
-            }
-            
-            const promises = [];
-
-            // 1. Deploy (1-10)
-            for (let i = 1; i <= 10; i++) {
-                const deployBalancer = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
-                const targetUrl = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
-                const elementId = `deploy-${i}`;
+            try {
+                if (isInitialLoad) {
+                    loader.style.display = 'flex';
+                    await fetchServerStatus(); 
+                }
                 
-                promises.push(checkURL(deployBalancer).then(isAccessible => {
+                const promises = [];
+
+                // 1. Deploy (1-10)
+                for (let i = 1; i <= 10; i++) {
+                    const deployBalancer = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
+                    const targetUrl = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
+                    const elementId = `deploy-${i}`;
+                    
+                    promises.push(checkURL(deployBalancer).then(isAccessible => {
+                        if (isAccessible) {
+                            return updateOrAddButton('deploy-results', elementId, `Deploy ${i}`, targetUrl, deployBalancer, i);
+                        } else {
+                            removeButton(elementId);
+                        }
+                    }));
+                }
+
+                // 2. Classic
+                const classicBalancer = 'https://test.ru.tankionline.com/status';
+                const classicLink = 'https://tankiclassic.com/play/';
+                const classicId = 'classic-btn';
+                
+                promises.push(checkURL(classicBalancer).then(isAccessible => {
                     if (isAccessible) {
-                        return updateOrAddButton('deploy-results', elementId, `Deploy ${i}`, targetUrl, deployBalancer, i);
+                        return updateOrAddButton('classic-results', classicId, 'Classic', classicLink, classicBalancer, 1);
                     } else {
-                        removeButton(elementId);
+                        removeButton(classicId);
                     }
                 }));
-            }
 
-            // 2. Classic
-            const classicBalancer = 'https://test.ru.tankionline.com/status';
-            const classicLink = 'https://tankiclassic.com/play/';
-            const classicId = 'classic-btn';
-            
-            promises.push(checkURL(classicBalancer).then(isAccessible => {
-                if (isAccessible) {
-                    return updateOrAddButton('classic-results', classicId, 'Classic', classicLink, classicBalancer, 1);
+                await Promise.allSettled(promises);
+
+                const totalServers = document.querySelectorAll('.button-container').length;
+                if (totalServers === 0) {
+                    noServersDiv.classList.remove('hidden');
                 } else {
-                    removeButton(classicId);
+                    noServersDiv.classList.add('hidden');
                 }
-            }));
 
-            await Promise.allSettled(promises);
-
-            const totalServers = document.querySelectorAll('.button-container').length;
-            if (totalServers === 0) {
-                noServersDiv.classList.remove('hidden');
-            } else {
-                noServersDiv.classList.add('hidden');
-            }
-
-            if (isInitialLoad) {
-                loader.style.display = 'none';
+                if (isInitialLoad) {
+                    loader.style.display = 'none';
+                }
+            } finally {
+                // 执行完毕释放锁，允许下次请求
+                isChecking = false;
             }
         }
 
