@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map.bin Parser</title>
+    <title>Tanki Online Map Data Parser</title>
     
     <!-- 引入第一字体 Rubik 和第二字体 M PLUS 1p -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,8 +21,8 @@
         }
 
         * {
-            /* 移除移动端点击高亮，让 M3 的交互反馈更纯粹 */
             -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
         }
 
         body { 
@@ -36,37 +36,85 @@
             min-height: 100vh;
             margin: 0;
             padding: 24px;
-            box-sizing: border-box;
             -webkit-font-smoothing: antialiased;
         }
 
         .container {
             background: var(--md-sys-color-surface);
             padding: 48px 40px;
-            border-radius: 32px; /* M3 Expressive 超大圆角 */
+            border-radius: 32px;
             border: 1px solid var(--md-sys-color-outline);
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
             text-align: center;
             max-width: 560px;
             width: 100%;
-            box-sizing: border-box;
         }
 
         h2 { 
             margin-top: 0; 
             color: var(--md-sys-color-primary); 
-            font-size: 2.5rem;
+            font-size: 2.25rem;
             font-weight: 700;
-            letter-spacing: -0.02em; /* Expressive 标题缩进 */
+            letter-spacing: -0.02em;
             margin-bottom: 16px;
         }
 
         p { 
             color: var(--md-sys-color-secondary); 
-            font-size: 1.125rem;
-            margin-bottom: 40px; 
+            font-size: 1rem;
+            margin-bottom: 32px; 
             line-height: 1.6; 
             opacity: 0.85;
+        }
+
+        /* 类型选择器 Segmented Button */
+        .type-selector {
+            display: flex;
+            background: rgba(191, 213, 255, 0.08);
+            border-radius: 100px;
+            padding: 6px;
+            margin-bottom: 32px;
+            position: relative;
+        }
+        
+        .type-selector label {
+            flex: 1;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .type-selector input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            margin: 0;
+        }
+
+        .type-selector span {
+            display: block;
+            text-align: center;
+            padding: 12px 16px;
+            border-radius: 100px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--md-sys-color-secondary);
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            z-index: 2;
+            position: relative;
+        }
+
+        .type-selector input[type="radio"]:checked + span {
+            background: var(--md-sys-color-secondary);
+            color: var(--md-sys-color-background);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .type-selector span:hover {
+            background: rgba(191, 213, 255, 0.15);
+        }
+        .type-selector input[type="radio"]:checked + span:hover {
+            background: var(--md-sys-color-secondary);
         }
 
         input[type="file"] { 
@@ -77,7 +125,7 @@
             background: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
             padding: 18px 36px;
-            border-radius: 100px; /* M3 完全圆角按钮 */
+            border-radius: 100px;
             cursor: pointer;
             font-weight: 700;
             font-size: 1.125rem;
@@ -103,7 +151,6 @@
         #log {
             margin-top: 32px;
             color: var(--md-sys-color-secondary);
-            /* 日志使用等宽数字特性，同时继承全局字体 */
             font-variant-numeric: tabular-nums;
             white-space: pre-wrap;
             text-align: left;
@@ -117,7 +164,6 @@
             line-height: 1.6;
         }
 
-        /* 滚动条美化 */
         #log::-webkit-scrollbar {
             width: 8px;
         }
@@ -136,40 +182,58 @@
 <body>
 
 <div class="container">
-    <h2 id="ui-title">Map.bin 解析器</h2>
-    <p id="ui-desc">该工具会在浏览器本地直接解压并读取3D坦克的二进制 map.bin 文件。解析完成后会自动将其转为 JSON 文件供你下载查看。</p>
+    <h2 id="ui-title">3D坦克地图数据解析</h2>
+    <p id="ui-desc">该工具会在浏览器本地读取并解压3D坦克的二进制数据文件。解析完成后会自动将其转为 JSON 文件供你下载查看。</p>
+    
+    <!-- 类型选择器 (精简了文字) -->
+    <div class="type-selector">
+        <label>
+            <input type="radio" name="fileType" value="map" checked>
+            <span>map.bin</span>
+        </label>
+        <label>
+            <input type="radio" name="fileType" value="lightmap">
+            <span>lightmapdata</span>
+        </label>
+    </div>
     
     <label class="upload-btn" tabindex="0">
         <span id="ui-btn">选择并解析 map.bin</span>
         <input type="file" id="fileInput" accept=".bin">
     </label>
     
-    <div id="log">等待上传...</div>
+    <div id="log">等待操作...</div>
 </div>
 
 <script>
-// 多语言配置
+// 多语言配置 (固定 Title 和 Desc，仅按钮根据类型变化)
 const i18n = {
     zh: {
-        title: "Map.bin 解析器",
-        desc: "该工具会在浏览器本地直接解压并读取3D坦克的二进制 map.bin 文件。解析完成后会自动将其转为 JSON 文件供你下载查看。",
-        btn: "选择并解析 map.bin",
-        logWait: "等待上传...",
+        title: "3D坦克地图数据解析",
+        desc: "该工具会在浏览器本地读取并解压3D坦克的二进制地图数据文件。解析完成后会自动将其转为 JSON 文件供你下载查看。",
+        btnMap: "选择并解析 map.bin",
+        btnLightmap: "选择并解析 lightmapdata",
+        logWait: "等待操作...",
         logStart: "[INFO] 开始读取文件: ",
         logSize: "[INFO] 文件大小: ",
-        logProc: "[PROC] 正在进行 Zlib 解压并读取数据树...",
+        logProcMap: "[PROC] 正在进行 Zlib 解压并读取数据树...",
+        logProcLightmap: "[PROC] 正在读取并解析 Lightmap 数据...",
+        logLightmapSum: "[INFO] 光照贴图解析成功！\n  - 光照贴图数量: {m}\n  - 影响物体数: {o}\n  - 平行光颜色: {l}\n  - 环境光颜色: {a}",
         logDone: "[DONE] 解析完成！准备生成 JSON 文件...",
         logSuccess: "[SUCCESS] 下载已触发！请检查浏览器的下载记录。",
         logFail: "[ERROR] 解析失败: "
     },
     en: {
-        title: "Map.bin Parser",
-        desc: "This tool decompresses and reads Tanki Online's binary map.bin file locally in your browser. Once parsed, it automatically converts it into a JSON file for you to download and view.",
-        btn: "Select and Parse map.bin",
-        logWait: "Waiting for upload...",
+        title: "Tanki Online Map Data Parser",
+        desc: "This tool reads and decompresses Tanki Online's binary map data files locally. Once parsed, it automatically converts them into JSON files for you to download.",
+        btnMap: "Select and Parse map.bin",
+        btnLightmap: "Select and Parse lightmapdata",
+        logWait: "Waiting for action...",
         logStart: "[INFO] Started reading file: ",
         logSize: "[INFO] File size: ",
-        logProc: "[PROC] Decompressing Zlib and reading data tree...",
+        logProcMap: "[PROC] Decompressing Zlib and reading data tree...",
+        logProcLightmap: "[PROC] Reading and parsing lightmap data...",
+        logLightmapSum: "[INFO] Lightmap parsed successfully!\n  - Lightmaps count: {m}\n  - Affected objects: {o}\n  - Light Color: {l}\n  - Ambient Color: {a}",
         logDone: "[DONE] Parsing completed! Generating JSON file...",
         logSuccess: "[SUCCESS] Download triggered! Please check your browser's download history.",
         logFail: "[ERROR] Parsing failed: "
@@ -182,20 +246,44 @@ const lang = isZh ? 'zh' : 'en';
 const t = i18n[lang];
 
 document.documentElement.lang = isZh ? 'zh-CN' : 'en';
-document.title = t.title;
+document.title = "Tanki Online Parser";
+document.getElementById('log').innerText = t.logWait;
+
+// 初始化固定的文字
 document.getElementById('ui-title').innerText = t.title;
 document.getElementById('ui-desc').innerText = t.desc;
-document.getElementById('ui-btn').innerText = t.btn;
-document.getElementById('log').innerText = t.logWait;
+
+// 仅更新操作按钮相关的 UI
+function updateUI() {
+    const type = document.querySelector('input[name="fileType"]:checked').value;
+    if (type === 'map') {
+        document.getElementById('ui-btn').innerText = t.btnMap;
+        document.getElementById('fileInput').accept = '.bin';
+    } else {
+        document.getElementById('ui-btn').innerText = t.btnLightmap;
+        document.getElementById('fileInput').accept = '*/*';
+    }
+}
+updateUI(); // 初始化
+
+// 监听单选按钮切换
+document.querySelectorAll('input[name="fileType"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        updateUI();
+        document.getElementById('log').innerText = t.logWait;
+    });
+});
 
 // 日志追加函数
 function logMsg(msg) {
     const logEl = document.getElementById('log');
-    logEl.innerText += '\n' + msg;
+    if (logEl.innerText === t.logWait) logEl.innerText = '';
+    else logEl.innerText += '\n';
+    logEl.innerText += msg;
     logEl.scrollTop = logEl.scrollHeight;
 }
 
-// 核心：二进制流读取器
+// 核心：合并后的二进制流读取器 (兼容两种 Endian 模式)
 class BinaryStream {
     constructor(buffer) {
         this.buffer = new Uint8Array(buffer);
@@ -218,7 +306,9 @@ class BinaryStream {
     readString() { return new TextDecoder().decode(this.readBytes(this.readStringLength())); }
 }
 
-// 核心：Zlib 数据解压
+/* =========================================
+   Map.bin 解析逻辑
+========================================= */
 async function decompressZlib(uint8array) {
     const ds = new DecompressionStream("deflate");
     const writer = ds.writable.getWriter();
@@ -227,7 +317,6 @@ async function decompressZlib(uint8array) {
     return new Uint8Array(await new Response(ds.readable).arrayBuffer());
 }
 
-// 核心：解析数据包包头并自动解压
 async function unwrapPacket(stream) {
     const flags = stream.readUint8();
     const compressed = (flags & 0b01000000) > 0;
@@ -244,7 +333,6 @@ async function unwrapPacket(stream) {
     return new BinaryStream(data);
 }
 
-// 核心：解析 map.bin 生成对象
 async function parseMapBin(buffer) {
     const stream = new BinaryStream(buffer);
     const packet = await unwrapPacket(stream);
@@ -335,7 +423,7 @@ async function parseMapBin(buffer) {
         const name = packet.readString();
         const pos = readV3();
         const rot = optMask.pop() ? readV3() : [0,0,0];
-        const scale = optMask.pop() ? readV3() : [1,1,1];
+        const scale = optMask.pop() ? readV3() :[1,1,1];
         
         result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
     }
@@ -343,7 +431,79 @@ async function parseMapBin(buffer) {
     return result;
 }
 
-// 绑定回车键也可触发选择
+/* =========================================
+   LightmapData 解析逻辑
+========================================= */
+function decodeIntColorToHex(intColor) {
+    const r = (intColor >> 16) & 255;
+    const g = (intColor >> 8) & 255;
+    const b = intColor & 255;
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+}
+
+function parseLightmapData(buffer) {
+    const stream = new BinaryStream(buffer);
+    const version = stream.readUint32(true);
+    if (version !== 2) {
+        throw new Error(`Unsupported LightmapData version: ${version} (expected 2)`);
+    }
+
+    const lightColorInt = stream.readUint32(true);
+    const ambientColorInt = stream.readUint32(true);
+    const lightAngleX = stream.readFloat32(true);
+    const lightAngleZ = stream.readFloat32(true);
+
+    const lightmapCount = stream.readUint32(true);
+    const lightmaps =[];
+    for (let i = 0; i < lightmapCount; i++) {
+        lightmaps.push(stream.readString());
+    }
+
+    const mapObjectCount = stream.readUint32(true);
+    const mapObjects =[];
+    
+    for (let i = 0; i < mapObjectCount; i++) {
+        const index = stream.readInt32(true);
+        const lightmapIndex = stream.readInt32(true);
+        let lightmapScaleOffset = null;
+        let uv1 = [], uv2 =[];
+        
+        if (lightmapIndex >= 0) {
+            lightmapScaleOffset =[
+                stream.readFloat32(true), stream.readFloat32(true),
+                stream.readFloat32(true), stream.readFloat32(true)
+            ];
+            const hasUVs = stream.readUint8();
+            if (hasUVs > 0) {
+                const vertexCount = stream.readUint32(true);
+                for (let v = 0; v < Math.floor(vertexCount / 2); v++) {
+                    uv1.push([stream.readFloat32(true), stream.readFloat32(true)]);
+                    uv2.push([stream.readFloat32(true), stream.readFloat32(true)]);
+                }
+            }
+        }
+        const castShadows = stream.readUint8() > 0;
+        const receiveShadows = stream.readUint8() > 0;
+
+        mapObjects.push({
+            index, lightmapIndex, lightmapScaleOffset, uv1, uv2, castShadows, receiveShadows
+        });
+    }
+
+    return {
+        version, 
+        lightColor: decodeIntColorToHex(lightColorInt),
+        ambientColor: decodeIntColorToHex(ambientColorInt),
+        lightAngleX, 
+        lightAngleZ, 
+        lightmaps, 
+        mapObjects
+    };
+}
+
+/* =========================================
+   事件绑定与主流程
+========================================= */
 const uploadLabel = document.querySelector('.upload-btn');
 uploadLabel.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -352,33 +512,48 @@ uploadLabel.addEventListener('keydown', (e) => {
     }
 });
 
-// 事件绑定
 document.getElementById('fileInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    const type = document.querySelector('input[name="fileType"]:checked').value;
 
-    const logEl = document.getElementById('log');
-    logEl.innerText = `${t.logStart}${file.name}`;
+    document.getElementById('log').innerText = ''; 
+    logMsg(`${t.logStart}${file.name}`);
     
     try {
         const buffer = await file.arrayBuffer();
         logMsg(`${t.logSize}${(buffer.byteLength / 1024).toFixed(2)} KB`);
         
-        logMsg(t.logProc);
-        const result = await parseMapBin(buffer);
+        let result;
+        let dlName = file.name;
+
+        if (type === 'map') {
+            logMsg(t.logProcMap);
+            result = await parseMapBin(buffer);
+            dlName = dlName.replace(/\.bin$/i, '.json');
+        } else {
+            logMsg(t.logProcLightmap);
+            result = parseLightmapData(buffer);
+            dlName = dlName.endsWith('.json') ? dlName : dlName + '.json';
+            
+            const sumMsg = t.logLightmapSum
+                .replace('{m}', result.lightmaps.length)
+                .replace('{o}', result.mapObjects.length)
+                .replace('{l}', result.lightColor)
+                .replace('{a}', result.ambientColor);
+            logMsg(sumMsg);
+        }
         
         logMsg(t.logDone);
         
-        // 转换为排版良好的 JSON 字符串
         const jsonString = JSON.stringify(result, null, 2);
-        
-        // 生成 Blob 对象并在浏览器自动触发下载
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = file.name.replace('.bin', '.json');
+        a.download = dlName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -390,7 +565,6 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
         console.error(err);
     }
     
-    // 清除 value 确保同文件可重复选择
     e.target.value = '';
 });
 </script>
