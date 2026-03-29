@@ -211,6 +211,14 @@
             min-width: 0; /* Enable truncation in children */
         }
 
+        .list-item-title-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+        }
+
         .list-item-title {
             font-size: 16px;
             font-weight: 500;
@@ -218,6 +226,26 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        /* ADDED: 实时在线人数徽章样式 */
+        .online-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--md-sys-color-primary);
+            background-color: rgba(118, 255, 51, 0.15);
+            padding: 2px 8px;
+            border-radius: 12px;
+            flex-shrink: 0;
+            font-family: 'Rubik', sans-serif;
+            transition: opacity 0.3s;
+        }
+
+        .online-badge .material-symbols-rounded {
+            font-size: 14px;
         }
 
         .list-item-subtitle {
@@ -471,7 +499,6 @@
                     </div>
                 </a>
 
-                <!-- ADDED: VK Play -->
                 <a href="https://vkplay.ru/app/21879" class="list-item">
                     <img src="https://testanki1.github.io/logos/vkplay.svg" alt="VK Play">
                     <div class="list-item-content">
@@ -482,7 +509,6 @@
                     </div>
                 </a>
 
-                <!-- ADDED: OK -->
                 <a href="https://ok.ru/game/tankionline_official" class="list-item">
                     <img src="https://testanki1.github.io/logos/ok.svg" alt="OK">
                     <div class="list-item-content">
@@ -578,15 +604,24 @@
                         </div></div>
                     </div>
                 </div>
+                
+                <!-- 4399 modified with dynamic online count -->
                 <a href="https://my.4399.com/yxtk/play?sid=1" class="list-item">
                     <img src="https://testanki1.github.io/logos/4399.png" alt="4399">
                     <div class="list-item-content">
-                        <span class="list-item-title" data-i18n="p_4399">4399</span>
+                        <div class="list-item-title-wrapper">
+                            <span class="list-item-title" data-i18n="p_4399">4399</span>
+                            <div class="online-badge" title="当前在线人数">
+                                <span class="material-symbols-rounded">group</span>
+                                <span id="4399-online-count">--</span>
+                            </div>
+                        </div>
                         <div class="url-marquee-container"><div class="url-marquee">
                             <span class="url-marquee-content">https://my.4399.com/yxtk/play?sid=1</span>
                         </div></div>
                     </div>
                 </a>
+
                 <a href="https://g.7k7k.com/games/3dtk/" class="list-item">
                     <img src="https://testanki1.github.io/logos/7k7k.png" alt="7k7k">
                     <div class="list-item-content">
@@ -817,7 +852,7 @@
                 'classic': strings.server_classic
             };
             if (titles[pageId]) {
-                document.getElementById('page-title').innerText = titles[pageId];
+                document.getElementById('page-title') ? document.getElementById('page-title').innerText = titles[pageId] : null;
             }
         }
 
@@ -830,6 +865,11 @@
                 document.getElementById('main-header').classList.remove('hidden');
                 document.getElementById('view-' + pageId).classList.add('active');
                 updateHeaderTitle(pageId);
+                
+                // --- Start fetch dynamically if navigating to CN Server ---
+                if (pageId === 'cn') {
+                    fetch4399OnlineCount();
+                }
             } else {
                 document.getElementById('main-header').classList.add('hidden');
                 document.getElementById('view-home').classList.add('active');
@@ -868,6 +908,33 @@
                     el.appendChild(clone);
                 }
             });
+        }
+
+        // --- ADDED: 4399 在线人数逻辑 ---
+        let fetchTimeoutId = null;
+        function fetch4399OnlineCount() {
+            clearTimeout(fetchTimeoutId);
+            const timestamp = Date.now();
+            const url = `https://balancer.3dtank.com/balancer?t=${timestamp}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    let totalMy4399Com = 0;
+                    Object.values(data.nodes).forEach(node => {
+                        totalMy4399Com += node.partners && node.partners.my_4399_com ? node.partners.my_4399_com : 0;
+                    });
+                    
+                    document.getElementById('4399-online-count').innerText = totalMy4399Com;
+
+                    // 每隔 5 秒定时刷新 (如原逻辑设计)
+                    fetchTimeoutId = setTimeout(fetch4399OnlineCount, 5000);
+                })
+                .catch(error => {
+                    console.error('获取4399人数失败:', error);
+                    // 即使失败，1秒后重新尝试
+                    fetchTimeoutId = setTimeout(fetch4399OnlineCount, 1000);
+                });
         }
 
         // Initialize logic
