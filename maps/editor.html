@@ -6,6 +6,7 @@
       <title>Tanki Online Map Editor. Remaster</title>
       <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" />
       <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
       <style>
          :root {
          --md-sys-color-primary: #76FF33;
@@ -51,7 +52,7 @@
          }
          #menu-toggle {
          position: fixed;
-         top: 16px;
+         top: 32px;
          right: 16px;
          z-index: 200;
          width: 48px;
@@ -433,46 +434,49 @@
       <span class="material-symbols-rounded">menu</span>
       </button>
       <div id="ui-container">
-         <!-- MAP LIST VIEW -->
-         <div id="view-maps" style="display: flex; flex-direction: column; height: 100%;">
-            <div class="m3-header">
+         <div class="m3-header" style="border-bottom: 1px solid var(--md-sys-color-outline); padding-bottom: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
                <h2 class="m3-title">Map Libraries</h2>
-               <div class="m3-subtitle">Select a map library to load props</div>
+               <div class="m3-subtitle" style="margin: 0;">
+                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">touch_app</span> Place
+                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look
+               </div>
             </div>
+            <div style="display:flex;gap:6px;margin-top:8px; justify-content: flex-start;">
+               <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import Custom ZIP" style="flex: none; width: 48px;">
+                  <span class="material-symbols-rounded">upload_file</span>
+               </button>
+               <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export as ZIP" style="flex: none; width: 48px;">
+                  <span class="material-symbols-rounded">save</span>
+               </button>
+               <button id="clear-btn" class="m3-btn m3-btn-error" title="Clear Scene" style="flex: none; width: 48px;">
+                  <span class="material-symbols-rounded">delete</span>
+               </button>
+            </div>
+            <input type="file" id="file-input" accept=".zip,.bin" style="display: none;" />
+         </div>
+
+         <!-- MAP LIST VIEW -->
+         <div id="view-maps" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
             <div id="map-list" style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
                <!-- Auto Generated via JS -->
             </div>
          </div>
+
          <!-- PROPS VIEW -->
-         <div id="view-props" style="display: none; flex-direction: column; height: 100%;">
-            <div class="m3-header">
-               <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px; padding-right: 48px;">
+         <div id="view-props" style="display: none; flex-direction: column; flex: 1; overflow: hidden; position: relative;">
+            <div id="props-header" class="m3-header" style="position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; z-index: 10; padding-top: 12px; padding-bottom: 12px; flex-direction: row; justify-content: space-between; align-items: center; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: var(--md-sys-color-surface); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
+               <div style="display: flex; align-items: center; gap: 12px;">
                   <button id="back-to-maps-btn" class="m3-btn-secondary" title="Back to Map Library" style="width: 36px; height: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--md-sys-color-outline); flex-shrink: 0;">
                   <span class="material-symbols-rounded" style="font-size: 20px; color: var(--md-sys-color-on-surface);">arrow_back</span>
                   </button>
                   <h2 class="m3-title" style="margin: 0;">Props</h2>
                </div>
-               <div class="m3-subtitle">
-                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">touch_app</span> Place
-                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look
-               </div>
-               <div style="display:flex;gap:6px;justify-content:space-between;margin-top:8px;">
-                  <button id="load-original-btn" class="m3-btn m3-btn-secondary" title="Load Original Map">
-                  <span class="material-symbols-rounded">map</span>
-                  </button>
-                  <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin / models">
-                  <span class="material-symbols-rounded">upload_file</span>
-                  </button>
-                  <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export map.bin">
-                  <span class="material-symbols-rounded">save</span>
-                  </button>
-                  <button id="clear-btn" class="m3-btn m3-btn-error" title="Clear Scene">
-                  <span class="material-symbols-rounded">delete</span>
-                  </button>
-               </div>
-               <input type="file" id="file-input" accept=".bin" style="display: none;" />
+               <button id="load-original-btn" class="m3-btn m3-btn-secondary" title="Load Original Map" style="width: 36px; height: 36px; padding: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <span class="material-symbols-rounded" style="font-size: 20px;">map</span>
+               </button>
             </div>
-            <div id="prefab-list"></div>
+            <div id="prefab-list" style="padding-top: 72px;"></div>
          </div>
       </div>
       <div class="grid-floating-panel">
@@ -542,6 +546,7 @@
          window.currentLibraryUrl = null;
          window.currentLibraryBaseUrl = null;
          window.currentMapBaseUrl = null;
+         window.rawFileCache = new Map();
          
          const toastEl = document.getElementById('toast-msg');
          const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -592,10 +597,6 @@
                  cleaned = cleaned.replace(/[-_]sub[-_]?\d+$/i, '');
              }
              return cleaned;
-         }
-         
-         function log(msg) {
-             console.log(`[System] ${msg}`);
          }
          
          function showToast(msg, isError = true) {
@@ -690,6 +691,7 @@
              writeUint8(v) { this._add(new Uint8Array([v])); }
              writeUint16(v, le = false) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, v, le); this._add(b); }
              writeUint32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v, le); this._add(b); }
+             writeInt32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, v, le); this._add(b); }
              writeFloat32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, v, le); this._add(b); }
              writeBytes(b) { this._add(b); }
              writeStringLength(len) {
@@ -698,6 +700,13 @@
                  else { this.writeUint8(0b11000000 | (len >> 16)); this.writeUint16(len & 0xFFFF, false); }
              }
              writeString(str) { const bytes = new TextEncoder().encode(str); this.writeStringLength(bytes.length); this.writeBytes(bytes); }
+             writeLengthPrefixedStringA3D(str) {
+                 const bytes = new TextEncoder().encode(str);
+                 this.writeUint32(bytes.length, true);
+                 this.writeBytes(bytes);
+                 const pad = (((bytes.length + 3) >> 2) << 2) - bytes.length;
+                 for(let i=0; i<pad; i++) this.writeUint8(0);
+             }
              _add(b) { this.chunks.push(b); this.length += b.length; }
              toUint8Array() {
                  const res = new Uint8Array(this.length);
@@ -818,7 +827,8 @@
              const meshCount = stream.readUint32(true);
              
              for(let i=0; i<meshCount; i++) {
-                 if(version===3) { stream.readLengthPrefixedStringA3D(); stream.offset += 28; }
+                 let mName = "Mesh_" + i;
+                 if(version===3) { mName = stream.readLengthPrefixedStringA3D(); stream.offset += 28; }
                  const vertexCount = stream.readUint32(true);
                  const vBufCount = stream.readUint32(true);
                  const buffers =[];
@@ -854,6 +864,7 @@
                  }
                  
                  const geo = new THREE.BufferGeometry();
+                 geo.name = mName;
                  let mainIndices =[];
                  submeshes.forEach((sm, idx) => {
                      const start = mainIndices.length;
@@ -951,6 +962,7 @@
                                          geo.userData.matIds = geo.userData.v2MatIds ||[];
                                      }
                           
+                                     geo.name = obj.name; // Keep accurate name for rebuilding
                                      data.namedMeshes[obj.name] = geo;
                                      data.namedMeshes[`mesh_${i}`] = geo;
                                      
@@ -968,6 +980,104 @@
              return data;
          }
          
+         function exportOptimizedA3D(geometries) {
+             const bw = new BinaryWriter();
+             bw.writeBytes(new TextEncoder().encode("A3D\0"));
+             bw.writeUint16(3, true); bw.writeUint16(0, true); bw.writeUint32(0, true); bw.writeUint32(0, true);
+             
+             const matBw = new BinaryWriter();
+             for(let i=0; i<geometries.length; i++) {
+                 matBw.writeLengthPrefixedStringA3D("mat_" + i);
+                 matBw.writeFloat32(0,true); matBw.writeFloat32(0,true); matBw.writeFloat32(0,true);
+                 matBw.writeLengthPrefixedStringA3D("tex_" + i);
+             }
+             const matBytes = matBw.toUint8Array();
+             bw.writeUint32(1, true); bw.writeUint32(matBytes.length, true); bw.writeUint32(geometries.length, true); bw.writeBytes(matBytes);
+             let pad = (((matBytes.length + 3) >> 2) << 2) - matBytes.length;
+             for(let i=0; i<pad; i++) bw.writeUint8(0);
+         
+             const meshBw = new BinaryWriter();
+             for(let geo of geometries) {
+                 meshBw.writeLengthPrefixedStringA3D(geo.name || "UnnamedMesh");
+                 for(let k=0; k<7; k++) meshBw.writeFloat32(0, true);
+                 
+                 const pos = geo.attributes.position;
+                 const uv = geo.attributes.uv || geo.attributes.uv2;
+                 const normal = geo.attributes.normal;
+                 
+                 meshBw.writeUint32(pos.count, true);
+                 let bufs =[];
+                 bufs.push({type: 1, arr: pos});
+                 if (uv) bufs.push({type: 2, arr: uv});
+                 if (normal) bufs.push({type: 3, arr: normal});
+                 
+                 meshBw.writeUint32(bufs.length, true);
+                 for(let b of bufs) {
+                     meshBw.writeUint32(b.type, true);
+                     for(let i=0; i<b.arr.count * b.arr.itemSize; i++) {
+                         meshBw.writeFloat32(b.arr.array[i], true);
+                     }
+                 }
+                 
+                 let groups = geo.groups;
+                 if(!groups || groups.length === 0) {
+                     let count = geo.index ? geo.index.count : pos.count;
+                     groups =[{start: 0, count: count, materialIndex: 0}];
+                 }
+                 meshBw.writeUint32(groups.length, true);
+                 for(let g of groups) {
+                     meshBw.writeUint32(g.count, true);
+                     let indices = geo.index ? geo.index.array : null;
+                     for(let i=0; i<g.count; i++) {
+                         let idx = indices ? indices[g.start + i] : (g.start + i);
+                         meshBw.writeUint16(idx, true);
+                     }
+                     let padBytes = (((g.count * 2 + 3) >> 2) << 2) - (g.count * 2);
+                     for(let i=0; i<padBytes; i++) meshBw.writeUint8(0);
+                 }
+             }
+             const meshBytes = meshBw.toUint8Array();
+             bw.writeUint32(2, true); bw.writeUint32(meshBytes.length, true); bw.writeUint32(geometries.length, true); bw.writeBytes(meshBytes);
+         
+             const tBw = new BinaryWriter();
+             for(let geo of geometries) {
+                 tBw.writeLengthPrefixedStringA3D("tf_" + (geo.name || "Unnamed"));
+                 tBw.writeFloat32(0,true); tBw.writeFloat32(0,true); tBw.writeFloat32(0,true);
+                 tBw.writeFloat32(0,true); tBw.writeFloat32(0,true); tBw.writeFloat32(0,true); tBw.writeFloat32(1,true);
+                 tBw.writeFloat32(1,true); tBw.writeFloat32(1,true); tBw.writeFloat32(1,true);
+             }
+             for(let geo of geometries) tBw.writeInt32(-1, true);
+             const tBytes = tBw.toUint8Array();
+             bw.writeUint32(3, true); bw.writeUint32(tBytes.length, true); bw.writeUint32(geometries.length, true); bw.writeBytes(tBytes);
+             pad = (((tBytes.length + 3) >> 2) << 2) - tBytes.length;
+             for(let i=0; i<pad; i++) bw.writeUint8(0);
+         
+             const objBw = new BinaryWriter();
+             for(let i=0; i<geometries.length; i++) {
+                 const geo = geometries[i];
+                 objBw.writeLengthPrefixedStringA3D(geo.name || "Unnamed");
+                 objBw.writeUint32(i, true);
+                 objBw.writeUint32(i, true);
+                 
+                 let groups = geo.groups;
+                 if(!groups || groups.length === 0) groups =[{materialIndex: 0}];
+                 objBw.writeUint32(groups.length, true);
+                 
+                 let matIds = geo.userData.matIds || geo.userData.v2MatIds ||[];
+                 for(let j=0; j<groups.length; j++) {
+                     let mId = j < matIds.length ? matIds[j] : 0;
+                     objBw.writeInt32(mId, true);
+                 }
+             }
+             const objBytes = objBw.toUint8Array();
+             bw.writeUint32(5, true);
+             bw.writeUint32(objBytes.length, true);
+             bw.writeUint32(geometries.length, true);
+             bw.writeBytes(objBytes);
+         
+             return bw.toUint8Array();
+         }
+
          window.repackingData = null;
          
          async function parseMapBin(buffer) {
@@ -989,16 +1099,18 @@
                  for (let i = 0; i < extBytes.length; i++) for (let b = 7; b >= 0; b--) fullOriginalBits.push((extBytes[i] & (1 << b)) === 0);
              }
              headerEndOffset = packet.offset;
-         
-             const optMask = [...fullOriginalBits].reverse();
+
+             const optMask =[...fullOriginalBits].reverse();
              let popCount = 0;
              const popBit = () => { popCount++; return optMask.pop(); };
-         
+
              const skipObjectArray = (p, cb) => { const len = p.readStringLength(); for(let i=0; i<len; i++) cb(p); };
              const readV3 = () =>[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
-         
+
              const result = { props:[], materials: {}, atlases: {} };
-         
+
+             const atlasStartOffset = packet.offset;
+             const atlasBitIndex = popCount;
              if (popBit()) {
                  const atlasLen = packet.readStringLength();
                  for(let i=0; i<atlasLen; i++) {
@@ -1014,12 +1126,13 @@
                          const rWidth = packet.readUint32(false);
                          const rx = packet.readUint32(false);
                          const ry = packet.readUint32(false);
-                         rects[`${rLib}_${rName}`] = { x: rx, y: ry, w: rWidth, h: rHeight };
+                         rects[`${rLib}_${rName}`] = { x: rx, y: ry, w: rWidth, h: rHeight, originalName: rName };
                      }
                      const aWidth = packet.readUint32(false);
                      result.atlases[aName] = { width: aWidth, height: aHeight, rects };
                  }
              }
+             const atlasEndOffset = packet.offset;
          
              if (popBit()) skipObjectArray(packet, p => { p.readUint32(false); p.readString(); p.offset+=12; p.readString(); });
          
@@ -1029,14 +1142,21 @@
                  len = packet.readStringLength(); for(let i=0; i<len; i++) { packet.readFloat64(false); packet.offset+=60; } 
              };
              skipCols(); skipCols();
-         
+
+             const popCountBeforeMaterials = popCount;
+             const matStartOffset = packet.offset;
+             const originalMaterialsData =[];
+
              const matLen = packet.readStringLength();
              for(let i=0; i<matLen; i++) {
+                 const mStartOffset = packet.offset;
+                 const mStartBit = popCount;
+                 
                  const matID = packet.readUint32(false);
                  const matName = packet.readString();
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=4; });
                  const shader = packet.readString();
-         
+
                  const texParams =[];
                  const texLen = packet.readStringLength();
                  for(let j=0; j<texLen; j++) {
@@ -1046,16 +1166,24 @@
                      const texName = packet.readString();
                      texParams.push({ libName, name: texParamName, texName });
                  }
-         
+
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=8; });
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=12; });
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=16; });
                  
+                 originalMaterialsData.push({
+                     matID,
+                     bytes: packet.buffer.slice(mStartOffset, packet.offset),
+                     bits: fullOriginalBits.slice(mStartBit, popCount)
+                 });
                  result.materials[matID] = { name: matName, shader, texParams };
              }
-         
+
+             const matEndOffset = packet.offset;
+             const matEndBit = popCount;
+
              if (popBit()) skipObjectArray(packet, p => { p.offset+=28; }); 
-         
+
              const prefixOffset = packet.offset; 
              const popCountBeforeProps = popCount; 
          
@@ -1080,14 +1208,20 @@
              const suffixBits = fullOriginalBits.slice(popCount);
          
              window.repackingData = {
-                 prefixBytes: packet.buffer.slice(headerEndOffset, prefixOffset),
+                 preMatBytes: packet.buffer.slice(headerEndOffset, matStartOffset),
+                 originalMaterialsData: originalMaterialsData,
+                 postMatBytes: packet.buffer.slice(matEndOffset, prefixOffset),
+                 postMatBits: fullOriginalBits.slice(matEndBit, popCountBeforeProps),
+                 consumedBitsBeforeMaterials: fullOriginalBits.slice(0, popCountBeforeMaterials),
                  suffixBytes: suffixBytes,
-                 consumedBitsBeforeProps: fullOriginalBits.slice(0, popCountBeforeProps),
                  suffixBits: suffixBits,
                  maxPropId: maxPropId,
-                 originalProps: result.props 
+                 originalProps: result.props,
+                 atlasStart: atlasStartOffset - headerEndOffset,
+                 atlasEnd: atlasEndOffset - headerEndOffset,
+                 atlasBitIndex: atlasBitIndex
              };
-         
+
              return result;
          }
          
@@ -1101,10 +1235,7 @@
          function parseLightmapData(buffer) {
              const stream = new BinaryStream(buffer);
              const version = stream.readUint32(true);
-             if (version !== 2) {
-                 console.warn("Unsupported LightmapData version:", version);
-                 return null;
-             }
+             if (version !== 2) return null;
          
              const lightColorInt = stream.readUint32(true);
              const ambientColorInt = stream.readUint32(true);
@@ -1146,30 +1277,21 @@
                      index, lightmapIndex, lightmapScaleOffset, uv1, uv2, castShadows, receiveShadows
                  });
              }
-         
-             return {
-                 version, lightColorInt, ambientColorInt, lightAngleX, lightAngleZ, lightmaps, mapObjects
-             };
+             return { version, lightColorInt, ambientColorInt, lightAngleX, lightAngleZ, lightmaps, mapObjects };
          }
          
          function applyLightmapData(data) {
              if (!data) return;
-             
              const lightColor = decodeIntColorToHex(data.lightColorInt);
              const ambientColor = decodeIntColorToHex(data.ambientColorInt);
-         
              if (dirLight) {
                  dirLight.color.setHex(lightColor);
-                 
                  const lightPos = new THREE.Vector3(0, 0, 5000);
-             
                  const euler = new THREE.Euler(data.lightAngleX, 0, data.lightAngleZ, 'XYZ');
                  lightPos.applyEuler(euler);
-                 
                  dirLight.position.set(lightPos.x, lightPos.z, -lightPos.y);
                  dirLight.lookAt(0, 0, 0);
              }
-         
              if (hemiLight) {
                  hemiLight.color.setHex(ambientColor);
                  hemiLight.groundColor.setHex(ambientColor);
@@ -1181,25 +1303,15 @@
          function setupMobileFullscreen() {
              const lockScreen = async () => {
                  const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
-                 
                  if (!isFullscreen) {
                      try {
                          const doc = document.documentElement;
-                         if (doc.requestFullscreen) {
-                             await doc.requestFullscreen();
-                         } else if (doc.webkitRequestFullscreen) {
-                             await doc.webkitRequestFullscreen();
-                         }
-                         
-                         if (screen.orientation && screen.orientation.lock) {
-                             await screen.orientation.lock("landscape");
-                         }
-                     } catch (e) {
-                         console.warn("Fullscreen or orientation lock failed:", e.message);
-                     }
+                         if (doc.requestFullscreen) { await doc.requestFullscreen(); } 
+                         else if (doc.webkitRequestFullscreen) { await doc.webkitRequestFullscreen(); }
+                         if (screen.orientation && screen.orientation.lock) { await screen.orientation.lock("landscape"); }
+                     } catch (e) { console.warn("Fullscreen error", e.message); }
                  }
              };
-         
              document.body.addEventListener('click', lockScreen);
              document.body.addEventListener('touchstart', lockScreen, { passive: true });
          }
@@ -1224,7 +1336,6 @@
                      const deltaPanX = currentState.midpoint.x - previousTwoFingerState.midpoint.x;
                      const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y;
                      const deltaPinch = currentState.distance - previousTwoFingerState.distance;
-         
                      camera.translateX(-deltaPanX);
                      camera.translateY(deltaPanY);
                      camera.translateZ(-deltaPinch);
@@ -1251,7 +1362,6 @@
                      pointer.y = e.clientY;
                      return;
                  }
-         
                  const deltaX = e.clientX - pointer.x;
                  const deltaY = e.clientY - pointer.y;
          
@@ -1289,10 +1399,8 @@
          
          function initThree() {
              if (renderer) return;
-         
              scene = new THREE.Scene();
-             const skyColor = new THREE.Color(0x9DD1F1); 
-             scene.background = skyColor;
+             scene.background = new THREE.Color(0x9DD1F1);
              
              camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
              camera.position.set(0, 10, 80);
@@ -1302,43 +1410,29 @@
              renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
              renderer.setPixelRatio(window.devicePixelRatio);
              renderer.setSize(window.innerWidth, window.innerHeight);
-             
              renderer.toneMapping = THREE.ACESFilmicToneMapping;
              renderer.toneMappingExposure = 1.2; 
-             
              renderer.shadowMap.enabled = true;
              renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
              document.getElementById('canvas-container').appendChild(renderer.domElement);
          
              renderer.domElement.addEventListener('webglcontextlost', (event) => {
                  event.preventDefault();
-                 console.warn("WebGL Context Lost! Pausing rendering...");
              }, false);
          
              renderer.domElement.addEventListener('webglcontextrestored', () => {
-                 console.log("WebGL Context Restored! Re-initializing resources...");
-               
                  const pmremGenerator = new THREE.PMREMGenerator(renderer);
                  pmremGenerator.compileEquirectangularShader();
                  const environment = new RoomEnvironment();
                  scene.environment = pmremGenerator.fromScene(environment).texture;
                  environment.dispose();
-         
-                 textureCache.forEach(tex => {
-                     if(tex) tex.needsUpdate = true;
-                 });
+                 textureCache.forEach(tex => { if(tex) tex.needsUpdate = true; });
                  defaultControl.needsUpdate = true;
                  defaultTile.needsUpdate = true;
-         
                  scene.traverse((child) => {
-                     if (child.isMesh && child.material) {
-                         child.material.needsUpdate = true;
-                     }
+                     if (child.isMesh && child.material) child.material.needsUpdate = true;
                  });
-                 
-                 setTimeout(() => {
-                     window.dispatchEvent(new Event('resize'));
-                 }, 100);
+                 setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100);
              }, false);
          
              clock = new THREE.Clock();
@@ -1359,7 +1453,6 @@
              const environment = new RoomEnvironment();
              scene.environment = pmremGenerator.fromScene(environment).texture;
              environment.dispose();
-             
              scene.environmentIntensity = 0.5; 
          
              hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
@@ -1369,10 +1462,8 @@
              dirLight = new THREE.DirectionalLight(0xffffff, 2.0); 
              dirLight.position.set(-800, 1500, -500);
              dirLight.castShadow = true;
-             
              dirLight.shadow.mapSize.width = 4096;
              dirLight.shadow.mapSize.height = 4096;
-             
              const d = 500; 
              dirLight.shadow.camera.left = -d;
              dirLight.shadow.camera.right = d;
@@ -1380,37 +1471,29 @@
              dirLight.shadow.camera.bottom = -d;
              dirLight.shadow.camera.near = 100;
              dirLight.shadow.camera.far = 5000;
-             
              dirLight.shadow.bias = -0.0005; 
              dirLight.shadow.normalBias = 0.05; 
              dirLight.shadow.blurSamples = 16; 
              dirLight.shadow.radius = 1.5; 
-             
              scene.add(dirLight);
          
              const pixelRatio = window.devicePixelRatio;
              const renderTarget = new THREE.WebGLRenderTarget(
                  window.innerWidth * pixelRatio, 
                  window.innerHeight * pixelRatio, 
-                 {
-                     samples: 4,
-                     type: THREE.HalfFloatType
-                 }
+                 { samples: 4, type: THREE.HalfFloatType }
              );
              
              composer = new EffectComposer(renderer, renderTarget);
              composer.setPixelRatio(window.devicePixelRatio);
-             
              const renderPass = new RenderPass(scene, camera);
              composer.addPass(renderPass);
-         
              const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
              ssaoPass.kernelRadius = 8;      
              ssaoPass.minDistance = 0.002;    
              ssaoPass.maxDistance = 0.2;      
              ssaoPass.output = SSAOPass.OUTPUT.Default; 
              composer.addPass(ssaoPass);
-         
              const outputPass = new OutputPass();
              composer.addPass(outputPass);
          
@@ -1424,9 +1507,7 @@
                  composer.setSize(width, height); 
              }
              window.addEventListener('resize', onWindowResize);
-            
              onWindowResize();
-         
              initThumbnails();
              animate();
          }
@@ -1434,15 +1515,12 @@
          function initThumbnails() {
              thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
              thumbRenderer.setSize(512, 512);
-             
              thumbRenderer.toneMapping = THREE.ACESFilmicToneMapping;
              thumbRenderer.toneMappingExposure = 1.0; 
-         
              thumbScene = new THREE.Scene();
              thumbCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
              thumbCamera.position.set(0, 5, 12);
              thumbCamera.lookAt(0, 0, 0);
-             
              function setupThumbEnv() {
                  const pmremGenerator = new THREE.PMREMGenerator(thumbRenderer);
                  pmremGenerator.compileEquirectangularShader();
@@ -1451,42 +1529,23 @@
                  environment.dispose();
              }
              setupThumbEnv();
-         
              const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
              dirLight.position.set(5, 8, 8); 
              thumbScene.add(dirLight);
-         
-             thumbRenderer.domElement.addEventListener('webglcontextlost', (e) => {
-                 e.preventDefault();
-                 console.warn("Thumbnail WebGL Context Lost!");
-             }, false);
-         
+             thumbRenderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false);
              thumbRenderer.domElement.addEventListener('webglcontextrestored', () => {
-                 console.log("Thumbnail WebGL Context Restored!");
-                 
                  thumbRenderer.setSize(512, 512);
-               
                  setupThumbEnv();
-                 
                  if (defaultControl) defaultControl.needsUpdate = true;
                  if (defaultTile) defaultTile.needsUpdate = true;
-                 textureCache.forEach(tex => {
-                     if(tex) tex.needsUpdate = true;
-                 });
-                 
+                 textureCache.forEach(tex => { if(tex) tex.needsUpdate = true; });
                  for (const item of thumbnailItems) {
                      item.model.traverse((child) => {
                          if (child.isMesh) {
-                             if (child.material) {
-                                 child.material.needsUpdate = true;
-                             }
+                             if (child.material) child.material.needsUpdate = true;
                              if (child.geometry) {
-                                 for (const key in child.geometry.attributes) {
-                                     child.geometry.attributes[key].needsUpdate = true;
-                                 }
-                                 if (child.geometry.index) {
-                                     child.geometry.index.needsUpdate = true;
-                                 }
+                                 for (const key in child.geometry.attributes) { child.geometry.attributes[key].needsUpdate = true; }
+                                 if (child.geometry.index) child.geometry.index.needsUpdate = true;
                              }
                          }
                      });
@@ -1496,9 +1555,7 @@
          
          function animate() {
              requestAnimationFrame(animate);
-             
              const delta = Math.min(clock.getDelta(), 0.1); 
-             
              if (controls) controls.update(delta);
              
              const uiContainer = document.getElementById('ui-container');
@@ -1506,7 +1563,6 @@
              if (uiContainer.style.transform !== 'translateX(100%)' && propsView.style.display !== 'none') {
                  const listContainer = document.getElementById('prefab-list');
                  const listRect = listContainer.getBoundingClientRect();
-                 
                  for (const item of thumbnailItems) {
                      item.model.rotation.y += delta * 1.5; 
                      const rect = item.element.getBoundingClientRect();
@@ -1519,7 +1575,6 @@
                      }
                  }
              }
-             
              if (composer && scene && camera) {
                  composer.render();
              }
@@ -1535,35 +1590,44 @@
              }
          }
          
-         function loadTextureDirect(url, silent = false, isLinear = false, isRepeating = false) {
-             const loader = new THREE.TextureLoader();
-             return new Promise((resolve) => {
-                 loader.load(url, (tex) => {
-                     tex.colorSpace = isLinear ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
-                     tex.flipY = false;
-                     
-                     if (isRepeating) {
-                         tex.wrapS = THREE.RepeatWrapping;
-                         tex.wrapT = THREE.RepeatWrapping;
-                     } else {
-                         tex.wrapS = THREE.ClampToEdgeWrapping;
-                         tex.wrapT = THREE.ClampToEdgeWrapping;
-                     }
-         
-                     if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-                     resolve(tex);
-                 }, undefined, () => {
-                     if(!silent) console.warn(`Failed to load texture: ${url}`);
-                     resolve(null);
+         async function loadTextureDirect(url, silent = false, isLinear = false, isRepeating = false) {
+             try {
+                 const res = await fetch(url);
+                 if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+                 const blob = await res.blob();
+                 const buffer = await blob.arrayBuffer();
+                 
+                 const fileName = url.substring(url.lastIndexOf('/') + 1);
+                 if (!window.rawFileCache.has(fileName)) {
+                     window.rawFileCache.set(fileName, buffer);
+                 }
+                 window.rawFileCache.set(url, buffer); 
+                 
+                 const objUrl = URL.createObjectURL(blob);
+                 const loader = new THREE.TextureLoader();
+                 
+                 return new Promise((resolve) => {
+                     loader.load(objUrl, (tex) => {
+                         tex.colorSpace = isLinear ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
+                         tex.flipY = false;
+                         if (isRepeating) {
+                             tex.wrapS = THREE.RepeatWrapping;
+                             tex.wrapT = THREE.RepeatWrapping;
+                         } else {
+                             tex.wrapS = THREE.ClampToEdgeWrapping;
+                             tex.wrapT = THREE.ClampToEdgeWrapping;
+                         }
+                         if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                         resolve(tex);
+                     }, undefined, () => { resolve(null); });
                  });
-             });
+             } catch(e) { return null; }
          }
          
          window.loadedLibraries = new Set();
          
          async function getPropDict(mapData) {
              if (!propDictCache) propDictCache = {};
-         
              if (window.currentLibraryUrl) {
                  if (!window.loadedLibraries.has(window.currentLibraryUrl)) {
                      try {
@@ -1571,8 +1635,8 @@
                          for(const grp of libJson.groups) {
                              for(const p of grp.props) {
                                  if (p.mesh && p.mesh.file) {
-                                     propDictCache[`${grp.name}_${p.name}`] = p;
-                                     propDictCache[p.name] = p; 
+                                     propDictCache[`${window.currentLibraryUrl}_${grp.name}_${p.name}`] = p;
+                                     propDictCache[`${window.currentLibraryUrl}_${p.name}`] = p; 
                                  }
                              }
                          }
@@ -1582,14 +1646,12 @@
                      }
                  }
              }
-             
              return propDictCache;
          }
          
          function addPrefabToUI(baseName, group) {
              const item = document.createElement('div');
              item.className = 'prefab-item';
-             
              const canvas = document.createElement('canvas');
              canvas.width = 200;
              canvas.height = 200;
@@ -1599,34 +1661,26 @@
              canvas.style.top = '0';
              canvas.style.left = '0';
              canvas.style.pointerEvents = 'none';
-             
              const ctx = canvas.getContext('2d', { willReadFrequently: true });
-             
              const label = document.createElement('span');
              label.innerText = baseName;
              label.title = baseName;
-             
              item.appendChild(canvas);
              item.appendChild(label);
              document.getElementById('prefab-list').appendChild(item);
              
              const thumbModel = group.clone();
-             
              thumbModel.updateMatrixWorld(true);
              const box = new THREE.Box3().setFromObject(thumbModel, true);
              const size = box.getSize(new THREE.Vector3());
              const center = box.getCenter(new THREE.Vector3());
              const maxDim = Math.max(size.x, size.y, size.z);
-             
              thumbModel.position.sub(center);
-             
              const rotationGroup = new THREE.Group();
              rotationGroup.rotation.x = -Math.PI / 2;
              rotationGroup.add(thumbModel);
-             
              const container = new THREE.Group();
              container.add(rotationGroup);
-             
              const scale = 8 / (maxDim || 0.1);
              container.scale.set(scale, scale, scale);
              
@@ -1649,7 +1703,6 @@
              const item = document.createElement('div');
              item.className = 'prefab-item-error';
              item.title = `File: ${fileName}\nError: ${errorMsg}`; 
-             
              item.innerHTML = `
                  <span class="material-symbols-rounded icon">broken_image</span>
                  <div class="text-container">
@@ -1662,118 +1715,94 @@
          
          async function processMap(mapData, buildWorld = false, onProgress = null, lightmapData = null) {
              const propDict = await getPropDict(mapData); 
-         
              let shadowSettings = {};
              if (lightmapData) {
-                 lightmapData.mapObjects.forEach(mo => {
-                     shadowSettings[mo.index] = { cast: mo.castShadows, receive: mo.receiveShadows };
-                 });
+                 lightmapData.mapObjects.forEach(mo => { shadowSettings[mo.index] = { cast: mo.castShadows, receive: mo.receiveShadows }; });
              }
          
              const uniqueModelToLib = new Map(); 
              const uniqueTexToLib = new Map();
              const repeatingTextures = new Set(); 
+             
+             const getBaseUrl = (libName) => {
+                 return (libName && window.currentLibraryBaseUrl) ? window.currentLibraryBaseUrl : window.currentMapBaseUrl;
+             };
          
              for (const prop of mapData.props) {
-                 const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+                 let pInfo = propDict[`${window.currentLibraryUrl}_${prop.grpName}_${prop.name}`] || propDict[`${window.currentLibraryUrl}_${prop.name}`];
+                 if (!pInfo) pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+                 const baseUrl = getBaseUrl(prop.libName);
                  
                  if (!prop.libName) {
-                     uniqueModelToLib.set('models.a3d', null);
+                     uniqueModelToLib.set(`${baseUrl}/models.a3d`, { file: 'models.a3d', baseUrl });
                  } else {
                      let file = (pInfo && pInfo.mesh && pInfo.mesh.file) ? pInfo.mesh.file : (prop.name + ".a3d");
-                     uniqueModelToLib.set(file, prop.libName);
+                     uniqueModelToLib.set(`${baseUrl}/${file}`, { file, baseUrl });
                  }
-                 
                  if (pInfo && pInfo.textures) {
                      for (let t of pInfo.textures) {
-                         if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+                         if (t.diffuseMap) uniqueTexToLib.set(`${baseUrl}/${t.diffuseMap}`, { texName: t.diffuseMap, baseUrl });
                      }
                  }
              }
          
              for (const mat of Object.values(mapData.materials)) {
                  for (const param of mat.texParams) {
-                     uniqueTexToLib.set(param.texName, param.libName);
-                     if (param.name.startsWith('_Splat')) {
-                         repeatingTextures.add(param.texName);
-                     }
+                     const baseUrl = getBaseUrl(param.libName);
+                     uniqueTexToLib.set(`${baseUrl}/${param.texName}`, { texName: param.texName, baseUrl });
+                     if (param.name.startsWith('_Splat')) repeatingTextures.add(`${baseUrl}/${param.texName}`);
                  }
              }
              if (mapData.atlases) {
+                 const baseUrl = window.currentMapBaseUrl;
                  for (const atlasName of Object.keys(mapData.atlases)) {
-                     uniqueTexToLib.set(atlasName, null);
+                     uniqueTexToLib.set(`${baseUrl}/${atlasName}`, { texName: atlasName, baseUrl });
                  }
              }
              
-             const modelPromises = Array.from(uniqueModelToLib.entries()).map(async ([file, libName]) => {
-                 if (!modelCache.has(file)) {
+             const modelPromises = Array.from(uniqueModelToLib.entries()).map(async ([cacheKey, info]) => {
+                 if (!modelCache.has(cacheKey)) {
                      try {
-                         if (file.toLowerCase().endsWith('.a3d')) {
+                         if (info.file.toLowerCase().endsWith('.a3d')) {
                              let a3dBuf;
-                             try {
-                                 if (window.currentLibraryBaseUrl) {
-                                     a3dBuf = await fetchFile(`${window.currentLibraryBaseUrl}/${file}`);
-                                 } else {
-                                     a3dBuf = await fetchFile(`${window.currentMapBaseUrl}/${file}`);
-                                 }
-                             } catch (fetchErr) {
-                                 const lowerFile = file.toLowerCase();
-                                 if (file !== lowerFile) {
-                                     if (window.currentLibraryBaseUrl) {
-                                         a3dBuf = await fetchFile(`${window.currentLibraryBaseUrl}/${lowerFile}`);
-                                     } else {
-                                         a3dBuf = await fetchFile(`${window.currentMapBaseUrl}/${lowerFile}`);
-                                     }
-                                 } else {
-                                     throw fetchErr; 
-                                 }
+                             try { a3dBuf = await fetchFile(`${info.baseUrl}/${info.file}`); } 
+                             catch (fetchErr) {
+                                 const lowerFile = info.file.toLowerCase();
+                                 if (info.file !== lowerFile) a3dBuf = await fetchFile(`${info.baseUrl}/${lowerFile}`);
+                                 else throw fetchErr; 
                              }
-                             
                              const a3dData = parseA3D(a3dBuf);
-                             modelCache.set(file, a3dData); 
+                             modelCache.set(cacheKey, a3dData); 
                          }
-                     } catch (e) {
-                         console.error(`[Missing Model] ${file} -> ${e.message}`);
-                         addErrorToUI(file, e.message);
-                     }
+                     } catch (e) { addErrorToUI(info.file, e.message); }
                  }
              });
          
-             const texPromises = Array.from(uniqueTexToLib.entries()).map(async ([texName, libName]) => {
-                 if (!textureCache.has(texName)) {
-                     const isControl = texName.includes('-control'); 
-                     const isRepeat = repeatingTextures.has(texName);
-                     let tex = null;
-         
-                     if (window.currentLibraryBaseUrl) {
-                         tex = await loadTextureDirect(`${window.currentLibraryBaseUrl}/${texName}.webp`, true, isControl, isRepeat);
+             const texPromises = Array.from(uniqueTexToLib.entries()).map(async ([cacheKey, info]) => {
+                 if (!textureCache.has(cacheKey)) {
+                     const isControl = info.texName.includes('-control'); 
+                     const isRepeat = repeatingTextures.has(cacheKey);
+                     let tex = await loadTextureDirect(`${info.baseUrl}/${info.texName}.webp`, true, isControl, isRepeat);
+                     if (!tex && info.baseUrl !== window.currentMapBaseUrl && window.currentMapBaseUrl) {
+                         tex = await loadTextureDirect(`${window.currentMapBaseUrl}/${info.texName}.webp`, true, isControl, isRepeat);
                      }
-                     if (!tex && window.currentMapBaseUrl) {
-                         tex = await loadTextureDirect(`${window.currentMapBaseUrl}/${texName}.webp`, true, isControl, isRepeat);
-                     }
-         
-                     if (tex) textureCache.set(texName, tex);
+                     if (tex) textureCache.set(cacheKey, tex);
                  }
              });
          
              const lightmapPromises =[];
              if (lightmapData && lightmapData.lightmaps) {
-         lightmapData.lightmaps.forEach((lmName) => {
-         if (!textureCache.has(lmName)) {
-            const url = `${window.currentMapBaseUrl}/${lmName}.webp`;
-            
-            const promise = loadTextureDirect(url, true, true, false).then(tex => {
-                if (tex) {
-                    tex.flipY = false;
-                    tex.channel = 1;
-                    textureCache.set(lmName, tex);
-                }
-            });
-            
-            lightmapPromises.push(promise);
-         }
-         });
-         }
+                 lightmapData.lightmaps.forEach((lmName) => {
+                     const cacheKey = `${window.currentMapBaseUrl}/${lmName}`;
+                     if (!textureCache.has(cacheKey)) {
+                        const url = `${window.currentMapBaseUrl}/${lmName}.webp`;
+                        const promise = loadTextureDirect(url, true, true, false).then(tex => {
+                            if (tex) { tex.flipY = false; tex.channel = 1; textureCache.set(cacheKey, tex); }
+                        });
+                        lightmapPromises.push(promise);
+                     }
+                 });
+             }
          
              const allPromises =[...modelPromises, ...texPromises, ...lightmapPromises];
              let completed = 0;
@@ -1788,6 +1817,18 @@
                  await Promise.all(wrappedPromises);
              }
          
+             const getTexFromCache = (texName, baseUrl) => {
+                 if (!texName) return null;
+                 let tex = textureCache.get(`${baseUrl}/${texName}`);
+                 if (!tex) tex = textureCache.get(`${window.currentMapBaseUrl}/${texName}`);
+                 if (!tex) {
+                     for (let[k, v] of textureCache.entries()) {
+                         if (k.endsWith('/' + texName) || k === `null/${texName}`) return v;
+                     }
+                 }
+                 return tex;
+             };
+         
              if (buildWorld) {
                  if (ghost) {
                      editorGroup.remove(ghost);
@@ -1796,9 +1837,7 @@
                      document.querySelector('.grid-floating-panel').style.display = 'none';
                  }
                  const toRemove =[];
-                 editorGroup.children.forEach(child => {
-                     toRemove.push(child);
-                 });
+                 editorGroup.children.forEach(child => { toRemove.push(child); });
                  toRemove.forEach(c => editorGroup.remove(c));
              }
              
@@ -1816,8 +1855,16 @@
              for (let i = 0; i < mapData.props.length; i++) {
                  const prop = mapData.props[i];
                  let baseName = getCleanBaseName(prop.name);
-                 const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+                 
+                 let pInfo = propDict[`${window.currentLibraryUrl}_${prop.grpName}_${prop.name}`] || propDict[`${window.currentLibraryUrl}_${prop.name}`];
+                 if (!pInfo) pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+                 
                  const file = (pInfo && pInfo.mesh && pInfo.mesh.file) ? pInfo.mesh.file : (prop.name + ".a3d");
+                 const baseUrl = getBaseUrl(prop.libName);
+
+                 prop._pInfo = pInfo;
+                 prop._baseUrl = baseUrl;
+                 prop._file = file;
                  
                  let lmInfo = null;
                  if (lightmapData && lightmapData.mapObjects) {
@@ -1828,18 +1875,29 @@
                  let geometry = null;
                  let a3dData = null;
              
-                 if (!prop.libName) {
-                     const a3dData = modelCache.get('models.a3d');
-                     if (a3dData && a3dData.namedMeshes) {
-                         geometry = a3dData.namedMeshes[prop.name];
-                         if (!geometry) {
-                             const matchedKey = Object.keys(a3dData.namedMeshes).find(k => k.toLowerCase() === prop.name.toLowerCase());
-                             if (matchedKey) geometry = a3dData.namedMeshes[matchedKey];
+                 let modelCacheKey = prop.libName ? `${baseUrl}/${file}` : `${baseUrl}/models.a3d`;
+                 a3dData = modelCache.get(modelCacheKey);
+         
+                 if (!a3dData) {
+                     let fallbackFile = prop.libName ? file : 'models.a3d';
+                     for (let [k, v] of modelCache.entries()) {
+                         if (k.endsWith('/' + fallbackFile) || k === fallbackFile || k === `null/${fallbackFile}`) {
+                             a3dData = v;
+                             break;
                          }
                      }
-                 } else {
-                     a3dData = file ? modelCache.get(file) : null;
-                     if (a3dData) {
+                 }
+             
+                 if (a3dData) {
+                     if (!prop.libName) {
+                         if (a3dData.namedMeshes) {
+                             geometry = a3dData.namedMeshes[prop.name];
+                             if (!geometry) {
+                                 const matchedKey = Object.keys(a3dData.namedMeshes).find(k => k.toLowerCase() === prop.name.toLowerCase());
+                                 if (matchedKey) geometry = a3dData.namedMeshes[matchedKey];
+                             }
+                         }
+                     } else {
                          if (a3dData.namedMeshes && Object.keys(a3dData.namedMeshes).length > 0) {
                              geometry = Object.values(a3dData.namedMeshes)[0];
                          } else if (a3dData.meshes && a3dData.meshes.length > 0) {
@@ -1851,31 +1909,57 @@
                  if (!geometry) continue;
                  
                  const matInfo = mapData.materials[prop.matID];
-                 const isSprite = matInfo && matInfo.shader.includes("Sprite");
          
-                 let controlTexName = null;
-                 let baseTexName = null;
-                 if (matInfo && matInfo.texParams) {
-                     const pControl = matInfo.texParams.find(p => p.name === '_Control');
-                     if (pControl) controlTexName = pControl.texName;
-         
-                     const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
-                     if (pBase) baseTexName = pBase.texName;
-                 }
+                         let controlTexName = null;
+        let baseTexName = null;
+        let splat0TexName = null, splat1TexName = null, splat2TexName = null, splat3TexName = null;
+        let matBaseUrl = window.currentMapBaseUrl; 
+
+        if (matInfo && matInfo.texParams) {
+            const pControl = matInfo.texParams.find(p => p.name === '_Control');
+            if (pControl) controlTexName = pControl.texName;
+
+            const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
+            if (pBase) {
+                baseTexName = pBase.texName;
+                if (pBase.libName && window.currentLibraryBaseUrl) matBaseUrl = window.currentLibraryBaseUrl;
+            }
+
+      
+            const pSplat0 = matInfo.texParams.find(p => p.name === '_Splat0');
+            if (pSplat0) splat0TexName = pSplat0.texName;
+            const pSplat1 = matInfo.texParams.find(p => p.name === '_Splat1');
+            if (pSplat1) splat1TexName = pSplat1.texName;
+            const pSplat2 = matInfo.texParams.find(p => p.name === '_Splat2');
+            if (pSplat2) splat2TexName = pSplat2.texName;
+            const pSplat3 = matInfo.texParams.find(p => p.name === '_Splat3');
+            if (pSplat3) splat3TexName = pSplat3.texName;
+        }
          
                  if (!baseTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
                      const fallbackTex = pInfo.textures.find(t => t.diffuseMap && !t.diffuseMap.includes('-control'));
-                     if (fallbackTex) baseTexName = fallbackTex.diffuseMap;
+                     if (fallbackTex) {
+                         baseTexName = fallbackTex.diffuseMap;
+                         matBaseUrl = baseUrl;
+                     }
                  }
                  if (!controlTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
                      const fallbackCtrl = pInfo.textures.find(t => t.diffuseMap && t.diffuseMap.includes('-control'));
                      if (fallbackCtrl) controlTexName = fallbackCtrl.diffuseMap;
                  }
+                 
+        prop._baseTexName = baseTexName;
+        prop._controlTexName = controlTexName;
+        prop._splat0TexName = splat0TexName; 
+        prop._splat1TexName = splat1TexName; 
+        prop._splat2TexName = splat2TexName; 
+        prop._splat3TexName = splat3TexName; 
          
                  const instGeo = geometry.clone();
+                 instGeo.name = geometry.name || prop.name; 
                  
                  if (lmInfo && lmInfo.lightmapIndex >= 0 && lmInfo.lightmapScaleOffset) {
-                     const [sx, sy, ox, oy] = lmInfo.lightmapScaleOffset;
+                     const[sx, sy, ox, oy] = lmInfo.lightmapScaleOffset;
                      
                      if (instGeo.attributes.uv2) {
                          const uv2 = instGeo.attributes.uv2.clone();
@@ -1925,15 +2009,14 @@
                  matName1 = cleanStr(matName1);
                  matName2 = cleanStr(matName2);
          
-                 const exactKeys = [baseTexName, prop.name, baseName].filter(Boolean).map(s => s.toLowerCase());
+                 const exactKeys =[baseTexName, prop.name, baseName].filter(Boolean).map(s => s.toLowerCase());
                  const fuzzyKeys =[matName1, matName2].filter(Boolean).map(s => s.toLowerCase());
          
                  if (mapData.atlases) {
                      let found = false;
-                     for (const [aName, aInfo] of Object.entries(mapData.atlases)) {
-                         
+                     for (const[aName, aInfo] of Object.entries(mapData.atlases)) {
                          for (const [rectKey, rect] of Object.entries(aInfo.rects)) {
-                             const lowerKey = rectKey.toLowerCase();
+                             const lowerKey = rect.originalName.toLowerCase();
                              if (exactKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}` || lowerKey.endsWith(`_${pk}`))) {
                                  atlasRect = rect;
                                  atlasInfo = aInfo;
@@ -1943,9 +2026,8 @@
                              }
                          }
                          if (found) break;
-         
-                         for (const [rectKey, rect] of Object.entries(aInfo.rects)) {
-                             const lowerKey = rectKey.toLowerCase();
+                         for (const[rectKey, rect] of Object.entries(aInfo.rects)) {
+                             const lowerKey = rect.originalName.toLowerCase();
                              if (fuzzyKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}`)) {
                                  atlasRect = rect;
                                  atlasInfo = aInfo;
@@ -1957,34 +2039,49 @@
                          if (found) break;
                      }
                  }
+                 
+                 if (atlasRect) {
+                     prop._atlasRect = atlasRect;
+                     prop._atlasName = targetTexName;
+                     prop._atlasBaseUrl = window.currentMapBaseUrl;
+                 }
          
-                 const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}_LM${lmIdx}`;
-         
+                 const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}_LM${lmIdx}_${baseUrl}`;
                  if (materialCache.has(matCacheKey)) {
                      mat = materialCache.get(matCacheKey);
                  } else {
                      if (isTerrainMesh || hasControlMap) {
                          let texR = null, texG = null, texB = null, texA = null;
-         
                          if (matInfo && matInfo.texParams) {
                              const splat0 = matInfo.texParams.find(p => p.name === '_Splat0');
                              const splat1 = matInfo.texParams.find(p => p.name === '_Splat1');
                              const splat2 = matInfo.texParams.find(p => p.name === '_Splat2');
                              const splat3 = matInfo.texParams.find(p => p.name === '_Splat3');
                              
-                             if (splat0) texR = textureCache.get(splat0.texName);
-                             if (splat1) texG = textureCache.get(splat1.texName);
-                             if (splat2) texB = textureCache.get(splat2.texName);
-                             if (splat3) texA = textureCache.get(splat3.texName);
+                             if (splat0) texR = getTexFromCache(splat0.texName, matBaseUrl);
+                             if (splat1) texG = getTexFromCache(splat1.texName, matBaseUrl);
+                             if (splat2) texB = getTexFromCache(splat2.texName, matBaseUrl);
+                             if (splat3) texA = getTexFromCache(splat3.texName, matBaseUrl);
                          }
-         
-                         let tControl = textureCache.get(controlTexName);
-                         
+                         let tControl = getTexFromCache(controlTexName, matBaseUrl);
                          const maxAniso = renderer.capabilities.getMaxAnisotropy();
                          if (texR && texR.anisotropy !== maxAniso) texR.anisotropy = maxAniso;
                          if (texG && texG.anisotropy !== maxAniso) texG.anisotropy = maxAniso;
                          if (texB && texB.anisotropy !== maxAniso) texB.anisotropy = maxAniso;
                          if (texA && texA.anisotropy !== maxAniso) texA.anisotropy = maxAniso;
+                                           
+                        const forceRepeat = (tex) => {
+                            if (tex && (tex.wrapS !== THREE.RepeatWrapping || tex.wrapT !== THREE.RepeatWrapping)) {
+                                tex.wrapS = THREE.RepeatWrapping;
+                                tex.wrapT = THREE.RepeatWrapping;
+                                tex.needsUpdate = true;
+                            }
+                        };
+                        forceRepeat(texR);
+                        forceRepeat(texG);
+                        forceRepeat(texB);
+                        forceRepeat(texA);
+                       
          
                          mat = new THREE.MeshStandardMaterial({
                              roughness: 0.9,
@@ -2035,96 +2132,53 @@
                                  `#include <map_fragment>`,
                                  `
                                  vec4 control = texture2D(tControl, vUvControl);
-                                 
-         
                                  float w1 = control.r;
                                  float w2 = control.g;
                                  float w3 = control.b;
                                  float w4 = uHasSplat3 ? control.a : 0.0;
-                          
                                  vec3 dx = dFdx(vLocalPos);
                                  vec3 dy = dFdy(vLocalPos);
                                  vec3 geoNormal = normalize(cross(dx, dy));
-                          
                                  vec3 blendWeights = abs(geoNormal);
                                  blendWeights = pow(blendWeights, vec3(8.0));
                                  blendWeights /= dot(blendWeights, vec3(1.0));
-                                 
                                  float texScale = 1.0 / 500.0;
-                        
                                  vec2 uvX = vec2(vLocalPos.y, vLocalPos.z) * texScale;
                                  vec2 uvY = vec2(vLocalPos.x, vLocalPos.z) * texScale;
                                  vec2 uvZ = vec2(vLocalPos.x, vLocalPos.y) * texScale;
-                                 
-                                 vec4 colR = texture2D(tR, uvX) * blendWeights.x + 
-                                             texture2D(tR, uvY) * blendWeights.y + 
-                                             texture2D(tR, uvZ) * blendWeights.z;
-                                             
-                                 vec4 colG = texture2D(tG, uvX) * blendWeights.x + 
-                                             texture2D(tG, uvY) * blendWeights.y + 
-                                             texture2D(tG, uvZ) * blendWeights.z;
-                                             
-                                 vec4 colB = texture2D(tB, uvX) * blendWeights.x + 
-                                             texture2D(tB, uvY) * blendWeights.y + 
-                                             texture2D(tB, uvZ) * blendWeights.z;
-                                             
+                                 vec4 colR = texture2D(tR, uvX) * blendWeights.x + texture2D(tR, uvY) * blendWeights.y + texture2D(tR, uvZ) * blendWeights.z;
+                                 vec4 colG = texture2D(tG, uvX) * blendWeights.x + texture2D(tG, uvY) * blendWeights.y + texture2D(tG, uvZ) * blendWeights.z;
+                                 vec4 colB = texture2D(tB, uvX) * blendWeights.x + texture2D(tB, uvY) * blendWeights.y + texture2D(tB, uvZ) * blendWeights.z;
                                  vec4 colA = vec4(0.0);
                                  if (uHasSplat3) {
-                                     colA = texture2D(tA, uvX) * blendWeights.x + 
-                                            texture2D(tA, uvY) * blendWeights.y + 
-                                            texture2D(tA, uvZ) * blendWeights.z;
+                                     colA = texture2D(tA, uvX) * blendWeights.x + texture2D(tA, uvY) * blendWeights.y + texture2D(tA, uvZ) * blendWeights.z;
                                  }
-               
                                  vec4 splatColor = colR * w1 + colG * w2 + colB * w3 + colA * w4;
                                  float sum = w1 + w2 + w3 + w4;
-                          
-                                 if (sum > 0.001) {
-                                     splatColor = splatColor / sum; 
-                                 } else {
-                                     discard;
-                                 }
-                                 
+                                 if (sum > 0.001) { splatColor = splatColor / sum; } else { discard; }
                                  diffuseColor = vec4(splatColor.rgb, diffuseColor.a);
                                  `
                              );
                          };
-                         mat.customProgramCacheKey = function() {
-                             return "terrain_" + matCacheKey;
-                         };
+                         mat.customProgramCacheKey = function() { return "terrain_" + matCacheKey; };
                      } else {
                          mat = new THREE.MeshStandardMaterial({ 
-                             color: 0xffffff, 
-                             roughness: 0.85,
-                             metalness: 0.02,
-                             side: THREE.DoubleSide,
-                             transparent: false,
-                             alphaTest: 0.5,
-                             depthWrite: true
+                             color: 0xffffff, roughness: 0.85, metalness: 0.02,
+                             side: THREE.DoubleSide, transparent: false, alphaTest: 0.5, depthWrite: true
                          });
-         
                          if (targetTexName) {
-                             const diffTex = textureCache.get(targetTexName);
-                             if (diffTex) {
-                                 mat.map = diffTex;
-                             } else {
-                                 mat.color.setHex(0xaaaaaa);
-                                 mat.map = defaultTile; 
-                             }
+                             const diffTex = getTexFromCache(targetTexName, matBaseUrl);
+                             if (diffTex) mat.map = diffTex;
+                             else { mat.color.setHex(0xaaaaaa); mat.map = defaultTile; }
                          } else {
-                             mat.color.setHex(0xaaaaaa);
-                             mat.map = defaultTile;
+                             mat.color.setHex(0xaaaaaa); mat.map = defaultTile;
                          }
                      }
-                     
                      if (lmIdx >= 0 && lightmapData && lightmapData.lightmaps) {
                          const lmName = lightmapData.lightmaps[lmIdx];
-                         const lmTex = textureCache.get(lmName);
-                         if (lmTex) {
-                             mat.lightMap = lmTex;
-                             mat.lightMapIntensity = 2.0;
-                         }
+                         const lmTex = getTexFromCache(lmName, window.currentMapBaseUrl);
+                         if (lmTex) { mat.lightMap = lmTex; mat.lightMapIntensity = 2.0; }
                      }
-                     
                      materialCache.set(matCacheKey, mat);
                  }
          
@@ -2134,7 +2188,6 @@
                      let sy = atlasRect.h / atlasInfo.height;
                      let ox = atlasRect.x / atlasInfo.width;
                      let oy = atlasRect.y / atlasInfo.height;
-                     
                      for(let u=0; u<uv.array.length; u+=2) {
                          uv.array[u] = uv.array[u] * sx + ox;
                          uv.array[u+1] = uv.array[u+1] * sy + oy;
@@ -2158,7 +2211,6 @@
                          const pz = Math.round(prop.pos[2] / snap) * snap;
                          instanceKey = `${baseName}_${px}_${py}_${pz}`;
                      }
-                     
                      if (!originalInstancesMap.has(instanceKey)) {
                          const grp = new THREE.Group();
                          grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
@@ -2167,7 +2219,6 @@
                          grp.userData.originalProps =[];
                          originalInstancesMap.set(instanceKey, grp);
                      }
-                     
                      const instanceGroup = originalInstancesMap.get(instanceKey);
                      instanceGroup.userData.originalProps.push(prop);
                      
@@ -2176,11 +2227,8 @@
                          sceneMesh.castShadow = shadowSettings[prop.id].cast;
                          sceneMesh.receiveShadow = shadowSettings[prop.id].receive;
                      }
-                     
                      const rootMatrix = new THREE.Matrix4().compose(
-                         instanceGroup.position,
-                         instanceGroup.quaternion,
-                         new THREE.Vector3(1, 1, 1)
+                         instanceGroup.position, instanceGroup.quaternion, new THREE.Vector3(1, 1, 1)
                      );
                      const propMatrix = new THREE.Matrix4().compose(
                          new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
@@ -2188,7 +2236,6 @@
                          new THREE.Vector3(1, 1, 1)
                      );
                      const localMatrix = propMatrix.premultiply(rootMatrix.invert());
-                     
                      localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
                      instanceGroup.add(sceneMesh);
                  }
@@ -2201,57 +2248,39 @@
                          group.userData.rootRot = new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
                          prefabs.set(baseName, group);
                      }
-                     
                      const group = prefabs.get(baseName);
                      const currentPos = new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]);
                      const dist = group.userData.rootPos.distanceTo(currentPos);
-                     
                      if (dist < 3000) {
                          globalLoadedProps.add(prop.name);
                          group.userData.originalProps.push(prop);
-         
                          const rootMatrix = new THREE.Matrix4().compose(
-                             group.userData.rootPos,
-                             new THREE.Quaternion().setFromEuler(group.userData.rootRot),
-                             new THREE.Vector3(1, 1, 1)
+                             group.userData.rootPos, new THREE.Quaternion().setFromEuler(group.userData.rootRot), new THREE.Vector3(1, 1, 1)
                          );
-                         
                          const propMatrix = new THREE.Matrix4().compose(
-                             currentPos,
-                             new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
-                             new THREE.Vector3(1, 1, 1)
+                             currentPos, new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')), new THREE.Vector3(1, 1, 1)
                          );
-         
                          const localMatrix = propMatrix.premultiply(rootMatrix.invert());
-                         
                          const localPos = new THREE.Vector3();
                          const localQuat = new THREE.Quaternion();
                          localMatrix.decompose(localPos, localQuat, new THREE.Vector3());
-         
                          prefabMesh.position.copy(localPos);
                          prefabMesh.quaternion.copy(localQuat);
-                         
                          group.add(prefabMesh);
                      }
                  }
              }
              if (buildWorld && originalMapGroup) {
-                 for (const grp of originalInstancesMap.values()) {
-                     originalMapGroup.add(grp);
-                 }
+                 for (const grp of originalInstancesMap.values()) originalMapGroup.add(grp);
              }
-             
              const sortedBaseNames = Array.from(prefabs.keys()).sort();
              sortedBaseNames.forEach(baseName => {
-                 if (!thumbnailItems.find(t => t.baseName === baseName)) {
-                     addPrefabToUI(baseName, prefabs.get(baseName));
-                 }
+                 if (!thumbnailItems.find(t => t.baseName === baseName)) addPrefabToUI(baseName, prefabs.get(baseName));
              });
          }
          
          async function renderMapList() {
              const list = document.getElementById('map-list');
-             
              list.innerHTML = `
                  <div style="padding: 24px; text-align: center; color: var(--md-sys-color-on-surface-variant); display: flex; flex-direction: column; align-items: center; gap: 8px;">
                      <span class="material-symbols-rounded" style="animation: spin 2s linear infinite;">sync</span>
@@ -2259,12 +2288,10 @@
                      <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
                  </div>
              `;
-         
              try {
                  const response = await fetch(EXTERNAL_MAPS_JSON_URL);
                  if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
                  const data = await response.json();
-         
                  list.innerHTML = '';
                  data.forEach(category => {
                      category.subgroups.forEach(subgroup => {
@@ -2275,16 +2302,13 @@
                          subTitle.style.fontWeight = '500';
                          subTitle.innerText = subgroup.name;
                          list.appendChild(subTitle);
-         
                          subgroup.maps.forEach(map => {
                              const item = document.createElement('div');
                              item.className = 'map-item';
                              item.innerHTML = `
                                  <span class="map-item-title">${map.name}</span>
                                  <div class="progress-container" style="display:none; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);">
-                                     <div class="circular-progress">
-                                         <span class="circular-progress-text">0%</span>
-                                     </div>
+                                     <div class="circular-progress"><span class="circular-progress-text">0%</span></div>
                                  </div>
                              `;
                              item.onclick = () => loadMapLibrary(map.name, map.url, item, category.libraryJsonUrl);
@@ -2292,9 +2316,7 @@
                          });
                      });
                  });
-         
              } catch (error) {
-                 console.error("Failed to load map list:", error);
                  list.innerHTML = `
                      <div style="padding: 16px; text-align: center; background: rgba(255,102,102,0.1); border: 1px solid var(--md-sys-color-error); border-radius: 12px; margin: 0 12px;">
                          <span class="material-symbols-rounded" style="color: var(--md-sys-color-error); margin-bottom: 8px; font-size: 32px;">wifi_off</span>
@@ -2308,20 +2330,21 @@
              document.getElementById('prefab-list').innerHTML = '';
              prefabs.clear();
              thumbnailItems.length = 0;
-             
              textureCache.clear();
              modelCache.clear();
              propDictCache = null;
              window.loadedLibraries.clear();
              globalLoadedProps.clear();
-             
+             clearSceneOnly();
+         }
+         
+         function clearSceneOnly() {
              if (ghost) {
                  editorGroup.remove(ghost);
                  ghost = null;
                  currentPrefabGroup = null;
                  document.querySelector('.grid-floating-panel').style.display = 'none';
              }
-             
              while (editorGroup.children.length > 0) {
                  let child = editorGroup.children[0];
                  editorGroup.remove(child);
@@ -2329,26 +2352,31 @@
          }
          
          async function loadMapLibrary(mapName, mapUrl, itemElement, libraryJsonUrl) {
-             if (itemElement.classList.contains('loading')) return;
-             resetEditorState();
-         
-             itemElement.classList.add('loading');
-             const progContainer = itemElement.querySelector('.progress-container');
-             const progCirc = itemElement.querySelector('.circular-progress');
-             const progText = itemElement.querySelector('.circular-progress-text');
-             progContainer.style.display = 'block';
-         
-             const updateUI = (percent) => {
-                 const p = Math.floor(percent * 100);
-                 progCirc.style.background = `conic-gradient(var(--md-sys-color-primary) ${p}%, transparent ${p}%)`;
-                 progText.innerText = `${p}%`;
-             };
-             updateUI(0);
+             if (itemElement && itemElement.classList.contains('loading')) return;
+             document.getElementById('prefab-list').innerHTML = '';
+             thumbnailItems.length = 0;
+             prefabs.clear();
+             globalLoadedProps.clear();
+             
+             if (itemElement) {
+                 itemElement.classList.add('loading');
+                 const progContainer = itemElement.querySelector('.progress-container');
+                 const progCirc = itemElement.querySelector('.circular-progress');
+                 const progText = itemElement.querySelector('.circular-progress-text');
+                 if(progContainer) progContainer.style.display = 'block';
+                 var updateUI = (percent) => {
+                     const p = Math.floor(percent * 100);
+                     if(progCirc) progCirc.style.background = `conic-gradient(var(--md-sys-color-primary) ${p}%, transparent ${p}%)`;
+                     if(progText) progText.innerText = `${p}%`;
+                 };
+                 updateUI(0);
+             } else {
+                 var updateUI = () => {};
+             }
          
              try {
                  window.currentLibraryUrl = libraryJsonUrl || null;
                  window.currentLibraryBaseUrl = window.currentLibraryUrl ? window.currentLibraryUrl.substring(0, window.currentLibraryUrl.lastIndexOf('/')) : null;
-         
                  const baseUrl = mapUrl.substring(0, mapUrl.lastIndexOf('/'));
                  window.currentMapBaseUrl = baseUrl;
          
@@ -2362,9 +2390,7 @@
                      const lmBuf = await fetchFile(`${baseUrl}/lightmapdata`);
                      lightmapData = parseLightmapData(lmBuf);
                      applyLightmapData(lightmapData);
-                 } catch (e) {
-                     console.warn("No lightmapdata found or failed to parse");
-                 }
+                 } catch (e) { console.warn("No lightmapdata found"); }
                  window.currentLightmapData = lightmapData;
          
                  await processMap(mapData, false, (p) => updateUI(0.15 + p * 0.85), lightmapData);
@@ -2373,15 +2399,20 @@
                  setTimeout(() => {
                      document.getElementById('view-maps').style.display = 'none';
                      document.getElementById('view-props').style.display = 'flex';
-                     itemElement.classList.remove('loading');
-                     progContainer.style.display = 'none';
+                     if (itemElement) {
+                         itemElement.classList.remove('loading');
+                         const progContainer = itemElement.querySelector('.progress-container');
+                         if(progContainer) progContainer.style.display = 'none';
+                     }
                  }, 400);
-         
              } catch (e) {
                  console.error(e);
                  showToast(`Failed to load ${mapName}`);
-                 itemElement.classList.remove('loading');
-                 progContainer.style.display = 'none';
+                 if (itemElement) {
+                     itemElement.classList.remove('loading');
+                     const progContainer = itemElement.querySelector('.progress-container');
+                     if(progContainer) progContainer.style.display = 'none';
+                 }
              }
          }
          
@@ -2391,9 +2422,7 @@
                  setupEditorGroup();
                  await renderMapList();
                  setupUIEvents();
-             } catch (e) {
-                 console.error("Fatal initialization error:", e);
-             }
+             } catch (e) { console.error("Fatal initialization error:", e); }
          }
          
          document.addEventListener('visibilitychange', () => {
@@ -2403,13 +2432,10 @@
                  if (clock) clock.start();
                  setTimeout(() => {
                      window.dispatchEvent(new Event('resize'));
-                     
                      if (thumbnailItems && thumbnailItems.length > 0) {
                          for (const item of thumbnailItems) {
                              item.model.traverse((child) => {
-                                 if (child.isMesh && child.material) {
-                                     child.material.needsUpdate = true;
-                                 }
+                                 if (child.isMesh && child.material) child.material.needsUpdate = true;
                              });
                          }
                      }
@@ -2417,13 +2443,27 @@
              }
          });
          
+        function getDecimalPrefix(url) {
+            if (!url) return 'common';
+            let folder = url.split('/').pop();
+            if (folder === 'null' || !folder) return 'common';
+            
+            if (/^[0-7]+$/.test(folder)) {
+                try {
+                    return BigInt("0o" + folder).toString(10);
+                } catch(e) {
+                    return folder;
+                }
+            }
+            return folder;
+        }
+        
          async function generateMapBin() {
              if (!window.repackingData) throw new Error("Repacking data not initialized");
-             
              const newPropBits =[];
              const bw = new BinaryWriter();
              const propsToWrite =[];
-           
+             let idMapping = new Map();
              let globalIdCounter = 0; 
            
              let originalMapGrp = editorGroup.children.find(c => c.userData.isOriginalMapGroup);
@@ -2435,20 +2475,18 @@
                              const mesh = child.children[meshIdx++];
                              const partMatrix = new THREE.Matrix4().multiplyMatrices(child.matrixWorld, mesh.matrix);
                              const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
-                             
-                             const pos = new THREE.Vector3();
-                            const quat = new THREE.Quaternion();
-                            const scl = new THREE.Vector3();
-                            rawMatrix.decompose(pos, quat, scl);
-                            const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
-         
-                            propsToWrite.push({
-                                ...origProp,
-                                id: globalIdCounter++,
-                                pos:[pos.x, pos.y, pos.z],
-                                rot:[euler.x, euler.y, euler.z],
-                                scale:[scl.x, scl.y, scl.z]
-                            });
+                             const pos = new THREE.Vector3(); const quat = new THREE.Quaternion(); const scl = new THREE.Vector3();
+                             rawMatrix.decompose(pos, quat, scl);
+                             const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
+                             propsToWrite.push({
+                                 ...origProp,
+                                 id: globalIdCounter,
+                                 pos:[pos.x, pos.y, pos.z],
+                                 rot:[euler.x, euler.y, euler.z],
+                                 scale:[scl.x, scl.y, scl.z]
+                             });
+                             idMapping.set(origProp.id, globalIdCounter);
+                             globalIdCounter++;
                          }
                      }
                  }
@@ -2457,99 +2495,174 @@
              let instanceIndex = 1;
              for (const child of editorGroup.children) {
                  if (child === ghost || child.userData.isOriginalMapGroup) continue;  
-                 
                  if (child.userData.originalProps) {
                      let meshIdx = 0;
                      for (const origProp of child.userData.originalProps) {
                          const mesh = child.children[meshIdx++];
                          const partMatrix = new THREE.Matrix4().multiplyMatrices(child.matrixWorld, mesh.matrix);
                          const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
-                         
-                         const pos = new THREE.Vector3();
-                        const quat = new THREE.Quaternion();
-                        const scl = new THREE.Vector3();
-                        rawMatrix.decompose(pos, quat, scl);
-                        const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
-         
-                        let outGrpName = origProp.grpName;
-                        if (outGrpName && outGrpName !== "") {
-                            outGrpName = outGrpName + "_inst" + instanceIndex;
-                        }
-                        propsToWrite.push({
+                         const pos = new THREE.Vector3(); const quat = new THREE.Quaternion(); const scl = new THREE.Vector3();
+                         rawMatrix.decompose(pos, quat, scl);
+                         const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
+                         let outGrpName = origProp.grpName;
+                         if (outGrpName && outGrpName !== "") outGrpName = outGrpName + "_inst" + instanceIndex;
+                         propsToWrite.push({
                             ...origProp,
                             grpName: outGrpName,
-                            id: globalIdCounter++,
+                            id: globalIdCounter,
                             pos:[pos.x, pos.y, pos.z],
                             rot:[euler.x, euler.y, euler.z],
-                            scale: [scl.x, scl.y, scl.z]
-                        });
+                            scale:[scl.x, scl.y, scl.z]
+                         });
+                         idMapping.set(origProp.id, globalIdCounter);
+                         globalIdCounter++;
                      }
                      instanceIndex++;
                  }
              }
              
-             bw.writeStringLength(propsToWrite.length);
+             let newConsumedBits =[...window.repackingData.consumedBitsBeforeMaterials];
+             let finalPreMatBytes = window.repackingData.preMatBytes;
+             
+             if (newConsumedBits[window.repackingData.atlasBitIndex] === true) {
+                 newConsumedBits[window.repackingData.atlasBitIndex] = false;
+                 const p1 = finalPreMatBytes.slice(0, window.repackingData.atlasStart);
+                 const p2 = finalPreMatBytes.slice(window.repackingData.atlasEnd);
+                 const combined = new Uint8Array(p1.length + p2.length);
+                 combined.set(p1, 0); combined.set(p2, p1.length);
+                 finalPreMatBytes = combined;
+             }
+
+             window.dynamicAtlasesToSlice = []; 
+             let nextMatID = 0;
+             const newMaterials = [];
+             const rectNameToMatID = new Map();
+             
              for (const p of propsToWrite) {
-                 if (p.grpName && p.grpName !== "") {
-                     newPropBits.push(true);
-                     bw.writeString(p.grpName);
-                 } else {
-                     newPropBits.push(false);
-                 }
-                 
-                 bw.writeUint32(p.id, false);
-                 bw.writeString(p.libName);
-                 bw.writeUint32(p.matID, false);
-                 bw.writeString(p.name);
-                 
-                 bw.writeFloat32(p.pos[0], false);
-                 bw.writeFloat32(p.pos[1], false);
-                 bw.writeFloat32(p.pos[2], false);
-           
-                 const isRotZero = (Math.abs(p.rot[0]) < 1e-5 && Math.abs(p.rot[1]) < 1e-5 && Math.abs(p.rot[2]) < 1e-5);
-                 if (!isRotZero) {
-                     newPropBits.push(true);
-                     bw.writeFloat32(p.rot[0], false);
-                     bw.writeFloat32(p.rot[1], false);
-                     bw.writeFloat32(p.rot[2], false);
-                 } else {
-                     newPropBits.push(false);
-                 }
-           
-                 const isScaleOne = (Math.abs(p.scale[0]-1) < 1e-5 && Math.abs(p.scale[1]-1) < 1e-5 && Math.abs(p.scale[2]-1) < 1e-5);
-                 if (!isScaleOne) {
-                     newPropBits.push(true);
-                     bw.writeFloat32(p.scale[0], false);
-                     bw.writeFloat32(p.scale[1], false);
-                     bw.writeFloat32(p.scale[2], false);
-                 } else {
-                     newPropBits.push(false);
+                 let libFolder = getDecimalPrefix(p._baseUrl);
+
+                 if (p._controlTexName) {
+                     const applyPrefix = (texName) => {
+                         if (!texName) return null;
+                         let baseName = texName.split('/').pop();
+                         return baseName.startsWith(libFolder + "_") ? baseName : `${libFolder}_${baseName}`;
+                     };
+
+                     let pCtrl = applyPrefix(p._controlTexName);
+                     let pS0 = applyPrefix(p._splat0TexName);
+                     let pS1 = applyPrefix(p._splat1TexName);
+                     let pS2 = applyPrefix(p._splat2TexName);
+                     let pS3 = applyPrefix(p._splat3TexName);
+
+                     let matKey = `TERRAIN_${pCtrl}_${pS0}_${pS1}_${pS2}_${pS3}`;
+                     if (!rectNameToMatID.has(matKey)) {
+                         rectNameToMatID.set(matKey, nextMatID);
+                         let texParams = [{ name: "_Control", texName: pCtrl }];
+                         if (pS0) texParams.push({ name: "_Splat0", texName: pS0 });
+                         if (pS1) texParams.push({ name: "_Splat1", texName: pS1 });
+                         if (pS2) texParams.push({ name: "_Splat2", texName: pS2 });
+                         if (pS3) texParams.push({ name: "_Splat3", texName: pS3 });
+
+                         newMaterials.push({ 
+                             id: nextMatID, 
+                             name: `Terrain_Auto_${nextMatID}`, 
+                             shader: "TankiOnline/Terrain", 
+                             texParams: texParams 
+                         });
+                         nextMatID++;
+                     }
+                     p.matID = rectNameToMatID.get(matKey);
+
+                                  } else if (p._atlasRect) {
+                     let atlasFolder = getDecimalPrefix(p._atlasBaseUrl);
+                     let uniqueTexName = `${atlasFolder}_${p._atlasRect.originalName}`;
+                     let rectKey = `${p._atlasBaseUrl}_${p._atlasRect.originalName}`;
+                     if (!rectNameToMatID.has(rectKey)) {
+                         rectNameToMatID.set(rectKey, nextMatID);
+                         newMaterials.push({ 
+                             id: nextMatID, name: uniqueTexName, shader: "TankiOnline/SingleTextureShader", 
+                             texParams: [{ name: "_MainTex", texName: uniqueTexName }] 
+                         });
+                         window.dynamicAtlasesToSlice.push({ 
+                             atlas: p._atlasName, rect: p._atlasRect, baseUrl: p._atlasBaseUrl, exportName: uniqueTexName
+                         });
+                         nextMatID++;
+                     }
+                     p.matID = rectNameToMatID.get(rectKey); 
+                     
+                 } else if (p._baseTexName) {
+                     let baseName = p._baseTexName.split('/').pop();
+                     let uniqueTexName = baseName.startsWith(libFolder + "_") ? baseName : `${libFolder}_${baseName}`;
+                     let texKey = `${p._baseUrl}_${baseName}`;
+                     if (!rectNameToMatID.has(texKey)) {
+                         rectNameToMatID.set(texKey, nextMatID);
+                         newMaterials.push({ 
+                             id: nextMatID, name: uniqueTexName, shader: "TankiOnline/SingleTextureShader", 
+                             texParams: [{ name: "_MainTex", texName: uniqueTexName }] 
+                         });
+                         nextMatID++;
+                     }
+                     p.matID = rectNameToMatID.get(texKey);
                  }
              }
+
+             bw.writeStringLength(propsToWrite.length);
+             for (const p of propsToWrite) {
+                 if (p.grpName && p.grpName !== "") { newPropBits.push(true); bw.writeString(p.grpName); } else { newPropBits.push(false); }
+                 bw.writeUint32(p.id, false);
+                 bw.writeString("");
+                 bw.writeUint32(p.matID, false); 
+                 bw.writeString(p.name);
+                 bw.writeFloat32(p.pos[0], false); bw.writeFloat32(p.pos[1], false); bw.writeFloat32(p.pos[2], false);
+                 const isRotZero = (Math.abs(p.rot[0]) < 1e-5 && Math.abs(p.rot[1]) < 1e-5 && Math.abs(p.rot[2]) < 1e-5);
+                 if (!isRotZero) { newPropBits.push(true); bw.writeFloat32(p.rot[0], false); bw.writeFloat32(p.rot[1], false); bw.writeFloat32(p.rot[2], false); } else { newPropBits.push(false); }
+                 const isScaleOne = (Math.abs(p.scale[0]-1) < 1e-5 && Math.abs(p.scale[1]-1) < 1e-5 && Math.abs(p.scale[2]-1) < 1e-5);
+                 if (!isScaleOne) { newPropBits.push(true); bw.writeFloat32(p.scale[0], false); bw.writeFloat32(p.scale[1], false); bw.writeFloat32(p.scale[2], false); } else { newPropBits.push(false); }
+             }
              
+                          const matBw = new BinaryWriter();
+             matBw.writeStringLength(newMaterials.length); 
+             
+             for (const nMat of newMaterials) {
+                 matBw.writeUint32(nMat.id, false);
+                 matBw.writeString(nMat.name);
+                 newConsumedBits.push(false); 
+                 matBw.writeString(nMat.shader); 
+                 
+                 matBw.writeStringLength(nMat.texParams.length); 
+                 for (let tp of nMat.texParams) {
+                     newConsumedBits.push(false); 
+                     matBw.writeString(tp.name);  
+                     matBw.writeString(tp.texName); 
+                 }
+                 
+                 newConsumedBits.push(false); 
+                 newConsumedBits.push(false); 
+                 newConsumedBits.push(false); 
+             }
+
              const finalBits =[
-                 ...window.repackingData.consumedBitsBeforeProps, 
-                 ...newPropBits,
+                 ...newConsumedBits, 
+                 ...window.repackingData.postMatBits,
+                 ...newPropBits, 
                  ...window.repackingData.suffixBits
              ];
              const header = packHeader(finalBits);
              
-             const uncompressedLen = header.headerPrefix.length + 
-                                     header.extBytes.length + 
-                                     window.repackingData.prefixBytes.length + 
-                                     bw.length + 
-                                     window.repackingData.suffixBytes.length; 
-             
+             const uncompressedLen = header.headerPrefix.length + header.extBytes.length + finalPreMatBytes.length + matBw.length + window.repackingData.postMatBytes.length + bw.length + window.repackingData.suffixBytes.length; 
              const uncompressed = new Uint8Array(uncompressedLen);
              let offset = 0;
              
              uncompressed.set(header.headerPrefix, offset); offset += header.headerPrefix.length;
              uncompressed.set(header.extBytes, offset); offset += header.extBytes.length;
-             uncompressed.set(window.repackingData.prefixBytes, offset); offset += window.repackingData.prefixBytes.length;
+             uncompressed.set(finalPreMatBytes, offset); offset += finalPreMatBytes.length;
+             uncompressed.set(matBw.toUint8Array(), offset); offset += matBw.length;
+             uncompressed.set(window.repackingData.postMatBytes, offset); offset += window.repackingData.postMatBytes.length;
              uncompressed.set(bw.toUint8Array(), offset); offset += bw.length; 
              uncompressed.set(window.repackingData.suffixBytes, offset); 
              
-             return await wrapPacketCompressed(uncompressed);
+             const binZipped = await wrapPacketCompressed(uncompressed);
+             return { binData: binZipped, propsToWrite, idMapping };
          }
          
          window.selectPrefab = function(baseName) {
@@ -2558,11 +2671,8 @@
                      editorGroup.remove(ghost);
                      ghost = null;
                      if (window.originalObjectBeingMoved) {
-                         if (window.originalObjectParent) {
-                             window.originalObjectParent.add(window.originalObjectBeingMoved);
-                         } else {
-                             editorGroup.add(window.originalObjectBeingMoved);
-                         }
+                         if (window.originalObjectParent) window.originalObjectParent.add(window.originalObjectBeingMoved);
+                         else editorGroup.add(window.originalObjectBeingMoved);
                          window.originalObjectBeingMoved = null;
                          window.originalObjectParent = null;
                      }
@@ -2571,7 +2681,6 @@
                  window.isContinuousCopyEnabled = false;
                  const copyBtn = document.getElementById('continuous-copy-btn');
                  if (copyBtn) copyBtn.className = 'm3-btn m3-btn-secondary';
-                 
                  window.dragMode = 'none';
                  if (window.updateDragModeUI) window.updateDragModeUI();
          
@@ -2581,7 +2690,6 @@
                  if (currentPrefabGroup) {
                      ghost = currentPrefabGroup.clone();
                      ghost.rotation.order = 'ZYX';
-                     
                      ghost.traverse(child => {
                          if (child.isMesh && child.material) {
                              try {
@@ -2604,19 +2712,14 @@
                                      child.material.depthWrite = false;
                                      child.userData.origColor = child.material.color ? child.material.color.getHex() : 0xffffff;
                                  }
-                             } catch (matErr) {
-                                 console.warn("Material cloning bypassed for safety", matErr);
-                             }
+                             } catch (matErr) { console.warn("Material cloning bypassed for safety", matErr); }
                          }
                      });
                      editorGroup.add(ghost);
-                     if (!window.isGhostLockedToOriginal) {
-                         updateGhost(currentMousePos.x, currentMousePos.y);
-                     }
+                     if (!window.isGhostLockedToOriginal) updateGhost(currentMousePos.x, currentMousePos.y);
                      const fp = document.querySelector('.grid-floating-panel');
                      if (fp) fp.style.display = 'flex';
                  }
-         
                  if (isTouchDevice) {
                      isUIOpen = false;
                      const ui = document.getElementById('ui-container');
@@ -2631,6 +2734,22 @@
          function setupUIEvents() {
              const uiContainer = document.getElementById('ui-container');
              const menuToggle = document.getElementById('menu-toggle');
+             const prefabList = document.getElementById('prefab-list');
+             const propsHeader = document.getElementById('props-header');
+             let lastScrollY = 0;
+             prefabList.addEventListener('scroll', () => {
+                 if (!isTouchDevice) {
+                     propsHeader.style.transform = 'translateY(0)';
+                     return;
+                 }
+                 const currentScrollY = prefabList.scrollTop;
+                 if (currentScrollY > lastScrollY && currentScrollY > 60) {
+                     propsHeader.style.transform = 'translateY(-100%)';
+                 } else {
+                     propsHeader.style.transform = 'translateY(0)';
+                 }
+                 lastScrollY = currentScrollY;
+             });
              const rotateBtn = document.getElementById('rotate-btn');
              const exportBtn = document.getElementById('export-btn');
              const importBtn = document.getElementById('import-btn');
@@ -2654,7 +2773,6 @@
                  if (dialogDescText) dialogDescText.innerText = desc;
                  if (dialogConfirmBtn) dialogConfirmBtn.innerText = confirmText;
                  currentDialogAction = actionCallback;
-                 
                  dialogOverlay.style.display = 'flex';
                  void dialogOverlay.offsetWidth;
                  dialogOverlay.style.opacity = '1';
@@ -2677,85 +2795,43 @@
              const backToMapsBtn = document.getElementById('back-to-maps-btn');
              if (backToMapsBtn) {
                  backToMapsBtn.addEventListener('click', () => {
-                     showDialog(
-                         "Leave Map",
-                         "Are you sure you want to go back? All unsaved placed props will be lost.",
-                         "Leave",
-                         () => {
-                             resetEditorState();
-                             document.getElementById('view-props').style.display = 'none';
-                             document.getElementById('view-maps').style.display = 'flex';
-                         }
-                     );
+                     document.getElementById('view-props').style.display = 'none';
+                     document.getElementById('view-maps').style.display = 'flex';
                  });
              }
          
              clearBtn.addEventListener('click', () => {
-                 showDialog(
-                     "Clear Scene", 
-                     "Are you sure you want to delete all objects in the scene? This action cannot be undone.", 
-                     "Delete",
-                     () => {
-                         while(editorGroup.children.length > 0) {
-                             editorGroup.remove(editorGroup.children[0]);
-                         }
-                         
-                         if (ghost) {
-                             ghost = null;
-                             window.isGhostLockedToOriginal = false;
-                         }
-                         
-                         window.originalObjectBeingMoved = null;
-                         window.originalObjectParent = null;
-                         
-                         document.querySelector('.grid-floating-panel').style.display = 'none';
-                     }
-                 );
+                 showDialog("Clear Scene", "Are you sure you want to delete all objects in the scene?", "Delete", () => { clearSceneOnly(); });
              });
          
              loadOriginalBtn.addEventListener('click', () => {
-                 if (!window.currentMapData) {
-                     showToast("No original map data available.");
-                     return;
-                 }
-                 
-                 showDialog(
-                     "Load Original Map", 
-                     "Are you sure you want to clear the current scene and load the original map layout? This action cannot be undone.", 
-                     "Load Map",
-                     async () => {
-                         try {
-                             await processMap(window.currentMapData, true, null, window.currentLightmapData);
-               
-                             if (editorGroup) {
-                                 editorGroup.updateMatrixWorld(true);
-                                 const box = new THREE.Box3().setFromObject(editorGroup, true);
-                                 if (!box.isEmpty() && box.min.x !== Infinity) {
-                                     const center = box.getCenter(new THREE.Vector3());
-                                     const size = box.getSize(new THREE.Vector3());
-                                     const maxDim = Math.max(size.x, size.z);
-                                     const fov = camera.fov * (Math.PI / 180);
-                                     let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                                     cameraDistance = Math.max(cameraDistance, 50) * 1.2;
-                                     camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
-                                     camera.lookAt(center);
-                                 }
+                 if (!window.currentMapData) { showToast("No original map data available."); return; }
+                 showDialog("Load Original Map", "Are you sure you want to load the original map layout?", "Load Map", async () => {
+                     try {
+                         await processMap(window.currentMapData, true, null, window.currentLightmapData);
+                         if (editorGroup) {
+                             editorGroup.updateMatrixWorld(true);
+                             const box = new THREE.Box3().setFromObject(editorGroup, true);
+                             if (!box.isEmpty() && box.min.x !== Infinity) {
+                                 const center = box.getCenter(new THREE.Vector3());
+                                 const size = box.getSize(new THREE.Vector3());
+                                 const maxDim = Math.max(size.x, size.z);
+                                 const fov = camera.fov * (Math.PI / 180);
+                                 let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                                 cameraDistance = Math.max(cameraDistance, 50) * 1.2;
+                                 camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
+                                 camera.lookAt(center);
                              }
-                             showToast("Original map loaded successfully!", false);
-                         } catch (err) {
-                             console.error(err);
-                             showToast("Failed to load original map.");
                          }
-                     }
-                 );
+                         showToast("Original map loaded successfully!", false);
+                     } catch (err) { console.error(err); showToast("Failed to load original map."); }
+                 });
              });
          
              function updateDragModeUI() {
                  rotateBtn.className = window.dragMode === 'rotate' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
                  gridZBtn.className = window.dragMode === 'gridZ' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
-                 if (controls) {
-                     controls.dragToLook = window.dragMode === 'none';
-                 }
+                 if (controls) controls.dragToLook = window.dragMode === 'none';
              }
              window.updateDragModeUI = updateDragModeUI;
          
@@ -2767,8 +2843,7 @@
                      isLongPress = false;
                      if (e.pointerId) btn.setPointerCapture(e.pointerId);
                      timer = setTimeout(() => {
-                         isLongPress = true;
-                         onLongPress();
+                         isLongPress = true; onLongPress();
                          if ('vibrate' in navigator) navigator.vibrate(50);
                      }, 500);
                  });
@@ -2786,144 +2861,158 @@
              }
          
              setupBtnPress(rotateBtn, 
-                 () => {
-                     window.dragMode = window.dragMode === 'rotate' ? 'none' : 'rotate';
-                     updateDragModeUI();
-                 },
+                 () => { window.dragMode = window.dragMode === 'rotate' ? 'none' : 'rotate'; updateDragModeUI(); },
                  () => {
                      if (window.rotateButtonMode === 'horizontal') {
-                         window.rotateButtonMode = 'free';
-                         rotateBtn.querySelector('span').innerText = '3d_rotation';
-                         rotateBtn.title = "Toggle Free Rotate (Long press to switch)";
-                         showToast("Switched to Free Rotate Mode", false);
+                         window.rotateButtonMode = 'free'; rotateBtn.querySelector('span').innerText = '3d_rotation'; rotateBtn.title = "Toggle Free Rotate"; showToast("Switched to Free Rotate Mode", false);
                      } else {
-                         window.rotateButtonMode = 'horizontal';
-                         rotateBtn.querySelector('span').innerText = 'rotate_right';
-                         rotateBtn.title = "Toggle Horizontal Rotate (Long press to switch)";
-                         showToast("Switched to Horizontal Rotate Mode", false);
+                         window.rotateButtonMode = 'horizontal'; rotateBtn.querySelector('span').innerText = 'rotate_right'; rotateBtn.title = "Toggle Horizontal Rotate"; showToast("Switched to Horizontal Rotate Mode", false);
                      }
                  }
              );
          
              setupBtnPress(gridZBtn, 
-                 () => {
-                     window.dragMode = window.dragMode === 'gridZ' ? 'none' : 'gridZ';
-                     updateDragModeUI();
-                 },
-                 () => {
-                     currentGridHeight = 0;
-                     document.getElementById('grid-height-display').innerText = '0';
-                     if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true);
-                     showToast("Grid Z Reset", false);
-                 }
+                 () => { window.dragMode = window.dragMode === 'gridZ' ? 'none' : 'gridZ'; updateDragModeUI(); },
+                 () => { currentGridHeight = 0; document.getElementById('grid-height-display').innerText = '0'; if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true); showToast("Grid Z Reset", false); }
              );
          
              function updateGridHeight(delta) {
                  currentGridHeight += delta;
                  gridHeightDisplay.innerText = Math.round(currentGridHeight);
-                 if (ghost) {
-                     updateGhost(currentMousePos.x, currentMousePos.y, true);
-                 }
+                 if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true);
              }
          
-             function updateUIState() {
-                 uiContainer.style.transform = isUIOpen ? 'translateX(0)' : 'translateX(100%)';
-             }
+             function updateUIState() { uiContainer.style.transform = isUIOpen ? 'translateX(0)' : 'translateX(100%)'; }
              updateUIState();
              
              window.addEventListener('resize', () => {
                  const w = window.innerWidth;
-                 if(isTouchDevice && w < 768) {
-                     isUIOpen = false;
-                 } else if(!isTouchDevice && w >= 768) {
-                     isUIOpen = true;
-                 }
+                 if(isTouchDevice && w < 768) { isUIOpen = false; } else if(!isTouchDevice && w >= 768) { isUIOpen = true; }
                  updateUIState();
              });
              
-             menuToggle.addEventListener('click', () => {
-                 isUIOpen = !isUIOpen;
-                 updateUIState();
-             });
+             menuToggle.addEventListener('click', () => { isUIOpen = !isUIOpen; updateUIState(); });
          
              const snapBtn = document.getElementById('snap-btn');
              snapBtn.addEventListener('click', () => {
-                 isSnapping = !isSnapping;
-                 snapBtn.className = isSnapping ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
+                 isSnapping = !isSnapping; snapBtn.className = isSnapping ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
              });
          
-             importBtn.addEventListener('click', () => {
-                 fileInput.click();
-                 if(isTouchDevice) { isUIOpen = false; updateUIState(); }
-             });
+             importBtn.addEventListener('click', () => { fileInput.click(); if(isTouchDevice) { isUIOpen = false; updateUIState(); } });
              
              fileInput.addEventListener('change', async (e) => {
                  const files = Array.from(e.target.files);
                  if (files.length === 0) return;
-                 
+                 const file = files[0];
                  try {
-                     const mapFile = files.find(f => f.name === 'map.bin' || f.name.endsWith('.bin'));
-                     const a3dFile = files.find(f => f.name === 'models.a3d' || f.name.endsWith('.a3d'));
-                     const lmFile = files.find(f => f.name === 'lightmapdata' || f.name.endsWith('.lightmapdata'));
-                     
-                     if (a3dFile) {
-                         const a3dBuf = await a3dFile.arrayBuffer();
-                         const a3dData = parseA3D(a3dBuf);
-                         modelCache.set('models.a3d', a3dData);
-                     }
-         
-                     for (const file of files) {
-                         if (file.name.endsWith('.webp') || file.name.endsWith('.png') || file.name.endsWith('.jpg')) {
-                             const url = URL.createObjectURL(file);
-                             let texName = file.name;
-                             texName = texName.substring(0, texName.lastIndexOf('.'));
-                             const isCtrl = texName.includes('-control') || texName.includes('_Control');
-                             const tex = await loadTextureDirect(url, false, isCtrl, false);
-                             if (tex) {
-                                 textureCache.set(texName, tex);
-                             }
+                     if (file.name.endsWith('.zip')) {
+                         showToast("Importing ZIP...", false);
+                         const zip = await JSZip.loadAsync(file);
+                         
+                         document.getElementById('prefab-list').innerHTML = '';
+                         thumbnailItems.length = 0; 
+                         prefabs.clear(); 
+                         globalLoadedProps.clear();
+                         
+                         const a3dFile = zip.file("models.a3d");
+                         if (a3dFile) {
+                             const a3dBuf = await a3dFile.async("arraybuffer");
+                             const a3dData = parseA3D(a3dBuf);
+                             modelCache.set('null/models.a3d', a3dData);
                          }
-                     }
-                     
-                     let lightmapData = null;
-                     if (lmFile) {
-                         try {
-                             const lmBuf = await lmFile.arrayBuffer();
+                         
+                         let lightmapData = null;
+                         const lmFile = zip.file("lightmapdata");
+                         if (lmFile) {
+                             const lmBuf = await lmFile.async("arraybuffer");
                              lightmapData = parseLightmapData(lmBuf);
                              applyLightmapData(lightmapData);
-                         } catch (err) {
-                             console.warn("Failed to parse local lightmapdata", err);
                          }
-                     }
-         
-                     if (mapFile) {
-                         const buffer = await mapFile.arrayBuffer();
-                         const mapData = await parseMapBin(buffer);
-                         window.currentMapData = mapData;
-                         window.currentLightmapData = lightmapData;
-                         await processMap(mapData, true, null, lightmapData);
                          
-                         if (editorGroup) {
-                             editorGroup.updateMatrixWorld(true);
-                             const box = new THREE.Box3().setFromObject(editorGroup, true);
-                             if (!box.isEmpty() && box.min.x !== Infinity) {
-                                 const center = box.getCenter(new THREE.Vector3());
-                                 const size = box.getSize(new THREE.Vector3());
-                                 const maxDim = Math.max(size.x, size.z);
-                                 const fov = camera.fov * (Math.PI / 180);
-                                 let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                                 cameraDistance = Math.max(cameraDistance, 50) * 1.2;
-                                 camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
-                                 camera.lookAt(center);
+                         for (const[name, zipEntry] of Object.entries(zip.files)) {
+                             if (name.endsWith('.webp') || name.endsWith('.png') || name.endsWith('.jpg')) {
+                                 const buf = await zipEntry.async("arraybuffer");
+                                 const baseName = name.split('/').pop();
+                                 window.rawFileCache.set(baseName, buf); 
+                                 const blob = new Blob([buf], { type: 'image/webp' });
+                                 const url = URL.createObjectURL(blob);
+                                 const texName = baseName.substring(0, baseName.lastIndexOf('.'));
+                                 const isCtrl = texName.includes('-control') || texName.includes('_Control');
+                                 
+                                 const loader = new THREE.TextureLoader();
+                                 await new Promise(res => {
+                                     loader.load(url, (tex) => {
+                                         tex.colorSpace = isCtrl ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
+                                         tex.flipY = false;
+                                         if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                                         textureCache.set(`null/${texName}`, tex);
+                                         res();
+                                     }, undefined, () => res());
+                                 });
                              }
                          }
-                     } else {
-                         showToast("No map.bin selected!");
-                     }
-                 } catch (err) {
-                     console.error(err);
-                     showToast("Failed to load map.");
-                 }
+                         
+                         const mapFile = zip.file("map.bin");
+                         if (mapFile) {
+                             const mapBuf = await mapFile.async("arraybuffer");
+                             const mapData = await parseMapBin(mapBuf);
+                             window.currentMapData = mapData;
+                             window.currentLightmapData = lightmapData;
+                             window.currentLibraryUrl = null; window.currentLibraryBaseUrl = null; window.currentMapBaseUrl = null;
+                             
+        
+                             await processMap(mapData, false, null, lightmapData);
+                             
+                             document.getElementById('view-maps').style.display = 'none';
+                             document.getElementById('view-props').style.display = 'flex';
+                             
+                             if (window.isReopeningZip) {
+                                 showToast("Library Loaded", false);"Library Loaded"
+                                 window.isReopeningZip = false;
+                             } else {
+                                 showToast("ZIP Import Successful!", false);
+                             }
+                             
+                             const pHeader = document.getElementById('props-header');
+                             if (pHeader) pHeader.style.transform = 'translateY(0)';
+
+                
+                             const customId = "custom-zip-" + file.name.replace(/[^a-zA-Z0-9]/g, '');
+                             if (!document.getElementById(customId)) {
+                                 const mapList = document.getElementById('map-list');
+                                 
+                                 if (!document.getElementById('custom-imports-title')) {
+                                     const subTitle = document.createElement('div');
+                                     subTitle.id = 'custom-imports-title';
+                                     subTitle.style.padding = '12px 12px 6px 12px';
+                                     subTitle.style.fontSize = '12px';
+                                     subTitle.style.color = 'var(--md-sys-color-tertiary)';
+                                     subTitle.style.fontWeight = '500';
+                                     subTitle.style.borderTop = '1px solid var(--md-sys-color-outline)';
+                                     subTitle.style.marginTop = '8px';
+                                     subTitle.innerText = 'Custom Imports';
+                                     mapList.appendChild(subTitle);
+                                 }
+
+                                 const customItem = document.createElement('div');
+                                 customItem.id = customId;
+                                 customItem.className = 'map-item';
+                                 customItem.innerHTML = `<span class="map-item-title">📦 ${file.name}</span>`;
+                                 
+                                 customItem.onclick = () => {
+                                     window.isReopeningZip = true;
+                                     const dt = new DataTransfer();
+                                     dt.items.add(file);
+                                     fileInput.files = dt.files;
+                                     fileInput.dispatchEvent(new Event('change'));
+                                 };
+                                 mapList.appendChild(customItem);
+                             }
+                             document.querySelectorAll('.map-item').forEach(el => el.classList.remove('loading'));
+    
+                         } else { showToast("No map.bin inside ZIP!"); }
+                     } else { showToast("Please select a .zip package.", true); }
+                 } catch (err) { console.error(err); showToast("Failed to load map."); }
                  e.target.value = ''; 
              });
          
@@ -2939,43 +3028,198 @@
              if (cancelGhostBtn) {
                  cancelGhostBtn.addEventListener('click', () => {
                      if (ghost) {
-                         editorGroup.remove(ghost);
-                         ghost = null;
-                         window.isGhostLockedToOriginal = false;
-                         document.querySelector('.grid-floating-panel').style.display = 'none';
-                         
+                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; document.querySelector('.grid-floating-panel').style.display = 'none';
                          if (window.originalObjectBeingMoved) {
-                             if (window.originalObjectParent) {
-                                 window.originalObjectParent.add(window.originalObjectBeingMoved);
-                             } else {
-                                 editorGroup.add(window.originalObjectBeingMoved);
-                             }
-                             window.originalObjectBeingMoved = null;
-                             window.originalObjectParent = null;
+                             if (window.originalObjectParent) window.originalObjectParent.add(window.originalObjectBeingMoved);
+                             else editorGroup.add(window.originalObjectBeingMoved);
+                             window.originalObjectBeingMoved = null; window.originalObjectParent = null;
                          }
                      }
                  });
              }
          
+        async function autoCropAtlas(atlasName, rect, baseUrl) {
+            const baseName = atlasName.split('/').pop();
+            let buf = window.rawFileCache.get(`${baseUrl}/${atlasName}.webp`) || window.rawFileCache.get(`${baseUrl}/${atlasName}`) || window.rawFileCache.get(`${baseUrl}/${baseName}.webp`) || window.rawFileCache.get(atlasName + ".webp") || window.rawFileCache.get(baseName + ".webp") || window.rawFileCache.get(atlasName);
+            if (!buf) return null;
+            return new Promise((resolve) => {
+                const blob = new Blob([buf], { type: 'image/webp' });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = rect.w; canvas.height = rect.h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+                    canvas.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/webp', 0.9);
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+                img.src = url;
+            });
+        }
+
              exportBtn.addEventListener('click', async () => {
                  try {
-                     const binData = await generateMapBin();
-                     const hashBuffer = await crypto.subtle.digest('SHA-256', binData);
-                     const hashHex = Array.from(new Uint8Array(hashBuffer))
-                         .map(b => b.toString(16).padStart(2, '0'))
-                         .join('')
-                         .substring(0, 8);
+                     if (!window.repackingData) { showToast("Please load a map before exporting!"); return; }
+                     showToast("Preparing ZIP export...", false);
+                     
+                     if (!window.SparkMD5) {
+                         await new Promise((resolve, reject) => {
+                             const script = document.createElement('script');
+                             script.src = "https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js";
+                             script.onload = resolve;
+                             script.onerror = reject;
+                             document.head.appendChild(script);
+                         });
+                     }
+
+                     const zip = new JSZip();
+                     const metaInfoList =[];
+
+                     async function addFileToZip(name, data) {
+                         let arrayBuffer;
+                         let size = 0;
+                         if (data instanceof Blob) {
+                             arrayBuffer = await data.arrayBuffer();
+                             size = data.size;
+                         } else if (data.buffer) {
+                             arrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+                             size = data.byteLength;
+                         } else if (data instanceof ArrayBuffer) {
+                             arrayBuffer = data;
+                             size = data.byteLength;
+                         } else {
+                             const encoder = new TextEncoder();
+                             const uint8 = encoder.encode(String(data));
+                             arrayBuffer = uint8.buffer;
+                             size = uint8.byteLength;
+                         }
+                         const md5 = SparkMD5.ArrayBuffer.hash(arrayBuffer);
+                         metaInfoList.push({ name, size, md5 });
+                         zip.file(name, data);
+                     }
+                     
+                     const { binData, propsToWrite } = await generateMapBin();
+                     
+                     await addFileToZip("map.bin", binData);
+          
+                     
+                     const geometriesToExport =[];
+                     const exportedGeoNames = new Set();
+                     const usedTexNames = new Set();
+                     
+                     for (const p of propsToWrite) {
+                         if (!exportedGeoNames.has(p.name)) {
+                             let geo = null;
+                             const targetName = p.name.toLowerCase();
+                             let pInfo = p._pInfo;
+                             const libBaseUrl = p._baseUrl;
+                             const searchFile = p._file;
+                             
+                             if (pInfo && pInfo.mesh && pInfo.mesh.file) {
+                                 let fileA3d = modelCache.get(`${libBaseUrl}/${searchFile}`);
+                                 if (!fileA3d) {
+                                     for (const [key, a3d] of modelCache.entries()) {
+                                         if (key.endsWith('/' + searchFile) || key === searchFile || key === `null/${searchFile}`) {
+                                             fileA3d = a3d; break;
+                                         }
+                                     }
+                                 }
+                                 if (fileA3d) {
+                                     if (fileA3d.namedMeshes && Object.keys(fileA3d.namedMeshes).length > 0) geo = Object.values(fileA3d.namedMeshes)[0];
+                                     else if (fileA3d.meshes && fileA3d.meshes.length > 0) geo = fileA3d.meshes[0];
+                                 }
+                             }
+                             if (!geo) {
+                                 for (const [key, a3d] of modelCache.entries()) {
+                                     if (a3d.namedMeshes) {
+                                         const matchedKey = Object.keys(a3d.namedMeshes).find(k => k.toLowerCase() === targetName);
+                                         if (matchedKey) { geo = a3d.namedMeshes[matchedKey]; break; }
+                                     }
+                                     if (!geo && a3d.meshes && a3d.meshes.length > 0) {
+                                         if (key.toLowerCase().includes(targetName)) { geo = a3d.meshes[0]; break; }
+                                     }
+                                 }
+                             }
+                             
+                             if (geo) {
+                                 const cloneGeo = geo.clone();
+                                 cloneGeo.name = p.name;
+                                 if (!cloneGeo.userData.matIds) cloneGeo.userData.matIds = geo.userData.matIds || [0];
+                                 geometriesToExport.push(cloneGeo);
+                                 exportedGeoNames.add(p.name);
+                             } else { console.warn("Missing geometry for: " + p.name); }
+                         }
                          
-                     const blob = new Blob([binData], { type: 'application/octet-stream' });
-                     const url = URL.createObjectURL(blob);
+                         const pInfo2 = p._pInfo;
+                         const libBaseUrl = p._baseUrl;
+                         if (pInfo2 && pInfo2.textures) {
+                             for (let t of pInfo2.textures) {
+                                 if (t.diffuseMap) usedTexNames.add(JSON.stringify({ name: t.diffuseMap, baseUrl: libBaseUrl }));
+                             }
+                         }
+                         if (p._baseTexName) usedTexNames.add(JSON.stringify({ name: p._baseTexName, baseUrl: libBaseUrl }));
+                         if (p._controlTexName) usedTexNames.add(JSON.stringify({ name: p._controlTexName, baseUrl: libBaseUrl }));
+                         
+                         if (p._splat0TexName) usedTexNames.add(JSON.stringify({ name: p._splat0TexName, baseUrl: libBaseUrl }));
+                         if (p._splat1TexName) usedTexNames.add(JSON.stringify({ name: p._splat1TexName, baseUrl: libBaseUrl }));
+                         if (p._splat2TexName) usedTexNames.add(JSON.stringify({ name: p._splat2TexName, baseUrl: libBaseUrl }));
+                         if (p._splat3TexName) usedTexNames.add(JSON.stringify({ name: p._splat3TexName, baseUrl: libBaseUrl }));
+                     }
+                     
+                     if (geometriesToExport.length > 0) {
+                         const a3dBytes = exportOptimizedA3D(geometriesToExport);
+                         await addFileToZip("models.a3d", a3dBytes);
+                     } else { throw new Error("No valid model geometry data found, models.a3d generation failed!"); }
+            
+                     for (const itemStr of usedTexNames) {
+                         const itemObj = JSON.parse(itemStr);
+                         const tName = itemObj.name;
+                         const baseUrl = itemObj.baseUrl;
+                         const lowerName = tName.toLowerCase();
+                         if (lowerName.includes('lightmap') || lowerName.includes('comp_light') || lowerName.startsWith('atlas')) continue;
+                         
+                         const baseName = tName.split('/').pop();
+                         let buf = window.rawFileCache.get(`${baseUrl}/${tName}.webp`) || window.rawFileCache.get(`${baseUrl}/${tName}`) || window.rawFileCache.get(`${baseUrl}/${baseName}.webp`) || window.rawFileCache.get(tName + ".webp") || window.rawFileCache.get(tName) || window.rawFileCache.get(baseName + ".webp") || window.rawFileCache.get(baseName);
+                         
+                         if (buf) {
+                             let libFolder = getDecimalPrefix(baseUrl);
+                             let uniqueExportName = baseName;
+                             if (!baseName.startsWith(libFolder + "_")) {
+                                 uniqueExportName = `${libFolder}_${baseName}`;
+                             }
+                             
+                             await addFileToZip(uniqueExportName + ".webp", buf);
+                         }
+                     }
+                     if (window.dynamicAtlasesToSlice) {
+                         for (const item of window.dynamicAtlasesToSlice) {
+                             const croppedBlob = await autoCropAtlas(item.atlas, item.rect, item.baseUrl);
+                             if (croppedBlob) {
+                                 await addFileToZip(item.exportName + ".webp", croppedBlob);
+                             }
+                         }
+                     }
+                
+                     metaInfoList.sort((a, b) => {
+                         if (a.name < b.name) return -1;
+                         if (a.name > b.name) return 1;
+                         return 0;
+                     });
+                     zip.file("meta.info", JSON.stringify(metaInfoList, null, 2));
+                     
+                     const content = await zip.generateAsync({ type: 'blob', compression: "DEFLATE", compressionOptions: { level: 6 }});
+                     const url = URL.createObjectURL(content);
                      const a = document.createElement('a');
                      a.href = url;
-                     a.download = `map.${hashHex}.bin`;
+                     const timestamp = Date.now();
+                     a.download = `exported_map_${timestamp}.zip`;
                      document.body.appendChild(a);
                      a.click();
                      document.body.removeChild(a);
                      URL.revokeObjectURL(url);
-                     showToast("Export successful!", false);
+                     
+                     showToast("ZIP Export successful!", false);
                  } catch (err) {
                      console.error(err);
                      showToast("Export failed: " + err.message);
@@ -2994,10 +3238,7 @@
                  if (e.key === 'q' || e.key === 'Q') updateGridHeight(-100);
                  if (e.key === 'e' || e.key === 'E') updateGridHeight(100);
                  if (e.key === 'r' || e.key === 'R') {
-                     if (ghost) {
-                         ghost.rotation.z -= Math.PI / 4; 
-                         updateGhost(currentMousePos.x, currentMousePos.y);
-                     }
+                     if (ghost) { ghost.rotation.z -= Math.PI / 4; updateGhost(currentMousePos.x, currentMousePos.y); }
                  }
              });
              
@@ -3007,47 +3248,35 @@
              function handleLongPress(clientX, clientY) {
                  longPressTimer = null;
                  if (ghost) return;
-         
                  mouse.x = (clientX / window.innerWidth) * 2 - 1;
                  mouse.y = -(clientY / window.innerHeight) * 2 + 1;
                  raycaster.setFromCamera(mouse, camera);
-         
                  const intersects = raycaster.intersectObjects(editorGroup.children, true);
                  let hitObj = null;
-         
                  for (let ix of intersects) {
                      let obj = ix.object;
                      while (obj && obj !== editorGroup) {
-                         if (obj === ghost || obj.userData.isOriginalMapGroup) {
-                             break; 
-                         }
+                         if (obj === ghost || obj.userData.isOriginalMapGroup) break; 
                          if (obj.userData && (obj.userData.baseName || (obj.userData.originalProps && obj.userData.originalProps.length > 0))) {
-                             hitObj = obj;
-                             break;
+                             hitObj = obj; break;
                          }
                          obj = obj.parent;
                      }
                      if (hitObj) break;
                  }
-         
                  if (hitObj) {
                      if ('vibrate' in navigator) navigator.vibrate(50);
-                     
                      selectedObjectForAction = hitObj;
                      const cm = document.getElementById('context-menu');
                      const title = document.getElementById('cm-title');
-                     
                      let name = hitObj.userData.baseName;
                      if (!name && hitObj.userData.originalProps && hitObj.userData.originalProps.length > 0) {
                          let pName = hitObj.userData.originalProps[0].name;
                          name = getCleanBaseName(pName);
                      }
                      title.innerText = name || "Unknown Object";
-                     
                      cm.style.display = 'flex';
-                     const cmWidth = cm.offsetWidth;
-                     const cmHeight = cm.offsetHeight;
-                     
+                     const cmWidth = cm.offsetWidth; const cmHeight = cm.offsetHeight;
                      cm.style.left = Math.max(16, Math.min(clientX, window.innerWidth - cmWidth - 16)) + 'px';
                      cm.style.top = Math.max(16, Math.min(clientY, window.innerHeight - cmHeight - 16)) + 'px';
                  }
@@ -3055,11 +3284,8 @@
          
              document.getElementById('cm-delete').onclick = () => {
                  if (selectedObjectForAction) {
-                     if (selectedObjectForAction.parent) {
-                         selectedObjectForAction.parent.remove(selectedObjectForAction);
-                     } else {
-                         editorGroup.remove(selectedObjectForAction);
-                     }
+                     if (selectedObjectForAction.parent) selectedObjectForAction.parent.remove(selectedObjectForAction);
+                     else editorGroup.remove(selectedObjectForAction);
                  }
                  document.getElementById('context-menu').style.display = 'none';
                  selectedObjectForAction = null;
@@ -3075,63 +3301,38 @@
                      const rot = selectedObjectForAction.rotation.clone();
                     const pos = selectedObjectForAction.position.clone();
                     const scales = selectedObjectForAction.children.map(c => c.scale.clone());
-                    
                     window.originalObjectBeingMoved = selectedObjectForAction;
                      window.originalObjectParent = selectedObjectForAction.parent;
-                     
-                     if (selectedObjectForAction.parent) {
-                         selectedObjectForAction.parent.remove(selectedObjectForAction);
-                     } else {
-                         editorGroup.remove(selectedObjectForAction);
-                     }
-                     
+                     if (selectedObjectForAction.parent) selectedObjectForAction.parent.remove(selectedObjectForAction);
+                     else editorGroup.remove(selectedObjectForAction);
                      if (name) {
-                         window.dragMode = 'none';
-                         updateDragModeUI();
-                         window.isGhostLockedToOriginal = true;
-                         window.selectPrefab(name);
+                         window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; window.selectPrefab(name);
                          if (ghost) {
-                            ghost.rotation.copy(rot);
-                            ghost.position.copy(pos);
-                 
+                            ghost.rotation.copy(rot); ghost.position.copy(pos);
                             ghost.children.forEach((c, i) => { if (scales[i]) c.scale.copy(scales[i]); });
                             ghost.updateMatrixWorld(true);
-                             
                              const box = new THREE.Box3().setFromObject(ghost, true);
                              const originalWorldY = editorGroup.localToWorld(pos.clone()).y;
                              let dip = 0;
-                             if (box.min.y !== Infinity) {
-                                 dip = (originalWorldY - box.min.y) / editorGroup.scale.z;
-                             }
-                             
+                             if (box.min.y !== Infinity) dip = (originalWorldY - box.min.y) / editorGroup.scale.z;
                              editorGroup.remove(ghost);
                              const originWorld = editorGroup.localToWorld(pos.clone());
                              const downRay = new THREE.Raycaster(originWorld, new THREE.Vector3(0, -1, 0));
                              const intersects = downRay.intersectObjects(editorGroup.children, true);
                              let hitZ = 0;
-                             if (intersects.length > 0) {
-                                 const pt = editorGroup.worldToLocal(intersects[0].point);
-                                 hitZ = pt.z;
-                             } else {
+                             if (intersects.length > 0) { hitZ = editorGroup.worldToLocal(intersects[0].point).z; } 
+                             else {
                                  const zeroPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
                                  const ptWorld = new THREE.Vector3();
-                                 if (downRay.ray.intersectPlane(zeroPlane, ptWorld)) {
-                                     hitZ = editorGroup.worldToLocal(ptWorld).z;
-                                 }
+                                 if (downRay.ray.intersectPlane(zeroPlane, ptWorld)) hitZ = editorGroup.worldToLocal(ptWorld).z;
                              }
                              editorGroup.add(ghost);
-                             
                              let calculatedGridZ = (pos.z - dip) - hitZ;
-                             if (isSnapping) {
-                                 calculatedGridZ = Math.round(calculatedGridZ / 100) * 100;
-                             } else {
-                                 calculatedGridZ = Math.round(calculatedGridZ);
-                             }
-                             
+                             if (isSnapping) calculatedGridZ = Math.round(calculatedGridZ / 100) * 100;
+                             else calculatedGridZ = Math.round(calculatedGridZ);
                              currentGridHeight = calculatedGridZ;
                              const gridHeightDisplay = document.getElementById('grid-height-display');
                              if (gridHeightDisplay) gridHeightDisplay.innerText = currentGridHeight;
-                             
                              ghost.userData.baseHitPoint = pos.clone();
                              ghost.userData.baseHitPoint.z = hitZ;
                              updateGhost(currentMousePos.x, currentMousePos.y, true);
@@ -3152,61 +3353,38 @@
                      const rot = selectedObjectForAction.rotation.clone();
                     const pos = selectedObjectForAction.position.clone();
                     const scales = selectedObjectForAction.children.map(c => c.scale.clone());
-                    
-                    window.originalObjectBeingMoved = null;
-                     window.originalObjectParent = null;
-                     
+                    window.originalObjectBeingMoved = null; window.originalObjectParent = null;
                      if (name) {
-                         window.dragMode = 'none';
-                         updateDragModeUI();
-                         window.isGhostLockedToOriginal = true;
-                         window.selectPrefab(name);
-                         
+                         window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; window.selectPrefab(name);
                          window.isContinuousCopyEnabled = true;
                          const copyBtn = document.getElementById('continuous-copy-btn');
                          if (copyBtn) copyBtn.className = 'm3-btn m3-btn-primary';
                          if (ghost) {
-                            ghost.rotation.copy(rot);
-                            ghost.position.copy(pos);
-                 
+                            ghost.rotation.copy(rot); ghost.position.copy(pos);
                             ghost.children.forEach((c, i) => { if (scales[i]) c.scale.copy(scales[i]); });
                             ghost.updateMatrixWorld(true);
-                             
                              const box = new THREE.Box3().setFromObject(ghost, true);
                              const originalWorldY = editorGroup.localToWorld(pos.clone()).y;
                              let dip = 0;
-                             if (box.min.y !== Infinity) {
-                                 dip = (originalWorldY - box.min.y) / editorGroup.scale.z;
-                             }
-                             
+                             if (box.min.y !== Infinity) dip = (originalWorldY - box.min.y) / editorGroup.scale.z;
                              editorGroup.remove(ghost);
                              const originWorld = editorGroup.localToWorld(pos.clone());
                              const downRay = new THREE.Raycaster(originWorld, new THREE.Vector3(0, -1, 0));
                              const intersects = downRay.intersectObjects(editorGroup.children, true);
                              let hitZ = 0;
-                             if (intersects.length > 0) {
-                                 const pt = editorGroup.worldToLocal(intersects[0].point);
-                                 hitZ = pt.z;
-                             } else {
+                             if (intersects.length > 0) { hitZ = editorGroup.worldToLocal(intersects[0].point).z; } 
+                             else {
                                  const zeroPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
                                  const ptWorld = new THREE.Vector3();
-                                 if (downRay.ray.intersectPlane(zeroPlane, ptWorld)) {
-                                     hitZ = editorGroup.worldToLocal(ptWorld).z;
-                                 }
+                                 if (downRay.ray.intersectPlane(zeroPlane, ptWorld)) hitZ = editorGroup.worldToLocal(ptWorld).z;
                              }
                              editorGroup.add(ghost);
-                             
                              let calculatedGridZ = (pos.z - dip) - hitZ;
-                             if (isSnapping) {
-                                 calculatedGridZ = Math.round(calculatedGridZ / 100) * 100;
-                             } else {
-                                 calculatedGridZ = Math.round(calculatedGridZ);
-                             }
-                             
+                             if (isSnapping) calculatedGridZ = Math.round(calculatedGridZ / 100) * 100;
+                             else calculatedGridZ = Math.round(calculatedGridZ);
                              currentGridHeight = calculatedGridZ;
                              const gridHeightDisplay = document.getElementById('grid-height-display');
                              if (gridHeightDisplay) gridHeightDisplay.innerText = currentGridHeight;
-                             
                              ghost.userData.baseHitPoint = pos.clone();
                              ghost.userData.baseHitPoint.z = hitZ;
                              updateGhost(currentMousePos.x, currentMousePos.y, true);
@@ -3225,19 +3403,11 @@
                  if (e.button === 2) {
                      document.getElementById('context-menu').style.display = 'none';
                      if (ghost) {
-                         editorGroup.remove(ghost);
-                         ghost = null;
-                         window.isGhostLockedToOriginal = false;
-                         document.querySelector('.grid-floating-panel').style.display = 'none';
-                         
+                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; document.querySelector('.grid-floating-panel').style.display = 'none';
                          if (window.originalObjectBeingMoved) {
-                             if (window.originalObjectParent) {
-                                 window.originalObjectParent.add(window.originalObjectBeingMoved);
-                             } else {
-                                 editorGroup.add(window.originalObjectBeingMoved);
-                             }
-                             window.originalObjectBeingMoved = null;
-                             window.originalObjectParent = null;
+                             if (window.originalObjectParent) window.originalObjectParent.add(window.originalObjectBeingMoved);
+                             else editorGroup.add(window.originalObjectBeingMoved);
+                             window.originalObjectBeingMoved = null; window.originalObjectParent = null;
                          }
                      }
                      return;
@@ -3248,18 +3418,11 @@
                  }
                  
                  if (window.dragMode !== 'none' && ghost && (window.cameraPointersCount || 0) < 2) {
-                     window.isEditingDrag = true;
-                     editDragStart = {x: e.clientX, y: e.clientY};
-                     initialGhostRot.copy(ghost.rotation);
-                     initialGridZ = currentGridHeight;
-                     window.hasSlidGridZ = false;
-                     return; 
+                     window.isEditingDrag = true; editDragStart = {x: e.clientX, y: e.clientY};
+                     initialGhostRot.copy(ghost.rotation); initialGridZ = currentGridHeight; window.hasSlidGridZ = false; return; 
                  }
          
-                 if (window.isGhostLockedToOriginal) {
-                     window.isGhostLockedToOriginal = false;
-                 }
-         
+                 if (window.isGhostLockedToOriginal) window.isGhostLockedToOriginal = false;
                  longPressTimer = setTimeout(() => handleLongPress(e.clientX, e.clientY), 500);
                  updateGhost(e.clientX, e.clientY);
              });
@@ -3268,13 +3431,8 @@
                  if (e.isPrimary) {
                      if (Math.abs(e.clientX - pointerDownPos.x) > 15 || Math.abs(e.clientY - pointerDownPos.y) > 15) {
                          isDragging = true;
-                         if (longPressTimer) {
-                             clearTimeout(longPressTimer);
-                             longPressTimer = null;
-                         }
-                         if (window.isGhostLockedToOriginal && window.dragMode === 'none') {
-                             window.isGhostLockedToOriginal = false;
-                         }
+                         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                         if (window.isGhostLockedToOriginal && window.dragMode === 'none') window.isGhostLockedToOriginal = false;
                      }
                  }
                  
@@ -3283,122 +3441,68 @@
                      const deltaY = e.clientY - editDragStart.y;
          
                      if (window.dragMode === 'rotate') {
-                         let rotZ = deltaX * 0.02;
-                         let rotX = deltaY * 0.02;
-         
-                         const snap = Math.PI / 4;
-         
+                         let rotZ = deltaX * 0.02; let rotX = deltaY * 0.02; const snap = Math.PI / 4;
                          const camRightWorld = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
                          const camUpWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-         
                          const groupInv = editorGroup.matrixWorld.clone().invert();
                          const camRightLocal = camRightWorld.clone().transformDirection(groupInv).normalize();
                          const camUpLocal = camUpWorld.clone().transformDirection(groupInv).normalize();
          
                          if (window.rotateButtonMode === 'free') {
                              const qInitial = new THREE.Quaternion().setFromEuler(initialGhostRot);
-                             
                              const qUp = new THREE.Quaternion().setFromAxisAngle(camUpLocal, rotZ); 
                              const qRight = new THREE.Quaternion().setFromAxisAngle(camRightLocal, rotX);
                              const finalQ = new THREE.Quaternion().copy(qUp).multiply(qRight).multiply(qInitial);
-                             
                              if (isSnapping) {
-                          
                                  const euler = new THREE.Euler().setFromQuaternion(finalQ, ghost.rotation.order);
-                                 euler.x = Math.round(euler.x / snap) * snap;
-                                 euler.y = Math.round(euler.y / snap) * snap;
-                                 euler.z = Math.round(euler.z / snap) * snap;
+                                 euler.x = Math.round(euler.x / snap) * snap; euler.y = Math.round(euler.y / snap) * snap; euler.z = Math.round(euler.z / snap) * snap;
                                  ghost.rotation.copy(euler);
-                             } else {
-                      
-                                 ghost.quaternion.copy(finalQ);
-                             }
+                             } else { ghost.quaternion.copy(finalQ); }
                          } else {
-                             if (isSnapping) {
-                                 rotZ = Math.round(rotZ / snap) * snap;
-                             }
-                             
+                             if (isSnapping) rotZ = Math.round(rotZ / snap) * snap;
                              const isCameraInverted = camUpLocal.z < 0; 
                              let finalRotZ = rotZ;
-                             if (isCameraInverted) {
-                                 finalRotZ = -rotZ;
-                             }
-                             
-                             ghost.rotation.set(
-                                 initialGhostRot.x,
-                                 initialGhostRot.y,
-                                 initialGhostRot.z + finalRotZ
-                             );
+                             if (isCameraInverted) finalRotZ = -rotZ;
+                             ghost.rotation.set(initialGhostRot.x, initialGhostRot.y, initialGhostRot.z + finalRotZ);
                          }
                      } else if (window.dragMode === 'gridZ') {
-                         let deltaZ = -deltaY * 2;
-                         let newZ = initialGridZ + deltaZ;
-                         
+                         let deltaZ = -deltaY * 2; let newZ = initialGridZ + deltaZ;
                          if (Math.abs(deltaY) > 5) window.hasSlidGridZ = true;
-         
-                         if (isSnapping && window.hasSlidGridZ) {
-                             newZ = Math.round(newZ / 100) * 100;
-                         } else if (isSnapping && !window.hasSlidGridZ) {
-                             newZ = initialGridZ; 
-                         }
-         
+                         if (isSnapping && window.hasSlidGridZ) newZ = Math.round(newZ / 100) * 100;
+                         else if (isSnapping && !window.hasSlidGridZ) newZ = initialGridZ; 
                          currentGridHeight = newZ;
                          document.getElementById('grid-height-display').innerText = Math.round(currentGridHeight);
                      }
-         
-                     updateGhost(editDragStart.x, editDragStart.y, true);
-                     return;
+                     updateGhost(editDragStart.x, editDragStart.y, true); return;
                  }
-         
                  if ((window.cameraPointersCount || 0) >= 2) return; 
-         
                  updateGhost(e.clientX, e.clientY);
              });
          
              renderer.domElement.addEventListener('pointerup', (e) => {
                  if (!e.isPrimary) return;
-                 if (longPressTimer) {
-                     clearTimeout(longPressTimer);
-                     longPressTimer = null;
-                 }
-                 
+                 if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
                  if (window.isEditingDrag) {
                      window.isEditingDrag = false;
-                     if (Math.abs(e.clientX - pointerDownPos.x) > 10 || Math.abs(e.clientY - pointerDownPos.y) > 10) {
-                         return;
-                     }
+                     if (Math.abs(e.clientX - pointerDownPos.x) > 10 || Math.abs(e.clientY - pointerDownPos.y) > 10) return;
                  }
-                 
-                 if (window.wasMultiTouch) {
-                     return;
-                 }
+                 if (window.wasMultiTouch) return;
                  
                  if (!isDragging && ghost && (e.button === 0 || e.pointerType === 'touch')) {
                      updateGhost(e.clientX, e.clientY, window.dragMode !== 'none' || window.isGhostLockedToOriginal);
                      const instance = currentPrefabGroup.clone();
-                    instance.position.copy(ghost.position);
-                    instance.rotation.copy(ghost.rotation);
-                    instance.children.forEach((c, i) => {
-                        if (ghost.children[i]) c.scale.copy(ghost.children[i].scale);
-                    });
-                    
+                    instance.position.copy(ghost.position); instance.rotation.copy(ghost.rotation);
+                    instance.children.forEach((c, i) => { if (ghost.children[i]) c.scale.copy(ghost.children[i].scale); });
                     instance.updateMatrixWorld(true);
                      instance.userData.worldBox = new THREE.Box3().setFromObject(instance, true);
                      instance.userData.baseName = window.currentBaseName;
-                     
                      editorGroup.add(instance);
-                     
-                     window.originalObjectBeingMoved = null;
-                     window.originalObjectParent = null;
+                     window.originalObjectBeingMoved = null; window.originalObjectParent = null;
          
                      if (!window.isContinuousCopyEnabled) {
-                         editorGroup.remove(ghost);
-                         ghost = null;
-                         window.isGhostLockedToOriginal = false;
-                         document.querySelector('.grid-floating-panel').style.display = 'none';
+                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; document.querySelector('.grid-floating-panel').style.display = 'none';
                      } else {
-                         window.isGhostLockedToOriginal = false;
-                         window.dragMode = 'none';
+                         window.isGhostLockedToOriginal = false; window.dragMode = 'none';
                          if (window.updateDragModeUI) window.updateDragModeUI();
                          updateGhost(e.clientX, e.clientY, false);
                      }
@@ -3407,90 +3511,57 @@
          }
          
          function updateGhost(clientX, clientY, isLockedDrag = false) {
-             currentMousePos.x = clientX;
-             currentMousePos.y = clientY;
+             currentMousePos.x = clientX; currentMousePos.y = clientY;
              if (!ghost) return;
          
              if (!isLockedDrag && !window.isGhostLockedToOriginal) {
-                 mouse.x = (clientX / window.innerWidth) * 2 - 1;
-                 mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+                 mouse.x = (clientX / window.innerWidth) * 2 - 1; mouse.y = -(clientY / window.innerHeight) * 2 + 1;
                  raycaster.setFromCamera(mouse, camera);
-                 
                  const intersects = raycaster.intersectObjects(editorGroup.children, true);
-                 let hitPoint = null;
-         
-                 let objHitPoint = null;
+                 let hitPoint = null; let objHitPoint = null;
                  const validIntersects = intersects.filter(ix => {
                      let obj = ix.object;
-                     while(obj) {
-                         if (obj === ghost) return false;
-                         obj = obj.parent;
-                     }
+                     while(obj) { if (obj === ghost) return false; obj = obj.parent; }
                      return true;
                  });
-                 if (validIntersects.length > 0) {
-                     objHitPoint = validIntersects[0].point;
-                 }
+                 if (validIntersects.length > 0) objHitPoint = validIntersects[0].point;
          
                  groundPlane.set(new THREE.Vector3(0, 1, 0), 0);
-                 let zeroPlaneHitPoint = null;
-                 const zeroIntersect = new THREE.Vector3();
-                 if (raycaster.ray.intersectPlane(groundPlane, zeroIntersect)) {
-                     zeroPlaneHitPoint = zeroIntersect;
-                 }
+                 let zeroPlaneHitPoint = null; const zeroIntersect = new THREE.Vector3();
+                 if (raycaster.ray.intersectPlane(groundPlane, zeroIntersect)) zeroPlaneHitPoint = zeroIntersect;
          
                  if (camera.position.y >= 0) {
                      if (objHitPoint && zeroPlaneHitPoint) {
-                         if (camera.position.distanceTo(objHitPoint) < camera.position.distanceTo(zeroPlaneHitPoint)) {
-                             hitPoint = objHitPoint;
-                         } else {
-                             hitPoint = zeroPlaneHitPoint;
-                         }
-                     } else if (objHitPoint) {
-                         hitPoint = objHitPoint;
-                     } else if (zeroPlaneHitPoint) {
-                         hitPoint = zeroPlaneHitPoint;
-                     }
+                         if (camera.position.distanceTo(objHitPoint) < camera.position.distanceTo(zeroPlaneHitPoint)) hitPoint = objHitPoint;
+                         else hitPoint = zeroPlaneHitPoint;
+                     } else if (objHitPoint) hitPoint = objHitPoint;
+                     else if (zeroPlaneHitPoint) hitPoint = zeroPlaneHitPoint;
                  } else {
-                     if (objHitPoint) {
-                         hitPoint = objHitPoint;
-                     } else if (zeroPlaneHitPoint) {
-                         hitPoint = zeroPlaneHitPoint;
-                     }
+                     if (objHitPoint) hitPoint = objHitPoint;
+                     else if (zeroPlaneHitPoint) hitPoint = zeroPlaneHitPoint;
                  }
-         
                  if (!hitPoint) {
                      hitPoint = raycaster.ray.at(1000, new THREE.Vector3());
                      if (camera.position.y >= 0) hitPoint.y = 0;
                  }
-         
                  if (hitPoint) {
                      editorGroup.worldToLocal(hitPoint);
-                     
                      if (isSnapping && currentPrefabGroup) {
-                         let snapped = false;
-                         let snapX = 250;
-                         let snapY = 250;
-                         let snapZ = 100;
-         
+                         let snapped = false; let snapX = 250; let snapY = 250; let snapZ = 100;
                          for (let i = 0; i < editorGroup.children.length; i++) {
                              const child = editorGroup.children[i];
                              if (child === ghost || child.userData.isOriginalMapGroup) continue;
-                             
                              const dist = child.position.distanceTo(hitPoint);
                              if (dist < 800.0) {
                                  const diff = hitPoint.clone().sub(child.position);
                                  hitPoint.x = child.position.x + Math.round(diff.x / snapX) * snapX;
                                  hitPoint.y = child.position.y + Math.round(diff.y / snapY) * snapY;
                                  hitPoint.z = child.position.z + Math.round(diff.z / snapZ) * snapZ;
-                                 snapped = true;
-                                 break;
+                                 snapped = true; break;
                              }
                          }
                          if (!snapped) {
-                             hitPoint.x = Math.round(hitPoint.x / snapX) * snapX;
-                             hitPoint.y = Math.round(hitPoint.y / snapY) * snapY;
-                             hitPoint.z = Math.round(hitPoint.z / snapZ) * snapZ;
+                             hitPoint.x = Math.round(hitPoint.x / snapX) * snapX; hitPoint.y = Math.round(hitPoint.y / snapY) * snapY; hitPoint.z = Math.round(hitPoint.z / snapZ) * snapZ;
                          }
                      }
                      ghost.userData.baseHitPoint = hitPoint.clone();
@@ -3501,16 +3572,12 @@
                  const hp = ghost.userData.baseHitPoint.clone();
                  hp.z += currentGridHeight;
                  ghost.position.copy(hp);
-                 
                  ghost.updateMatrixWorld(true);
                  const box = new THREE.Box3().setFromObject(ghost, true);
                  const originalWorldY = editorGroup.localToWorld(hp.clone()).y;
-                 
                  if (box.min.y !== Infinity) {
                      const dip = originalWorldY - box.min.y;
-                     if (Math.abs(dip) > 0.001) {
-                         ghost.position.z += dip / editorGroup.scale.z;
-                     }
+                     if (Math.abs(dip) > 0.001) ghost.position.z += dip / editorGroup.scale.z;
                  }
              }
          }
