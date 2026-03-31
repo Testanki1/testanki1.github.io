@@ -3306,7 +3306,16 @@
                      if (selectedObjectForAction.parent) selectedObjectForAction.parent.remove(selectedObjectForAction);
                      else editorGroup.remove(selectedObjectForAction);
                      if (name) {
-                         window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; window.selectPrefab(name);
+                         window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; 
+                         
+                         if (!prefabs.has(name)) {
+                             const fallbackPrefab = window.originalObjectBeingMoved.clone();
+                             fallbackPrefab.position.set(0, 0, 0);
+                             fallbackPrefab.rotation.set(0, 0, 0);
+                             prefabs.set(name, fallbackPrefab);
+                         }
+                         
+                         window.selectPrefab(name);
                          if (ghost) {
                             ghost.rotation.copy(rot); ghost.position.copy(pos);
                             ghost.children.forEach((c, i) => { if (scales[i]) c.scale.copy(scales[i]); });
@@ -3355,7 +3364,16 @@
                     const scales = selectedObjectForAction.children.map(c => c.scale.clone());
                     window.originalObjectBeingMoved = null; window.originalObjectParent = null;
                      if (name) {
-                         window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; window.selectPrefab(name);
+                         window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; 
+                         
+                         if (!prefabs.has(name)) {
+                             const fallbackPrefab = selectedObjectForAction.clone();
+                             fallbackPrefab.position.set(0, 0, 0);
+                             fallbackPrefab.rotation.set(0, 0, 0);
+                             prefabs.set(name, fallbackPrefab);
+                         }
+                         
+                         window.selectPrefab(name);
                          window.isContinuousCopyEnabled = true;
                          const copyBtn = document.getElementById('continuous-copy-btn');
                          if (copyBtn) copyBtn.className = 'm3-btn m3-btn-primary';
