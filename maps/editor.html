@@ -962,7 +962,7 @@
                                          geo.userData.matIds = geo.userData.v2MatIds ||[];
                                      }
                           
-                                     geo.name = obj.name; // Keep accurate name for rebuilding
+                                     geo.name = obj.name;
                                      data.namedMeshes[obj.name] = geo;
                                      data.namedMeshes[`mesh_${i}`] = geo;
                                      
@@ -1078,13 +1078,10 @@
              return bw.toUint8Array();
          }
 
-         window.repackingData = null;
-         
          async function parseMapBin(buffer) {
              const stream = new BinaryStream(buffer);
              const packet = await unwrapPacket(stream);
              
-             let headerEndOffset = 0;
              const fullOriginalBits =[];
              const flags = packet.readUint8();
              if ((flags & 0b10000000) === 0) {
@@ -1098,25 +1095,21 @@
                  const extBytes = packet.readBytes(extCount);
                  for (let i = 0; i < extBytes.length; i++) for (let b = 7; b >= 0; b--) fullOriginalBits.push((extBytes[i] & (1 << b)) === 0);
              }
-             headerEndOffset = packet.offset;
 
              const optMask =[...fullOriginalBits].reverse();
-             let popCount = 0;
-             const popBit = () => { popCount++; return optMask.pop(); };
+             const popBit = () => optMask.pop();
 
              const skipObjectArray = (p, cb) => { const len = p.readStringLength(); for(let i=0; i<len; i++) cb(p); };
              const readV3 = () =>[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
 
              const result = { props:[], materials: {}, atlases: {} };
 
-             const atlasStartOffset = packet.offset;
-             const atlasBitIndex = popCount;
              if (popBit()) {
                  const atlasLen = packet.readStringLength();
                  for(let i=0; i<atlasLen; i++) {
                      const aHeight = packet.readInt32(false); 
                      const aName = packet.readString();
-                     packet.readUint32(false); 
+                     const aUnknown = packet.readUint32(false); 
                      const rects = {};
                      const rectLen = packet.readStringLength();
                      for(let j=0; j<rectLen; j++) {
@@ -1126,13 +1119,13 @@
                          const rWidth = packet.readUint32(false);
                          const rx = packet.readUint32(false);
                          const ry = packet.readUint32(false);
-                         rects[`${rLib}_${rName}`] = { x: rx, y: ry, w: rWidth, h: rHeight, originalName: rName };
+                         rects[`${rLib}_${rName}`] = { x: rx, y: ry, w: rWidth, h: rHeight, originalName: rName, rLib: rLib };
                      }
                      const aWidth = packet.readUint32(false);
-                     result.atlases[aName] = { width: aWidth, height: aHeight, rects };
+                     result.atlases[aName] = { width: aWidth, height: aHeight, aUnknown, rects };
                  }
              }
-             const atlasEndOffset = packet.offset;
+             window.parsedAtlases = result.atlases;
          
              if (popBit()) skipObjectArray(packet, p => { p.readUint32(false); p.readString(); p.offset+=12; p.readString(); });
          
@@ -1143,15 +1136,8 @@
              };
              skipCols(); skipCols();
 
-             const popCountBeforeMaterials = popCount;
-             const matStartOffset = packet.offset;
-             const originalMaterialsData =[];
-
              const matLen = packet.readStringLength();
              for(let i=0; i<matLen; i++) {
-                 const mStartOffset = packet.offset;
-                 const mStartBit = popCount;
-                 
                  const matID = packet.readUint32(false);
                  const matName = packet.readString();
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=4; });
@@ -1171,22 +1157,11 @@
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=12; });
                  if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=16; });
                  
-                 originalMaterialsData.push({
-                     matID,
-                     bytes: packet.buffer.slice(mStartOffset, packet.offset),
-                     bits: fullOriginalBits.slice(mStartBit, popCount)
-                 });
                  result.materials[matID] = { name: matName, shader, texParams };
              }
 
-             const matEndOffset = packet.offset;
-             const matEndBit = popCount;
-
              if (popBit()) skipObjectArray(packet, p => { p.offset+=28; }); 
 
-             const prefixOffset = packet.offset; 
-             const popCountBeforeProps = popCount; 
-         
              let maxPropId = 0;
              const propLen = packet.readStringLength();
              for(let i=0; i<propLen; i++) {
@@ -1204,24 +1179,6 @@
                  result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
              }
          
-             const suffixBytes = packet.buffer.slice(packet.offset);
-             const suffixBits = fullOriginalBits.slice(popCount);
-         
-             window.repackingData = {
-                 preMatBytes: packet.buffer.slice(headerEndOffset, matStartOffset),
-                 originalMaterialsData: originalMaterialsData,
-                 postMatBytes: packet.buffer.slice(matEndOffset, prefixOffset),
-                 postMatBits: fullOriginalBits.slice(matEndBit, popCountBeforeProps),
-                 consumedBitsBeforeMaterials: fullOriginalBits.slice(0, popCountBeforeMaterials),
-                 suffixBytes: suffixBytes,
-                 suffixBits: suffixBits,
-                 maxPropId: maxPropId,
-                 originalProps: result.props,
-                 atlasStart: atlasStartOffset - headerEndOffset,
-                 atlasEnd: atlasEndOffset - headerEndOffset,
-                 atlasBitIndex: atlasBitIndex
-             };
-
              return result;
          }
          
@@ -1254,7 +1211,7 @@
                  const index = stream.readInt32(true);
                  const lightmapIndex = stream.readInt32(true);
                  let lightmapScaleOffset = null;
-                 let uv1 =[], uv2 =[];
+                 let uvs =[];
                  
                  if (lightmapIndex >= 0) {
                      lightmapScaleOffset =[
@@ -1264,9 +1221,8 @@
                      const hasUVs = stream.readUint8();
                      if (hasUVs > 0) {
                          const vertexCount = stream.readUint32(true);
-                         for (let v = 0; v < Math.floor(vertexCount / 2); v++) {
-                             uv1.push([stream.readFloat32(true), stream.readFloat32(true)]);
-                             uv2.push([stream.readFloat32(true), stream.readFloat32(true)]);
+                         for (let v = 0; v < vertexCount; v++) {
+                             uvs.push([stream.readFloat32(true), stream.readFloat32(true)]);
                          }
                      }
                  }
@@ -1274,7 +1230,7 @@
                  const receiveShadows = stream.readUint8() > 0;
          
                  mapObjects.push({
-                     index, lightmapIndex, lightmapScaleOffset, uv1, uv2, castShadows, receiveShadows
+                     index, lightmapIndex, lightmapScaleOffset, uvs, castShadows, receiveShadows
                  });
              }
              return { version, lightColorInt, ambientColorInt, lightAngleX, lightAngleZ, lightmaps, mapObjects };
@@ -1910,31 +1866,30 @@
                  
                  const matInfo = mapData.materials[prop.matID];
          
-                         let controlTexName = null;
-        let baseTexName = null;
-        let splat0TexName = null, splat1TexName = null, splat2TexName = null, splat3TexName = null;
-        let matBaseUrl = window.currentMapBaseUrl; 
+                 let controlTexName = null;
+                 let baseTexName = null;
+                 let splat0TexName = null, splat1TexName = null, splat2TexName = null, splat3TexName = null;
+                 let matBaseUrl = window.currentMapBaseUrl; 
 
-        if (matInfo && matInfo.texParams) {
-            const pControl = matInfo.texParams.find(p => p.name === '_Control');
-            if (pControl) controlTexName = pControl.texName;
+                 if (matInfo && matInfo.texParams) {
+                     const pControl = matInfo.texParams.find(p => p.name === '_Control');
+                     if (pControl) controlTexName = pControl.texName;
 
-            const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
-            if (pBase) {
-                baseTexName = pBase.texName;
-                if (pBase.libName && window.currentLibraryBaseUrl) matBaseUrl = window.currentLibraryBaseUrl;
-            }
+                     const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
+                     if (pBase) {
+                         baseTexName = pBase.texName;
+                         if (pBase.libName && window.currentLibraryBaseUrl) matBaseUrl = window.currentLibraryBaseUrl;
+                     }
 
-      
-            const pSplat0 = matInfo.texParams.find(p => p.name === '_Splat0');
-            if (pSplat0) splat0TexName = pSplat0.texName;
-            const pSplat1 = matInfo.texParams.find(p => p.name === '_Splat1');
-            if (pSplat1) splat1TexName = pSplat1.texName;
-            const pSplat2 = matInfo.texParams.find(p => p.name === '_Splat2');
-            if (pSplat2) splat2TexName = pSplat2.texName;
-            const pSplat3 = matInfo.texParams.find(p => p.name === '_Splat3');
-            if (pSplat3) splat3TexName = pSplat3.texName;
-        }
+                     const pSplat0 = matInfo.texParams.find(p => p.name === '_Splat0');
+                     if (pSplat0) splat0TexName = pSplat0.texName;
+                     const pSplat1 = matInfo.texParams.find(p => p.name === '_Splat1');
+                     if (pSplat1) splat1TexName = pSplat1.texName;
+                     const pSplat2 = matInfo.texParams.find(p => p.name === '_Splat2');
+                     if (pSplat2) splat2TexName = pSplat2.texName;
+                     const pSplat3 = matInfo.texParams.find(p => p.name === '_Splat3');
+                     if (pSplat3) splat3TexName = pSplat3.texName;
+                 }
          
                  if (!baseTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
                      const fallbackTex = pInfo.textures.find(t => t.diffuseMap && !t.diffuseMap.includes('-control'));
@@ -1948,12 +1903,12 @@
                      if (fallbackCtrl) controlTexName = fallbackCtrl.diffuseMap;
                  }
                  
-        prop._baseTexName = baseTexName;
-        prop._controlTexName = controlTexName;
-        prop._splat0TexName = splat0TexName; 
-        prop._splat1TexName = splat1TexName; 
-        prop._splat2TexName = splat2TexName; 
-        prop._splat3TexName = splat3TexName; 
+                 prop._baseTexName = baseTexName;
+                 prop._controlTexName = controlTexName;
+                 prop._splat0TexName = splat0TexName; 
+                 prop._splat1TexName = splat1TexName; 
+                 prop._splat2TexName = splat2TexName; 
+                 prop._splat3TexName = splat3TexName; 
          
                  const instGeo = geometry.clone();
                  instGeo.name = geometry.name || prop.name; 
@@ -2459,9 +2414,6 @@
         }
         
          async function generateMapBin() {
-             if (!window.repackingData) throw new Error("Repacking data not initialized");
-             const newPropBits =[];
-             const bw = new BinaryWriter();
              const propsToWrite =[];
              let idMapping = new Map();
              let globalIdCounter = 0; 
@@ -2521,21 +2473,9 @@
                  }
              }
              
-             let newConsumedBits =[...window.repackingData.consumedBitsBeforeMaterials];
-             let finalPreMatBytes = window.repackingData.preMatBytes;
-             
-             if (newConsumedBits[window.repackingData.atlasBitIndex] === true) {
-                 newConsumedBits[window.repackingData.atlasBitIndex] = false;
-                 const p1 = finalPreMatBytes.slice(0, window.repackingData.atlasStart);
-                 const p2 = finalPreMatBytes.slice(window.repackingData.atlasEnd);
-                 const combined = new Uint8Array(p1.length + p2.length);
-                 combined.set(p1, 0); combined.set(p2, p1.length);
-                 finalPreMatBytes = combined;
-             }
-
-             window.dynamicAtlasesToSlice = []; 
+             window.dynamicAtlasesToSlice =[]; 
              let nextMatID = 0;
-             const newMaterials = [];
+             const newMaterials =[];
              const rectNameToMatID = new Map();
              
              for (const p of propsToWrite) {
@@ -2573,7 +2513,7 @@
                      }
                      p.matID = rectNameToMatID.get(matKey);
 
-                                  } else if (p._atlasRect) {
+                 } else if (p._atlasRect) {
                      let atlasFolder = getDecimalPrefix(p._atlasBaseUrl);
                      let uniqueTexName = `${atlasFolder}_${p._atlasRect.originalName}`;
                      let rectKey = `${p._atlasBaseUrl}_${p._atlasRect.originalName}`;
@@ -2581,7 +2521,7 @@
                          rectNameToMatID.set(rectKey, nextMatID);
                          newMaterials.push({ 
                              id: nextMatID, name: uniqueTexName, shader: "TankiOnline/SingleTextureShader", 
-                             texParams: [{ name: "_MainTex", texName: uniqueTexName }] 
+                             texParams:[{ name: "_MainTex", texName: uniqueTexName }] 
                          });
                          window.dynamicAtlasesToSlice.push({ 
                              atlas: p._atlasName, rect: p._atlasRect, baseUrl: p._atlasBaseUrl, exportName: uniqueTexName
@@ -2606,60 +2546,83 @@
                  }
              }
 
+             const bitFlags =[];
+             const pushBit = (b) => bitFlags.push(b);
+             const bw = new BinaryWriter();
+
+             const atlasKeys = window.parsedAtlases ? Object.keys(window.parsedAtlases) :[];
+             if (atlasKeys.length > 0) {
+                 pushBit(true);
+                 bw.writeStringLength(atlasKeys.length);
+                 for (const aName of atlasKeys) {
+                     const a = window.parsedAtlases[aName];
+                     bw.writeInt32(a.height, false);
+                     bw.writeString(aName);
+                     bw.writeUint32(a.aUnknown, false);
+                     const rectKeys = Object.keys(a.rects);
+                     bw.writeStringLength(rectKeys.length);
+                     for (const rKey of rectKeys) {
+                         const r = a.rects[rKey];
+                         bw.writeUint32(r.h, false);
+                         bw.writeString(r.rLib || "");
+                         bw.writeString(r.originalName || "");
+                         bw.writeUint32(r.w, false);
+                         bw.writeUint32(r.x, false);
+                         bw.writeUint32(r.y, false);
+                     }
+                     bw.writeUint32(a.width, false);
+                 }
+             } else {
+                 pushBit(false);
+             }
+
+             pushBit(false);
+
+             bw.writeStringLength(0); bw.writeStringLength(0); bw.writeStringLength(0);
+             bw.writeStringLength(0); bw.writeStringLength(0); bw.writeStringLength(0);
+
+             bw.writeStringLength(newMaterials.length);
+             for (const nMat of newMaterials) {
+                 bw.writeUint32(nMat.id, false);
+                 bw.writeString(nMat.name);
+                 pushBit(false); 
+                 bw.writeString(nMat.shader);
+
+                 bw.writeStringLength(nMat.texParams.length);
+                 for (let tp of nMat.texParams) {
+                     pushBit(false); 
+                     bw.writeString(tp.name);
+                     bw.writeString(tp.texName);
+                 }
+
+                 pushBit(false);
+                 pushBit(false);
+                 pushBit(false);
+             }
+
+             pushBit(false);
+
              bw.writeStringLength(propsToWrite.length);
              for (const p of propsToWrite) {
-                 if (p.grpName && p.grpName !== "") { newPropBits.push(true); bw.writeString(p.grpName); } else { newPropBits.push(false); }
+                 if (p.grpName && p.grpName !== "") { pushBit(true); bw.writeString(p.grpName); } else { pushBit(false); }
                  bw.writeUint32(p.id, false);
                  bw.writeString("");
                  bw.writeUint32(p.matID, false); 
                  bw.writeString(p.name);
                  bw.writeFloat32(p.pos[0], false); bw.writeFloat32(p.pos[1], false); bw.writeFloat32(p.pos[2], false);
                  const isRotZero = (Math.abs(p.rot[0]) < 1e-5 && Math.abs(p.rot[1]) < 1e-5 && Math.abs(p.rot[2]) < 1e-5);
-                 if (!isRotZero) { newPropBits.push(true); bw.writeFloat32(p.rot[0], false); bw.writeFloat32(p.rot[1], false); bw.writeFloat32(p.rot[2], false); } else { newPropBits.push(false); }
+                 if (!isRotZero) { pushBit(true); bw.writeFloat32(p.rot[0], false); bw.writeFloat32(p.rot[1], false); bw.writeFloat32(p.rot[2], false); } else { pushBit(false); }
                  const isScaleOne = (Math.abs(p.scale[0]-1) < 1e-5 && Math.abs(p.scale[1]-1) < 1e-5 && Math.abs(p.scale[2]-1) < 1e-5);
-                 if (!isScaleOne) { newPropBits.push(true); bw.writeFloat32(p.scale[0], false); bw.writeFloat32(p.scale[1], false); bw.writeFloat32(p.scale[2], false); } else { newPropBits.push(false); }
+                 if (!isScaleOne) { pushBit(true); bw.writeFloat32(p.scale[0], false); bw.writeFloat32(p.scale[1], false); bw.writeFloat32(p.scale[2], false); } else { pushBit(false); }
              }
              
-                          const matBw = new BinaryWriter();
-             matBw.writeStringLength(newMaterials.length); 
+             const header = packHeader(bitFlags);
+             const bodyBytes = bw.toUint8Array();
              
-             for (const nMat of newMaterials) {
-                 matBw.writeUint32(nMat.id, false);
-                 matBw.writeString(nMat.name);
-                 newConsumedBits.push(false); 
-                 matBw.writeString(nMat.shader); 
-                 
-                 matBw.writeStringLength(nMat.texParams.length); 
-                 for (let tp of nMat.texParams) {
-                     newConsumedBits.push(false); 
-                     matBw.writeString(tp.name);  
-                     matBw.writeString(tp.texName); 
-                 }
-                 
-                 newConsumedBits.push(false); 
-                 newConsumedBits.push(false); 
-                 newConsumedBits.push(false); 
-             }
-
-             const finalBits =[
-                 ...newConsumedBits, 
-                 ...window.repackingData.postMatBits,
-                 ...newPropBits, 
-                 ...window.repackingData.suffixBits
-             ];
-             const header = packHeader(finalBits);
-             
-             const uncompressedLen = header.headerPrefix.length + header.extBytes.length + finalPreMatBytes.length + matBw.length + window.repackingData.postMatBytes.length + bw.length + window.repackingData.suffixBytes.length; 
-             const uncompressed = new Uint8Array(uncompressedLen);
-             let offset = 0;
-             
-             uncompressed.set(header.headerPrefix, offset); offset += header.headerPrefix.length;
-             uncompressed.set(header.extBytes, offset); offset += header.extBytes.length;
-             uncompressed.set(finalPreMatBytes, offset); offset += finalPreMatBytes.length;
-             uncompressed.set(matBw.toUint8Array(), offset); offset += matBw.length;
-             uncompressed.set(window.repackingData.postMatBytes, offset); offset += window.repackingData.postMatBytes.length;
-             uncompressed.set(bw.toUint8Array(), offset); offset += bw.length; 
-             uncompressed.set(window.repackingData.suffixBytes, offset); 
+             const uncompressed = new Uint8Array(header.headerPrefix.length + header.extBytes.length + bodyBytes.length);
+             uncompressed.set(header.headerPrefix, 0);
+             uncompressed.set(header.extBytes, header.headerPrefix.length);
+             uncompressed.set(bodyBytes, header.headerPrefix.length + header.extBytes.length);
              
              const binZipped = await wrapPacketCompressed(uncompressed);
              return { binData: binZipped, propsToWrite, idMapping };
@@ -3060,7 +3023,6 @@
 
              exportBtn.addEventListener('click', async () => {
                  try {
-                     if (!window.repackingData) { showToast("Please load a map before exporting!"); return; }
                      showToast("Preparing ZIP export...", false);
                      
                      if (!window.SparkMD5) {
