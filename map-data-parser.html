@@ -185,7 +185,7 @@
     <h2 id="ui-title">3D坦克地图数据解析</h2>
     <p id="ui-desc">该工具会在浏览器本地读取并解压3D坦克的二进制数据文件。解析完成后会自动将其转为 JSON 文件供你下载查看。</p>
     
-    <!-- 类型选择器 (精简了文字) -->
+    <!-- 类型选择器 -->
     <div class="type-selector">
         <label>
             <input type="radio" name="fileType" value="map" checked>
@@ -206,7 +206,7 @@
 </div>
 
 <script>
-// 多语言配置 (固定 Title 和 Desc，仅按钮根据类型变化)
+// 多语言配置
 const i18n = {
     zh: {
         title: "3D坦克地图数据解析",
@@ -253,7 +253,7 @@ document.getElementById('log').innerText = t.logWait;
 document.getElementById('ui-title').innerText = t.title;
 document.getElementById('ui-desc').innerText = t.desc;
 
-// 仅更新操作按钮相关的 UI
+// 更新操作按钮相关的 UI
 function updateUI() {
     const type = document.querySelector('input[name="fileType"]:checked').value;
     if (type === 'map') {
@@ -283,7 +283,7 @@ function logMsg(msg) {
     logEl.scrollTop = logEl.scrollHeight;
 }
 
-// 核心：合并后的二进制流读取器 (兼容两种 Endian 模式)
+// 核心读写器
 class BinaryStream {
     constructor(buffer) {
         this.buffer = new Uint8Array(buffer);
@@ -306,9 +306,6 @@ class BinaryStream {
     readString() { return new TextDecoder().decode(this.readBytes(this.readStringLength())); }
 }
 
-/* =========================================
-   Map.bin 解析逻辑
-========================================= */
 async function decompressZlib(uint8array) {
     const ds = new DecompressionStream("deflate");
     const writer = ds.writable.getWriter();
@@ -333,10 +330,14 @@ async function unwrapPacket(stream) {
     return new BinaryStream(data);
 }
 
+/* =========================================
+   Map.bin 解析逻辑 (包含隐藏碰撞体积解锁)
+========================================= */
 async function parseMapBin(buffer) {
     const stream = new BinaryStream(buffer);
     const packet = await unwrapPacket(stream);
     
+    // 解析标志位屏蔽树
     const optMask =[];
     const flags = packet.readUint8();
     if ((flags & 0b10000000) === 0) {
@@ -352,17 +353,25 @@ async function parseMapBin(buffer) {
     }
     optMask.reverse();
 
-    const skipObjectArray = (p, cb) => { const len = p.readStringLength(); for(let i=0; i<len; i++) cb(p); };
     const readV3 = () =>[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
 
-    const result = { props:[], materials: {}, atlases: {} };
+    const result = { 
+        atlases: {}, 
+        markers:[], 
+        collisionData1: {}, 
+        collisionData2: {}, 
+        materials: {}, 
+        lightingGroups: [], 
+        props:[] 
+    };
 
+    // 1. 图集解析 (Atlases)
     if (optMask.pop()) {
         const atlasLen = packet.readStringLength();
         for(let i=0; i<atlasLen; i++) {
             const aHeight = packet.readInt32(false); 
             const aName = packet.readString();
-            packet.readUint32(false); 
+            const aUnknown = packet.readUint32(false); 
             const rects = {};
             const rectLen = packet.readStringLength();
             for(let j=0; j<rectLen; j++) {
@@ -375,24 +384,64 @@ async function parseMapBin(buffer) {
                 rects[`${rLib}_${rName}`] = { x: rx, y: ry, w: rWidth, h: rHeight };
             }
             const aWidth = packet.readUint32(false);
-            result.atlases[aName] = { width: aWidth, height: aHeight, rects };
+            result.atlases[aName] = { width: aWidth, height: aHeight, aUnknown, rects };
         }
     }
 
-    if (optMask.pop()) skipObjectArray(packet, p => { p.readUint32(false); p.readString(); p.offset+=12; p.readString(); });
+    // 2. 特殊标记/重生点 (Markers/Spawns)
+    if (optMask.pop()) {
+        const len = packet.readStringLength();
+        for(let i=0; i<len; i++) {
+            const id = packet.readUint32(false);
+            const name = packet.readString();
+            const pos = readV3();
+            const type = packet.readString();
+            result.markers.push({ id, name, pos, type });
+        }
+    }
 
-    const skipCols = () => {
-        let len = packet.readStringLength(); for(let i=0; i<len; i++) packet.offset += 36; 
-        let len2 = packet.readStringLength(); for(let i=0; i<len2; i++) { packet.readFloat64(false); packet.offset+=24; packet.readFloat64(false); } 
-        let len3 = packet.readStringLength(); for(let i=0; i<len3; i++) { packet.readFloat64(false); packet.offset+=60; } 
+    // 3. 物理碰撞树解析 (Collisions)
+    const parseCollisions = () => {
+        const cols = { shapesType1: [], shapesType2: [], shapesType3:[] };
+        
+        let len1 = packet.readStringLength(); 
+        for(let i=0; i<len1; i++) {
+            const data =[]; for(let j=0; j<9; j++) data.push(packet.readFloat32(false));
+            cols.shapesType1.push(data);
+        }
+        
+        let len2 = packet.readStringLength(); 
+        for(let i=0; i<len2; i++) {
+            const f1 = packet.readFloat64(false);
+            const data =[]; for(let j=0; j<6; j++) data.push(packet.readFloat32(false));
+            const f2 = packet.readFloat64(false);
+            cols.shapesType2.push({ f1, data, f2 });
+        }
+        
+        let len3 = packet.readStringLength(); 
+        for(let i=0; i<len3; i++) {
+            const f1 = packet.readFloat64(false);
+            const data =[]; for(let j=0; j<15; j++) data.push(packet.readFloat32(false));
+            cols.shapesType3.push({ f1, data });
+        }
+        return cols;
     };
-    skipCols(); skipCols();
+    
+    result.collisionData1 = parseCollisions();
+    result.collisionData2 = parseCollisions();
 
+    // 4. 材质深度解析 (Materials)
     const matLen = packet.readStringLength();
     for(let i=0; i<matLen; i++) {
         const matID = packet.readUint32(false);
         const matName = packet.readString();
-        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=4; });
+        
+        const materialParams_1 =[];
+        if (optMask.pop()) {
+            const len = packet.readStringLength();
+            for(let j=0; j<len; j++) materialParams_1.push({ name: packet.readString(), val: packet.readFloat32(false) });
+        }
+        
         const shader = packet.readString();
 
         const texParams =[];
@@ -405,15 +454,40 @@ async function parseMapBin(buffer) {
             texParams.push({ libName, name: texParamName, texName });
         }
 
-        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=8; });
-        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=12; });
-        if (optMask.pop()) skipObjectArray(packet, p => { p.readString(); p.offset+=16; });
+        const materialParams_2 =[];
+        if (optMask.pop()) {
+            const len = packet.readStringLength();
+            for(let j=0; j<len; j++) materialParams_2.push({ name: packet.readString(), val:[packet.readFloat32(false), packet.readFloat32(false)] });
+        }
         
-        result.materials[matID] = { name: matName, shader, texParams };
+        const materialParams_3 =[];
+        if (optMask.pop()) {
+            const len = packet.readStringLength();
+            for(let j=0; j<len; j++) materialParams_3.push({ name: packet.readString(), val: readV3() });
+        }
+        
+        const materialParams_4 =[];
+        if (optMask.pop()) {
+            const len = packet.readStringLength();
+            for(let j=0; j<len; j++) materialParams_4.push({ name: packet.readString(), val:[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)] });
+        }
+        
+        result.materials[matID] = { 
+            name: matName, shader, texParams, 
+            extraParams: { float1: materialParams_1, float2: materialParams_2, float3: materialParams_3, float4: materialParams_4 } 
+        };
     }
 
-    if (optMask.pop()) skipObjectArray(packet, p => { p.offset+=28; }); 
+    // 5. 光照组 / 附加属性
+    if (optMask.pop()) {
+        const len = packet.readStringLength();
+        for(let i=0; i<len; i++) {
+            const data =[]; for(let j=0; j<7; j++) data.push(packet.readFloat32(false));
+            result.lightingGroups.push(data);
+        }
+    }
 
+    // 6. 物体实例 (Props)
     const propLen = packet.readStringLength();
     for(let i=0; i<propLen; i++) {
         let grpName = ""; if(optMask.pop()) grpName = packet.readString();
@@ -423,7 +497,7 @@ async function parseMapBin(buffer) {
         const name = packet.readString();
         const pos = readV3();
         const rot = optMask.pop() ? readV3() : [0,0,0];
-        const scale = optMask.pop() ? readV3() :[1,1,1];
+        const scale = optMask.pop() ? readV3() : [1,1,1];
         
         result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
     }
@@ -432,7 +506,7 @@ async function parseMapBin(buffer) {
 }
 
 /* =========================================
-   LightmapData 解析逻辑
+   LightmapData 解析逻辑 (修复 UV 错位 Bug)
 ========================================= */
 function decodeIntColorToHex(intColor) {
     const r = (intColor >> 16) & 255;
@@ -444,9 +518,7 @@ function decodeIntColorToHex(intColor) {
 function parseLightmapData(buffer) {
     const stream = new BinaryStream(buffer);
     const version = stream.readUint32(true);
-    if (version !== 2) {
-        throw new Error(`Unsupported LightmapData version: ${version} (expected 2)`);
-    }
+    if (version !== 2) throw new Error(`Unsupported LightmapData version: ${version} (expected 2)`);
 
     const lightColorInt = stream.readUint32(true);
     const ambientColorInt = stream.readUint32(true);
@@ -455,9 +527,7 @@ function parseLightmapData(buffer) {
 
     const lightmapCount = stream.readUint32(true);
     const lightmaps =[];
-    for (let i = 0; i < lightmapCount; i++) {
-        lightmaps.push(stream.readString());
-    }
+    for (let i = 0; i < lightmapCount; i++) lightmaps.push(stream.readString());
 
     const mapObjectCount = stream.readUint32(true);
     const mapObjects =[];
@@ -466,7 +536,7 @@ function parseLightmapData(buffer) {
         const index = stream.readInt32(true);
         const lightmapIndex = stream.readInt32(true);
         let lightmapScaleOffset = null;
-        let uv1 = [], uv2 =[];
+        let uvs =[]; // 完美修复的 UV 读取循环
         
         if (lightmapIndex >= 0) {
             lightmapScaleOffset =[
@@ -476,17 +546,17 @@ function parseLightmapData(buffer) {
             const hasUVs = stream.readUint8();
             if (hasUVs > 0) {
                 const vertexCount = stream.readUint32(true);
-                for (let v = 0; v < Math.floor(vertexCount / 2); v++) {
-                    uv1.push([stream.readFloat32(true), stream.readFloat32(true)]);
-                    uv2.push([stream.readFloat32(true), stream.readFloat32(true)]);
+                for (let v = 0; v < vertexCount; v++) {
+                    uvs.push([stream.readFloat32(true), stream.readFloat32(true)]);
                 }
             }
         }
+        
         const castShadows = stream.readUint8() > 0;
         const receiveShadows = stream.readUint8() > 0;
 
         mapObjects.push({
-            index, lightmapIndex, lightmapScaleOffset, uv1, uv2, castShadows, receiveShadows
+            index, lightmapIndex, lightmapScaleOffset, uvs, castShadows, receiveShadows
         });
     }
 
