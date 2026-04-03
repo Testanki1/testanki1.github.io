@@ -84,6 +84,18 @@
         #fab:hover { background: color-mix(in srgb, var(--md-sys-color-primary-container), white 10%); box-shadow: 0 6px 10px 4px rgba(0,0,0,0.2); transform:scale(1.02); }
         #fab svg { width: 24px; fill: currentColor; }
 
+        /* M3 FAB (Screenshot) */
+        #fab-cam { 
+            position: absolute; bottom: 96px; right: 24px; 
+            width: 56px; height: 56px; border-radius: 16px; 
+            background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); 
+            border: 1px solid var(--md-sys-color-outline-variant); box-shadow: 0 4px 8px 3px rgba(0,0,0,0.15); 
+            display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; 
+            transition: 0.2s cubic-bezier(0.2,0,0,1); 
+        }
+        #fab-cam:hover { background: color-mix(in srgb, var(--md-sys-color-surface-container-high), white 10%); box-shadow: 0 6px 10px 4px rgba(0,0,0,0.2); transform:scale(1.02); }
+        #fab-cam svg { width: 24px; fill: currentColor; }
+
         /* M3 Navigation Drawer */
         #drawer { 
             position: absolute; top: 0; right: 0; bottom: 0; width: 360px; max-width: 95vw; 
@@ -342,6 +354,8 @@
         <div class="app-title" id="t-app-title">Model showcase</div>
     </div>
     <div id="toast"><span>Ready</span></div>
+    
+    <button id="fab-cam" title="4K Screenshot"><svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg></button>
     <button id="fab"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
 
     <div id="drawer" class="open">
@@ -495,7 +509,8 @@
             mountNone: "未检测",
             export: "导出 GLB",
             clear: "清空场景",
-            loading: "加载中..."
+            loading: "加载中...",
+            screenshot: "已保存 4K 截图"
         },
         en: {
             appTitle: "Tanki Online Model Showcase",
@@ -519,7 +534,8 @@
             mountNone: "Not Detected",
             export: "Export GLB",
             clear: "Clear All Objects",
-            loading: "Loading..."
+            loading: "Loading...",
+            screenshot: "4K Screenshot Saved"
         }
     };
     const T = Dict[userLang];
@@ -583,7 +599,6 @@
     const IconLoader = {
         cache: new Map(),
         
-        // Returns SVG String (for inlining, allows recolor)
         async getEquipmentIcon(internalName) {
             let filename = internalName;
             const lower = internalName.toLowerCase();
@@ -598,10 +613,7 @@
                 if (!resp.ok) throw "Icon 404";
                 let text = await resp.text();
                 
-                // Simple cleanup
                 text = text.replace(/<\?xml.*?\?>/g, '').replace(/<!DOCTYPE.*?>/g, '');
-                
-                // Ensure currentColor is used for fills if they aren't 'none' or 'currentColor'
                 text = text.replace(/fill="(?!(none|currentColor))[^"]*"/gi, 'fill="currentColor"');
                 
                 if (!text.includes('fill="currentColor"') && !text.includes('fill="none"')) {
@@ -615,33 +627,26 @@
             }
         },
 
-        // Returns URL String (for <img src>, protects original color)
         getSkinIconUrl(skinId) {
             if(!skinId) return null;
             const lower = skinId.toLowerCase();
             
-            // Special Mappings (Equipment icons reused as skins)
-            // Handle both English and Chinese keys
             if (lower === 'claw' || lower === '螯' || lower === 'spider' || lower === '蜘蛛') 
                 return `${ICON_BASE_EQUIP}/bonk.svg`;
             
-            // "Tomato" or "Tomato Gun" or "番茄" or "番茄炮"
             if (lower.includes('tomato') || lower.includes('番茄')) 
                 return `${ICON_BASE_EQUIP}/magnum.svg`;
                 
             if (lower === 'snowman' || lower === '雪人') 
                 return `${ICON_BASE_EQUIP}/freeze.svg`;
             
-            // Standard Skin Mappings
             if (lower === 'default' || lower === '默认') 
                 return `${ICON_BASE_SKIN}/standard.svg`;
             
-            // "Old Demon" -> DC (悪魔)
             const isDc = lower.includes('dc') || lower.includes('恶魔');
             const isOld = lower.includes('old') || lower.includes('旧');
             if (isDc && isOld) return `${ICON_BASE_SKIN}/DC.svg`;
 
-            // Filename generation
             let filename = "";
             if (lower === 'ic') filename = "ICE.svg";
             else if (lower === 'xt_hd') filename = "XT_HD.svg";
@@ -652,16 +657,16 @@
     };
 
     // State
-    let currentMode = 'assembly'; // Default mode
+    let currentMode = 'assembly'; 
     const slots = { hull: null, turret: null, scene: null };
-    const pools = { hull: [], turret: [] };
-    let assetsData = null; // Store fetched index
+    const pools = { hull:[], turret:[] };
+    let assetsData = null; 
     
     // Scene Lib
-    const sceneLib = { tex: new Map(), meshes: [] };
+    const sceneLib = { tex: new Map(), meshes:[] };
     const logBox = document.getElementById('scene-log');
 
-    let normalMeshes = [], normalTextures = [];
+    let normalMeshes = [], normalTextures =[];
 
     // Helpers
     const mountHelper = new THREE.Mesh(new THREE.SphereGeometry(3,8,8), new THREE.MeshBasicMaterial({color:0x76FF33}));
@@ -671,6 +676,7 @@
     // Scene
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x001926);
     const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 1, 1e6); camera.position.set(150,150,150);
+    // preserveDrawingBuffer is key for taking screenshot via toDataURL
     const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer: true}); 
     renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio); 
     renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
@@ -681,7 +687,7 @@
     const groupNormal = new THREE.Group();
     const groupAssembly = new THREE.Group();
     groupNormal.visible = false;
-    groupAssembly.visible = true; // Default
+    groupAssembly.visible = true; 
     root.add(groupNormal);
     root.add(groupAssembly);
     
@@ -701,10 +707,10 @@
     let open=true; fab.onclick=()=>{open=!open;if(open)drawer.style.display='flex';else drawer.style.display='none'};
     function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
     
-    function log(msg) {
+    function log(msgText) {
         const div = document.createElement('div');
         div.className = `log-line log-ok`;
-        div.innerText = msg;
+        div.innerText = msgText;
         logBox.appendChild(div);
         logBox.scrollTop = logBox.scrollHeight;
     }
@@ -724,14 +730,10 @@
             if(!resp.ok) throw "Fetch failed";
             assetsData = await resp.json();
             
-            // Build UI
             await populateUI();
             
-            // Auto-load if in assembly mode (defaults to first item usually)
             if(currentMode==='assembly') {
-                // 加载底盘
                 if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
-                // 加载炮塔 (新增这行)
                 if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
             }
             msg("Ready");
@@ -740,6 +742,56 @@
             msg("Failed to load index");
         }
     })();
+
+    // 4K Screenshot Logic (No UI elements captured naturally via toDataURL)
+    document.getElementById('fab-cam').onclick = () => {
+        const targetWidth = 3840;
+        const targetHeight = 2160;
+
+        const origWidth = innerWidth;
+        const origHeight = innerHeight;
+        const origPixelRatio = renderer.getPixelRatio();
+        const origAspect = camera.aspect;
+        
+        // Hide UI helper sphere to make screenshot perfectly clean
+        const wasMountVisible = mountHelper.visible;
+        mountHelper.visible = false;
+
+        // Apply 4K Settings
+        renderer.setPixelRatio(1);
+        renderer.setSize(targetWidth, targetHeight, false);
+        camera.aspect = targetWidth / targetHeight;
+        camera.updateProjectionMatrix();
+
+        // Render & Capture pure WebGL canvas
+        renderer.render(scene, camera);
+        const dataURL = renderer.domElement.toDataURL('image/png');
+
+        // Restore everything back to normal
+        renderer.setPixelRatio(origPixelRatio);
+        renderer.setSize(origWidth, origHeight);
+        camera.aspect = origAspect;
+        camera.updateProjectionMatrix();
+        mountHelper.visible = wasMountVisible;
+        renderer.render(scene, camera);
+
+        // Download
+        const link = document.createElement('a');
+        link.href = dataURL;
+        link.download = `Tanki_4K_Screenshot_${new Date().toISOString().slice(0,10)}.png`;
+        link.click();
+
+        msg(T.screenshot);
+    };
+
+    // Mobile Auto Fullscreen on canvas click/touch
+    renderer.domElement.addEventListener('touchend', () => {
+        const doc = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            if (doc.requestFullscreen) doc.requestFullscreen().catch(()=>{});
+            else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen();
+        }
+    }, { passive: true });
 
     // Beta Toggle Logic
     window.toggleScene = function() {
@@ -756,27 +808,22 @@
 
     // --- M3 Custom Select Logic ---
     async function renderCustomSelect(nativeSelectId, type, items) {
-        // Items: [{ value, label }]
         const nativeSel = document.getElementById(nativeSelectId);
         const container = nativeSel.parentElement;
         const oldCustom = container.querySelector('.m3-custom-select');
         if(oldCustom) oldCustom.remove();
         
-        // Setup Native Options (Hidden source of truth)
         nativeSel.innerHTML = "";
         items.forEach(item => nativeSel.add(new Option(item.label, item.value)));
 
-        // Create DOM
         const wrapper = document.createElement('div');
         wrapper.className = 'm3-custom-select';
         
-        // Determine label text
         let labelTxt = "";
         if(type === 'model') labelTxt = T.lblModel;
         else if(type === 'skin') labelTxt = T.lblSkin;
         else if(type === 'env') labelTxt = T.lblEnv;
 
-        // Determine Initial Icon (first item)
         const initialVal = items[0]?.value;
         const initialLabel = items[0]?.label || "Select...";
         
@@ -798,10 +845,9 @@
         const textBox = wrapper.querySelector('.select-text');
         const panel = wrapper.querySelector('.m3-options-panel');
         
-        // Helper to update displayed selection
         const updateDisplay = async (val, txt) => {
             textBox.innerText = txt;
-            iconBox.innerHTML = ""; // Clear current
+            iconBox.innerHTML = ""; 
             
             if (type === 'model') {
                 const svg = await IconLoader.getEquipmentIcon(val);
@@ -812,13 +858,11 @@
             }
         };
 
-        // Populate Dropdown
         for (const item of items) {
             const row = document.createElement('div');
             row.className = 'm3-option-row';
             if(item.value === initialVal) row.classList.add('selected');
             
-            // Icon holder
             const iHolder = document.createElement('div'); iHolder.className = 'opt-icon';
             const txt = document.createElement('div'); txt.className = 'opt-text'; txt.innerText = item.label;
             
@@ -826,24 +870,19 @@
             
             row.onclick = (e) => {
                 e.stopPropagation();
-                // Update Native Select
                 nativeSel.value = item.value;
-                // Update Custom UI
                 panel.querySelectorAll('.m3-option-row').forEach(r => r.classList.remove('selected'));
                 row.classList.add('selected');
                 updateDisplay(item.value, item.label);
                 
-                // Close menu
                 panel.classList.remove('show');
                 wrapper.classList.remove('active');
                 
-                // Trigger Native Change Event
                 nativeSel.dispatchEvent(new Event('change'));
             };
             
             panel.appendChild(row);
             
-            // Load Icon Async (Branching Logic)
             (async () => {
                 if(type === 'model') {
                     const svg = await IconLoader.getEquipmentIcon(item.value);
@@ -855,9 +894,7 @@
             })();
         }
 
-        // Trigger Click
         wrapper.onclick = (e) => {
-            // Close other dropdowns
             document.querySelectorAll('.m3-options-panel.show').forEach(p => {
                 if(p !== panel) { p.classList.remove('show'); p.parentElement.classList.remove('active'); }
             });
@@ -872,14 +909,11 @@
             }
         };
 
-        // Initialize Display
         if(items.length > 0) updateDisplay(initialVal, initialLabel);
 
-        // Inject
         container.insertBefore(wrapper, nativeSel);
     }
 
-    // Close dropdowns when clicking outside
     document.addEventListener('click', (e) => {
         if(!e.target.closest('.m3-custom-select')) {
             document.querySelectorAll('.m3-options-panel.show').forEach(p => {
@@ -889,23 +923,19 @@
         }
     });
 
-
     async function populateUI() {
         if(!assetsData) return;
         
-        // Hulls
         const hullKeys = Object.keys(assetsData.hulls || {});
         const hullItems = hullKeys.map(k => ({ value: k, label: formatName(k) }));
         await renderCustomSelect('sel-hull-name', 'model', hullItems);
         
-        // Wire events
         const selHull = document.getElementById('sel-hull-name');
         selHull.onchange = () => {
             updateSkinSelect('hull', selHull.value);
             if(currentMode==='assembly') triggerLoad('hull');
         };
 
-        // Turrets
         const turretKeys = Object.keys(assetsData.turrets || {});
         const turretItems = turretKeys.map(k => ({ value: k, label: formatName(k) }));
         await renderCustomSelect('sel-turret-name', 'model', turretItems);
@@ -916,7 +946,6 @@
             if(currentMode==='assembly') triggerLoad('turret');
         };
 
-        // Scenes
         const selScene = document.getElementById('sel-scene-var');
         const garageData = assetsData.festivals?.garage || {};
         const sceneItems = Object.keys(garageData).map(k => ({ value: k, label: translateDataKey(k) }));
@@ -924,7 +953,6 @@
         await renderCustomSelect('sel-scene-var', 'env', sceneItems);
         selScene.onchange = () => triggerSceneLoad();
 
-        // Initialize Skins
         if(hullItems.length) updateSkinSelect('hull', hullItems[0].value);
         if(turretItems.length) updateSkinSelect('turret', turretItems[0].value);
     }
@@ -933,7 +961,6 @@
         const skins = assetsData[`${type}s`][name] || {};
         const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) }));
         
-        // Sort: default first
         skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
         
         await renderCustomSelect(`sel-${type}-skin`, 'skin', skinItems);
@@ -962,7 +989,6 @@
         if(!path) return;
         
         const box = document.getElementById(`box-${type}`);
-        // Add loading class to custom wrapper
         const wrapper = box.querySelector('.m3-custom-select');
         if(wrapper) wrapper.classList.add('loading');
         
@@ -1003,9 +1029,7 @@
             
             if(!modelEntry) throw "Model file not found";
 
-            // Find all textures
             const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx'));
-            
             const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
             
             let group;
@@ -1023,7 +1047,7 @@
                 });
             }
 
-            pools[type] = [];
+            pools[type] =[];
             if(imgEntries.length > 0) {
                 const texPromises = imgEntries.map(async entry => {
                     const texUrl = `${RES_BASE}/${pathStr}/${entry.name}`;
@@ -1066,7 +1090,7 @@
 
     async function loadRemoteScene(path, variant) {
         if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
-        sceneLib.meshes = []; sceneLib.tex.clear();
+        sceneLib.meshes =[]; sceneLib.tex.clear();
         logBox.style.display = 'block'; logBox.innerHTML='';
         
         try {
@@ -1121,7 +1145,6 @@
     }
 
     // --- Standard Functions ---
-
     window.switchMode = function(mode) {
         if(currentMode === mode) return;
         currentMode = mode;
@@ -1146,8 +1169,6 @@
              mountHelper.visible = false;
         }
     }
-
-    const loadingManager = new THREE.LoadingManager();
 
     document.getElementById('btn-clear').onclick = clearScene;
 
@@ -1201,12 +1222,12 @@
     function runSceneInjector() {
         let count = 0; log(">>> Injecting Textures...");
         sceneLib.meshes.forEach(mesh => {
-            const candidates = [];
+            const candidates =[];
             if (mesh.material && mesh.material.name) candidates.push(mesh.material.name);
             if (mesh.name) candidates.push(mesh.name);
             if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
             let bestTex = null;
-            for (const [texName, texObj] of sceneLib.tex) {
+            for (const[texName, texObj] of sceneLib.tex) {
                 const cleanTexName = texName.toLowerCase().split('.')[0];
                 for (const cand of candidates) {
                     const cleanCand = cand.toLowerCase();
@@ -1220,7 +1241,7 @@
                     map: bestTex, emissiveMap: bestTex, emissive: new THREE.Color(0x888888), 
                     color: 0xffffff, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 
                 });
-                mesh.material.needsUpdate = true; log(`✔ [${mesh.name}] -> ${bestTex.name}`); count++;
+                mesh.material.needsUpdate = true; log(`✔[${mesh.name}] -> ${bestTex.name}`); count++;
             }
         });
         if(count > 0) msg(`Matched ${count} materials`); else log("⚠ No matches found");
@@ -1229,7 +1250,7 @@
     document.getElementById('btn-clear-scene').onclick = () => {
          if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
          sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear();
-         sceneLib.meshes = [];
+         sceneLib.meshes =[];
          logBox.innerHTML = ''; logBox.style.display = 'none';
          document.getElementById('display-scene').innerText = T.sceneDisplay;
          msg(T.removeEnv);
@@ -1309,7 +1330,7 @@
                 const c = groupNormal.children[0];
                 dispose(c); groupNormal.remove(c);
             }
-            normalMeshes = []; normalTextures.forEach(t=>t.dispose()); normalTextures = [];
+            normalMeshes =[]; normalTextures.forEach(t=>t.dispose()); normalTextures =[];
             document.getElementById('list-normal').innerHTML="";
         } else {
             if(slots.hull) { groupAssembly.remove(slots.hull.group); dispose(slots.hull.group); }
@@ -1317,8 +1338,6 @@
             if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); }
             slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
             
-            // Re-select first items if available to reset select visuals
-            // Or just leave them as is but empty scene.
             logBox.style.display='none';
             updateMount(null);
         }
