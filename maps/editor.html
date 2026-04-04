@@ -1245,10 +1245,15 @@
     if (dirLight) {
         dirLight.color.setHex(lightColor);
         dirLight.intensity = 4.0;
-        const lightPos = new THREE.Vector3(0, 0, 5000);
-        const euler = new THREE.Euler(data.lightAngleX, 0, data.lightAngleZ, 'XYZ');
-        lightPos.applyEuler(euler);
-        dirLight.position.set(lightPos.x, lightPos.z, -lightPos.y);
+        
+        const radX = data.lightAngleX;
+        const radZ = data.lightAngleZ;
+
+        const dirX = -Math.cos(radX) * Math.sin(radZ);
+        const dirY = Math.cos(radX) * Math.cos(radZ);
+        const dirZ = Math.sin(radX);
+
+dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
         dirLight.lookAt(0, 0, 0);
     }
     if (hemiLight) {
@@ -1419,19 +1424,20 @@
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 4096;
     dirLight.shadow.mapSize.height = 4096;
-    const d = 500;
+    
+    const d = 800;
     dirLight.shadow.camera.left = -d;
     dirLight.shadow.camera.right = d;
     dirLight.shadow.camera.top = d;
     dirLight.shadow.camera.bottom = -d;
     dirLight.shadow.camera.near = 100;
-    dirLight.shadow.camera.far = 5000;
+    dirLight.shadow.camera.far = 10000; 
     
-    dirLight.shadow.bias = -0.0001;
-    dirLight.shadow.normalBias = 0.0;
+    dirLight.shadow.bias = -0.0005;
+    dirLight.shadow.normalBias = 0.002;
     
     dirLight.shadow.blurSamples = 4;
-    dirLight.shadow.radius = 1.5; 
+    dirLight.shadow.radius = 1.5;
     scene.add(dirLight);
 
     const pixelRatio = window.devicePixelRatio;
