@@ -1433,11 +1433,11 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
     dirLight.shadow.camera.near = 100;
     dirLight.shadow.camera.far = 10000; 
     
-    dirLight.shadow.bias = -0.0005;
-    dirLight.shadow.normalBias = 0.002;
+    dirLight.shadow.bias = -0.0001;
+    dirLight.shadow.normalBias = 0.0;
     
     dirLight.shadow.blurSamples = 4;
-    dirLight.shadow.radius = 1.5;
+    dirLight.shadow.radius = 1;
     scene.add(dirLight);
 
     const pixelRatio = window.devicePixelRatio;
@@ -2170,50 +2170,64 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      instGeo.setAttribute('uv', uv);
                  }
          
-                 const prefabMesh = new THREE.Mesh(instGeo, mat);
-                 prefabMesh.castShadow = true;
-                 prefabMesh.receiveShadow = true;
-                 prefabMesh.scale.set(prop.scale[0], prop.scale[1], prop.scale[2]);
-         
-                 if (buildWorld && originalMapGroup) {
-                     let instanceKey;
-                     if (prop.grpName && prop.grpName.trim() !== "") {
-                         instanceKey = `${baseName}_grp_${prop.grpName}`;
-                     } else {
-                         let snap = 1;
-                         const px = Math.round(prop.pos[0] / snap) * snap;
-                         const py = Math.round(prop.pos[1] / snap) * snap;
-                         const pz = Math.round(prop.pos[2] / snap) * snap;
-                         instanceKey = `${baseName}_${px}_${py}_${pz}`;
-                     }
-                     if (!originalInstancesMap.has(instanceKey)) {
-                         const grp = new THREE.Group();
-                         grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
-                         grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
-                         grp.userData.baseName = baseName;
-                         grp.userData.originalProps =[];
-                         originalInstancesMap.set(instanceKey, grp);
-                     }
-                     const instanceGroup = originalInstancesMap.get(instanceKey);
-                     instanceGroup.userData.originalProps.push(prop);
-                     
-                     const sceneMesh = prefabMesh.clone();
-                     if (shadowSettings[prop.id]) {
-                         sceneMesh.castShadow = shadowSettings[prop.id].cast;
-                         sceneMesh.receiveShadow = shadowSettings[prop.id].receive;
-                     }
-                     const rootMatrix = new THREE.Matrix4().compose(
-                         instanceGroup.position, instanceGroup.quaternion, new THREE.Vector3(1, 1, 1)
-                     );
-                     const propMatrix = new THREE.Matrix4().compose(
-                         new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
-                         new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
-                         new THREE.Vector3(1, 1, 1)
-                     );
-                     const localMatrix = propMatrix.premultiply(rootMatrix.invert());
-                     localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
-                     instanceGroup.add(sceneMesh);
-                 }
+        const nameLower = prop.name.toLowerCase();
+        const fileLower = file ? file.toLowerCase() : "";
+        const isMountOrLandscape = nameLower.includes('mount') || fileLower.includes('mount') || 
+                                   nameLower.includes('landscape') || fileLower.includes('landscape');
+
+        const prefabMesh = new THREE.Mesh(instGeo, mat);
+      
+        prefabMesh.castShadow = !isMountOrLandscape; 
+        prefabMesh.receiveShadow = !isMountOrLandscape; 
+        prefabMesh.scale.set(prop.scale[0], prop.scale[1], prop.scale[2]);
+        
+        if (buildWorld && originalMapGroup) {
+           
+            let instanceKey;
+            if (prop.grpName && prop.grpName.trim() !== "") {
+                instanceKey = `${baseName}_grp_${prop.grpName}`;
+            } else {
+                let snap = 1;
+                const px = Math.round(prop.pos[0] / snap) * snap;
+                const py = Math.round(prop.pos[1] / snap) * snap;
+                const pz = Math.round(prop.pos[2] / snap) * snap;
+                instanceKey = `${baseName}_${px}_${py}_${pz}`;
+            }
+            if (!originalInstancesMap.has(instanceKey)) {
+                const grp = new THREE.Group();
+                grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
+                grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
+                grp.userData.baseName = baseName;
+                grp.userData.originalProps =[];
+                originalInstancesMap.set(instanceKey, grp);
+            }
+            const instanceGroup = originalInstancesMap.get(instanceKey);
+            instanceGroup.userData.originalProps.push(prop);
+            
+            const sceneMesh = prefabMesh.clone();
+            
+            if (shadowSettings[prop.id]) {
+                sceneMesh.castShadow = shadowSettings[prop.id].cast;
+                sceneMesh.receiveShadow = shadowSettings[prop.id].receive;
+            }
+            
+            if (isMountOrLandscape) {
+                sceneMesh.castShadow = false;
+                sceneMesh.receiveShadow = false;
+            }
+
+            const rootMatrix = new THREE.Matrix4().compose(
+                instanceGroup.position, instanceGroup.quaternion, new THREE.Vector3(1, 1, 1)
+            );
+            const propMatrix = new THREE.Matrix4().compose(
+                new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
+                new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
+                new THREE.Vector3(1, 1, 1)
+            );
+            const localMatrix = propMatrix.premultiply(rootMatrix.invert());
+            localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
+            instanceGroup.add(sceneMesh);
+        }
          
                  if (!globalLoadedProps.has(prop.name)) {
                      if (!prefabs.has(baseName)) {
