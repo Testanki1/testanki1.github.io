@@ -540,6 +540,7 @@
          import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
          import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
          import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
          
          const EXTERNAL_MAPS_JSON_URL = "https://raw.githubusercontent.com/Testanki1/testanki1.github.io/refs/heads/main/maps/maps.json"; 
          
@@ -1237,24 +1238,28 @@
          }
          
          function applyLightmapData(data) {
-             if (!data) return;
-             const lightColor = decodeIntColorToHex(data.lightColorInt);
-             const ambientColor = decodeIntColorToHex(data.ambientColorInt);
-             if (dirLight) {
-                 dirLight.color.setHex(lightColor);
-                 const lightPos = new THREE.Vector3(0, 0, 5000);
-                 const euler = new THREE.Euler(data.lightAngleX, 0, data.lightAngleZ, 'XYZ');
-                 lightPos.applyEuler(euler);
-                 dirLight.position.set(lightPos.x, lightPos.z, -lightPos.y);
-                 dirLight.lookAt(0, 0, 0);
-             }
-             if (hemiLight) {
-                 hemiLight.color.setHex(ambientColor);
-                 hemiLight.groundColor.setHex(ambientColor);
-             } else {
-                 scene.background = new THREE.Color(ambientColor);
-             }
-         }
+    if (!data) return;
+    const lightColor = decodeIntColorToHex(data.lightColorInt);
+    const ambientColor = decodeIntColorToHex(data.ambientColorInt);
+    
+    if (dirLight) {
+        dirLight.color.setHex(lightColor);
+        dirLight.intensity = 4.0;
+        const lightPos = new THREE.Vector3(0, 0, 5000);
+        const euler = new THREE.Euler(data.lightAngleX, 0, data.lightAngleZ, 'XYZ');
+        lightPos.applyEuler(euler);
+        dirLight.position.set(lightPos.x, lightPos.z, -lightPos.y);
+        dirLight.lookAt(0, 0, 0);
+    }
+    if (hemiLight) {
+        hemiLight.color.setHex(ambientColor);
+        const groundColor = new THREE.Color(ambientColor).multiplyScalar(0.4);
+        hemiLight.groundColor.copy(groundColor); 
+        hemiLight.intensity = 0.8;
+    } 
+    
+    scene.background = new THREE.Color(ambientColor); 
+}
          
          function setupMobileFullscreen() {
              const lockScreen = async () => {
@@ -1354,119 +1359,125 @@
          }
          
          function initThree() {
-             if (renderer) return;
-             scene = new THREE.Scene();
-             scene.background = new THREE.Color(0x9DD1F1);
-             
-             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
-             camera.position.set(0, 10, 80);
-             camera.rotation.order = 'YXZ';
-             camera.rotation.set(0.1, 0, 0);
-         
-             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
-             renderer.setPixelRatio(window.devicePixelRatio);
-             renderer.setSize(window.innerWidth, window.innerHeight);
-             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-             renderer.toneMappingExposure = 1.2; 
-             renderer.shadowMap.enabled = true;
-             renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-             document.getElementById('canvas-container').appendChild(renderer.domElement);
-         
-             renderer.domElement.addEventListener('webglcontextlost', (event) => {
-                 event.preventDefault();
-             }, false);
-         
-             renderer.domElement.addEventListener('webglcontextrestored', () => {
-                 const pmremGenerator = new THREE.PMREMGenerator(renderer);
-                 pmremGenerator.compileEquirectangularShader();
-                 const environment = new RoomEnvironment();
-                 scene.environment = pmremGenerator.fromScene(environment).texture;
-                 environment.dispose();
-                 textureCache.forEach(tex => { if(tex) tex.needsUpdate = true; });
-                 defaultControl.needsUpdate = true;
-                 defaultTile.needsUpdate = true;
-                 scene.traverse((child) => {
-                     if (child.isMesh && child.material) child.material.needsUpdate = true;
-                 });
-                 setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100);
-             }, false);
-         
-             clock = new THREE.Clock();
-             
-             if (!isTouchDevice) {
-                 controls = new FlyControls(camera, renderer.domElement);
-                 controls.movementSpeed = 600;
-                 controls.rollSpeed = Math.PI / 6;
-                 controls.autoForward = false;
-                 controls.dragToLook = true;
-             } else {
-                 setupMobileControls();
-                 setupMobileFullscreen();
-             }
-         
-             const pmremGenerator = new THREE.PMREMGenerator(renderer);
-             pmremGenerator.compileEquirectangularShader();
-             const environment = new RoomEnvironment();
-             scene.environment = pmremGenerator.fromScene(environment).texture;
-             environment.dispose();
-             scene.environmentIntensity = 0.5; 
-         
-             hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
-             hemiLight.position.set(0, 1000, 0);
-             scene.add(hemiLight);
-         
-             dirLight = new THREE.DirectionalLight(0xffffff, 2.0); 
-             dirLight.position.set(-800, 1500, -500);
-             dirLight.castShadow = true;
-             dirLight.shadow.mapSize.width = 4096;
-             dirLight.shadow.mapSize.height = 4096;
-             const d = 500; 
-             dirLight.shadow.camera.left = -d;
-             dirLight.shadow.camera.right = d;
-             dirLight.shadow.camera.top = d;
-             dirLight.shadow.camera.bottom = -d;
-             dirLight.shadow.camera.near = 100;
-             dirLight.shadow.camera.far = 5000;
-             dirLight.shadow.bias = -0.0005; 
-             dirLight.shadow.normalBias = 0.05; 
-             dirLight.shadow.blurSamples = 16; 
-             dirLight.shadow.radius = 1.5; 
-             scene.add(dirLight);
-         
-             const pixelRatio = window.devicePixelRatio;
-             const renderTarget = new THREE.WebGLRenderTarget(
-                 window.innerWidth * pixelRatio, 
-                 window.innerHeight * pixelRatio, 
-                 { samples: 4, type: THREE.HalfFloatType }
-             );
-             
-             composer = new EffectComposer(renderer, renderTarget);
-             composer.setPixelRatio(window.devicePixelRatio);
-             const renderPass = new RenderPass(scene, camera);
-             composer.addPass(renderPass);
-             const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-             ssaoPass.kernelRadius = 8;      
-             ssaoPass.minDistance = 0.002;    
-             ssaoPass.maxDistance = 0.2;      
-             ssaoPass.output = SSAOPass.OUTPUT.Default; 
-             composer.addPass(ssaoPass);
-             const outputPass = new OutputPass();
-             composer.addPass(outputPass);
-         
-             function onWindowResize() {
-                 if(!camera || !renderer || !composer) return;
-                 const width = window.innerWidth;
-                 const height = window.innerHeight;
-                 camera.aspect = width / height;
-                 camera.updateProjectionMatrix();
-                 renderer.setSize(width, height);
-                 composer.setSize(width, height); 
-             }
-             window.addEventListener('resize', onWindowResize);
-             onWindowResize();
-             initThumbnails();
-             animate();
-         }
+    if (renderer) return;
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x3EA1FF); 
+    
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
+    camera.position.set(0, 10, 80);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.set(0.1, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.6; 
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    renderer.domElement.addEventListener('webglcontextlost', (event) => {
+        event.preventDefault();
+    }, false);
+
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+        scene.environment = null; 
+        textureCache.forEach(tex => { if(tex) tex.needsUpdate = true; });
+        defaultControl.needsUpdate = true;
+        defaultTile.needsUpdate = true;
+        scene.traverse((child) => {
+            if (child.isMesh && child.material) child.material.needsUpdate = true;
+        });
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100);
+    }, false);
+
+    clock = new THREE.Clock();
+    
+    if (!isTouchDevice) {
+        controls = new FlyControls(camera, renderer.domElement);
+        controls.movementSpeed = 600;
+        controls.rollSpeed = Math.PI / 6;
+        controls.autoForward = false;
+        controls.dragToLook = true;
+    } else {
+        setupMobileControls();
+        setupMobileFullscreen();
+    }
+    scene.environment = null;
+    scene.environmentIntensity = 0.0; 
+
+    hemiLight = new THREE.HemisphereLight(0xffffff, 0x777788, 1.5); 
+    hemiLight.position.set(0, 1000, 0);
+    scene.add(hemiLight);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
+    scene.add(ambientLight);
+
+    dirLight = new THREE.DirectionalLight(0xFFFAE6, 3.5);
+    dirLight.position.set(-800, 1500, -500);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 4096;
+    dirLight.shadow.mapSize.height = 4096;
+    const d = 500;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.camera.near = 100;
+    dirLight.shadow.camera.far = 5000;
+    
+    dirLight.shadow.bias = -0.0001;
+    dirLight.shadow.normalBias = 0.0;
+    
+    dirLight.shadow.blurSamples = 4;
+    dirLight.shadow.radius = 1.5; 
+    scene.add(dirLight);
+
+    const pixelRatio = window.devicePixelRatio;
+    const renderTarget = new THREE.WebGLRenderTarget(
+        window.innerWidth * pixelRatio, 
+        window.innerHeight * pixelRatio, 
+        { samples: 4, type: THREE.HalfFloatType }
+    );
+    
+    composer = new EffectComposer(renderer, renderTarget);
+    composer.setPixelRatio(window.devicePixelRatio);
+    
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+    ssaoPass.kernelRadius = 16;
+    ssaoPass.minDistance = 0.001;    
+    ssaoPass.maxDistance = 0.1;
+    composer.addPass(ssaoPass);
+
+    const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.35,
+        0.4,
+        0.85
+    );
+    composer.addPass(bloomPass);
+
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+
+    function onWindowResize() {
+        if(!camera || !renderer || !composer) return;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+        composer.setSize(width, height); 
+    }
+    window.addEventListener('resize', onWindowResize);
+    onWindowResize();
+    initThumbnails();
+    animate();
+}
          
          function initThumbnails() {
              thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -2039,10 +2050,12 @@
                        
          
                          mat = new THREE.MeshStandardMaterial({
-                             roughness: 0.9,
-                             metalness: 0.05,
+                             roughness: 1.0,
+                             metalness: 0.0,
                              side: THREE.DoubleSide
                          });
+                         
+                          
          
                          let customUniforms = {
                              tControl: { value: tControl || defaultControl },
@@ -2118,9 +2131,10 @@
                          mat.customProgramCacheKey = function() { return "terrain_" + matCacheKey; };
                      } else {
                          mat = new THREE.MeshStandardMaterial({ 
-                             color: 0xffffff, roughness: 0.85, metalness: 0.02,
+                             color: 0xffffff, roughness: 1.0, metalness: 0.0,
                              side: THREE.DoubleSide, transparent: false, alphaTest: 0.5, depthWrite: true
                          });
+                         
                          if (targetTexName) {
                              const diffTex = getTexFromCache(targetTexName, matBaseUrl);
                              if (diffTex) mat.map = diffTex;
