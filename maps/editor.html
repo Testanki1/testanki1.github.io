@@ -1206,35 +1206,7 @@
                  lightmaps.push(stream.readString());
              }
          
-             const mapObjectCount = stream.readUint32(true);
-             const mapObjects =[];
-             for (let i = 0; i < mapObjectCount; i++) {
-                 const index = stream.readInt32(true);
-                 const lightmapIndex = stream.readInt32(true);
-                 let lightmapScaleOffset = null;
-                 let uvs =[];
-                 
-                 if (lightmapIndex >= 0) {
-                     lightmapScaleOffset =[
-                         stream.readFloat32(true), stream.readFloat32(true),
-                         stream.readFloat32(true), stream.readFloat32(true)
-                     ];
-                     const hasUVs = stream.readUint8();
-                     if (hasUVs > 0) {
-                         const vertexCount = stream.readUint32(true);
-                         for (let v = 0; v < vertexCount; v++) {
-                             uvs.push([stream.readFloat32(true), stream.readFloat32(true)]);
-                         }
-                     }
-                 }
-                 const castShadows = stream.readUint8() > 0;
-                 const receiveShadows = stream.readUint8() > 0;
-         
-                 mapObjects.push({
-                     index, lightmapIndex, lightmapScaleOffset, uvs, castShadows, receiveShadows
-                 });
-             }
-             return { version, lightColorInt, ambientColorInt, lightAngleX, lightAngleZ, lightmaps, mapObjects };
+             return { version, lightColorInt, ambientColorInt, lightAngleX, lightAngleZ, lightmaps };
          }
          
          function applyLightmapData(data) {
@@ -1688,11 +1660,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
          async function processMap(mapData, buildWorld = false, onProgress = null, lightmapData = null) {
              const propDict = await getPropDict(mapData); 
-             let shadowSettings = {};
-             if (lightmapData) {
-                 lightmapData.mapObjects.forEach(mo => { shadowSettings[mo.index] = { cast: mo.castShadows, receive: mo.receiveShadows }; });
-             }
-         
+             
              const uniqueModelToLib = new Map(); 
              const uniqueTexToLib = new Map();
              const repeatingTextures = new Set(); 
@@ -1839,12 +1807,6 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  prop._baseUrl = baseUrl;
                  prop._file = file;
                  
-                 let lmInfo = null;
-                 if (lightmapData && lightmapData.mapObjects) {
-                     lmInfo = lightmapData.mapObjects.find(mo => mo.index === prop.id);
-                 }
-                 const lmIdx = (lmInfo && lmInfo.lightmapIndex >= 0) ? lmInfo.lightmapIndex : -1;
-                 
                  let geometry = null;
                  let a3dData = null;
              
@@ -1930,26 +1892,6 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  const instGeo = geometry.clone();
                  instGeo.name = geometry.name || prop.name; 
                  
-                 if (lmInfo && lmInfo.lightmapIndex >= 0 && lmInfo.lightmapScaleOffset) {
-                     const[sx, sy, ox, oy] = lmInfo.lightmapScaleOffset;
-                     
-                     if (instGeo.attributes.uv2) {
-                         const uv2 = instGeo.attributes.uv2.clone();
-                         for (let u = 0; u < uv2.array.length; u += 2) {
-                             uv2.array[u] = uv2.array[u] * sx + ox;
-                             uv2.array[u+1] = uv2.array[u+1] * sy + oy;
-                         }
-                         instGeo.setAttribute('uv2', uv2);
-                     } else if (instGeo.attributes.uv) {
-                         const uv2 = instGeo.attributes.uv.clone();
-                         for (let u = 0; u < uv2.array.length; u += 2) {
-                             uv2.array[u] = uv2.array[u] * sx + ox;
-                             uv2.array[u+1] = uv2.array[u+1] * sy + oy;
-                         }
-                         instGeo.setAttribute('uv2', uv2);
-                     }
-                 }
-                 
                  let mat;
                  const isTerrainMesh = file.toLowerCase().includes('terrain');
                  const hasControlMap = !!controlTexName;
@@ -2018,7 +1960,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      prop._atlasBaseUrl = window.currentMapBaseUrl;
                  }
          
-                 const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}_LM${lmIdx}_${baseUrl}`;
+                 const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}_${baseUrl}`;
                  if (materialCache.has(matCacheKey)) {
                      mat = materialCache.get(matCacheKey);
                  } else {
@@ -2149,11 +2091,6 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                              mat.color.setHex(0xaaaaaa); mat.map = defaultTile;
                          }
                      }
-                     if (lmIdx >= 0 && lightmapData && lightmapData.lightmaps) {
-                         const lmName = lightmapData.lightmaps[lmIdx];
-                         const lmTex = getTexFromCache(lmName, window.currentMapBaseUrl);
-                         if (lmTex) { mat.lightMap = lmTex; mat.lightMapIntensity = 2.0; }
-                     }
                      materialCache.set(matCacheKey, mat);
                  }
          
@@ -2205,11 +2142,6 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
             instanceGroup.userData.originalProps.push(prop);
             
             const sceneMesh = prefabMesh.clone();
-            
-            if (shadowSettings[prop.id]) {
-                sceneMesh.castShadow = shadowSettings[prop.id].cast;
-                sceneMesh.receiveShadow = shadowSettings[prop.id].receive;
-            }
             
             if (isMountOrLandscape) {
                 sceneMesh.castShadow = false;
