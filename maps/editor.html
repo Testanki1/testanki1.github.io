@@ -2581,6 +2581,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
          window.selectPrefab = function(baseName) {
              try {
+                 window.isGhostFrozen = false;
                  if (ghost) {
                      editorGroup.remove(ghost);
                      ghost = null;
@@ -2745,7 +2746,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              function updateDragModeUI() {
                  rotateBtn.className = window.dragMode === 'rotate' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
                  gridZBtn.className = window.dragMode === 'gridZ' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
-                 if (controls) controls.dragToLook = window.dragMode === 'none';
+                 if (controls) controls.dragToLook = true;
              }
              window.updateDragModeUI = updateDragModeUI;
          
@@ -2942,7 +2943,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              if (cancelGhostBtn) {
                  cancelGhostBtn.addEventListener('click', () => {
                      if (ghost) {
-                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; document.querySelector('.grid-floating-panel').style.display = 'none';
+                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; window.isGhostFrozen = false; document.querySelector('.grid-floating-panel').style.display = 'none';
                          if (window.originalObjectBeingMoved) {
                              if (window.originalObjectParent) window.originalObjectParent.add(window.originalObjectBeingMoved);
                              else editorGroup.add(window.originalObjectBeingMoved);
@@ -3334,11 +3335,13 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  if (e.button === 2) {
                      document.getElementById('context-menu').style.display = 'none';
                      if (ghost) {
-                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; document.querySelector('.grid-floating-panel').style.display = 'none';
-                         if (window.originalObjectBeingMoved) {
-                             if (window.originalObjectParent) window.originalObjectParent.add(window.originalObjectBeingMoved);
-                             else editorGroup.add(window.originalObjectBeingMoved);
-                             window.originalObjectBeingMoved = null; window.originalObjectParent = null;
+                 
+                         window.isGhostFrozen = !window.isGhostFrozen;
+                         if (window.isGhostFrozen) {
+                             showToast("Prop frozen in place", false);
+                         } else {
+                             showToast("Prop unfrozen", false);
+                             updateGhost(e.clientX, e.clientY);
                          }
                      } else {
                          handleLongPress(e.clientX, e.clientY);
@@ -3435,9 +3438,9 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      window.originalObjectBeingMoved = null; window.originalObjectParent = null;
          
                      if (!window.isContinuousCopyEnabled) {
-                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; document.querySelector('.grid-floating-panel').style.display = 'none';
+                         editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; window.isGhostFrozen = false; document.querySelector('.grid-floating-panel').style.display = 'none';
                      } else {
-                         window.isGhostLockedToOriginal = false; window.dragMode = 'none';
+                         window.isGhostLockedToOriginal = false; window.isGhostFrozen = false; window.dragMode = 'none';
                          if (window.updateDragModeUI) window.updateDragModeUI();
                          updateGhost(e.clientX, e.clientY, false);
                      }
@@ -3449,7 +3452,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              currentMousePos.x = clientX; currentMousePos.y = clientY;
              if (!ghost) return;
          
-             if (!isLockedDrag && !window.isGhostLockedToOriginal) {
+             if (!isLockedDrag && !window.isGhostLockedToOriginal && !window.isGhostFrozen) {
                  mouse.x = (clientX / window.innerWidth) * 2 - 1; mouse.y = -(clientY / window.innerHeight) * 2 + 1;
                  raycaster.setFromCamera(mouse, camera);
                  const intersects = raycaster.intersectObjects(editorGroup.children, true);
