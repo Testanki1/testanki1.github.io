@@ -571,6 +571,9 @@
          </div>
       </div>
       <div id="toast-msg"></div>
+      <div id="pan-anchor" style="position: fixed; width: 32px; height: 32px; border: 2px solid rgba(255, 255, 255, 0.6); border-radius: 50%; pointer-events: none; z-index: 9999; display: none; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.2); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);">
+         <div style="position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255, 255, 255, 0.9); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>
+      </div>
       <div id="canvas-container"></div>
       <script type="module">
          import * as THREE from 'three';
@@ -1436,12 +1439,12 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                 cameraTarget.quaternion.copy(camera.quaternion);
             }
             
-            if (window.isMiddleDragging && window.middleDragOrigin && window.middleDragCurrent) {
-                const dx = window.middleDragCurrent.x - window.middleDragOrigin.x;
-                const dy = window.middleDragCurrent.y - window.middleDragOrigin.y;
+            if (window.isMiddlePanMode && window.middlePanOrigin && window.middlePanCurrent) {
+                const dx = window.middlePanCurrent.x - window.middlePanOrigin.x;
+                const dy = window.middlePanCurrent.y - window.middlePanOrigin.y;
                 
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > 3) {
+                if (dist > 5) {
                     const speedMultiplier = (delta * controls.movementSpeed) / 100;
                     cameraTarget.translateX(dx * speedMultiplier);
                     cameraTarget.translateZ(dy * speedMultiplier); 
@@ -3401,17 +3404,32 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
              renderer.domElement.addEventListener('pointerdown', (e) => {
                  if (!e.isPrimary) return;
-                 isDragging = false;
-                 pointerDownPos = {x: e.clientX, y: e.clientY};
 
                  if (e.button === 1) {
                      e.preventDefault();
-                     window.isMiddleDragging = true;
-                     window.middleDragOrigin = { x: e.clientX, y: e.clientY };
-                     window.middleDragCurrent = { x: e.clientX, y: e.clientY };
-                     if (controls) controls.mouseStatus = 0;
+                     window.isMiddlePanMode = !window.isMiddlePanMode;
+                     const anchorEl = document.getElementById('pan-anchor');
+                     if (window.isMiddlePanMode) {
+                         window.middlePanOrigin = { x: e.clientX, y: e.clientY };
+                         window.middlePanCurrent = { x: e.clientX, y: e.clientY };
+                         anchorEl.style.left = e.clientX + 'px';
+                         anchorEl.style.top = e.clientY + 'px';
+                         anchorEl.style.display = 'block';
+                     } else {
+                         anchorEl.style.display = 'none';
+                     }
+                     if (controls) controls.mouseStatus = 0; 
                      return;
                  }
+                 
+                 if (window.isMiddlePanMode) {
+                     window.isMiddlePanMode = false;
+                     document.getElementById('pan-anchor').style.display = 'none';
+                     if (controls) controls.mouseStatus = 0;
+                 }
+
+                 isDragging = false;
+                 pointerDownPos = {x: e.clientX, y: e.clientY};
                  
                  if (e.button === 2) {
                      document.getElementById('context-menu').style.display = 'none';
@@ -3448,8 +3466,8 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
              renderer.domElement.addEventListener('pointermove', (e) => {
                  if (e.isPrimary) {
-                     if (window.isMiddleDragging) {
-                         window.middleDragCurrent = { x: e.clientX, y: e.clientY };
+                     if (window.isMiddlePanMode) {
+                         window.middlePanCurrent = { x: e.clientX, y: e.clientY };
                          if (controls) controls.mouseStatus = 0;
                          return;
                      }
@@ -3506,11 +3524,6 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
              renderer.domElement.addEventListener('pointerup', (e) => {
                  if (!e.isPrimary) return;
-
-                 if (e.button === 1) {
-                     window.isMiddleDragging = false;
-                     return;
-                 }
 
                  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
                  if (window.isEditingDrag) {
