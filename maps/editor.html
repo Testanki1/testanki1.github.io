@@ -541,6 +541,7 @@
          import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
          import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
          import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+         import { Timer } from 'three/addons/misc/Timer.js';
          
          const EXTERNAL_MAPS_JSON_URL = "https://raw.githubusercontent.com/Testanki1/testanki1.github.io/refs/heads/main/maps/maps.json"; 
          
@@ -1352,7 +1353,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.6; 
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
     renderer.domElement.addEventListener('webglcontextlost', (event) => {
@@ -1370,7 +1371,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
         setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100);
     }, false);
 
-    clock = new THREE.Clock();
+    clock = new Timer();
     
     if (!isTouchDevice) {
         controls = new FlyControls(camera, renderer.domElement);
@@ -1500,8 +1501,9 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
          function animate() {
              requestAnimationFrame(animate);
-             const delta = Math.min(clock.getDelta(), 0.1); 
-             if (controls) controls.update(delta);
+    if (clock) clock.update();
+    const delta = Math.min(clock.getDelta(), 0.1); 
+    if (controls) controls.update(delta);
              
              const uiContainer = document.getElementById('ui-container');
              const propsView = document.getElementById('view-props');
@@ -2349,11 +2351,9 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          }
          
          document.addEventListener('visibilitychange', () => {
-             if (document.hidden) {
-                 if (clock) clock.stop();
-             } else {
-                 if (clock) clock.start();
-                 setTimeout(() => {
+    if (document.hidden) {
+    } else {
+        setTimeout(() => {
                      window.dispatchEvent(new Event('resize'));
                      if (thumbnailItems && thumbnailItems.length > 0) {
                          for (const item of thumbnailItems) {
