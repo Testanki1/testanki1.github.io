@@ -1376,9 +1376,18 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
     if (!isTouchDevice) {
         controls = new FlyControls(camera, renderer.domElement);
         controls.movementSpeed = 600;
-        controls.rollSpeed = Math.PI / 6;
+        controls.rollSpeed = 0;
         controls.autoForward = false;
         controls.dragToLook = true;
+
+        const originalUpdate = controls.update.bind(controls);
+        controls.update = function(delta) {
+            const tempQuat = camera.quaternion.clone();
+            originalUpdate(delta);
+            camera.quaternion.copy(tempQuat);
+        };
+
+        setupMobileControls();
     } else {
         setupMobileControls();
         setupMobileFullscreen();
@@ -3331,6 +3340,8 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                              else editorGroup.add(window.originalObjectBeingMoved);
                              window.originalObjectBeingMoved = null; window.originalObjectParent = null;
                          }
+                     } else {
+                         handleLongPress(e.clientX, e.clientY);
                      }
                      return;
                  }
@@ -3345,8 +3356,10 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  }
          
                  if (window.isGhostLockedToOriginal) window.isGhostLockedToOriginal = false;
-                 longPressTimer = setTimeout(() => handleLongPress(e.clientX, e.clientY), 500);
-                 updateGhost(e.clientX, e.clientY);
+            if (isTouchDevice) {
+                longPressTimer = setTimeout(() => handleLongPress(e.clientX, e.clientY), 500);
+            }
+            updateGhost(e.clientX, e.clientY);
              });
          
              renderer.domElement.addEventListener('pointermove', (e) => {
