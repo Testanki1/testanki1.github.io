@@ -1334,33 +1334,50 @@ let cameraTarget;
          }
          
          function applyLightmapData(data) {
-    if (!data) return;
-    const lightColor = decodeIntColorToHex(data.lightColorInt);
-    const ambientColor = decodeIntColorToHex(data.ambientColorInt);
-    
-    if (dirLight) {
-        dirLight.color.setHex(lightColor);
-        dirLight.intensity = 4.0;
-        
-        const radX = data.lightAngleX;
-        const radZ = data.lightAngleZ;
+             if (!data) {
+                 if (dirLight) {
+                     dirLight.color.setHex(0xFFFFFF);
+                     dirLight.intensity = 3.5;
+                     dirLight.position.set(-800, 1500, -500); 
+                     dirLight.lookAt(0, 0, 0);
+                 }
+                 if (hemiLight) {
+                     hemiLight.color.setHex(0xDDDDDD);
+                     hemiLight.groundColor.setHex(0x888888);
+                     hemiLight.intensity = 1.0;
+                 } 
+                 if (scene) {
+                     scene.background = new THREE.Color(0xDDDDDD);
+                 }
+                 return;
+             }
+             
+             const lightColor = decodeIntColorToHex(data.lightColorInt);
+             const ambientColor = decodeIntColorToHex(data.ambientColorInt);
+             
+             if (dirLight) {
+                 dirLight.color.setHex(lightColor);
+                 dirLight.intensity = 4.0;
+                 
+                 const radX = data.lightAngleX;
+                 const radZ = data.lightAngleZ;
 
-        const dirX = -Math.cos(radX) * Math.sin(radZ);
-        const dirY = Math.cos(radX) * Math.cos(radZ);
-        const dirZ = Math.sin(radX);
+                 const dirX = -Math.cos(radX) * Math.sin(radZ);
+                 const dirY = Math.cos(radX) * Math.cos(radZ);
+                 const dirZ = Math.sin(radX);
 
-dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
-        dirLight.lookAt(0, 0, 0);
-    }
-    if (hemiLight) {
-        hemiLight.color.setHex(ambientColor);
-        const groundColor = new THREE.Color(ambientColor).multiplyScalar(0.4);
-        hemiLight.groundColor.copy(groundColor); 
-        hemiLight.intensity = 0.8;
-    } 
-    
-    scene.background = new THREE.Color(ambientColor); 
-}
+                 dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
+                 dirLight.lookAt(0, 0, 0);
+             }
+             if (hemiLight) {
+                 hemiLight.color.setHex(ambientColor);
+                 const groundColor = new THREE.Color(ambientColor).multiplyScalar(0.4);
+                 hemiLight.groundColor.copy(groundColor); 
+                 hemiLight.intensity = 0.8;
+             } 
+             
+             scene.background = new THREE.Color(ambientColor); 
+         }
          
          function setupMobileFullscreen() {
              const lockScreen = async () => {
@@ -1463,11 +1480,11 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          }
          
          function initThree() {
-    if (renderer) return;
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x3EA1FF); 
-    
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
+             if (renderer) return;
+             scene = new THREE.Scene();
+             scene.background = new THREE.Color(0xDDDDDD); 
+             
+             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
     camera.position.set(0, 10, 80);
     camera.rotation.order = 'YXZ';
     camera.rotation.set(0.1, 0, 0);
@@ -2553,8 +2570,10 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  try {
                      const lmBuf = await fetchFile(`${baseUrl}/lightmapdata`);
                      lightmapData = parseLightmapData(lmBuf);
-                     applyLightmapData(lightmapData);
                  } catch (e) { console.warn("No lightmapdata found"); }
+               
+                 applyLightmapData(lightmapData);
+                 
                  window.currentLightmapData = lightmapData;
          
                  await processMap(mapData, false, (p) => updateUI(0.15 + p * 0.85), lightmapData);
@@ -3085,8 +3104,9 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                          if (lmFile) {
                              const lmBuf = await lmFile.async("arraybuffer");
                              lightmapData = parseLightmapData(lmBuf);
-                             applyLightmapData(lightmapData);
                          }
+          
+                         applyLightmapData(lightmapData);
                          
                          for (const[name, zipEntry] of Object.entries(zip.files)) {
                              if (name.endsWith('.webp') || name.endsWith('.png') || name.endsWith('.jpg')) {
