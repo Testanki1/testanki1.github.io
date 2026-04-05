@@ -554,6 +554,7 @@
          const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
          
          let scene, camera, renderer, controls, clock, composer;
+let cameraTarget;
          let thumbRenderer, thumbScene, thumbCamera;
          let hemiLight, dirLight;
          let editorGroup;
@@ -1276,10 +1277,13 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      const deltaPanY = currentState.midpoint.y - previousTwoFingerState.midpoint.y;
                      const deltaPinch = currentState.distance - previousTwoFingerState.distance;
                      camera.translateX(-deltaPanX);
-                     camera.translateY(deltaPanY);
-                     camera.translateZ(-deltaPinch);
-                 }
-                 previousTwoFingerState = currentState;
+            camera.translateY(deltaPanY);
+            camera.translateZ(-deltaPinch);
+            if (typeof cameraTarget !== 'undefined' && cameraTarget) {
+                cameraTarget.position.copy(camera.position);
+            }
+        }
+        previousTwoFingerState = currentState;
              }
          
              const onPointerDown = (e) => {
@@ -1374,18 +1378,27 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
     clock = new Timer();
     
     if (!isTouchDevice) {
-        controls = new FlyControls(camera, renderer.domElement);
-        controls.movementSpeed = 600;
+        cameraTarget = new THREE.Object3D();
+        cameraTarget.position.copy(camera.position);
+
+        controls = new FlyControls(cameraTarget, renderer.domElement);
+        controls.movementSpeed = 150;
         controls.rollSpeed = 0;
         controls.autoForward = false;
         controls.dragToLook = true;
 
         const originalUpdate = controls.update.bind(controls);
         controls.update = function(delta) {
-            const tempQuat = camera.quaternion.clone();
+            cameraTarget.quaternion.copy(camera.quaternion);
             originalUpdate(delta);
-            camera.quaternion.copy(tempQuat);
         };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Shift') controls.movementSpeed = 450;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift') controls.movementSpeed = 150;
+        });
 
         setupMobileControls();
     } else {
@@ -1512,9 +1525,15 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              requestAnimationFrame(animate);
     if (clock) clock.update();
     const delta = Math.min(clock.getDelta(), 0.1); 
-    if (controls) controls.update(delta);
+    
+    if (controls) {
+        controls.update(delta);
+        if (cameraTarget) {
+            camera.position.lerp(cameraTarget.position, 10 * delta);
+        }
+    }
              
-             const uiContainer = document.getElementById('ui-container');
+    const uiContainer = document.getElementById('ui-container');
              const propsView = document.getElementById('view-props');
              if (uiContainer.style.transform !== 'translateX(100%)' && propsView.style.display !== 'none') {
                  const listContainer = document.getElementById('prefab-list');
@@ -2735,10 +2754,13 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                                  let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
                                  cameraDistance = Math.max(cameraDistance, 50) * 1.2;
                                  camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
-                                 camera.lookAt(center);
-                             }
-                         }
-                         showToast("Original map loaded successfully!", false);
+                                camera.lookAt(center);
+                                if (typeof cameraTarget !== 'undefined' && cameraTarget) {
+                                    cameraTarget.position.copy(camera.position);
+                                }
+                            }
+                        }
+                        showToast("Original map loaded successfully!", false);
                      } catch (err) { console.error(err); showToast("Failed to load original map."); }
                  });
              });
