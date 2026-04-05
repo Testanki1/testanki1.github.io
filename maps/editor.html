@@ -484,7 +484,7 @@
          <span class="material-symbols-rounded" style="font-size:20px;">grid_on</span>
          </button>
          <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div>
-         <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Horizontal Rotate (Long press to switch)">
+         <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Horizontal Rotate">
          <span class="material-symbols-rounded" style="font-size:20px;">rotate_right</span>
          </button>
          <button id="grid-z-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Grid Z Drag">
@@ -497,6 +497,11 @@
          </button>
          <button id="cancel-ghost-btn" class="m3-btn m3-btn-error" style="width:40px;padding:8px 0;" title="Cancel Placement">
          <span class="material-symbols-rounded" style="font-size:20px;">close</span>
+         </button>
+      </div>
+      <div id="camera-floating-panel" style="position: fixed; left: 24px; bottom: 84px; z-index: 150; display: none; align-items: center; gap: 12px; background: var(--md-sys-color-surface); padding: 8px 12px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 1px solid var(--md-sys-color-outline); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
+         <button id="lock-height-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Fixed Height">
+            <span class="material-symbols-rounded" style="font-size:20px;">vertical_align_center</span>
          </button>
       </div>
       <div id="context-menu">
@@ -1389,7 +1394,18 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
 
         const originalUpdate = controls.update.bind(controls);
         controls.update = function(delta) {
-            cameraTarget.quaternion.copy(camera.quaternion);
+            if (window.isHeightLocked) {
+    
+                const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+                cameraTarget.quaternion.setFromEuler(new THREE.Euler(0, euler.y, 0, 'YXZ'));
+                
+                let moveY = 0;
+                if (window.keyQPressed) moveY -= controls.movementSpeed * delta;
+                if (window.keyEPressed) moveY += controls.movementSpeed * delta;
+                cameraTarget.position.y += moveY;
+            } else {
+                cameraTarget.quaternion.copy(camera.quaternion);
+            }
             originalUpdate(delta);
         };
 
@@ -2809,7 +2825,19 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  gridHeightDisplay.innerText = Math.round(currentGridHeight);
                  if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true);
              }
-         
+         const lockHeightBtn = document.getElementById('lock-height-btn');
+             const cameraPanel = document.getElementById('camera-floating-panel');
+             if (lockHeightBtn && !isTouchDevice) {
+                 cameraPanel.style.display = 'flex';
+                 window.isHeightLocked = false;
+                 window.keyQPressed = false;
+                 window.keyEPressed = false;
+                 
+                 lockHeightBtn.addEventListener('click', () => {
+                     window.isHeightLocked = !window.isHeightLocked;
+                     lockHeightBtn.className = window.isHeightLocked ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
+                 });
+             }
              function updateUIState() { uiContainer.style.transform = isUIOpen ? 'translateX(0)' : 'translateX(100%)'; }
              updateUIState();
              
@@ -3162,13 +3190,14 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              });
          
              window.addEventListener('keydown', (e) => {
-                 if (e.key === 'q' || e.key === 'Q') updateGridHeight(-100);
-                 if (e.key === 'e' || e.key === 'E') updateGridHeight(100);
-                 if (e.key === 'r' || e.key === 'R') {
-                     if (ghost) { ghost.rotation.z -= Math.PI / 4; updateGhost(currentMousePos.x, currentMousePos.y); }
-                 }
+                 if (e.key === 'q' || e.key === 'Q') window.keyQPressed = true;
+                 if (e.key === 'e' || e.key === 'E') window.keyEPressed = true;
              });
-             
+
+             window.addEventListener('keyup', (e) => {
+                 if (e.key === 'q' || e.key === 'Q') window.keyQPressed = false;
+                 if (e.key === 'e' || e.key === 'E') window.keyEPressed = false;
+             });
              let longPressTimer = null;
              let selectedObjectForAction = null;
          
