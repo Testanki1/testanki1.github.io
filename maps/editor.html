@@ -1436,6 +1436,18 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                 cameraTarget.quaternion.copy(camera.quaternion);
             }
             
+            if (window.isMiddleDragging && window.middleDragOrigin && window.middleDragCurrent) {
+                const dx = window.middleDragCurrent.x - window.middleDragOrigin.x;
+                const dy = window.middleDragCurrent.y - window.middleDragOrigin.y;
+                
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 3) {
+                    const speedMultiplier = (delta * controls.movementSpeed) / 100;
+                    cameraTarget.translateX(dx * speedMultiplier);
+                    cameraTarget.translateZ(dy * speedMultiplier); 
+                }
+            }
+            
             originalUpdate(delta);
         };
 
@@ -3391,6 +3403,15 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  if (!e.isPrimary) return;
                  isDragging = false;
                  pointerDownPos = {x: e.clientX, y: e.clientY};
+
+                 if (e.button === 1) {
+                     e.preventDefault();
+                     window.isMiddleDragging = true;
+                     window.middleDragOrigin = { x: e.clientX, y: e.clientY };
+                     window.middleDragCurrent = { x: e.clientX, y: e.clientY };
+                     if (controls) controls.mouseStatus = 0;
+                     return;
+                 }
                  
                  if (e.button === 2) {
                      document.getElementById('context-menu').style.display = 'none';
@@ -3427,6 +3448,12 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
              renderer.domElement.addEventListener('pointermove', (e) => {
                  if (e.isPrimary) {
+                     if (window.isMiddleDragging) {
+                         window.middleDragCurrent = { x: e.clientX, y: e.clientY };
+                         if (controls) controls.mouseStatus = 0;
+                         return;
+                     }
+
                      if (Math.abs(e.clientX - pointerDownPos.x) > 15 || Math.abs(e.clientY - pointerDownPos.y) > 15) {
                          isDragging = true;
                          if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
@@ -3479,6 +3506,12 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
              renderer.domElement.addEventListener('pointerup', (e) => {
                  if (!e.isPrimary) return;
+
+                 if (e.button === 1) {
+                     window.isMiddleDragging = false;
+                     return;
+                 }
+
                  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
                  if (window.isEditingDrag) {
                      window.isEditingDrag = false;
