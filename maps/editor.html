@@ -2749,47 +2749,38 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  if (controls) controls.dragToLook = true;
              }
              window.updateDragModeUI = updateDragModeUI;
-         
-             function setupBtnPress(btn, onClick, onLongPress) {
-                 let timer;
-                 let isLongPress = false;
-                 btn.addEventListener('pointerdown', (e) => {
-                     if (e.button !== 0 && e.pointerType === 'mouse') return;
-                     isLongPress = false;
-                     if (e.pointerId) btn.setPointerCapture(e.pointerId);
-                     timer = setTimeout(() => {
-                         isLongPress = true; onLongPress();
-                         if ('vibrate' in navigator) navigator.vibrate(50);
-                     }, 500);
-                 });
-                 btn.addEventListener('pointerup', (e) => {
-                     if (e.button !== 0 && e.pointerType === 'mouse') return;
-                     if (timer) clearTimeout(timer);
-                     if (!isLongPress) onClick();
-                     if (e.pointerId) btn.releasePointerCapture(e.pointerId);
-                 });
-                 btn.addEventListener('pointercancel', (e) => {
-                     if (timer) clearTimeout(timer);
-                     if (e.pointerId) btn.releasePointerCapture(e.pointerId);
-                 });
-                 btn.addEventListener('click', (e) => e.preventDefault());
-             }
-         
-             setupBtnPress(rotateBtn, 
-                 () => { window.dragMode = window.dragMode === 'rotate' ? 'none' : 'rotate'; updateDragModeUI(); },
-                 () => {
-                     if (window.rotateButtonMode === 'horizontal') {
-                         window.rotateButtonMode = 'free'; rotateBtn.querySelector('span').innerText = '3d_rotation'; rotateBtn.title = "Toggle Free Rotate"; showToast("Switched to Free Rotate Mode", false);
-                     } else {
-                         window.rotateButtonMode = 'horizontal'; rotateBtn.querySelector('span').innerText = 'rotate_right'; rotateBtn.title = "Toggle Horizontal Rotate"; showToast("Switched to Horizontal Rotate Mode", false);
-                     }
+    
+             rotateBtn.addEventListener('click', (e) => {
+                 e.preventDefault();
+                 window.dragMode = window.dragMode === 'rotate' ? 'none' : 'rotate';
+                 updateDragModeUI();
+                 if (window.dragMode === 'rotate' && !isTouchDevice && ghost && !window.isGhostFrozen) {
+                     showToast("Right-click to freeze the prop before dragging to adjust", false);
                  }
-             );
-         
-             setupBtnPress(gridZBtn, 
-                 () => { window.dragMode = window.dragMode === 'gridZ' ? 'none' : 'gridZ'; updateDragModeUI(); },
-                 () => { currentGridHeight = 0; document.getElementById('grid-height-display').innerText = '0'; if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true); showToast("Grid Z Reset", false); }
-             );
+             });
+             rotateBtn.addEventListener('contextmenu', (e) => {
+                 e.preventDefault();
+                 if (window.rotateButtonMode === 'horizontal') {
+                     window.rotateButtonMode = 'free'; rotateBtn.querySelector('span').innerText = '3d_rotation'; rotateBtn.title = "Toggle Free Rotate"; showToast("Switched to Free Rotate Mode", false);
+                 } else {
+                     window.rotateButtonMode = 'horizontal'; rotateBtn.querySelector('span').innerText = 'rotate_right'; rotateBtn.title = "Toggle Horizontal Rotate"; showToast("Switched to Horizontal Rotate Mode", false);
+                 }
+             });
+
+             gridZBtn.addEventListener('click', (e) => {
+                 e.preventDefault();
+                 window.dragMode = window.dragMode === 'gridZ' ? 'none' : 'gridZ';
+                 updateDragModeUI();
+                 if (window.dragMode === 'gridZ' && !isTouchDevice && ghost && !window.isGhostFrozen) {
+                     showToast("Right-click to freeze the prop before dragging to adjust", false);
+                 }
+             });
+             gridZBtn.addEventListener('contextmenu', (e) => {
+                 e.preventDefault();
+                 currentGridHeight = 0; document.getElementById('grid-height-display').innerText = '0'; 
+                 if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true); 
+                 showToast("Grid Z Reset", false);
+             });
          
              function updateGridHeight(delta) {
                  currentGridHeight += delta;
