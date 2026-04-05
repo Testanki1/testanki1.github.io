@@ -1430,14 +1430,8 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
         const originalUpdate = controls.update.bind(controls);
         controls.update = function(delta) {
             if (window.isHeightLocked) {
-    
                 const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
                 cameraTarget.quaternion.setFromEuler(new THREE.Euler(0, euler.y, 0, 'YXZ'));
-            
-                let moveY = 0;
-                if (window.keyQPressed) moveY += controls.movementSpeed * delta;
-                if (window.keyEPressed) moveY -= controls.movementSpeed * delta;
-                cameraTarget.position.y += moveY;
             } else {
                 cameraTarget.quaternion.copy(camera.quaternion);
             }
@@ -2864,8 +2858,6 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              if (lockHeightBtn && !isTouchDevice) {
                  lockHeightBtn.style.display = 'flex';
                  window.isHeightLocked = false;
-                 window.keyQPressed = false;
-                 window.keyEPressed = false;
                  
                  lockHeightBtn.addEventListener('click', () => {
                      window.isHeightLocked = !window.isHeightLocked;
@@ -3224,13 +3216,15 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              });
          
              window.addEventListener('keydown', (e) => {
-                 if (e.key === 'q' || e.key === 'Q') window.keyQPressed = true;
-                 if (e.key === 'e' || e.key === 'E') window.keyEPressed = true;
+                 if (!controls) return;
+                 if (e.key === 'q' || e.key === 'Q') controls.moveState.up = 1;
+                 if (e.key === 'e' || e.key === 'E') controls.moveState.down = 1;
              });
 
              window.addEventListener('keyup', (e) => {
-                 if (e.key === 'q' || e.key === 'Q') window.keyQPressed = false;
-                 if (e.key === 'e' || e.key === 'E') window.keyEPressed = false;
+                 if (!controls) return;
+                 if (e.key === 'q' || e.key === 'Q') controls.moveState.up = 0;
+                 if (e.key === 'e' || e.key === 'E') controls.moveState.down = 0;
              });
              let longPressTimer = null;
              let selectedObjectForAction = null;
