@@ -177,6 +177,37 @@
              color: var(--md-sys-color-on-primary);
              border-color: var(--md-sys-color-primary);
          }
+         #toggle-collision-btn {
+             position: fixed;
+             left: 24px;
+             bottom: 144px;
+             z-index: 150;
+             width: 48px;
+             height: 48px;
+             background: var(--md-sys-color-surface-variant);
+             color: var(--md-sys-color-on-surface);
+             border: 1px solid var(--md-sys-color-outline);
+             border-radius: 50%;
+             cursor: pointer;
+             display: none;
+             align-items: center;
+             justify-content: center;
+             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+             transition: all 0.2s;
+             backdrop-filter: blur(10px);
+             -webkit-backdrop-filter: blur(10px);
+         }
+         #toggle-collision-btn:hover {
+             filter: brightness(1.2);
+         }
+         #toggle-collision-btn:active {
+             transform: scale(0.95);
+         }
+         #toggle-collision-btn.active {
+             background: var(--md-sys-color-primary);
+             color: var(--md-sys-color-on-primary);
+             border-color: var(--md-sys-color-primary);
+         }
          #map-list::-webkit-scrollbar { width: 6px; }
          #map-list::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline); border-radius: 3px; }
          .map-item {
@@ -539,6 +570,9 @@
       <button id="lock-height-btn" title="Fixed Height">
          <span class="material-symbols-rounded" style="font-size:24px;">vertical_align_center</span>
       </button>
+      <button id="toggle-collision-btn" title="Toggle Collisions">
+         <span class="material-symbols-rounded" style="font-size:24px;">view_in_ar</span>
+      </button>
       <div id="context-menu">
          <div class="cm-title" id="cm-title">
             Model Name
@@ -636,6 +670,27 @@ let cameraTarget;
          const defaultTile = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
          defaultTile.colorSpace = THREE.SRGBColorSpace;
          defaultTile.needsUpdate = true;
+
+         function updateCollisionButtonVisibility() {
+             const mapData = window.currentMapData;
+             const toggleCollisionBtn = document.getElementById('toggle-collision-btn');
+             if (!toggleCollisionBtn || !mapData) return;
+             
+             const hasCol = (mapData.collisionData1 && (mapData.collisionData1.shapesType1.length > 0 || mapData.collisionData1.shapesType2.length > 0 || mapData.collisionData1.shapesType3.length > 0)) ||
+                            (mapData.collisionData2 && (mapData.collisionData2.shapesType1.length > 0 || mapData.collisionData2.shapesType2.length > 0 || mapData.collisionData2.shapesType3.length > 0));
+             
+             if (hasCol) {
+                 toggleCollisionBtn.style.display = 'flex';
+                 const lockBtn = document.getElementById('lock-height-btn');
+                 if (lockBtn && lockBtn.style.display !== 'none') {
+                     toggleCollisionBtn.style.bottom = '144px';
+                 } else {
+                     toggleCollisionBtn.style.bottom = '84px';
+                 }
+             } else {
+                 toggleCollisionBtn.style.display = 'none';
+             }
+         }
          
          function getCleanBaseName(rawName) {
              let cleaned = rawName;
@@ -739,6 +794,7 @@ let cameraTarget;
              writeUint32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v, le); this._add(b); }
              writeInt32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, v, le); this._add(b); }
              writeFloat32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, v, le); this._add(b); }
+             writeFloat64(v, le = false) { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, v, le); this._add(b); }
              writeBytes(b) { this._add(b); }
              writeStringLength(len) {
                  if (len <= 0b01111111) { this.writeUint8(len); } 
@@ -1175,12 +1231,35 @@ let cameraTarget;
          
              if (popBit()) skipObjectArray(packet, p => { p.readUint32(false); p.readString(); p.offset+=12; p.readString(); });
          
-             const skipCols = () => {
-                 let len = packet.readStringLength(); for(let i=0; i<len; i++) packet.offset += 36; 
-                 len = packet.readStringLength(); for(let i=0; i<len; i++) { packet.readFloat64(false); packet.offset+=24; packet.readFloat64(false); } 
-                 len = packet.readStringLength(); for(let i=0; i<len; i++) { packet.readFloat64(false); packet.offset+=60; } 
+             const readCols = () => {
+                 const col = { shapesType1: [], shapesType2: [], shapesType3:[] };
+                 let len = packet.readStringLength(); 
+                 for(let i=0; i<len; i++) {
+                     col.shapesType1.push([
+                         packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false),
+                         packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false),
+                         packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)
+                     ]);
+                 } 
+                 len = packet.readStringLength(); 
+                 for(let i=0; i<len; i++) { 
+                     const f1 = packet.readFloat64(false); 
+                     const data =[];
+                     for(let j=0; j<6; j++) data.push(packet.readFloat32(false));
+                     const f2 = packet.readFloat64(false); 
+                     col.shapesType2.push({ f1, data, f2 });
+                 } 
+                 len = packet.readStringLength(); 
+                 for(let i=0; i<len; i++) { 
+                     const f1 = packet.readFloat64(false);
+                     const data =[];
+                     for(let j=0; j<15; j++) data.push(packet.readFloat32(false));
+                     col.shapesType3.push({ f1, data });
+                 } 
+                 return col;
              };
-             skipCols(); skipCols();
+             result.collisionData1 = readCols(); 
+             result.collisionData2 = readCols();
 
              const matLen = packet.readStringLength();
              for(let i=0; i<matLen; i++) {
@@ -1869,9 +1948,74 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      document.querySelector('.grid-floating-panel').style.display = 'none';
                  }
                  const toRemove =[];
-                 editorGroup.children.forEach(child => { toRemove.push(child); });
+                 editorGroup.children.forEach(child => { 
+                     if (!child.userData.isCollisionGroup) {
+                         toRemove.push(child); 
+                     }
+                 });
                  toRemove.forEach(c => editorGroup.remove(c));
              }
+             
+             if (window.collisionGroup) {
+                 editorGroup.remove(window.collisionGroup);
+                 window.collisionGroup = null;
+             }
+             
+             window.collisionGroup = new THREE.Group();
+             window.collisionGroup.userData.isCollisionGroup = true;
+             const toggleBtn = document.getElementById('toggle-collision-btn');
+             window.collisionGroup.visible = toggleBtn && toggleBtn.classList.contains('active');
+             
+             const createCollisions = (colData, colorHex) => {
+                 if (!colData) return;
+                 const mat1 = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.3, depthWrite: false });
+                 const mat2 = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.3, depthWrite: false });
+                 const mat3 = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
+
+                 if (colData.shapesType1) {
+                     colData.shapesType1.forEach(d => {
+                         const geo = new THREE.BoxGeometry(d[6], d[7], d[8]);
+                         const mesh = new THREE.Mesh(geo, mat1);
+                         mesh.position.set(d[0], d[1], d[2]);
+                         mesh.rotation.set(d[3], d[4], d[5], 'ZYX');
+                         window.collisionGroup.add(mesh);
+                     });
+                 }
+                 if (colData.shapesType2) {
+                     colData.shapesType2.forEach(d => {
+                         const length = d.f1;
+                         const width = d.f2;
+                         const thickness = 5;
+                         
+                         const geo = new THREE.BoxGeometry(width, length, thickness);
+                         
+                         const mesh = new THREE.Mesh(geo, mat2);
+                         mesh.position.set(d.data[0], d.data[1], d.data[2]);
+                         mesh.rotation.set(d.data[3], d.data[4], d.data[5], 'ZYX');
+                         window.collisionGroup.add(mesh);
+                     });
+                 }
+                 if (colData.shapesType3) {
+                     colData.shapesType3.forEach(d => {
+                         const geo = new THREE.BufferGeometry();
+                         const v = new Float32Array([
+                             d.data[6], d.data[7], d.data[8],
+                             d.data[9], d.data[10], d.data[11],
+                             d.data[12], d.data[13], d.data[14]
+                         ]);
+                         geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+                         const mesh = new THREE.Mesh(geo, mat3);
+                         mesh.position.set(d.data[0], d.data[1], d.data[2]);
+                         mesh.rotation.set(d.data[3], d.data[4], d.data[5], 'ZYX');
+                         window.collisionGroup.add(mesh);
+                     });
+                 }
+             };
+
+             createCollisions(mapData.collisionData1, 0xFF3333); 
+             createCollisions(mapData.collisionData2, 0x33FF33); 
+             
+             editorGroup.add(window.collisionGroup);
              
              let originalMapGroup = null;
              let originalInstancesMap = new Map();
@@ -2359,10 +2503,14 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  currentPrefabGroup = null;
                  document.querySelector('.grid-floating-panel').style.display = 'none';
              }
-             while (editorGroup.children.length > 0) {
-                 let child = editorGroup.children[0];
-                 editorGroup.remove(child);
+             const toRemove =[];
+             for (let i = 0; i < editorGroup.children.length; i++) {
+                 let child = editorGroup.children[i];
+                 if (!child.userData.isCollisionGroup) {
+                     toRemove.push(child);
+                 }
              }
+             toRemove.forEach(c => editorGroup.remove(c));
          }
          
          async function loadMapLibrary(mapName, mapUrl, itemElement, libraryJsonUrl) {
@@ -2398,6 +2546,8 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  const mapData = await parseMapBin(mapBuf);
                  window.defaultMapProps = mapData.props;
                  window.currentMapData = mapData;
+                 
+                 updateCollisionButtonVisibility();
          
                  let lightmapData = null;
                  try {
@@ -2503,7 +2653,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
          
              let instanceIndex = 1;
              for (const child of editorGroup.children) {
-                 if (child === ghost || child.userData.isOriginalMapGroup) continue;  
+                 if (child === ghost || child.userData.isOriginalMapGroup || child.userData.isCollisionGroup) continue;  
                  if (child.userData.originalProps) {
                      let meshIdx = 0;
                      for (const origProp of child.userData.originalProps) {
@@ -2591,7 +2741,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      let baseName = p._baseTexName.split('/').pop();
                      let uniqueTexName = baseName.startsWith(libFolder + "_") ? baseName : `${libFolder}_${baseName}`;
                      let texKey = `${p._baseUrl}_${baseName}`;
-                     if (!rectNameToMatID.has(texKey)) {
+                     if (!rectNameToMatID.has(rectKey)) {
                          rectNameToMatID.set(texKey, nextMatID);
                          newMaterials.push({ 
                              id: nextMatID, name: uniqueTexName, shader: "TankiOnline/SingleTextureShader", 
@@ -2607,10 +2757,38 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
              const pushBit = (b) => bitFlags.push(b);
              const bw = new BinaryWriter();
 
+             const writeCols = (colData) => {
+                 if (!colData) {
+                     bw.writeStringLength(0); bw.writeStringLength(0); bw.writeStringLength(0);
+                     return;
+                 }
+                 bw.writeStringLength(colData.shapesType1 ? colData.shapesType1.length : 0);
+                 if (colData.shapesType1) {
+                     for(let d of colData.shapesType1) {
+                         for(let i=0; i<9; i++) bw.writeFloat32(d[i], false);
+                     }
+                 }
+                 bw.writeStringLength(colData.shapesType2 ? colData.shapesType2.length : 0);
+                 if (colData.shapesType2) {
+                     for(let d of colData.shapesType2) {
+                         bw.writeFloat64(d.f1, false);
+                         for(let i=0; i<6; i++) bw.writeFloat32(d.data[i], false);
+                         bw.writeFloat64(d.f2, false);
+                     }
+                 }
+                 bw.writeStringLength(colData.shapesType3 ? colData.shapesType3.length : 0);
+                 if (colData.shapesType3) {
+                     for(let d of colData.shapesType3) {
+                         bw.writeFloat64(d.f1, false);
+                         for(let i=0; i<15; i++) bw.writeFloat32(d.data[i], false);
+                     }
+                 }
+             };
+
              pushBit(false);
 
-             bw.writeStringLength(0); bw.writeStringLength(0); bw.writeStringLength(0);
-             bw.writeStringLength(0); bw.writeStringLength(0); bw.writeStringLength(0);
+             writeCols(window.currentMapData ? window.currentMapData.collisionData1 : null);
+             writeCols(window.currentMapData ? window.currentMapData.collisionData2 : null);
 
              bw.writeStringLength(newMaterials.length);
              for (const nMat of newMaterials) {
@@ -2880,6 +3058,17 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                      lockHeightBtn.classList.toggle('active', window.isHeightLocked); 
                  });
              }
+             
+             const toggleCollisionBtn = document.getElementById('toggle-collision-btn');
+             if (toggleCollisionBtn) {
+                 toggleCollisionBtn.addEventListener('click', () => {
+                     const isActive = toggleCollisionBtn.classList.toggle('active');
+                     if (window.collisionGroup) {
+                         window.collisionGroup.visible = isActive;
+                     }
+                 });
+             }
+
              function updateUIState() { uiContainer.style.transform = isUIOpen ? 'translateX(0)' : 'translateX(100%)'; }
              updateUIState();
              
@@ -2958,6 +3147,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                              window.currentLightmapData = lightmapData;
                              window.currentLibraryUrl = null; window.currentLibraryBaseUrl = null; window.currentMapBaseUrl = null;
                              
+                             updateCollisionButtonVisibility();
         
                              await processMap(mapData, false, null, lightmapData);
                              
@@ -3245,7 +3435,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  for (let ix of intersects) {
                      let obj = ix.object;
                      while (obj && obj !== editorGroup) {
-                         if (obj === ghost || obj.userData.isOriginalMapGroup) break; 
+                         if (obj === ghost || obj.userData.isOriginalMapGroup || obj.userData.isCollisionGroup) break; 
                          if (obj.userData && (obj.userData.baseName || (obj.userData.originalProps && obj.userData.originalProps.length > 0))) {
                              hitObj = obj; break;
                          }
@@ -3565,7 +3755,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                  let hitPoint = null; let objHitPoint = null;
                  const validIntersects = intersects.filter(ix => {
                      let obj = ix.object;
-                     while(obj) { if (obj === ghost) return false; obj = obj.parent; }
+                     while(obj) { if (obj === ghost || obj.userData.isCollisionGroup) return false; obj = obj.parent; }
                      return true;
                  });
                  if (validIntersects.length > 0) objHitPoint = validIntersects[0].point;
@@ -3594,7 +3784,7 @@ dirLight.position.set(-dirX * 5000, -dirZ * 5000, dirY * 5000);
                          let snapped = false; let snapX = 250; let snapY = 250; let snapZ = 100;
                          for (let i = 0; i < editorGroup.children.length; i++) {
                              const child = editorGroup.children[i];
-                             if (child === ghost || child.userData.isOriginalMapGroup) continue;
+                             if (child === ghost || child.userData.isOriginalMapGroup || child.userData.isCollisionGroup) continue;
                              const dist = child.position.distanceTo(hitPoint);
                              if (dist < 800.0) {
                                  const diff = hitPoint.clone().sub(child.position);
