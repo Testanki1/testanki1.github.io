@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resource Path Downloader (Example)</title>
+<script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js/dist/zip.min.js"></script>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: monospace;
+        font-size: 24px;
+        color: #000;
+        background-color: #fff;
+    }
+</style>
+</head>
+<body>
+    <div id="p">0.00 MB / 0.00 MB (0.0%)</div>
+
+<script>
+const host = "https://s.eu.tankionline.com/";
+
+const dirs = [
+    "0/230/236/5/30023171332713/",
+    "0/230/235/374/30023201462745/",
+    "0/230/236/123/30023173604610/",
+    "0/230/236/200/30023202233610/",
+    "0/230/236/10/30023204035440/",
+    "0/230/236/203/30023203466004/",
+    "0/230/236/120/30023173712307/",
+    "0/230/235/341/30023172121605/",
+    "0/230/235/355/30023201662612/",
+    "633/52501/160/122/31601040776065/",
+    "0/230/235/371/30023202025674/",
+    "0/230/236/76/30023164056106/",
+    "0/230/236/104/30023171365472/",
+    "0/230/236/73/30060462630451/",
+    "0/16721/15/124/30023203257226/",
+    "0/230/236/115/30023171266676/",
+    "0/230/236/65/30023173457262/",
+    "0/230/236/212/30023170253255/",
+    "0/230/236/211/30023170237225/",
+    "0/230/236/70/30023171772207/",
+    "0/230/236/304/30023173646700/",
+    "0/230/236/316/30023201460305/",
+    "0/230/236/327/30023170275037/",
+    "0/230/236/53/30023201503322/",
+    "0/230/236/352/30023164065606/",
+    "0/230/236/363/30023171220474/",
+    "0/230/236/331/30023164132007/",
+    "633/52501/307/351/31601041135754/",
+    "0/230/236/272/30023170305217/",
+    "0/230/236/371/30023201550262/",
+    "0/230/236/275/30023170347346/",
+    "0/230/236/303/30023171317544/",
+    "0/230/236/160/30023171403077/",
+    "0/16721/15/127/30023203273117/",
+    "0/230/236/163/30023171420700/",
+    "0/230/236/20/30023171120463/",
+    "0/230/236/34/30023170067073/",
+    "0/230/236/364/30023170200235/",
+    "0/230/236/250/30023173620701/",
+    "0/230/236/35/30023171125204/",
+    "0/230/236/57/30023171344033/",
+    "0/230/236/46/30023201500722/",
+    "0/230/236/247/30023173623463/",
+    "0/230/236/310/30023202236036/",
+    "0/230/236/62/30023204057557/",
+    "0/230/236/313/30023203505745/",
+    "0/230/236/244/30023173724731/",
+    "0/230/236/13/30023172141500/",
+    "0/230/236/27/30023201672476/",
+    "633/52501/311/347/31601124212177/",
+    "0/230/236/43/30023202034222/",
+    "0/230/236/153/30023164107367/",
+    "0/230/236/161/30023171406133/",
+    "0/230/236/150/30060462661450/",
+    "0/16721/15/125/30023203266657/",
+    "0/230/236/241/30023171316730/",
+    "0/230/236/142/30023173522000/",
+    "0/230/236/213/30023170267614/",
+    "0/230/236/321/30023170262620/",
+    "0/230/236/145/30023172100274/",
+    "633/52457/336/316/31601611202421/",
+    "633/52500/217/161/31601611405223/"
+];
+
+const el = document.getElementById("p");
+let dlBytes = 0;
+let totBytes = 0;
+
+function update() {
+    const d = (dlBytes / 1048576).toFixed(2);
+    const t = (totBytes / 1048576).toFixed(2);
+    const pct = totBytes > 0 ? ((dlBytes / totBytes) * 100).toFixed(1) : "0.0";
+    el.innerText = `${d} MB / ${t} MB (${pct}%)`;
+}
+
+function parsePath(str) {
+    try {
+        const p = str.split('/').filter(x => x);
+        if (p.length !== 5) return { folder: str, date: new Date() };
+        
+        const v = p.map(x => BigInt("0o" + x));
+        const id = (v[0] << 32n) | (v[1] << 16n) | (v[2] << 8n) | v[3];
+        
+        const tsNumber = Number(v[4]);
+
+        return {
+            folder: `${id}_${tsNumber}`,
+            date: new Date(tsNumber) 
+        };
+    } catch {
+        return { folder: str, date: new Date() };
+    }
+}
+
+async function run() {
+    const zipWriter = new zip.ZipWriter(new zip.BlobWriter("application/zip"));
+    const q = [];
+
+    const metaPromises = dirs.map(async (d) => {
+        try {
+            const res = await fetch(host + d + "meta.info");
+            if (!res.ok) return;
+            
+            const parsed = parsePath(d);
+            const folderName = parsed.folder;
+            const itemDate = parsed.date;
+
+            await zipWriter.add(folderName + "/", null, { directory: true, lastModDate: itemDate });
+
+            const list = await res.json();
+            
+            for (let f of list) {
+                const n = f.name.toLowerCase();
+                if (n.endsWith(".ktx") || n.endsWith(".meta") || n.endsWith(".info")) continue;
+                
+                totBytes += f.size;
+                q.push({
+                    url: host + d + f.name,
+                    path: folderName + "/" + f.name,
+                    date: itemDate
+                });
+            }
+        } catch (e) {}
+    });
+
+    await Promise.all(metaPromises);
+    update();
+
+    const dlPromises = q.map(async (item) => {
+        try {
+            const res = await fetch(item.url);
+            if (!res.ok) return;
+
+            const reader = res.body.getReader();
+            const chunks = [];
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                dlBytes += value.length;
+                update();
+            }
+
+            const blobObj = new Blob(chunks);
+            await zipWriter.add(item.path, new zip.BlobReader(blobObj), { lastModDate: item.date });
+        } catch (e) {}
+    });
+
+    await Promise.all(dlPromises);
+
+    el.innerText = `Finalizing ZIP...`;
+    const blob = await zipWriter.close();
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "assets.zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    
+    el.innerText = "Done";
+}
+
+window.onload = run;
+</script>
+
+</body>
+</html>
