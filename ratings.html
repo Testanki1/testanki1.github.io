@@ -4,568 +4,1088 @@
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <!-- 引入字体和图标 -->
-      <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+      <link
+         href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&family=M+PLUS+1p:wght@400;500;700&display=swap"
+         rel="stylesheet"
+      />
+      <link
+         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+         rel="stylesheet"
+      />
       <title>3D坦克排行榜</title>
       <style>
          :root {
-         /* 基础配置 */
-         --font-family: 'Rubik', 'M PLUS 1p', sans-serif;
-         /* M3 Expressive 表现力圆角系统 */
-         --radius-small: 12px;       /* M3 中小组件圆角 */
-         --radius-medium: 16px;      /* M3 标准卡片圆角 */
-         --radius-large: 24px;       /* M3 大卡片圆角 */
-         --radius-extra-large: 28px; /* M3 超大容器圆角 (Expressive) */
-         --radius-pill: 9999px;      /* 纯圆角 / 药丸状 */
-         /* M3 动画配置 */
-         --motion-easing: cubic-bezier(0.2, 0, 0, 1);
-         --motion-duration: 250ms;
-         /* 指定调色板 (保持不变) */
-         --color-lime: #76FF33;
-         --color-deep-blue: #001926;
-         --color-pale-blue: #BFD5FF;
-         --color-red: #FF6666;
-         --color-surface: #061e2e;
-         --color-surface-container: #0c2638;
-         --color-surface-container-high: #153247;
+            /* 基础配置 */
+            --font-family: "Rubik", "M PLUS 1p", sans-serif;
+            --radius-small: 12px;
+            --radius-medium: 16px;
+            --radius-large: 24px;
+            --radius-extra-large: 28px;
+            --radius-pill: 9999px;
+            --motion-easing: cubic-bezier(0.2, 0, 0, 1);
+            --motion-duration: 250ms;
+            /* 指定调色板 */
+            --color-lime: #76ff33;
+            --color-deep-blue: #001926;
+            --color-pale-blue: #bfd5ff;
+            --color-red: #ff6666;
+            --color-surface: #061e2e;
+            --color-surface-container: #0c2638;
+            --color-surface-container-high: #153247;
          }
-         /* 深色主题 (颜色保持不变，重构层级阴影) */
+         /* 深色主题 */
          [data-theme="dark"] {
-         --md-sys-color-background: var(--color-deep-blue);
-         --md-sys-color-on-background: #E1E3DF;
-         --md-sys-color-surface: var(--color-surface);
-         --md-sys-color-on-surface: #E1E3DF;
-         --md-sys-color-surface-container: var(--color-surface-container);
-         --md-sys-color-surface-container-high: var(--color-surface-container-high);
-         --md-sys-color-primary: var(--color-lime);
-         --md-sys-color-on-primary: #00390a;
-         --md-sys-color-primary-container: #005313;
-         --md-sys-color-on-primary-container: #96ff68;
-         --md-sys-color-secondary: var(--color-pale-blue);
-         --md-sys-color-on-secondary: #003256;
-         --md-sys-color-secondary-container: #233e52;
-         --md-sys-color-on-secondary-container: #d6e8cb;
-         --md-sys-color-outline: #586c78;
-         --md-sys-color-outline-variant: #344855;
-         --md-sys-color-error: var(--color-red);
-         --md-sys-color-on-error: #690005;
-         --chart-increase: var(--color-lime);
-         --chart-decrease: var(--color-red);
-         /* M3 柔和层级阴影 (Level 1 & Level 2) */
-         --elevation-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.2), 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-         --elevation-hover: 0 4px 8px 2px rgba(0, 0, 0, 0.2), 0 2px 4px 0 rgba(0, 0, 0, 0.4);
+            --md-sys-color-background: var(--color-deep-blue);
+            --md-sys-color-on-background: #e1e3df;
+            --md-sys-color-surface: var(--color-surface);
+            --md-sys-color-on-surface: #e1e3df;
+            --md-sys-color-surface-container: var(--color-surface-container);
+            --md-sys-color-surface-container-high: var(
+               --color-surface-container-high
+            );
+            --md-sys-color-primary: var(--color-lime);
+            --md-sys-color-on-primary: #00390a;
+            --md-sys-color-primary-container: #005313;
+            --md-sys-color-on-primary-container: #96ff68;
+            --md-sys-color-secondary: var(--color-pale-blue);
+            --md-sys-color-on-secondary: #003256;
+            --md-sys-color-secondary-container: #233e52;
+            --md-sys-color-on-secondary-container: #d6e8cb;
+            --md-sys-color-outline: #586c78;
+            --md-sys-color-outline-variant: #344855;
+            --md-sys-color-error: var(--color-red);
+            --md-sys-color-on-error: #690005;
+            --chart-increase: var(--color-lime);
+            --chart-decrease: var(--color-red);
+            --elevation-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.2),
+               0 1px 2px 0 rgba(0, 0, 0, 0.4);
+            --elevation-hover: 0 4px 8px 2px rgba(0, 0, 0, 0.3),
+               0 2px 4px 0 rgba(0, 0, 0, 0.4);
          }
-         /* 浅色主题 (颜色保持不变，重构层级阴影) */[data-theme="light"] {
-         --md-sys-color-background: #F4F8FC;
-         --md-sys-color-on-background: #001926;
-         --md-sys-color-surface: #FFFFFF;
-         --md-sys-color-on-surface: #001926;
-         --md-sys-color-surface-container: #E8F1F8;
-         --md-sys-color-surface-container-high: #DCE8F2;
-         --md-sys-color-primary: #006D2C;
-         --md-sys-color-on-primary: #FFFFFF;
-         --md-sys-color-primary-container: #96FF68;
-         --md-sys-color-on-primary-container: #002208;
-         --md-sys-color-secondary: #355B78;
-         --md-sys-color-on-secondary: #FFFFFF;
-         --md-sys-color-secondary-container: #BFD5FF;
-         --md-sys-color-on-secondary-container: #001D33;
-         --md-sys-color-outline: #747775;
-         --md-sys-color-outline-variant: #C4C7C5;
-         --md-sys-color-error: #BA1A1A;
-         --md-sys-color-on-error: #FFFFFF;
-         --chart-increase: #008000;
-         --chart-decrease: #BA1A1A;
-         /* M3 柔和层级阴影 (Level 1 & Level 2) */
-         --elevation-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.1);
-         --elevation-hover: 0 4px 8px 2px rgba(0, 0, 0, 0.05), 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+         /* 浅色主题 */
+         [data-theme="light"] {
+            --md-sys-color-background: #f4f8fc;
+            --md-sys-color-on-background: #001926;
+            --md-sys-color-surface: #ffffff;
+            --md-sys-color-on-surface: #001926;
+            --md-sys-color-surface-container: #e8f1f8;
+            --md-sys-color-surface-container-high: #dce8f2;
+            --md-sys-color-primary: #006d2c;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #96ff68;
+            --md-sys-color-on-primary-container: #002208;
+            --md-sys-color-secondary: #355b78;
+            --md-sys-color-on-secondary: #ffffff;
+            --md-sys-color-secondary-container: #bfd5ff;
+            --md-sys-color-on-secondary-container: #001d33;
+            --md-sys-color-outline: #747775;
+            --md-sys-color-outline-variant: #c4c7c5;
+            --md-sys-color-error: #ba1a1a;
+            --md-sys-color-on-error: #ffffff;
+            --chart-increase: #008000;
+            --chart-decrease: #ba1a1a;
+            --elevation-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.05),
+               0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            --elevation-hover: 0 4px 8px 2px rgba(0, 0, 0, 0.1),
+               0 2px 4px 0 rgba(0, 0, 0, 0.1);
          }
+         /* ================= 全局去除默认UI与滚动条 ================= */
          * {
-         box-sizing: border-box;
-         -webkit-tap-highlight-color: transparent;
-         font-family: var(--font-family);
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: var(--font-family);
+         }
+         ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+         }
+         ::-webkit-scrollbar-track {
+            background: transparent;
+         }
+         ::-webkit-scrollbar-thumb {
+            background: var(--md-sys-color-outline-variant);
+            border-radius: var(--radius-pill);
+            border: 2px solid var(--md-sys-color-background);
+         }
+         ::-webkit-scrollbar-thumb:hover {
+            background: var(--md-sys-color-outline);
          }
          body {
-         margin: 0;
-         padding: 0;
-         background-color: var(--md-sys-color-background);
-         color: var(--md-sys-color-on-background);
-         transition: background-color var(--motion-duration) var(--motion-easing), color var(--motion-duration) var(--motion-easing);
-         min-height: 100vh;
-         font-size: 13px;
-         line-height: 1.4;
+            margin: 0;
+            padding: 0;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            transition:
+               background-color var(--motion-duration) var(--motion-easing),
+               color var(--motion-duration) var(--motion-easing);
+            min-height: 100vh;
+            font-size: 13px;
+            line-height: 1.4;
          }
          .app-container {
-         max-width: 900px;
-         margin: 0 auto;
-         padding: 12px;
-         padding-top: 56px;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 12px;
+            padding-top: 56px;
          }
          /* --- 标题 --- */
          h1 {
-         font-size: 20px;
-         font-weight: 700;
-         text-align: center;
-         margin: 0 0 24px 0;
-         letter-spacing: 0.2px;
-         color: var(--md-sys-color-on-background);
+            font-size: 20px;
+            font-weight: 700;
+            text-align: center;
+            margin: 0 0 24px 0;
+            letter-spacing: 0.2px;
+            color: var(--md-sys-color-on-background);
          }
-         h2 { font-size: 16px; margin: 12px 0; font-weight: 600; color: var(--md-sys-color-on-surface); }
-         h3 { font-size: 14px; margin: 8px 0; font-weight: 500; color: var(--md-sys-color-secondary); }
-         a { text-decoration: none; color: inherit; }
+         h2 {
+            font-size: 16px;
+            margin: 12px 0;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+         }
+         h3 {
+            font-size: 14px;
+            margin: 8px 0;
+            font-weight: 500;
+            color: var(--md-sys-color-secondary);
+         }
+         a {
+            text-decoration: none;
+            color: inherit;
+         }
          /* --- 顶部栏 --- */
          .top-bar-actions {
-         position: fixed;
-         top: 12px;
-         right: 12px;
-         left: 12px;
-         display: flex;
-         justify-content: space-between;
-         z-index: 100;
-         pointer-events: none;
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            left: 12px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+            pointer-events: none;
          }
-         .top-bar-actions > * { pointer-events: auto; }
+         .top-bar-actions > * {
+            pointer-events: auto;
+         }
          .icon-btn {
-         width: 40px;
-         height: 40px;
-         border-radius: var(--radius-pill);
-         border: none;
-         background-color: var(--md-sys-color-surface-container);
-         color: var(--md-sys-color-on-surface);
-         cursor: pointer;
-         display: flex;
-         align-items: center;
-         justify-content: center;
-         box-shadow: var(--elevation-shadow);
-         transition: background-color var(--motion-duration) var(--motion-easing), box-shadow var(--motion-duration) var(--motion-easing), transform var(--motion-duration) var(--motion-easing), color var(--motion-duration) var(--motion-easing);
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-pill);
+            border: none;
+            background-color: var(--md-sys-color-surface-container);
+            color: var(--md-sys-color-on-surface);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--elevation-shadow);
+            transition: all 0.2s var(--motion-easing);
          }
-         /* M3 移除缩放，改为层级抬升悬浮表现 */
-         .icon-btn:hover { 
-         transform: translateY(-2px); 
-         background-color: var(--md-sys-color-primary-container); 
-         color: var(--md-sys-color-on-primary-container); 
-         box-shadow: var(--elevation-hover); 
+         /* 去除位移，仅用颜色层和更强的阴影表达交互 */
+         .icon-btn:hover {
+            background-color: var(--md-sys-color-surface-container-high);
+            box-shadow: var(--elevation-hover);
          }
-         .material-symbols-rounded { font-size: 20px; }
+         .material-symbols-rounded {
+            font-size: 20px;
+         }
+         /* --- 设置悬浮面板 --- */
+         .settings-menu {
+            display: none;
+            position: absolute;
+            top: 48px;
+            right: 0;
+            background: var(--md-sys-color-surface-container-high);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--radius-medium);
+            padding: 16px;
+            box-shadow: var(--elevation-hover);
+            white-space: nowrap;
+            z-index: 100;
+         }
+         .settings-menu.active {
+            display: block;
+            animation: fadeUp 0.2s ease;
+         }
+         .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--md-sys-color-on-surface);
+            font-weight: 500;
+         }
+         .md3-switch {
+            position: relative;
+            width: 50px;
+            height: 30px;
+            background-color: var(--md-sys-color-surface-container-high);
+            border: 2px solid var(--md-sys-color-outline);
+            border-radius: 15px;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
+         }
+         .md3-switch::after {
+            content: "";
+            position: absolute;
+            left: 4px;
+            width: 14px;
+            height: 14px;
+            background-color: var(--md-sys-color-outline);
+            border-radius: 50%;
+            transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+         }
+         .setting-item input[type="checkbox"] {
+            display: none;
+         }
+         .setting-item input[type="checkbox"]:checked + .md3-switch {
+            background-color: var(--md-sys-color-primary);
+            border-color: var(--md-sys-color-primary);
+         }
+         .setting-item input[type="checkbox"]:checked + .md3-switch::after {
+            left: 24px;
+            width: 22px;
+            height: 22px;
+            background-color: var(--md-sys-color-on-primary);
+         }
          #backButton {
-         height: 40px;
-         padding: 0 16px 0 12px;
-         border-radius: var(--radius-pill);
-         border: none;
-         background-color: var(--md-sys-color-secondary-container);
-         color: var(--md-sys-color-on-secondary-container);
-         font-size: 12px;
-         font-weight: 600;
-         cursor: pointer;
-         display: flex;
-         align-items: center;
-         gap: 6px;
-         box-shadow: var(--elevation-shadow);
-         transition: box-shadow var(--motion-duration) var(--motion-easing), transform var(--motion-duration) var(--motion-easing), filter var(--motion-duration);
+            height: 40px;
+            padding: 0 16px 0 12px;
+            border-radius: var(--radius-pill);
+            border: none;
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: var(--elevation-shadow);
+            transition: all 0.2s;
          }
-         #backButton:hover { 
-         box-shadow: var(--elevation-hover); 
-         transform: translateY(-2px);
-         filter: brightness(1.05);
+         #backButton:hover {
+            box-shadow: var(--elevation-hover);
+            filter: brightness(1.1);
          }
-         #backButton span.material-symbols-rounded { font-size: 18px; }
-         /* --- 搜索区域 --- */
+         #backButton span.material-symbols-rounded {
+            font-size: 18px;
+         }
+         /* --- 表单区域与自定义下拉框 --- */
          .form-container {
-         max-width: 360px;
-         margin: 0 auto 24px;
-         padding: 20px;
-         background-color: var(--md-sys-color-surface-container);
-         border-radius: var(--radius-extra-large); /* Expressive 超大圆角 */
-         border: 1px solid var(--md-sys-color-outline-variant);
-         box-shadow: var(--elevation-shadow);
+            max-width: 360px;
+            margin: 0 auto 24px;
+            padding: 20px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--radius-extra-large);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            box-shadow: var(--elevation-shadow);
          }
-         .form-group { margin-bottom: 16px; }
-         .form-group:last-child { margin-bottom: 0; }
+         .form-group {
+            position: relative;
+            margin-bottom: 16px;
+         }
+         .form-group:last-child {
+            margin-bottom: 0;
+         }
          .form-group label {
-         display: block;
-         font-size: 11px;
-         color: var(--md-sys-color-secondary);
-         margin-bottom: 6px;
-         font-weight: 600;
-         padding-left: 4px;
+            display: block;
+            font-size: 11px;
+            color: var(--md-sys-color-secondary);
+            margin-bottom: 6px;
+            font-weight: 600;
+            padding-left: 4px;
          }
-         .form-group input, .form-group select {
-         width: 100%;
-         height: 40px;
-         padding: 0 12px;
-         background-color: var(--md-sys-color-surface-container-high);
-         color: var(--md-sys-color-on-surface);
-         border: 1px solid var(--md-sys-color-outline-variant); /* M3 Outlined Field 风格 */
-         border-radius: var(--radius-small);
-         font-size: 13px;
-         transition: border-color var(--motion-duration) var(--motion-easing), box-shadow var(--motion-duration) var(--motion-easing), background-color var(--motion-duration);
+         .form-group input {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px;
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--radius-small);
+            font-size: 13px;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            transition: all 0.2s;
          }
-         /* M3 Focus 态: 主色描边 + 内部发光替代 border 变粗以防止跳变 */
-         .form-group input:focus, .form-group select:focus {
-         outline: none;
-         border-color: var(--md-sys-color-primary);
-         box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
-         background-color: var(--md-sys-color-surface);
+         .form-group input:focus {
+            border-color: var(--md-sys-color-primary);
+            box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+            background-color: var(--md-sys-color-surface);
          }
-         .form-group button {
-         width: 100%;
-         height: 42px;
-         border-radius: var(--radius-pill);
-         background-color: var(--md-sys-color-primary);
-         color: var(--md-sys-color-on-primary);
-         border: none;
-         font-size: 13px;
-         font-weight: 700;
-         letter-spacing: 0.3px;
-         cursor: pointer;
-         transition: box-shadow var(--motion-duration) var(--motion-easing), transform var(--motion-duration) var(--motion-easing), opacity var(--motion-duration);
+         /* 自定义下拉菜单 UI */
+         .custom-select-wrapper {
+            position: relative;
+            user-select: none;
+            width: 100%;
          }
-         .form-group button:hover:not(:disabled) { 
-         box-shadow: var(--elevation-hover); 
-         transform: translateY(-2px); 
+         .custom-select-display {
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--radius-small);
+            padding: 0 16px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            cursor: pointer;
+            transition:
+               border-color 0.2s,
+               background-color 0.2s;
          }
-         .form-group button:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--md-sys-color-outline); box-shadow: none; transform: none; }
+         .custom-select-display:hover {
+            border-color: var(--md-sys-color-outline);
+         }
+         .custom-select-display.active {
+            border-color: var(--md-sys-color-primary);
+            box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+            background-color: var(--md-sys-color-surface);
+         }
+         .custom-select-options {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: var(--md-sys-color-surface-container-high);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--radius-small);
+            box-shadow: var(--elevation-hover);
+            z-index: 200;
+            overflow: hidden;
+            display: none;
+         }
+         .custom-select-options.active {
+            display: block;
+            animation: fadeUp 0.15s ease-out;
+         }
+         .custom-option {
+            padding: 12px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--md-sys-color-on-surface);
+            transition: background 0.15s;
+         }
+         .custom-option:hover {
+            background: var(--md-sys-color-surface-container);
+         }
+         .custom-option.disabled {
+            color: var(--md-sys-color-outline);
+            pointer-events: none;
+         }
+         /* 修改后：将选择器改为 #fetchButton */
+         #fetchButton {
+            width: 100%;
+            height: 42px;
+            border-radius: var(--radius-pill);
+            border: none;
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--elevation-shadow);
+         }
+         #fetchButton:hover:not(:disabled) {
+            box-shadow:
+               var(--elevation-hover),
+               0 0 16px rgba(118, 255, 51, 0.4);
+         }
+         [data-theme="light"] #fetchButton:hover:not(:disabled) {
+            box-shadow:
+               var(--elevation-hover),
+               0 0 16px rgba(0, 109, 44, 0.4);
+         }
+         #fetchButton:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: var(--md-sys-color-outline);
+            box-shadow: none;
+         }
          .error-message {
-         color: var(--md-sys-color-error);
-         text-align: center;
-         margin-top: 12px;
-         font-size: 11px;
-         min-height: 16px;
-         font-weight: 600;
+            color: var(--md-sys-color-error);
+            text-align: center;
+            margin-top: 12px;
+            font-size: 11px;
+            min-height: 16px;
+            font-weight: 600;
+         }
+         /* --- 搜索历史 --- */
+         .search-history {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: var(--md-sys-color-surface-container-high);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--radius-small);
+            box-shadow: var(--elevation-hover);
+            z-index: 10;
+            max-height: 220px;
+            overflow-y: auto;
+         }
+         .search-history.active {
+            display: block;
+            animation: fadeUp 0.2s ease;
+         }
+         .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            transition: background 0.2s;
+         }
+         .history-item:last-child {
+            border-bottom: none;
+         }
+         .history-item:hover {
+            background: var(--md-sys-color-surface-container);
+         }
+         .history-item-text {
+            flex-grow: 1;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+         }
+         .history-item-server {
+            font-size: 10px;
+            color: var(--md-sys-color-on-secondary-container);
+            background: var(--md-sys-color-secondary-container);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 8px;
+            font-weight: 700;
+         }
+         .history-delete {
+            background: none;
+            border: none;
+            color: var(--md-sys-color-outline);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+         }
+         .history-delete:hover {
+            color: var(--md-sys-color-error);
          }
          /* --- 监测按钮 --- */
-         .monitor-container { text-align: center; margin-bottom: 16px; }
+         .monitor-container {
+            text-align: center;
+            margin-bottom: 16px;
+         }
          #monitorButton {
-         height: 44px; /* 更优的触控高度 */
-         padding: 0 28px;
-         border-radius: var(--radius-pill);
-         border: none; 
-         background-color: var(--md-sys-color-primary);
-         color: var(--md-sys-color-on-primary);
-         font-size: 13px;
-         font-weight: 600;
-         cursor: pointer;
-         transition: background-color var(--motion-duration) var(--motion-easing), color var(--motion-duration), box-shadow var(--motion-duration) var(--motion-easing), transform var(--motion-duration);
-         box-shadow: var(--elevation-shadow);
-         display: inline-flex;
-         align-items: center;
-         justify-content: center;
-         gap: 8px;
+            height: 44px;
+            padding: 0 28px;
+            border-radius: var(--radius-pill);
+            border: none;
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: var(--elevation-shadow);
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
          }
-         @media (hover: hover) {
          #monitorButton:hover:not(:disabled) {
-         background-color: var(--md-sys-color-primary-container);
-         color: var(--md-sys-color-on-primary-container);
-         box-shadow: var(--elevation-hover);
-         transform: translateY(-2px);
-         }
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            box-shadow:
+               var(--elevation-hover),
+               0 0 16px rgba(118, 255, 51, 0.3);
          }
          #monitorButton.monitoring {
-         background-color: var(--md-sys-color-error);
-         color: var(--md-sys-color-on-error);
+            background-color: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error);
          }
-         @media (hover: hover) {
          #monitorButton.monitoring:hover {
-         filter: brightness(1.1);
+            box-shadow:
+               var(--elevation-hover),
+               0 0 16px rgba(255, 102, 102, 0.3);
          }
-         }
-         /* --- 选项卡 (M3 Segmented Button 风格) --- */
+         /* --- 选项卡 --- */
          .tabs {
-         display: flex;
-         justify-content: center;
-         gap: 4px;
-         margin-bottom: 16px;
-         padding: 4px;
-         background-color: var(--md-sys-color-surface-container);
-         border-radius: var(--radius-pill);
-         width: fit-content;
-         margin-left: auto;
-         margin-right: auto;
-         border: 1px solid var(--md-sys-color-outline-variant);
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 16px;
+            padding: 4px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--radius-pill);
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid var(--md-sys-color-outline-variant);
          }
          .tab-button {
-         padding: 8px 20px;
-         background: transparent;
-         border: none;
-         border-radius: var(--radius-pill);
-         color: var(--md-sys-color-on-surface);
-         font-size: 12px;
-         font-weight: 600;
-         cursor: pointer;
-         transition: background-color var(--motion-duration) var(--motion-easing), color var(--motion-duration);
+            padding: 8px 20px;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-pill);
+            color: var(--md-sys-color-on-surface);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
          }
          .tab-button.active {
-         background-color: var(--md-sys-color-secondary-container);
-         color: var(--md-sys-color-on-secondary-container);
-         box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* 激活态轻微层级 */
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            box-shadow: 0 4px 12px rgba(118, 255, 51, 0.3);
          }
-         .tab-content { display: none; animation: fadeUp var(--motion-duration) var(--motion-easing); }
-         .tab-content.active { display: block; }
-         /* --- 玩家概览 --- */
+         [data-theme="light"] .tab-button.active {
+            box-shadow: 0 4px 12px rgba(0, 109, 44, 0.2);
+         }
+         .tab-content {
+            display: none;
+            animation: fadeUp 0.2s;
+         }
+         .tab-content.active {
+            display: block;
+         }
+         /* --- 数据概览卡片 --- */
          #profileSummary {
-         display: flex;
-         flex-wrap: wrap;
-         gap: 12px;
-         margin-bottom: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
          }
          .summary-item {
-         display: flex;
-         flex-direction: column;
-         padding: 12px 14px;
-         background-color: var(--md-sys-color-surface-container);
-         border-radius: var(--radius-medium);
-         border: 1px solid var(--md-sys-color-outline-variant); /* 加入 M3 卡片描边 */
-         flex: 1 0 auto; 
-         width: auto;
-         min-width: 100px;
-         transition: box-shadow var(--motion-duration) var(--motion-easing);
+            display: flex;
+            flex-direction: column;
+            padding: 12px 14px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--radius-medium);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            flex: 1 0 auto;
+            width: auto;
+            min-width: 100px;
+            transition:
+               box-shadow 0.2s,
+               border-color 0.2s;
          }
          .summary-item:hover {
-         box-shadow: var(--elevation-shadow);
+            box-shadow: var(--elevation-hover);
+            border-color: var(--md-sys-color-outline);
          }
          .summary-item.full-width {
-         flex-basis: 100%;
-         background-color: var(--md-sys-color-primary-container);
-         color: var(--md-sys-color-on-primary-container);
-         align-items: center;
-         justify-content: center;
-         padding: 20px;
-         border: none;
-         border-radius: var(--radius-large);
+            flex-basis: 100%;
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            border: none;
+            border-radius: var(--radius-large);
          }
          .summary-item.full-width .summary-label {
-         color: var(--md-sys-color-on-primary-container);
-         font-size: 11px;
-         opacity: 0.85;
-         margin-bottom: 4px;
+            color: var(--md-sys-color-on-primary-container);
+            font-size: 11px;
+            opacity: 0.85;
+            margin-bottom: 4px;
          }
          .summary-item.full-width .summary-value {
-         font-size: 24px;
-         color: var(--md-sys-color-on-primary-container);
-         font-weight: 700;
-         letter-spacing: -0.5px;
+            font-size: 24px;
+            color: var(--md-sys-color-on-primary-container);
+            font-weight: 700;
+            letter-spacing: -0.5px;
          }
-         .summary-label { font-size: 10px; color: var(--md-sys-color-secondary); margin-bottom: 4px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
-         .summary-value { 
-         font-size: 13px; 
-         font-weight: 600; 
-         color: var(--md-sys-color-on-surface); 
-         line-height: 1.2;
-         white-space: nowrap; 
+         .summary-label {
+            font-size: 10px;
+            color: var(--md-sys-color-secondary);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
          }
-         .summary-value.premium { color: var(--md-sys-color-primary); text-shadow: 0 0 8px rgba(118, 255, 51, 0.2); }
-         /* --- 变更日志 (M3 列表) --- */
-         #changeLogContainer {
-         max-height: 60vh; 
-         overflow-y: auto;
-         background-color: var(--md-sys-color-surface-container);
-         border-radius: var(--radius-extra-large); 
-         padding: 12px 0; 
-         border: 1px solid var(--md-sys-color-outline-variant);
-         box-shadow: var(--elevation-shadow);
+         .summary-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+            line-height: 1.2;
+            white-space: nowrap;
          }
-         .log-entry {
-         background-color: transparent;
-         padding: 14px 20px;
-         border-bottom: 1px solid var(--md-sys-color-outline-variant);
-         display: flex;
-         align-items: flex-start;
-         gap: 16px;
-         transition: background-color 0.2s;
+         .summary-value.premium {
+            color: var(--md-sys-color-primary);
+            text-shadow: 0 0 12px rgba(118, 255, 51, 0.4);
          }
-         .log-entry:hover {
-         background-color: var(--md-sys-color-surface-container-high);
+         /* --- 列表与网格 --- */
+         .list-section {
+            margin-bottom: 24px;
          }
-         .log-entry:last-child { border-bottom: none; }
-         .log-icon-wrapper {
-         flex-shrink: 0;
-         width: 36px;
-         height: 36px;
-         border-radius: 50%;
-         background-color: var(--md-sys-color-secondary-container);
-         color: var(--md-sys-color-on-secondary-container);
-         display: flex;
-         align-items: center;
-         justify-content: center;
+         .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
          }
-         .log-icon-wrapper .material-symbols-rounded { font-size: 20px; }
-         .log-text-content {
-         flex-grow: 1;
-         display: flex;
-         flex-direction: column;
-         justify-content: center;
-         min-height: 36px;
-         }
-         .log-timestamp { 
-         font-size: 11px; 
-         color: var(--md-sys-color-on-surface-variant); 
-         margin-bottom: 4px;
-         font-weight: 600;
-         }
-         .log-details {
-         font-size: 13px;
-         color: var(--md-sys-color-on-surface);
-         line-height: 1.4;
-         }
-         .log-details strong {
-         color: var(--md-sys-color-primary);
-         font-weight: 600;
-         }
-         /* --- 排行榜 & 列表通用 --- */
-         .leaderboard-category {
-         background-color: var(--md-sys-color-surface-container);
-         border-radius: var(--radius-extra-large);
-         padding: 16px;
-         max-height: 400px;
-         overflow: hidden;
-         display: flex;
-         flex-direction: column;
-         border: 1px solid var(--md-sys-color-outline-variant);
-         box-shadow: var(--elevation-shadow);
-         }
-         .leaderboard-category h3 { font-size: 14px; text-align: center; margin: 0 0 12px; color: var(--md-sys-color-primary); font-weight: 700; }
-         .leaderboard-carousel-container { position: relative; margin-top: 16px; }
-         #leaderboardCarouselContent {
-         display: grid;
-         grid-template-columns: 1fr;
-         gap: 16px;
-         transition: opacity var(--motion-duration) ease;
-         }
-         @media (min-width: 768px) { #leaderboardCarouselContent { grid-template-columns: 1fr 1fr; } }
-         .carousel-nav-button {
-         position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
-         width: 36px; height: 36px; border-radius: var(--radius-pill); border: none;
-         background-color: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface);
-         cursor: pointer; box-shadow: var(--elevation-shadow);
-         display: flex; align-items: center; justify-content: center;
-         border: 1px solid var(--md-sys-color-outline-variant);
-         transition: background-color 0.2s, box-shadow 0.2s;
-         }
-         .carousel-nav-button:hover { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: var(--elevation-hover); }
-         #leaderboardPrev { left: -18px; }
-         #leaderboardNext { right: -18px; }
-         table { width: 100%; border-collapse: collapse; font-size: 12px; }
-         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-         th { color: var(--md-sys-color-secondary); font-weight: 600; font-size: 11px; background-color: var(--md-sys-color-surface-container); position: sticky; top: 0; z-index: 1; }
-         tr:last-child td { border-bottom: none; }
-         .player-link { font-weight: 600; color: var(--md-sys-color-on-surface); transition: color 0.2s; }
-         .player-link:hover { color: var(--md-sys-color-primary); text-decoration: underline; }
-         .leaderboard-table-wrapper, .list-container { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--md-sys-color-outline-variant) transparent; }
-         .list-section { margin-bottom: 24px; }
          .list-title {
-         font-size: 14px; margin-bottom: 12px; font-weight: 700;
-         border-left: 4px solid var(--md-sys-color-primary);
-         padding-left: 10px;
-         color: var(--md-sys-color-on-background);
-         border-radius: 2px;
+            font-size: 14px;
+            margin-bottom: 0;
+            font-weight: 700;
+            border-left: 4px solid var(--md-sys-color-primary);
+            padding-left: 10px;
+            color: var(--md-sys-color-on-background);
+            border-radius: 2px;
          }
-         .list-container { display: flex; padding: 4px 4px 12px 4px; gap: 12px; scroll-snap-type: x mandatory; }
+         .list-container {
+            display: flex;
+            padding: 4px 4px 12px 4px;
+            gap: 12px;
+            scroll-snap-type: x mandatory;
+            overflow-x: auto;
+         }
          .data-card {
-         flex: 0 0 160px; scroll-snap-align: start;
-         background-color: var(--md-sys-color-surface-container);
-         padding: 14px 12px; border-radius: var(--radius-large);
-         display: flex; flex-direction: column; text-align: center;
-         border: 1px solid var(--md-sys-color-outline-variant); 
-         transition: transform var(--motion-duration) var(--motion-easing), box-shadow var(--motion-duration) var(--motion-easing), border-color 0.2s;
+            flex: 0 0 160px;
+            scroll-snap-align: start;
+            background-color: var(--md-sys-color-surface-container);
+            padding: 14px 12px;
+            border-radius: var(--radius-large);
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+            border: 1px solid var(--md-sys-color-outline-variant);
+            transition:
+               box-shadow 0.2s,
+               border-color 0.2s;
          }
-         .data-card:hover { transform: translateY(-4px); box-shadow: var(--elevation-hover); border-color: var(--md-sys-color-primary); }
-         .data-card.changed { border: 2px solid var(--md-sys-color-primary); background-color: rgba(118, 255, 51, 0.05); }
-         .item-name { font-size: 12px; font-weight: 700; margin-bottom: 8px; height: 28px; display: flex; align-items: center; justify-content: center; line-height: 1.2; }
-         .item-image { width: 56px; height: 56px; object-fit: contain; margin: 0 auto 10px; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2)); }
-         .data-card div { font-size: 11px; margin: 2px 0; color: var(--md-sys-color-on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
-         .data-card strong { color: var(--md-sys-color-on-surface); font-weight: 600; }
+         .data-card:hover {
+            box-shadow: var(--elevation-hover);
+            border-color: var(--md-sys-color-primary);
+         }
+         .data-card.changed {
+            border: 2px solid var(--md-sys-color-primary);
+            background-color: rgba(118, 255, 51, 0.05);
+         }
+         .item-name {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
+         }
+         .item-image {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            margin: 0 auto 10px;
+            filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.2));
+         }
+         .data-card div {
+            font-size: 11px;
+            margin: 2px 0;
+            color: var(--md-sys-color-on-surface-variant);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+         }
+         .data-card strong {
+            color: var(--md-sys-color-on-surface);
+            font-weight: 600;
+         }
+         .grade-badge {
+            display: inline-block !important;
+            width: fit-content !important;
+            margin: 4px auto 0 !important;
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px !important;
+            font-weight: 700;
+         }
          .view-data-button {
-         margin-top: auto; padding: 6px 12px;
-         background-color: var(--md-sys-color-secondary-container);
-         color: var(--md-sys-color-secondary);
-         border: none; border-radius: var(--radius-small);
-         font-size: 11px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 10px;
-         transition: filter 0.2s;
+            margin-top: auto;
+            padding: 6px 12px;
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            border: none;
+            border-radius: var(--radius-small);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: background-color 0.2s;
          }
-         .view-data-button:hover { filter: brightness(1.1); }
+         .view-data-button:hover {
+            background-color: var(--md-sys-color-secondary);
+            color: #fff;
+         }
+         /* --- 全屏网格与搜索 --- */
+         .fullscreen-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--md-sys-color-background);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s cubic-bezier(0.2, 0, 0, 1);
+         }
+         .fs-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background-color: var(--md-sys-color-surface-container);
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: var(--elevation-shadow);
+         }
+         .fs-search-wrapper {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+         }
+         .fs-search-wrapper input {
+            width: 100%;
+            height: 40px;
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface);
+            padding: 0 16px 0 44px;
+            font-size: 14px;
+         }
+         .fs-search-wrapper input:focus {
+            border-color: var(--md-sys-color-primary);
+            box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+            outline: none;
+         }
+         .fs-search-wrapper .material-symbols-rounded {
+            position: absolute;
+            left: 14px;
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 20px;
+            pointer-events: none;
+         }
+         .fullscreen-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            padding: 12px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+         }
+         .fullscreen-grid .data-card {
+            flex: unset;
+            scroll-snap-align: unset;
+            width: 100%;
+         }
+         /* --- 模态框、表格等剩余 UI (精简化处理，不再用位移) --- */
+         /* 修改后：将 z-index 改为 3000 */
          .modal-overlay {
-         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-         background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
-         display: flex; justify-content: center; align-items: center; z-index: 1000; animation: fadeIn var(--motion-duration) var(--motion-easing);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            animation: fadeIn 0.2s;
          }
          .modal-content {
-         background-color: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface);
-         padding: 24px; border-radius: var(--radius-extra-large);
-         width: 90%; max-width: 380px; max-height: 80vh; overflow-y: auto;
-         box-shadow: 0 10px 24px rgba(0,0,0,0.4); border: 1px solid var(--md-sys-color-outline-variant);
+            background-color: var(--md-sys-color-surface-container);
+            color: var(--md-sys-color-on-surface);
+            padding: 24px;
+            border-radius: var(--radius-extra-large);
+            width: 90%;
+            max-width: 380px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--md-sys-color-outline-variant);
          }
-         .modal-content h3 { color: var(--md-sys-color-primary); text-align: center; margin-top: 0; margin-bottom: 16px; font-size: 16px; font-weight: 700; }
          .close-button {
-         display: block; margin: 20px auto 0; padding: 10px 28px;
-         background-color: var(--md-sys-color-error); color: var(--md-sys-color-on-error);
-         border: none; border-radius: var(--radius-pill); cursor: pointer; font-size: 12px; font-weight: 700;
-         transition: transform 0.2s, box-shadow 0.2s;
+            display: block;
+            margin: 20px auto 0;
+            padding: 10px 28px;
+            background-color: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error);
+            border: none;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: box-shadow 0.2s;
          }
          .close-button:hover {
-         transform: translateY(-2px); box-shadow: var(--elevation-hover); filter: brightness(1.1);
+            box-shadow: var(--elevation-hover);
+            filter: brightness(1.1);
          }
-         #rankingsTableContainer {
-         background-color: var(--md-sys-color-surface-container); border-radius: var(--radius-extra-large);
-         padding: 16px; margin-bottom: 24px; overflow-x: auto;
-         border: 1px solid var(--md-sys-color-outline-variant);
-         box-shadow: var(--elevation-shadow);
+         /* 修改后：将 opacity 改为 0.3 */
+         .md-ripple-anim {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: mdRipple 0.5s linear;
+            background-color: currentColor;
+            opacity: 0.3;
+            pointer-events: none;
          }
-         #rankingsTableContainer h3 { text-align: center; color: var(--md-sys-color-primary); margin-bottom: 12px; font-size: 15px; font-weight: 700; }
-         .change-indicator { font-size: 10px; font-weight: 700; margin-left: 4px; padding: 2px 4px; border-radius: 4px; }
-         .change-increase { color: var(--chart-increase); background-color: rgba(118, 255, 51, 0.1); }
-         .change-decrease { color: var(--chart-decrease); background-color: rgba(255, 102, 102, 0.1); }
-         .loader { display: none; justify-content: center; padding: 32px; }
+         /* 辅助样式类 */
+         @keyframes slideUp {
+            from {
+               transform: translateY(100%);
+            }
+            to {
+               transform: translateY(0);
+            }
+         }
+         @keyframes fadeIn {
+            from {
+               opacity: 0;
+            }
+            to {
+               opacity: 1;
+            }
+         }
+         @keyframes fadeUp {
+            from {
+               opacity: 0;
+               transform: translateY(8px);
+            }
+            to {
+               opacity: 1;
+               transform: translateY(0);
+            }
+         }
+         @keyframes mdRipple {
+            to {
+               transform: scale(4);
+               opacity: 0;
+            }
+         }
+         @keyframes spin {
+            to {
+               transform: rotate(360deg);
+            }
+         }
+         #changeLogContainer,
+         #rankingsTableContainer,
+         .leaderboard-category {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--radius-extra-large);
+            padding: 16px;
+            border: 1px solid var(--md-sys-color-outline-variant);
+            box-shadow: var(--elevation-shadow);
+            margin-bottom: 24px;
+            overflow: hidden;
+         }
+         table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+         }
+         th,
+         td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+         }
+         th {
+            color: var(--md-sys-color-secondary);
+            font-weight: 600;
+            font-size: 11px;
+         }
+         .loader {
+            display: none;
+            justify-content: center;
+            padding: 32px;
+         }
          .loader-inner {
-         width: 32px; height: 32px; border-radius: 50%;
-         border: 4px solid var(--md-sys-color-surface-container-high); border-top-color: var(--md-sys-color-primary);
-         animation: spin 0.8s linear infinite;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 4px solid var(--md-sys-color-surface-container-high);
+            border-top-color: var(--md-sys-color-primary);
+            animation: spin 0.8s linear infinite;
          }
-         .no-data-message { text-align: center; color: var(--md-sys-color-outline); padding: 20px; font-size: 12px; font-style: italic; font-weight: 500;}
-         .prize-icons-container { display: flex; gap: 4px; align-items: center; }
-         .prize-icon { width: 16px; height: 16px; background-size: contain; background-repeat: no-repeat; background-position: center; }
-         .prize-icon.drone { background-image: url('https://pages.tankionline.com/images/challenge/hyperion.png'); }
-         .prize-icon.nuclear { background-image: url('https://pages.tankionline.com/images/challenge/nuclear-energy.png'); }
-         .prize-icon.ruby { background-image: url('https://pages.tankionline.com/images/challenge/rubies.png'); }
-         .prize-icon.epic-key { background-image: url('https://pages.tankionline.com/images/challenge/epic-key.png'); }
-         .prize-icon.rare-key { background-image: url('https://pages.tankionline.com/images/challenge/rare-key.png'); }
-         .prize-icon.common-key { background-image: url('https://pages.tankionline.com/images/challenge/common-key.png'); }
-         @keyframes spin { to { transform: rotate(360deg); } }
-         @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+         .no-data-message {
+            text-align: center;
+            color: var(--md-sys-color-outline);
+            padding: 20px;
+            font-size: 12px;
+            font-style: italic;
+         }
+         /* --- 垃圾桶按钮专属样式 --- */
+         .trash-btn {
+            background-color: transparent !important;
+            box-shadow: none !important;
+            color: var(--md-sys-color-outline) !important;
+         }
+         .trash-btn:hover {
+            background-color: rgba(255, 102, 102, 0.12) !important;
+            color: var(--md-sys-color-error) !important;
+         }
+         [data-theme="light"] .trash-btn:hover {
+            background-color: rgba(186, 26, 26, 0.12) !important;
+         }
+         /* --- 自定义确认弹窗样式 --- */
+         .dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 24px;
+         }
+         .dialog-btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-pill);
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+         }
+         .dialog-cancel {
+            background-color: transparent;
+            color: var(--md-sys-color-primary);
+         }
+         .dialog-cancel:hover {
+            background-color: var(--md-sys-color-surface-container-high);
+         }
+         .dialog-confirm {
+            background-color: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error);
+            box-shadow: var(--elevation-shadow);
+         }
+         .dialog-confirm:hover {
+            box-shadow: var(--elevation-hover);
+            filter: brightness(1.1);
+         }
       </style>
    </head>
    <body>
       <div class="app-container">
-         <!-- 顶部操作栏 -->
          <div class="top-bar-actions">
-            <div id="backToLeaderboardContainer" style="display: none;">
+            <div id="backToLeaderboardContainer" style="display: none">
                <button id="backButton">
-               <span class="material-symbols-rounded">arrow_back</span>
-               <span id="txt_back">返回</span>
+                  <span class="material-symbols-rounded">arrow_back</span>
+                  <span id="txt_back">返回</span>
                </button>
             </div>
-            <div style="flex-grow: 1;"></div>
-            <button id="themeToggle" class="icon-btn" aria-label="切换主题" title="切换深色/浅色主题">
-            <span class="material-symbols-rounded">dark_mode</span>
-            </button>
+            <div style="flex-grow: 1"></div>
+            <div style="position: relative; display: flex; gap: 8px">
+               <!-- 设置按钮与下拉菜单 -->
+               <div style="position: relative">
+                  <button
+                     id="settingsToggle"
+                     class="icon-btn"
+                     aria-label="设置"
+                     title="设置选项"
+                  >
+                     <span class="material-symbols-rounded">settings</span>
+                  </button>
+                  <div id="settingsMenu" class="settings-menu">
+                     <label class="setting-item">
+                        <span id="txt_precise">显示精确时间</span>
+                        <input type="checkbox" id="preciseTimeToggle" />
+                        <span class="md3-switch"></span>
+                     </label>
+                  </div>
+               </div>
+               <button
+                  id="themeToggle"
+                  class="icon-btn"
+                  aria-label="切换主题"
+                  title="切换深色/浅色主题"
+               >
+                  <span class="material-symbols-rounded">dark_mode</span>
+               </button>
+            </div>
          </div>
          <h1>
             <span id="txt_main_title">3D坦克排行榜</span>
-            <div id="txt_sub_title" style="font-size: 12px; font-weight: 500; color: var(--md-sys-color-secondary); margin-top: 6px;">重新设计</div>
+            <div
+               id="txt_sub_title"
+               style="
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: var(--md-sys-color-secondary);
+                  margin-top: 6px;
+               "
+            >
+               重新设计
+            </div>
          </h1>
          <div class="form-container">
+            <!-- 定制的模拟 Select UI -->
             <div class="form-group">
                <label for="server" id="lbl_server">服务器</label>
-               <select id="server">
-                  <option value="cn" disabled id="opt_cn">国服 (维护中)</option>
-                  <option value="eu" selected id="opt_eu">外服 (EU)</option>
+               <div class="custom-select-wrapper" id="customServerWrapper">
+                  <div class="custom-select-display" id="customServerDisplay">
+                     外服 (EU)
+                     <span
+                        class="material-symbols-rounded"
+                        style="font-size: 18px"
+                        >arrow_drop_down</span
+                     >
+                  </div>
+                  <div class="custom-select-options" id="customServerOptions">
+                     <div
+                        class="custom-option disabled"
+                        data-value="cn"
+                        id="opt_cn_custom"
+                     >
+                        国服 (维护中)
+                     </div>
+                     <div
+                        class="custom-option"
+                        data-value="eu"
+                        id="opt_eu_custom"
+                     >
+                        外服 (EU)
+                     </div>
+                  </div>
+               </div>
+               <select id="server" style="display: none">
+                  <option value="cn" disabled>cn</option>
+                  <option value="eu" selected>eu</option>
                </select>
             </div>
             <div class="form-group">
                <label for="username" id="lbl_username">玩家昵称</label>
-               <input type="text" id="username" placeholder="例如: Godmode_ON" autocomplete="off" />
+               <input
+                  type="text"
+                  id="username"
+                  placeholder="例如: Godmode_ON"
+                  autocomplete="off"
+               />
+               <div id="searchHistory" class="search-history"></div>
             </div>
-            <div class="form-group" style="margin-top: 20px;">
+            <div class="form-group" style="margin-top: 20px">
                <button id="fetchButton">查询资料</button>
             </div>
             <div id="errorMessage" class="error-message"></div>
@@ -573,20 +1093,25 @@
          <div class="loader" id="loader">
             <div class="loader-inner"></div>
          </div>
-         <div id="leaderboardContainer">
-            <!-- 动态加载轮播图 -->
-         </div>
-         <div id="resultsWrapper" class="results-wrapper" style="display: none;">
+         <div id="leaderboardContainer"></div>
+         <div id="resultsWrapper" class="results-wrapper" style="display: none">
             <div class="monitor-container">
-               <!-- 修复后的监测按钮，增加图标指示 -->
                <button id="monitorButton">
-               <span class="material-symbols-rounded">play_arrow</span>
-               <span id="txt_monitor_start">开启实时监测</span>
+                  <span class="material-symbols-rounded">play_arrow</span>
+                  <span id="txt_monitor_start">开启实时监测</span>
                </button>
             </div>
             <div class="tabs">
-               <button class="tab-button active" data-tab="profile" id="tab_profile">玩家资料</button>
-               <button class="tab-button" data-tab="log" id="tab_log">变更日志</button>
+               <button
+                  class="tab-button active"
+                  data-tab="profile"
+                  id="tab_profile"
+               >
+                  玩家资料
+               </button>
+               <button class="tab-button" data-tab="log" id="tab_log">
+                  变更日志
+               </button>
             </div>
             <div id="profileContent" class="tab-content active">
                <div id="profileSummary"></div>
@@ -595,961 +1120,1528 @@
             </div>
             <div id="logContent" class="tab-content">
                <div id="changeLogContainer">
-                  <p class="no-data-message" id="txt_no_log">暂无数据变更记录</p>
+                  <p class="no-data-message" id="txt_no_log">
+                     暂无数据变更记录
+                  </p>
                </div>
             </div>
          </div>
       </div>
       <script>
+         // --- 全局水波纹事件 (纯正 MD3 Ripple 交互) ---
+         document.addEventListener("mousedown", function (e) {
+            const btn = e.target.closest(
+               "button, .tab-button, .history-item, .custom-select-display, .custom-option, .setting-item",
+            );
+            if (!btn) return;
+            // 确保具有定位属性
+            if (window.getComputedStyle(btn).position === "static") {
+               btn.style.position = "relative";
+            }
+            btn.style.overflow = "hidden";
+
+            const rect = btn.getBoundingClientRect();
+            const ripple = document.createElement("span");
+            const diameter = Math.max(rect.width, rect.height);
+            const radius = diameter / 2;
+
+            ripple.style.width = ripple.style.height = `${diameter}px`;
+            ripple.style.left = `${e.clientX - rect.left - radius}px`;
+            ripple.style.top = `${e.clientY - rect.top - radius}px`;
+            ripple.className = "md-ripple-anim";
+
+            btn.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 500);
+         });
+
          // --- 语言检测与配置 ---
          const userLang = navigator.language || navigator.userLanguage;
-         const isChinese = userLang.toLowerCase().startsWith('zh');
-         
-         // 设置页面语言
-         document.documentElement.lang = isChinese ? 'zh-CN' : 'en';
-         
-         // 语言包字典
+         const isChinese = userLang.toLowerCase().startsWith("zh");
+         document.documentElement.lang = isChinese ? "zh-CN" : "en";
+
          const I18N = {
-         zh: {
-         title: "3D坦克排行榜",
-         subtitle: "重新设计",
-         server: "服务器",
-         server_cn: "国服 (维护中)",
-         server_eu: "外服 (EU)",
-         username: "玩家昵称",
-         fetch_btn: "查询资料",
-         back: "返回",
-         monitor_start: "开启实时监测",
-         monitor_stop: "停止监测",
-         tab_profile: "玩家资料",
-         tab_log: "变更日志",
-         no_log: "暂无数据变更记录",
-         error_server_url: "无法查询，因为来自 URL 的服务器当前不可用。",
-         error_input_name: "请输入昵称",
-         error_monitor: "请先停止监测再进行新的查询",
-         error_monitor_req: "请先至少查询一次，再开启监测",
-         error_not_found: "找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。",
-         monitor_active: "监测已开启...",
-         monitor_refresh: "监测中...数据已刷新",
-         monitor_stopped: "监测中断",
-         retry: "后重试",
-         
-         // 排行榜
-         lb_title: "每周/活动排行榜",
-         lb_score: "经验值",
-         lb_crystals: "获得的水晶",
-         lb_golds: "获得的金箱子",
-         lb_efficiency: "效率 (经验值/小时)",
-         lb_stars_current: "星星 (当前)",
-         lb_stars_previous: "星星 (上次)",
-         th_rank: "#",
-         th_name: "昵称",
-         th_value: "数值",
-         th_reward: "奖励",
-         th_stars: "星星",
-         no_data_lb: "无数据",
-         
-         // 玩家资料
-         rank: "等级",
-         unknown_rank: "未知等级",
-         label_nickname: "玩家昵称",
-         label_score: "经验值",
-         label_vip: "VIP 状态",
-         vip_active: "已激活",
-         vip_inactive: "未激活",
-         label_gear: "战斗力",
-         label_kd: "击杀/死亡",
-         label_ratio: "K/D",
-         label_time: "游戏时长",
-         label_supplies: "已用道具",
-         label_crystals: "获得水晶",
-         label_golds: "获得金箱子",
-         kill: "击杀",
-         death: "死亡",
-         
-         // 每周排名表格
-         weekly_rank_title: "每周排名",
-         th_cat: "类别",
-         th_cur_rank: "当前排名",
-         th_cur_val: "数值",
-         th_prev_rank: "上周排名",
-         th_prev_val: "上周数值",
-         cat_score: "经验值",
-         cat_golds: "金箱子",
-         cat_crystals: "水晶",
-         cat_eff: "效率（经验值/小时）",
-         
-         // 列表
-         list_turrets: "使用的炮塔",
-         list_hulls: "使用的底盘",
-         list_drones: "使用的无人机",
-         list_modules: "使用的防御模块",
-         list_paints: "使用的迷彩",
-         list_modes: "玩过的模式",
-         list_supplies: "使用的道具",
-         list_presents: "收到的礼物",
-         prop: "特性",
-         not_played: "未进行游戏",
-         count: "数量",
-         view_types: "各类型",
-         view_versions: "各版本",
-         view_grades: "各等级",
-         
-         // 模态框
-         modal_types: "各类型数据",
-         modal_versions: "各版本数据",
-         modal_grades: "各等级数据",
-         th_type: "类型",
-         th_ver: "版本",
-         th_grade: "等级",
-         th_time: "时长",
-         th_exp: "经验值",
-         close: "关闭",
-         
-         // 时间
-         hr: "小时",
-         min: "分钟",
-         sec: "秒"
-         },
-         en: {
-         title: "Tanki Online Ratings",
-         subtitle: "Redesigned",
-         server: "Server",
-         server_cn: "CN (Maintenance)",
-         server_eu: "EU Server",
-         username: "Nickname",
-         fetch_btn: "Fetch Data",
-         back: "Back",
-         monitor_start: "Start Monitoring",
-         monitor_stop: "Stop Monitoring",
-         tab_profile: "Profile",
-         tab_log: "Change Log",
-         no_log: "No data changes recorded yet.",
-         error_server_url: "Cannot fetch because the server from URL is currently unavailable.",
-         error_input_name: "Please enter a nickname",
-         error_monitor: "Please stop monitoring before making a new query",
-         error_monitor_req: "Please fetch data at least once before monitoring",
-         error_not_found: "Player not found. Check the nickname or if the profile is hidden.",
-         monitor_active: "Monitoring active...",
-         monitor_refresh: "Monitoring... Data Refreshed",
-         monitor_stopped: "Monitoring stopped",
-         retry: "retry in",
-         
-         // Leaderboard
-         lb_title: "Weekly / Event Leaderboards",
-         lb_score: "Experience",
-         lb_crystals: "Crystals Earned",
-         lb_golds: "Gold Boxes Caught",
-         lb_efficiency: "Efficiency (Experience/Hour)",
-         lb_stars_current: "Stars (Current)",
-         lb_stars_previous: "Stars (Previous)",
-         th_rank: "#",
-         th_name: "Name",
-         th_value: "Value",
-         th_reward: "Reward",
-         th_stars: "Stars",
-         no_data_lb: "No Data",
-         
-         // Profile
-         rank: "Rank",
-         unknown_rank: "Unknown Rank",
-         label_nickname: "Nickname",
-         label_score: "Experience",
-         label_vip: "Premium",
-         vip_active: "Active",
-         vip_inactive: "Inactive",
-         label_gear: "Gear Score",
-         label_kd: "Kills / Deaths",
-         label_ratio: "K/D Ratio",
-         label_time: "Time Played",
-         label_supplies: "Supplies Used",
-         label_crystals: "Crystals",
-         label_golds: "Gold Boxes",
-         kill: "Kills",
-         death: "Deaths",
-         
-         // Weekly Table
-         weekly_rank_title: "Weekly Ratings",
-         th_cat: "Category",
-         th_cur_rank: "Rank",
-         th_cur_val: "Value",
-         th_prev_rank: "Prev Rank",
-         th_prev_val: "Prev Value",
-         cat_score: "Experience",
-         cat_golds: "Gold Boxes",
-         cat_crystals: "Crystals",
-         cat_eff: "Efficiency",
-         
-         // Lists
-         list_turrets: "Turrets Played",
-         list_hulls: "Hulls Played",
-         list_drones: "Drones Played",
-         list_modules: "Modules",
-         list_paints: "Paints",
-         list_modes: "Modes Played",
-         list_supplies: "Supplies Usage",
-         list_presents: "Gifts Received",
-         prop: "Properties",
-         not_played: "Not Played",
-         count: "Count",
-         view_types: "Types",
-         view_versions: "Versions",
-         view_grades: "Grades",
-         
-         // Modal
-         modal_types: "Data by Type",
-         modal_versions: "Data by Version",
-         modal_grades: "Data by Grade",
-         th_type: "Type",
-         th_ver: "Version",
-         th_grade: "Grade",
-         th_time: "Time",
-         th_exp: "Experience",
-         close: "Close",
-         
-         // Time
-         hr: "h",
-         min: "m",
-         sec: "s"
-         }
+            zh: {
+               title: "3D坦克排行榜",
+               subtitle: "重新设计",
+               server: "服务器",
+               server_cn: "国服 (维护中)",
+               server_eu: "外服 (EU)",
+               username: "玩家昵称",
+               fetch_btn: "查询资料",
+               back: "返回",
+               monitor_start: "开启实时监测",
+               monitor_stop: "停止监测",
+               tab_profile: "玩家资料",
+               tab_log: "变更日志",
+               no_log: "暂无数据变更记录",
+               precise_time: "显示精确时间",
+               search: "搜索",
+               error_server_url: "无法查询，因为来自 URL 的服务器当前不可用。",
+               error_input_name: "请输入昵称",
+               error_monitor: "请先停止监测再进行新的查询",
+               error_monitor_req: "请先至少查询一次，再开启监测",
+               error_not_found:
+                  "找不到该玩家。请检查昵称或该玩家是否在游戏中隐藏了个人资料。",
+               monitor_active: "监测已开启...",
+               monitor_refresh: "监测中...数据已刷新",
+               monitor_stopped: "监测中断",
+               retry: "后重试",
+               lb_title: "每周/活动排行榜",
+               lb_score: "经验值",
+               lb_crystals: "获得的水晶",
+               lb_golds: "获得的金箱子",
+               lb_efficiency: "效率 (经验值/小时)",
+               lb_stars_current: "星星 (当前)",
+               lb_stars_previous: "星星 (上次)",
+               th_rank: "#",
+               th_name: "昵称",
+               th_value: "数值",
+               th_reward: "奖励",
+               th_stars: "星星",
+               no_data_lb: "无数据",
+               rank: "等级",
+               unknown_rank: "未知等级",
+               label_nickname: "玩家昵称",
+               label_score: "经验值",
+               label_vip: "VIP 状态",
+               vip_active: "已激活",
+               vip_inactive: "未激活",
+               label_gear: "战斗力",
+               label_kd: "击杀/死亡",
+               label_ratio: "K/D",
+               label_time: "游戏时长",
+               label_supplies: "已用道具",
+               label_crystals: "获得水晶",
+               label_golds: "获得金箱子",
+               kill: "击杀",
+               death: "死亡",
+               weekly_rank_title: "每周排名",
+               th_cat: "类别",
+               th_cur_rank: "当前排名",
+               th_cur_val: "数值",
+               th_prev_rank: "上周排名",
+               th_prev_val: "上周数值",
+               cat_score: "经验值",
+               cat_golds: "金箱子",
+               cat_crystals: "水晶",
+               cat_eff: "效率（经验值/小时）",
+               list_turrets: "使用的炮塔",
+               list_hulls: "使用的底盘",
+               list_drones: "使用的无人机",
+               list_modules: "使用的防御模块",
+               list_paints: "使用的迷彩",
+               list_modes: "玩过的模式",
+               list_supplies: "使用的道具",
+               list_presents: "收到的礼物",
+               prop: "特性",
+               not_played: "未进行游戏",
+               count: "数量",
+               view_types: "各类型",
+               view_versions: "各版本",
+               view_grades: "各等级",
+               modal_types: "各类型数据",
+               modal_versions: "各版本数据",
+               modal_grades: "各等级数据",
+               th_type: "类型",
+               th_ver: "版本",
+               th_grade: "等级",
+               th_time: "时长",
+               th_exp: "经验值",
+               close: "关闭",
+               hr: "小时",
+               min: "分钟",
+               sec: "秒",
+               lt1m: "< 1 分钟",
+               settings: "设置",
+               settings_desc: "设置选项",
+               theme_toggle: "切换主题",
+               theme_desc: "切换深色/浅色主题",
+               clear_log: "清空当前玩家日志",
+               confirm_clear: "确定要清空该玩家的所有变更记录吗？无法恢复。",
+            },
+            en: {
+               title: "Tanki Ratings",
+               subtitle: "Redesigned",
+               server: "Server",
+               server_cn: "CN (Maintenance)",
+               server_eu: "EU Server",
+               username: "Nickname",
+               fetch_btn: "Fetch Data",
+               back: "Back",
+               monitor_start: "Start Monitoring",
+               monitor_stop: "Stop Monitoring",
+               tab_profile: "Profile",
+               tab_log: "Change Log",
+               no_log: "No data changes recorded yet.",
+               precise_time: "Precise Time",
+               search: "Search",
+               error_server_url:
+                  "Cannot fetch because the server from URL is currently unavailable.",
+               error_input_name: "Please enter a nickname",
+               error_monitor:
+                  "Please stop monitoring before making a new query",
+               error_monitor_req:
+                  "Please fetch data at least once before monitoring",
+               error_not_found:
+                  "Player not found. Check the nickname or if the profile is hidden.",
+               monitor_active: "Monitoring active...",
+               monitor_refresh: "Monitoring... Data Refreshed",
+               monitor_stopped: "Monitoring stopped",
+               retry: "retry in",
+               lb_title: "Weekly / Event Leaderboards",
+               lb_score: "Experience",
+               lb_crystals: "Crystals Earned",
+               lb_golds: "Gold Boxes Caught",
+               lb_efficiency: "Efficiency",
+               lb_stars_current: "Stars (Current)",
+               lb_stars_previous: "Stars (Previous)",
+               th_rank: "#",
+               th_name: "Name",
+               th_value: "Value",
+               th_reward: "Reward",
+               th_stars: "Stars",
+               no_data_lb: "No Data",
+               rank: "Rank",
+               unknown_rank: "Unknown Rank",
+               label_nickname: "Nickname",
+               label_score: "Experience",
+               label_vip: "Premium",
+               vip_active: "Active",
+               vip_inactive: "Inactive",
+               label_gear: "Gear Score",
+               label_kd: "Kills / Deaths",
+               label_ratio: "K/D Ratio",
+               label_time: "Time Played",
+               label_supplies: "Supplies Used",
+               label_crystals: "Crystals",
+               label_golds: "Gold Boxes",
+               kill: "Kills",
+               death: "Deaths",
+               weekly_rank_title: "Weekly Ratings",
+               th_cat: "Category",
+               th_cur_rank: "Rank",
+               th_cur_val: "Value",
+               th_prev_rank: "Prev Rank",
+               th_prev_val: "Prev Value",
+               cat_score: "Experience",
+               cat_golds: "Gold Boxes",
+               cat_crystals: "Crystals",
+               cat_eff: "Efficiency",
+               list_turrets: "Turrets Played",
+               list_hulls: "Hulls Played",
+               list_drones: "Drones Played",
+               list_modules: "Modules",
+               list_paints: "Paints",
+               list_modes: "Modes Played",
+               list_supplies: "Supplies Usage",
+               list_presents: "Gifts Received",
+               prop: "Properties",
+               not_played: "Not Played",
+               count: "Count",
+               view_types: "Types",
+               view_versions: "Versions",
+               view_grades: "Grades",
+               modal_types: "Data by Type",
+               modal_versions: "Data by Version",
+               modal_grades: "Data by Grade",
+               th_type: "Type",
+               th_ver: "Version",
+               th_grade: "Grade",
+               th_time: "Time",
+               th_exp: "Experience",
+               close: "Close",
+               hr: "h",
+               min: "m",
+               sec: "s",
+               lt1m: "< 1 m",
+               settings: "Settings",
+               settings_desc: "Settings Options",
+               theme_toggle: "Toggle Theme",
+               theme_desc: "Toggle Dark/Light Theme",
+               clear_log: "Clear Logs",
+               confirm_clear:
+                  "Are you sure you want to clear all logs for this player? This cannot be undone.",
+            },
          };
-         
          const T = isChinese ? I18N.zh : I18N.en;
-         
-         // 应用静态文本到 HTML
+
          function applyLanguageToStaticHTML() {
-         document.getElementById('txt_main_title').textContent = T.title;
-         document.getElementById('txt_sub_title').textContent = T.subtitle;
-         document.getElementById('lbl_server').textContent = T.server;
-         document.getElementById('opt_cn').textContent = T.server_cn;
-         document.getElementById('opt_eu').textContent = T.server_eu;
-         document.getElementById('lbl_username').textContent = T.username;
-         document.getElementById('fetchButton').textContent = T.fetch_btn;
-         document.getElementById('txt_back').textContent = T.back;
-         document.getElementById('txt_monitor_start').textContent = T.monitor_start;
-         document.getElementById('tab_profile').textContent = T.tab_profile;
-         document.getElementById('tab_log').textContent = T.tab_log;
-         document.getElementById('txt_no_log').textContent = T.no_log;
-         document.getElementById('username').placeholder = isChinese ? "例如: Godmode_ON" : "e.g. Godmode_ON";
+            document.getElementById("txt_main_title").textContent = T.title;
+            document.getElementById("txt_sub_title").textContent = T.subtitle;
+            document.getElementById("lbl_server").textContent = T.server;
+
+            // 自定义下拉选项文本
+            document.getElementById("opt_cn_custom").textContent = T.server_cn;
+            document.getElementById("opt_eu_custom").textContent = T.server_eu;
+            const currentVal = document.getElementById("server").value;
+            document.getElementById("customServerDisplay").innerHTML =
+               `${currentVal === "eu" ? T.server_eu : T.server_cn} <span class="material-symbols-rounded" style="font-size:18px">arrow_drop_down</span>`;
+
+            document.getElementById("lbl_username").textContent = T.username;
+            document.getElementById("fetchButton").textContent = T.fetch_btn;
+            document.getElementById("txt_back").textContent = T.back;
+            document.getElementById("txt_monitor_start").textContent =
+               T.monitor_start;
+            document.getElementById("tab_profile").textContent = T.tab_profile;
+            document.getElementById("tab_log").textContent = T.tab_log;
+            document.getElementById("txt_no_log").textContent = T.no_log;
+            document.getElementById("txt_precise").textContent = T.precise_time;
+            document.getElementById("username").placeholder = isChinese
+               ? "例如: Godmode_ON"
+               : "e.g. Godmode_ON";
+            // 1. 初始化网页标签页的标题
+            document.title = T.title;
+
+            // 2. 替换设置按钮的无障碍标签和悬停提示
+            const settingsToggle = document.getElementById("settingsToggle");
+            if (settingsToggle) {
+               settingsToggle.setAttribute("aria-label", T.settings);
+               settingsToggle.title = T.settings_desc;
+            }
+
+            // 3. 替换主题切换按钮的无障碍标签和悬停提示
+            const themeToggle = document.getElementById("themeToggle");
+            if (themeToggle) {
+               themeToggle.setAttribute("aria-label", T.theme_toggle);
+               themeToggle.title = T.theme_desc;
+            }
          }
-         
-         // --- 主题引擎逻辑 (持久化保存) ---
-         const themeToggleBtn = document.getElementById('themeToggle');
-         const themeIcon = themeToggleBtn.querySelector('span');
-         const htmlEl = document.documentElement;
-         
+
+         // --- 自定义 Select 下拉交互 ---
+         const customServerDisplay = document.getElementById(
+            "customServerDisplay",
+         );
+         const customServerOptions = document.getElementById(
+            "customServerOptions",
+         );
+         const realSelect = document.getElementById("server");
+
+         customServerDisplay.addEventListener("click", (e) => {
+            e.stopPropagation();
+            customServerOptions.classList.toggle("active");
+            customServerDisplay.classList.toggle("active");
+         });
+
+         customServerOptions
+            .querySelectorAll(".custom-option")
+            .forEach((opt) => {
+               opt.addEventListener("click", (e) => {
+                  if (opt.classList.contains("disabled")) return;
+                  realSelect.value = opt.dataset.value;
+                  customServerDisplay.innerHTML = `${opt.textContent} <span class="material-symbols-rounded" style="font-size:18px">arrow_drop_down</span>`;
+                  customServerOptions.classList.remove("active");
+                  customServerDisplay.classList.remove("active");
+               });
+            });
+
+         document.addEventListener("click", () => {
+            customServerOptions.classList.remove("active");
+            customServerDisplay.classList.remove("active");
+         });
+
+         // --- 主题控制 ---
+         const themeToggleBtn = document.getElementById("themeToggle");
          function initTheme() {
-         const savedTheme = localStorage.getItem('theme') || 'dark';
-         setTheme(savedTheme);
+            setTheme(localStorage.getItem("theme") || "dark");
          }
-         
          function setTheme(theme) {
-         htmlEl.setAttribute('data-theme', theme);
-         localStorage.setItem('theme', theme);
-         themeIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+            document.documentElement.setAttribute("data-theme", theme);
+            localStorage.setItem("theme", theme);
+            themeToggleBtn.querySelector("span").textContent =
+               theme === "dark" ? "dark_mode" : "light_mode";
          }
-         
-         themeToggleBtn.addEventListener('click', () => {
-         const currentTheme = htmlEl.getAttribute('data-theme');
-         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-         setTheme(newTheme);
+         themeToggleBtn.addEventListener("click", () =>
+            setTheme(
+               document.documentElement.getAttribute("data-theme") === "dark"
+                  ? "light"
+                  : "dark",
+            ),
+         );
+
+         // --- 设置菜单 & 格式化小数时间 ---
+         let isPreciseTime = localStorage.getItem("precise_time") === "true";
+         const settingsBtn = document.getElementById("settingsToggle");
+         const settingsMenu = document.getElementById("settingsMenu");
+         const preciseToggle = document.getElementById("preciseTimeToggle");
+         preciseToggle.checked = isPreciseTime;
+
+         settingsBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            settingsMenu.classList.toggle("active");
          });
-         
-         initTheme();
-         applyLanguageToStaticHTML(); // Apply language on load
-         
-         // --- 核心业务逻辑 ---
-         const API_CONFIG = {
-         baseUrls: { 'eu': 'https://ratings.tankionline.com/api/eu/profile/', 'cn': 'https://ratings.3dtank.com/get_stat/profile/' },
-         leaderboardUrl: 'https://ratings.tankionline.com/api/eu/top/',
-         monitorInterval: 3000
-         };
-         
-         const RANKS_CN =["新兵", "二等兵", "一等兵", "下士", "中士", "上士", "三级军士长", "二级军士长", "一级军士长", "军士长", "五级准尉", "四级准尉", "三级准尉", "二级准尉", "一级准尉", "特级准尉", "少尉", "中尉", "上尉", "少校", "中校", "上校", "准将", "少将", "中将", "上将", "元帅", "陆军元帅", "统帅", "大元帅", "传奇"];
-         const RANKS_EN =["Recruit", "Private", "Gefreiter", "Corporal", "Master Corporal", "Sergeant", "Staff Sergeant", "Master Sergeant", "First Sergeant", "Sergeant-Major", "Warrant Officer 1", "Warrant Officer 2", "Warrant Officer 3", "Warrant Officer 4", "Warrant Officer 5", "Third Lieutenant", "Second Lieutenant", "First Lieutenant", "Captain", "Major", "Lieutenant Colonel", "Colonel", "Brigadier", "Major General", "Lieutenant General", "General", "Marshal", "Field Marshal", "Commander", "Generalissimo", "Legend"];
-         
-         const RANKS = isChinese ? RANKS_CN : RANKS_EN;
-         
-         const LIST_DATA_CONFIGS =[
-         { key: 'turretsPlayed', title: T.list_turrets },
-         { key: 'hullsPlayed', title: T.list_hulls },
-         { key: 'dronesPlayed', title: T.list_drones },
-         { key: 'resistanceModules', title: T.list_modules },
-         { key: 'paintsPlayed', title: T.list_paints },
-         { key: 'modesPlayed', title: T.list_modes },
-         { key: 'suppliesUsage', title: T.list_supplies },
-         { key: 'presents', title: T.list_presents }
-         ];
-         
-         // 翻译映射表 (确保键名正确) - 仅在中文模式下使用
-         const TRANSLATION_MAP = {
-         'JGR': '个人剑圣', 'TJR': '团队剑圣', 'RESISTANCE': '抗性', 'SHAFT': '镭射炮', 'THUNDER': '雷暴炮',
-         'CRITICAL': '暴击', 'MINE': '地雷', 'RAILGUN': '激光炮', 'FREEZE': '冰风暴', 'SMOKY': '轰天炮',
-         'RICOCHET': '火龙珠', 'ARTILLERY': '马格南', 'FIREBIRD': '火焰炮', 'TWINS': '离子炮', 'GAUSS': '电磁炮',
-         'ROCKET_LAUNCHER': '火箭炮', 'ISIS': '磁力炮', 'TESLA': '特斯拉', 'SCORPIO': '蝎子',
-         'MACHINE_GUN': '极速炮', 'SHOTGUN': '滑膛炮', 'MODULE': '模块'
-         };
-         
-         const LEADERBOARD_CATEGORIES =[
-         { key: 'score', title: T.lb_score },
-         { key: 'crystals', title: T.lb_crystals },
-         { key: 'golds', title: T.lb_golds },
-         { key: 'efficiency', title: T.lb_efficiency },
-         { key: 'stars_current', title: T.lb_stars_current },
-         { key: 'stars_previous', title: T.lb_stars_previous }
-         ];
-         
-         const elements = { fetchButton: document.getElementById('fetchButton'), monitorButton: document.getElementById('monitorButton'), serverSelect: document.getElementById('server'), usernameInput: document.getElementById('username'), loader: document.getElementById('loader'), errorMessage: document.getElementById('errorMessage'), leaderboardContainer: document.getElementById('leaderboardContainer'), resultsWrapper: document.getElementById('resultsWrapper'), profileSummary: document.getElementById('profileSummary'), rankingsTableContainer: document.getElementById('rankingsTableContainer'), listsContainer: document.getElementById('listsContainer'), tabs: document.querySelectorAll('.tab-button'), tabContents: document.querySelectorAll('.tab-content'), changeLogContainer: document.getElementById('changeLogContainer'), backButton: document.getElementById('backButton'), backToLeaderboardContainer: document.getElementById('backToLeaderboardContainer') };
-         let isMonitoring = false, monitoringTimeoutId = null, lastProfileData = null, changeLog =[], currentUsername = '', currentServer = '', leaderboardData = null, currentLeaderboardIndex = 0;
-         
-         document.addEventListener('DOMContentLoaded', () => {
-         const urlParams = new URLSearchParams(window.location.search);
-         if (!urlParams.has('username')) {
-         fetchAndRenderLeaderboard();
-         }
-         processUrlParams();
+         document.addEventListener("click", (e) => {
+            if (
+               !e.target.closest("#settingsMenu") &&
+               !e.target.closest("#settingsToggle")
+            )
+               settingsMenu.classList.remove("active");
          });
-         
-         window.addEventListener('popstate', (e) => {
-         if (isMonitoring) stopMonitoring();
-         processUrlParams();
+
+         preciseToggle.addEventListener("change", (e) => {
+            isPreciseTime = e.target.checked;
+            localStorage.setItem("precise_time", isPreciseTime);
+            if (lastProfileData) updateDisplay(lastProfileData, null);
          });
-         
-         elements.fetchButton.addEventListener('click', () => {
-         updateBrowserUrl(elements.serverSelect.value, elements.usernameInput.value.trim());
-         handleFetch();
-         });
-         elements.monitorButton.addEventListener('click', toggleMonitoring);
-         elements.usernameInput.addEventListener('keypress', (e) => {
-         if (e.key === 'Enter') {
-         updateBrowserUrl(elements.serverSelect.value, elements.usernameInput.value.trim());
-         handleFetch();
-         }
-         });
-         elements.backButton.addEventListener('click', () => showLeaderboardView(true));
-         elements.tabs.forEach(tab => tab.addEventListener('click', () => {
-         elements.tabs.forEach(t => t.classList.remove('active'));
-         elements.tabContents.forEach(c => c.classList.remove('active'));
-         tab.classList.add('active');
-         document.querySelector(`#${tab.dataset.tab}Content`).classList.add('active');
-         }));
-         
-         function processUrlParams() {
-         const params = new URLSearchParams(window.location.search);
-         const server = params.get('server');
-         const username = params.get('username');
-         
-         if (server && elements.serverSelect.querySelector(`option[value="${server}"]`)) {
-         elements.serverSelect.value = server;
-         }
-         
-         if (username) {
-         elements.usernameInput.value = username;
-         if (!elements.serverSelect.options[elements.serverSelect.selectedIndex].disabled) {
-         handleFetch();
-         } else {
-         displayError(T.error_server_url);
-         }
-         } else {
-         showLeaderboardView(false);
-         }
-         }
-         
-         function updateBrowserUrl(server, username) {
-         if (!username) return;
-         const newUrl = `${window.location.pathname}?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}`;
-         const pageTitle = `${T.title} - ${username}`;
-         document.title = pageTitle;
-         if(window.location.href !== newUrl) {
-         history.pushState({server, username}, pageTitle, newUrl);
-         }
-         }
-         
-         // --- 改进后的翻译函数 ---
-         function translateText(text) {
-         if (typeof text !== 'string' || !text) return text;
-         
-         let translated = text;
-         
-         if (isChinese) {
-         // 1. 按长度排序键名 (长词优先)
-         const sortedKeys = Object.keys(TRANSLATION_MAP).sort((a, b) => b.length - a.length);
-         
-         sortedKeys.forEach(key => {
-         // 使用 'gi' 标志，忽略大小写
-         const regex = new RegExp(key, 'gi');
-         if (regex.test(translated)) {
-         translated = translated.replace(regex, TRANSLATION_MAP[key]);
-         }
-         });
-         
-         // 2. 清理分隔符 (移除剩余的下划线 _ 和 连字符 -，以及空格)
-         return translated.replace(/[_\-\s]/g, '');
-         } else {
-         // 英文模式：将蛇形命名或全大写转换为 Title Case (e.g. ROCKET_LAUNCHER -> Rocket Launcher)
-         return translated
-         .toLowerCase()
-         .split(/[_\-\s]+/)
-         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-         .join(' ');
-         }
-         }
-         
-         function showLeaderboardView(pushState = true) {
-         elements.resultsWrapper.style.display = 'none';
-         if (isMonitoring) { stopMonitoring(); }
-         elements.usernameInput.value = '';
-         displayError('');
-         elements.leaderboardContainer.style.display = 'block';
-         elements.backToLeaderboardContainer.style.display = 'none';
-         
-         if (!leaderboardData) {
-         fetchAndRenderLeaderboard();
-         }
-         
-         if(pushState) {
-         const pageTitle = T.title;
-         document.title = pageTitle;
-         history.pushState({}, pageTitle, window.location.pathname);
-         }
-         }
-         
-         async function fetchStarsLeaderboardData() {
-         const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=';
-         const starsUrl = 'https://pages.tankionline.com/challenge-accepted';
-         const apiUrl = `${proxyUrl}${encodeURIComponent(starsUrl)}`;
-         
-         try {
-         const response = await fetch(apiUrl);
-         if (!response.ok) throw new Error('Status ' + response.status);
-         const htmlText = await response.text();
-         const parser = new DOMParser();
-         const doc = parser.parseFromString(htmlText, 'text/html');
-         
-         const parseList = (selector, prizeParser) => {
-         const list = doc.querySelector(selector);
-         if (!list) return[];
-         const players =[];
-         list.querySelectorAll('ul.list-content li').forEach(li => {
-         const name = li.querySelector('.name')?.textContent.trim();
-         const starsText = li.querySelector('.stars')?.textContent.trim().replace(/\s/g, '');
-         const value = parseInt(starsText, 10);
-         
-         if (name && !isNaN(value)) {
-         const player = { uid: name, value: value };
-         if (prizeParser) player.prizes = prizeParser(li);
-         players.push(player);
-         }
-         });
-         return players;
-         };
-         
-         const prizeParser = (li) => {
-         const prizeContainer = li.querySelector('.prizes');
-         if (!prizeContainer) return[];
-         return Array.from(prizeContainer.querySelectorAll('.prize')).map(p => {
-         return Array.from(p.classList).find(c => c !== 'prize');
-         }).filter(Boolean);
-         };
-         
-         const currentStars = parseList('.rating-list.active');
-         const previousStars = parseList('.rating-list.old-list', prizeParser);
-         
-         return { stars_current: currentStars, stars_previous: previousStars };
-         } catch (e) {
-         console.warn("Stars data fetch failed", e);
-         return { stars_current: [], stars_previous:[] };
-         }
-         }
-         
-         async function fetchAndRenderLeaderboard() {
-         const container = elements.leaderboardContainer;
-         container.style.display = 'block';
-         container.innerHTML = `<div class="loader" style="display: flex;"><div class="loader-inner"></div></div>`;
-         try {
-         const [regularDataResponse, starsData] = await Promise.all([
-         fetch(`${'https://api.codetabs.com/v1/proxy?quest='}${encodeURIComponent(API_CONFIG.leaderboardUrl)}`).then(res => {
-         if (!res.ok) throw new Error(`Network Error: ${res.status}`);
-         return res.json();
-         }),
-         fetchStarsLeaderboardData()
-         ]);
-         
-         if (regularDataResponse && regularDataResponse.response) {
-         leaderboardData = { ...regularDataResponse.response, ...starsData };
-         currentLeaderboardIndex = 0;
-         renderLeaderboardCarousel();
-         } else {
-         throw new Error('Invalid leaderboard data format');
-         }
-         } catch (error) {
-         console.error('Failed to fetch leaderboard:', error);
-         container.innerHTML = `<p class="no-data-message" style="color: var(--md-sys-color-error);">Error: ${error.message}</p>`;
-         }
-         }
-         
-         function renderLeaderboardCarousel() {
-         const container = elements.leaderboardContainer;
-         container.innerHTML = `<h2>${T.lb_title}</h2>
-         <div class="leaderboard-carousel-container">
-         <div id="leaderboardCarouselContent"></div>
-         <button id="leaderboardPrev" class="carousel-nav-button"><span class="material-symbols-rounded">chevron_left</span></button>
-         <button id="leaderboardNext" class="carousel-nav-button"><span class="material-symbols-rounded">chevron_right</span></button>
-         </div>`;
-         document.getElementById('leaderboardPrev').addEventListener('click', showPrevLeaderboard);
-         document.getElementById('leaderboardNext').addEventListener('click', showNextLeaderboard);
-         renderCurrentLeaderboard();
-         }
-         
-         function renderCurrentLeaderboard() {
-         if (!leaderboardData) return;
-         const contentDiv = document.getElementById('leaderboardCarouselContent');
-         if (!contentDiv) return;
-         
-         contentDiv.style.opacity = 0;
-         setTimeout(() => {
-         const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
-         const totalCategories = LEADERBOARD_CATEGORIES.length;
-         let combinedHtml = '';
-         
-         for (let i = 0; i < itemsPerPage; i++) {
-         const categoryIndex = (currentLeaderboardIndex + i) % totalCategories;
-         const category = LEADERBOARD_CATEGORIES[categoryIndex];
-         const categoryData = leaderboardData[category.key];
-         
-         let html = `<div class="leaderboard-category">`;
-         html += `<h3 class="list-title" style="border:none; padding:0; text-align: center;">${category.title}</h3>`;
-         
-         if (categoryData && categoryData.length > 0) {
-         html += '<div class="leaderboard-table-wrapper">';
-         if (category.key === 'stars_previous') {
-         html += `<table class="leaderboard-table" style="min-width: 100%;">
-         <thead><tr><th class="rank-col" style="width: 10%;">${T.th_rank}</th><th class="player-col" style="width: 35%;">${T.th_name}</th><th style="width: 35%; text-align: left;">${T.th_reward}</th><th class="value-col" style="width: 20%">${T.th_stars}</th></tr></thead>
-         <tbody>${categoryData.map((player, index) => {
-         const prizeHtml = (player.prizes ||[]).map(p => `<div class="prize-icon ${p.replace(/_/g, '-')}" title="${p}"></div>`).join('');
-         return `<tr>
-         <td class="rank-col">${index + 1}</td>
-         <td class="player-col"><a href="#" class="player-link" data-username="${player.uid}">${player.uid}</a></td>
-         <td><div class="prize-icons-container">${prizeHtml}</div></td>
-         <td class="value-col">${player.value.toLocaleString()}</td>
-         </tr>`
-         }).join('')}
-         </tbody>
-         </table>`;
-         } else {
-         html += `<table class="leaderboard-table">
-         <thead><tr><th class="rank-col">${T.th_rank}</th><th class="player-col">${T.th_name}</th><th class="value-col">${T.th_value}</th></tr></thead>
-         <tbody>${categoryData.map((player, index) => {
-         const isEfficiency = category.key === 'efficiency';
-         const rawValue = player.value;
-         const displayValue = isEfficiency ? (rawValue / 1000) : rawValue;
-         const formattedValue = displayValue.toLocaleString(undefined, { maximumFractionDigits: isEfficiency ? 3 : 0 });
-         
-         return `
-         <tr>
-         <td class="rank-col">${index + 1}</td>
-         <td class="player-col"><a href="#" class="player-link" data-username="${player.uid}">${player.uid}</a></td>
-         <td class="value-col">${formattedValue}</td>
-         </tr>`
-         }).join('')}
-         </tbody>
-         </table>`;
-         }
-         html += '</div>';
-         } else {
-         html += `<div class="no-data-message">${T.no_data_lb} - ${category.title}</div>`;
-         }
-         html += `</div>`;
-         combinedHtml += html;
-         }
-         
-         contentDiv.innerHTML = combinedHtml;
-         contentDiv.querySelectorAll('.player-link').forEach(link => link.addEventListener('click', handleLeaderboardClick));
-         contentDiv.style.opacity = 1;
-         }, 150);
-         }
-         
-         function showNextLeaderboard() {
-         const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
-         const totalCategories = LEADERBOARD_CATEGORIES.length;
-         currentLeaderboardIndex = (currentLeaderboardIndex + itemsPerPage) % totalCategories;
-         renderCurrentLeaderboard();
-         }
-         
-         function showPrevLeaderboard() {
-         const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
-         const totalCategories = LEADERBOARD_CATEGORIES.length;
-         currentLeaderboardIndex = (currentLeaderboardIndex - itemsPerPage + totalCategories) % totalCategories;
-         renderCurrentLeaderboard();
-         }
-         
-         function handleLeaderboardClick(event) {
-         event.preventDefault();
-         const username = event.target.dataset.username;
-         if (username) {
-         elements.usernameInput.value = username;
-         updateBrowserUrl(elements.serverSelect.value, username);
-         handleFetch();
-         }
-         }
-         async function handleFetch() { if (isMonitoring) { displayError(T.error_monitor); return; } currentServer = elements.serverSelect.value; currentUsername = elements.usernameInput.value.trim(); if (!currentUsername) { displayError(T.error_input_name); return; } clearDisplay(true); setLoading(true); try { const profileData = await fetchProfileData(currentServer, currentUsername); updateDisplay(profileData); lastProfileData = profileData; } catch (error) { console.error('Fetch Error:', error); displayError(error.message); } finally { setLoading(false); } }
-         async function fetchProfileData(server, username) { 
-             const baseUrl = API_CONFIG.baseUrls[server]; 
-             if (!baseUrl) throw new Error('Invalid Server'); 
-             const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest='; 
-             try { 
-                 // 动态设置语言参数：如果不是中文，则使用 en
-                 const langParam = isChinese ? 'cn' : 'en';
-                 const targetUrl = `${baseUrl}?user=${encodeURIComponent(username)}&lang=${langParam}&_=${Date.now()}`; 
-                 const apiUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; 
-                 const response = await fetch(apiUrl); 
-                 if (!response.ok) throw new Error(`Network Error: ${response.status}`); 
-                 const profileData = await response.json(); 
-                 if (profileData?.responseType === 'NOT_FOUND') { 
-                     throw new Error(T.error_not_found); 
-                 } else if (profileData?.response) { 
-                     return profileData.response; 
-                 } else { 
-                     throw new Error('Invalid response format'); 
-                 } 
-             } catch (err) { 
-                 throw err; 
-             } 
-         }
-         
-         function toggleMonitoring() {
-         if (isMonitoring) stopMonitoring();
-         else {
-         if (!lastProfileData) { displayError(T.error_monitor_req); return; }
-         isMonitoring = true; startMonitoring();
-         }
-         }
-         
-         function startMonitoring() {
-         if (!isMonitoring) return;
-         // 更改按钮文本和样式
-         elements.monitorButton.innerHTML = `<span class="material-symbols-rounded">stop</span><span>${T.monitor_stop}</span>`;
-         elements.monitorButton.classList.add('monitoring');
-         elements.fetchButton.disabled = true;
-         elements.usernameInput.disabled = true;
-         elements.serverSelect.disabled = true;
-         displayError(T.monitor_active);
-         performMonitoringFetch();
-         }
-         
-         function stopMonitoring() {
-         isMonitoring = false;
-         clearTimeout(monitoringTimeoutId);
-         // 恢复按钮文本和样式
-         elements.monitorButton.innerHTML = `<span class="material-symbols-rounded">play_arrow</span><span>${T.monitor_start}</span>`;
-         elements.monitorButton.classList.remove('monitoring');
-         elements.fetchButton.disabled = false;
-         elements.usernameInput.disabled = false;
-         elements.serverSelect.disabled = false;
-         displayError('');
-         }
-         
-         async function performMonitoringFetch() { if (!isMonitoring) return; try { const newData = await fetchProfileData(currentServer, currentUsername); if (isMonitoring) displayError(T.monitor_refresh); updateDisplay(newData, lastProfileData); lastProfileData = newData; } catch (error) { console.error("Monitoring fetch failed, will retry:", error); if (isMonitoring) displayError(`${T.monitor_stopped}: ${error.message} (${API_CONFIG.monitorInterval / 1000}s ${T.retry})`); } finally { if (isMonitoring) { monitoringTimeoutId = setTimeout(performMonitoringFetch, API_CONFIG.monitorInterval); } } }
-         function updateDisplay(newData, oldData = null) {
-         if (oldData === null) {
-         elements.leaderboardContainer.style.display = 'none';
-         elements.resultsWrapper.style.display = 'block';
-         elements.backToLeaderboardContainer.style.display = 'block';
-         }
-         displayProfileSummary(newData, oldData);
-         displayRankingsTable(newData, oldData);
-         displayAllLists(newData, oldData);
-         }
-         function createChangeSpan(diff) { if (diff === 0 || isNaN(diff)) return ''; const sign = diff > 0 ? '+' : ''; const className = diff > 0 ? 'change-increase' : 'change-decrease'; return `<span class="change-indicator ${className}">${sign}${diff.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span>`; }
-         
-         function logChange(item, oldValue, newValue) {
-         const entry = {
-         timestamp: new Date().toLocaleTimeString(isChinese ? 'zh-CN' : 'en-US', { hour12: !isChinese }),
-         item: translateText(item),
-         oldValue: oldValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A',
-         newValue: newValue?.toLocaleString(undefined, { maximumFractionDigits: 3 }) || 'N/A'
-         };
-         changeLog.unshift(entry);
-         renderChangeLog();
-         }
-         
-         function renderChangeLog() {
-         if (changeLog.length === 0) { elements.changeLogContainer.innerHTML = `<p class="no-data-message">${T.no_log}</p>`; return; }
-         // 重新设计的 List Item 渲染
-         elements.changeLogContainer.innerHTML = changeLog.map(log => `
-         <div class="log-entry">
-         <div class="log-icon-wrapper">
-         <span class="material-symbols-rounded">update</span>
-         </div>
-         <div class="log-text-content">
-         <div class="log-timestamp">${log.timestamp}</div>
-         <div class="log-details">
-         <strong>${log.item}</strong>
-         ${isChinese ? '从' : 'from'} ${log.oldValue} ${isChinese ? '变为' : 'to'} ${log.newValue}
-         </div>
-         </div>
-         </div>
-         `).join('');
-         }
-         
-         function displayProfileSummary(profile, oldProfile = null) {
-         const getStat = (p, key, oldP, label) => {
-         const value = p?.[key] ?? 0;
-         if (!oldP) return { value: value.toLocaleString(), changeHTML: '' };
-         const oldValue = oldP?.[key] ?? 0;
-         if (value !== oldValue) {
-         logChange(label || key, oldValue, value);
-         return { value: value.toLocaleString(), changeHTML: createChangeSpan(value - oldValue) };
-         }
-         return { value: value.toLocaleString(), changeHTML: '' };
-         };
-         
-         const kills = getStat(profile, 'kills', oldProfile, T.kill);
-         const deaths = getStat(profile, 'deaths', oldProfile, T.death);
-         const score = getStat(profile, 'score', oldProfile, T.label_score);
-         const gearScore = getStat(profile, 'gearScore', oldProfile, T.label_gear);
-         const earnedCrystals = getStat(profile, 'earnedCrystals', oldProfile, T.label_crystals);
-         const caughtGolds = getStat(profile, 'caughtGolds', oldProfile, T.label_golds);
-         
-         const totalTimePlayedMs = (profile.hullsPlayed ||[]).reduce((t, h) => t + (h.timePlayed || 0), 0);
-         const totalSuppliesUsed = (profile.suppliesUsage ||[]).reduce((t, s) => t + (s.usages || 0), 0);
-         
-         const rankNum = profile.rank || 1;
-         // 修复：使用动态的本地化“Legend”前缀，而非硬编码
-         const rankName = (rankNum > 0) ? (rankNum <= RANKS.length ? RANKS[rankNum - 1] : `${RANKS[RANKS.length - 1]} ${rankNum - RANKS.length}`) : T.unknown_rank;
-         
-         // 1. 单独生成昵称 HTML (全宽、大字体) - 使用 MD3 Filled Card 风格
-         const nicknameHTML = `<div class="summary-item full-width">
-         <span class="summary-label">${T.label_nickname}</span>
-         <span class="summary-value">${profile.name || 'N/A'}</span>
-         </div>`;
-         
-         const summaryData =[
-         { label: T.rank, value: rankName },
-         { label: T.label_score, value: `${score.value}${score.changeHTML} / ${profile.scoreNext?.toLocaleString() || 0}` },
-         { label: T.label_vip, value: profile.hasPremium ? T.vip_active : T.vip_inactive, isPremium: profile.hasPremium },
-         { label: T.label_gear, value: `${gearScore.value}${gearScore.changeHTML}` },
-         { label: T.label_kd, value: `${kills.value}${kills.changeHTML} / ${deaths.value}${deaths.changeHTML}` },
-         { label: T.label_ratio, value: (profile.deaths === 0) ? '∞' : (profile.kills / profile.deaths).toFixed(2) },
-         { label: T.label_time, value: formatTime(totalTimePlayedMs) },
-         { label: T.label_supplies, value: totalSuppliesUsed.toLocaleString() },
-         { label: T.label_crystals, value: `${earnedCrystals.value}${earnedCrystals.changeHTML}` },
-         { label: T.label_golds, value: `${caughtGolds.value}${caughtGolds.changeHTML}` },
-         ];
-         
-         // 2. 拼接 HTML
-         elements.profileSummary.innerHTML = nicknameHTML + summaryData.map(item => `<div class="summary-item"><span class="summary-label">${item.label}</span><span class="summary-value ${item.isPremium ? 'premium' : ''}">${item.value}</span></div>`).join('');
-         }
-         
-         function displayRankingsTable(newData, oldData = null) {
-         const categories =[
-         { key: 'score', name: T.cat_score },
-         { key: 'golds', name: T.cat_golds },
-         { key: 'crystals', name: T.cat_crystals },
-         { key: 'efficiency', name: T.cat_eff }
-         ];
-         const currentRating = newData.rating || {}, previousRating = newData.previousRating || {}, oldRating = oldData ? (oldData.rating || {}) : null;
-         
-         const formatVal = (val, key) => {
-         if (val === -1 || val == null) return '-';
-         return val.toLocaleString(undefined, { maximumFractionDigits: key === 'efficiency' ? 3 : 0 });
-         };
-         
-         const processVal = (key, val) => (key === 'efficiency' && val != null && val !== -1) ? val / 1000 : val;
-         
-         const tableRows = categories.map(category => {
-         const rawCurrent = currentRating[category.key] || {};
-         const rawPrevious = previousRating[category.key] || {};
-         const rawOldCat = oldRating && oldRating[category.key] ? oldRating[category.key] : null;
-         
-         const currentVal = processVal(category.key, rawCurrent.value);
-         const prevVal = processVal(category.key, rawPrevious.value);
-         const oldVal = processVal(category.key, rawOldCat?.value);
-         
-         let posChangeHTML = '', valChangeHTML = '';
-         
-         if (rawOldCat) {
-         if (rawCurrent.position > 0 && rawOldCat.position > 0 && rawCurrent.position !== rawOldCat.position) {
-         posChangeHTML = createChangeSpan(rawOldCat.position - rawCurrent.position);
-         logChange(`${category.name} ${T.th_cur_rank}`, rawOldCat.position, rawCurrent.position);
-         }
-         if (currentVal !== oldVal) {
-         valChangeHTML = createChangeSpan(currentVal - oldVal);
-         logChange(`${category.name} ${T.th_cur_val}`, oldVal, currentVal);
-         }
-         }
-         
-         return `<tr>
-         <td>${category.name}</td>
-         <td>${formatVal(rawCurrent.position)}${posChangeHTML}</td>
-         <td>${formatVal(currentVal, category.key)}${valChangeHTML}</td>
-         <td>${formatVal(rawPrevious.position)}</td>
-         <td>${formatVal(prevVal, category.key)}</td>
-         </tr>`;
-         }).join('');
-         
-         elements.rankingsTableContainer.innerHTML = `<h3 class="list-title" style="text-align:center;margin-bottom:12px;border:none;padding:0;">${T.weekly_rank_title}</h3><table cellpadding="0" cellspacing="0"><thead><tr><th>${T.th_cat}</th><th>${T.th_cur_rank}</th><th>${T.th_cur_val}</th><th>${T.th_prev_rank}</th><th>${T.th_prev_val}</th></tr></thead><tbody>${tableRows}</tbody></table>`;
-         }
-         
-         function displayAllLists(newData, oldData = null) { elements.listsContainer.innerHTML = ''; LIST_DATA_CONFIGS.forEach(config => { const newItems = newData[config.key] || [], oldItems = oldData ? (oldData[config.key] || []) :[]; const section = document.createElement('div'); section.className = 'list-section'; const title = document.createElement('h3'); title.className = 'list-title'; title.textContent = config.title; section.appendChild(title); if (newItems.length === 0) { section.appendChild(document.createElement('p')).className = 'no-data-message'; section.lastChild.textContent = T.no_data_lb; } else { const container = document.createElement('div'); container.className = 'list-container'; displayListData(newItems, oldItems, container, config.title); section.appendChild(container); } elements.listsContainer.appendChild(section); }); }
-         
-         function displayListData(newItems, oldItems, container, title) {
-         const aggregatedNewData = aggregateItems(newItems, title);
-         const aggregatedOldData = aggregateItems(oldItems, title);
-         const oldAggregatedMap = new Map(aggregatedOldData.map(item => [item.name, item]));
-         
-         aggregatedNewData.forEach(item => {
-         item.changes = {};
-         item.hasChanged = false;
-         const oldAggregatedItem = oldAggregatedMap.get(item.name);
-         if (oldAggregatedItem) {
-         const checkChange = (prop, label) => {
-         if ((item[prop] || 0) > (oldAggregatedItem[prop] || 0)) {
-         item.changes[prop] = true;
-         item.hasChanged = true;
-         logChange(`${item.name} ${label}`, oldAggregatedItem[prop], item[prop]);
-         }
-         };
-         checkChange('scoreEarned', T.cat_score);
-         checkChange('timePlayed', T.th_time);
-         checkChange('usages', T.count);
-         checkChange('count', T.count);
-         }
-         });
-         
-         aggregatedNewData.sort((a, b) => (b.hasChanged - a.hasChanged) || (b.timePlayed || b.usages || 0) - (a.timePlayed || a.usages || 0));
-         
-         aggregatedNewData.forEach(item => {
-         const cardDiv = document.createElement('div');
-         cardDiv.className = `data-card ${item.hasChanged ? 'changed' : ''}`;
-         let imageUrl = item.imageUrl ? item.imageUrl.replace(/s\.(eu\.tankionline|3dtank)\.com/g, isChinese ? 'res.3dtank.com' : 's.eu.tankionline.com').replace(/\.tnk/g, '.webp') : null;
-         
-         const createField = (label, value, prop) => {
-         const isChanged = item.changes[prop];
-         const diff = oldAggregatedMap.has(item.name) ? (item[prop] || 0) - (oldAggregatedMap.get(item.name)[prop] || 0) : 0;
-         const changeHTML = isChanged ? createChangeSpan(diff) : '';
-         return `<div class="${isChanged ? 'field-changed' : ''}"><strong>${label}:</strong> ${value}${changeHTML}</div>`;
-         };
-         
-         let cardHTML = `<div class="item-name">${translateText(item.name) || '-'}</div>`;
-         if (imageUrl) cardHTML += `<img src="${imageUrl}" class="item-image" alt="${item.name}" loading="lazy" />`;
-         if (item.properties != null) cardHTML += createField(T.prop, translateText(item.properties?.toLocaleString()), 'properties');
-         if (item.grade != null && item.grade != -1) cardHTML += `<div><strong>${T.th_grade}:</strong> ${getGradeName(item.grade)}</div>`;
-         
-         // --- 修改开始：针对时长和经验值的逻辑 ---
-         if (title !== T.list_supplies && title !== T.list_presents) {
-         if (item.timePlayed > 0) {
-         // 有游戏时长：显示经验值和时长
-         if (item.scoreEarned != null) {
-         cardHTML += createField(T.label_score, item.scoreEarned?.toLocaleString(), 'scoreEarned');
-         }
-         cardHTML += createField(T.th_time, formatTime(item.timePlayed), 'timePlayed');
-         } else {
-         // 时长为 0：只显示未进行游戏，不显示经验值
-         cardHTML += `<div style="font-size: 11px; color: var(--md-sys-color-outline); margin-top: 4px; font-style: italic;">${T.not_played}</div>`;
-         }
-         }
-         // --- 修改结束 ---
-         
-         if (item.count != null && title === T.list_presents) cardHTML += createField(T.count, item.count?.toLocaleString(), 'count');
-         if (item.usages != null && title === T.list_supplies) cardHTML += createField(T.count, item.usages?.toLocaleString(), 'usages');
-         cardDiv.innerHTML = cardHTML;
-         
-         if (item.detailedGrades && item.detailedGrades.length > 1) {
-         const button = document.createElement('button');
-         button.className = 'view-data-button';
-         button.textContent = title === T.list_modes ? T.view_types : (title === T.list_paints ? T.view_versions : T.view_grades);
-         button.addEventListener('click', () => showDetailedGrades(item.name, item.detailedGrades, title));
-         cardDiv.appendChild(button);
-         }
-         container.appendChild(cardDiv);
-         });
-         }
-         
-         function clearDisplay(fullReset = false) {
-         elements.resultsWrapper.style.display = 'none';
-         elements.profileSummary.innerHTML = '';
-         elements.rankingsTableContainer.innerHTML = '';
-         elements.listsContainer.innerHTML = '';
-         elements.errorMessage.textContent = '';
-         if (fullReset) {
-         elements.backToLeaderboardContainer.style.display = 'none';
-         lastProfileData = null;
-         changeLog =[];
-         renderChangeLog();
-         }
-         }
-         function setLoading(isLoading) {
-         elements.loader.style.display = isLoading ? 'flex' : 'none';
-         elements.fetchButton.disabled = isLoading;
-         if (isLoading) {
-         elements.leaderboardContainer.style.display = 'none';
-         elements.backToLeaderboardContainer.style.display = 'none';
-         elements.errorMessage.textContent = '';
-         }
-         }
-         function displayError(message) { elements.errorMessage.textContent = message; }
-         function aggregateItems(items, title) { const aggregated = {}; const keySelector = (item) => title === T.list_modules ? `${item.name}-${item.resistance}` : item.name; items.forEach(item => { const key = keySelector(item); if (!aggregated[key]) aggregated[key] = { ...item, timePlayed: 0, scoreEarned: 0, usages: 0, count: 0, detailedGrades: [] }; aggregated[key].timePlayed += item.timePlayed || 0; aggregated[key].scoreEarned += item.scoreEarned || 0; aggregated[key].usages += item.usages || 0; aggregated[key].count += item.count || 0; if (item.grade > (aggregated[key].grade || -1)) aggregated[key].grade = item.grade; aggregated[key].detailedGrades.push({ ...item }); }); return Object.values(aggregated); }
-         
-         function showDetailedGrades(name, detailedGrades, title) {
-         const isMode = title === T.list_modes;
-         const isPaint = title === T.list_paints;
-         
-         const sortedData = [...detailedGrades].sort((a, b) => {
-         if (isMode) return (a.type || '').localeCompare(b.type || '');
-         if (isPaint) return (a.id || 0) - (b.id || 0);
-         return (a.grade ?? -1) - (b.grade ?? -1);
-         });
-         
-         let firstColumnHeader, modalTitleSuffix;
-         if (isMode) { firstColumnHeader = T.th_type; modalTitleSuffix = T.modal_types; }
-         else if (isPaint) { firstColumnHeader = T.th_ver; modalTitleSuffix = T.modal_versions; }
-         else { firstColumnHeader = T.th_grade; modalTitleSuffix = T.modal_grades; }
-         
-         const tableRows = sortedData.map(data => {
-         let firstColumnValue;
-         if (isMode) firstColumnValue = data.type || '-';
-         else if (isPaint) firstColumnValue = `${data.id}`;
-         else firstColumnValue = getGradeName(data.grade);
-         return `<tr><td>${translateText(firstColumnValue)}</td><td>${formatTime(data.timePlayed)}</td><td>${data.scoreEarned?.toLocaleString() || '-'}</td></tr>`;
-         }).join('');
-         
-         const modalHTML = `<div class="modal-overlay">
-         <div class="modal-content">
-         <h3>${translateText(name)} - ${modalTitleSuffix}</h3>
-         <table style="width:100%;">
-         <thead>
-         <tr>
-         <th>${firstColumnHeader}</th>
-         <th>${T.th_time}</th>
-         <th>${T.th_exp}</th>
-         </tr>
-         </thead>
-         <tbody>${tableRows}</tbody>
-         </table>
-         <button class="close-button">${T.close}</button>
-         </div>
-         </div>`;
-         document.body.insertAdjacentHTML('beforeend', modalHTML);
-         const overlay = document.body.lastElementChild;
-         overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('close-button')) overlay.remove(); });
-         }
-         
+
+         // 带有小数位格式的时间显示，还原真实文字描述逻辑
          function formatTime(ms) {
-         if (!ms || ms <= 0) return '-';
-         const h = Math.floor(ms / 3600000);
-         const m = Math.floor((ms % 3600000) / 60000);
-         // 修复：移除秒数的小数位，使文本更短
-         const s = (ms % 60000) / 1000;
-         
-         const parts =[];
-             if (h > 0) parts.push(`${h} ${T.hr}`);
-             if (m > 0) parts.push(`${m} ${T.min}`);
-             if (s > 0 || parts.length === 0) parts.push(`${s} ${T.sec}`);
-             return parts.join(' ');
+            if (ms == null || ms <= 0) return "-";
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            const msPart = ms % 1000;
+
+            const parts = [];
+            if (isPreciseTime) {
+               if (h > 0) parts.push(`${h} ${T.hr}`);
+               if (m > 0 || h > 0) parts.push(`${m} ${T.min}`);
+               // 组合秒和毫秒，保留三位小数输出 (例如：17.698 秒)
+               const secWithMs = (s + msPart / 1000).toFixed(3);
+               parts.push(`${secWithMs} ${T.sec}`);
+            } else {
+               if (h > 0) parts.push(`${h} ${T.hr}`);
+               if (m > 0 || h > 0) parts.push(`${m} ${T.min}`);
+               if (h === 0 && m === 0) return T.lt1m;
+            }
+            return parts.join(" ");
          }
-         
-         function getGradeName(grade) { return grade != null && grade > -1 ? `Mk${grade + 1}` : '-'; }
+
+         // --- 搜索历史逻辑 ---
+         let searchHistory = JSON.parse(
+            localStorage.getItem("search_history") || "[]",
+         );
+         function updateHistory(server, username) {
+            searchHistory = searchHistory.filter(
+               (h) => !(h.server === server && h.username === username),
+            );
+            searchHistory.unshift({ server, username });
+            if (searchHistory.length > 15) searchHistory.pop();
+            localStorage.setItem(
+               "search_history",
+               JSON.stringify(searchHistory),
+            );
+            renderHistory();
+         }
+         function removeHistory(server, username, e) {
+            e.stopPropagation();
+            searchHistory = searchHistory.filter(
+               (h) => !(h.server === server && h.username === username),
+            );
+            localStorage.setItem(
+               "search_history",
+               JSON.stringify(searchHistory),
+            );
+            renderHistory();
+         }
+         function renderHistory() {
+            const container = document.getElementById("searchHistory");
+            if (searchHistory.length === 0) {
+               container.classList.remove("active");
+               return;
+            }
+            container.innerHTML = searchHistory
+               .map(
+                  (h) => `
+               <div class="history-item" onclick="triggerHistorySearch('${h.server}', '${h.username}')">
+                  <span class="history-item-text">${h.username}</span>
+                  <span class="history-item-server">${h.server === "eu" ? T.server_eu : T.server_cn}</span>
+                  <button class="history-delete" onclick="removeHistory('${h.server}', '${h.username}', event)">
+                        <span class="material-symbols-rounded">close</span>
+                  </button>
+               </div>
+            `,
+               )
+               .join("");
+         }
+         window.triggerHistorySearch = function (server, username) {
+            realSelect.value = server;
+            customServerDisplay.innerHTML = `${server === "eu" ? T.server_eu : T.server_cn} <span class="material-symbols-rounded" style="font-size:18px">arrow_drop_down</span>`;
+            document.getElementById("username").value = username;
+            document.getElementById("searchHistory").classList.remove("active");
+            handleFetch();
+         };
+         document.getElementById("username").addEventListener("focus", () => {
+            if (searchHistory.length > 0)
+               document.getElementById("searchHistory").classList.add("active");
+         });
+         document.addEventListener("click", (e) => {
+            if (!e.target.closest(".form-group"))
+               document
+                  .getElementById("searchHistory")
+                  .classList.remove("active");
+         });
+
+         initTheme();
+         applyLanguageToStaticHTML();
+         renderHistory();
+
+         const API_CONFIG = {
+            baseUrls: {
+               eu: "https://ratings.tankionline.com/api/eu/profile/",
+               cn: "https://ratings.3dtank.com/get_stat/profile/",
+            },
+            leaderboardUrl: "https://ratings.tankionline.com/api/eu/top/",
+            monitorInterval: 3000,
+         };
+         const RANKS = isChinese
+            ? [
+                 "新兵",
+                 "二等兵",
+                 "一等兵",
+                 "下士",
+                 "中士",
+                 "上士",
+                 "三级军士长",
+                 "二级军士长",
+                 "一级军士长",
+                 "军士长",
+                 "五级准尉",
+                 "四级准尉",
+                 "三级准尉",
+                 "二级准尉",
+                 "一级准尉",
+                 "特级准尉",
+                 "少尉",
+                 "中尉",
+                 "上尉",
+                 "少校",
+                 "中校",
+                 "上校",
+                 "准将",
+                 "少将",
+                 "中将",
+                 "上将",
+                 "元帅",
+                 "陆军元帅",
+                 "统帅",
+                 "大元帅",
+                 "传奇",
+              ]
+            : [
+                 "Recruit",
+                 "Private",
+                 "Gefreiter",
+                 "Corporal",
+                 "Master Corporal",
+                 "Sergeant",
+                 "Staff Sergeant",
+                 "Master Sergeant",
+                 "First Sergeant",
+                 "Sergeant-Major",
+                 "Warrant Officer 1",
+                 "Warrant Officer 2",
+                 "Warrant Officer 3",
+                 "Warrant Officer 4",
+                 "Warrant Officer 5",
+                 "Third Lieutenant",
+                 "Second Lieutenant",
+                 "First Lieutenant",
+                 "Captain",
+                 "Major",
+                 "Lieutenant Colonel",
+                 "Colonel",
+                 "Brigadier",
+                 "Major General",
+                 "Lieutenant General",
+                 "General",
+                 "Marshal",
+                 "Field Marshal",
+                 "Commander",
+                 "Generalissimo",
+                 "Legend",
+              ];
+         const LIST_DATA_CONFIGS = [
+            { key: "turretsPlayed", title: T.list_turrets },
+            { key: "hullsPlayed", title: T.list_hulls },
+            { key: "dronesPlayed", title: T.list_drones },
+            { key: "resistanceModules", title: T.list_modules },
+            { key: "paintsPlayed", title: T.list_paints },
+            { key: "modesPlayed", title: T.list_modes },
+            { key: "suppliesUsage", title: T.list_supplies },
+            { key: "presents", title: T.list_presents },
+         ];
+         const TRANSLATION_MAP = {
+            JGR: "个人剑圣",
+            TJR: "团队剑圣",
+            RESISTANCE: "抗性",
+            SHAFT: "镭射炮",
+            THUNDER: "雷暴炮",
+            CRITICAL: "暴击",
+            MINE: "地雷",
+            RAILGUN: "激光炮",
+            FREEZE: "冰风暴",
+            SMOKY: "轰天炮",
+            RICOCHET: "火龙珠",
+            ARTILLERY: "马格南",
+            FIREBIRD: "火焰炮",
+            TWINS: "离子炮",
+            GAUSS: "电磁炮",
+            ROCKET_LAUNCHER: "火箭炮",
+            ISIS: "磁力炮",
+            TESLA: "特斯拉",
+            SCORPIO: "蝎子",
+            MACHINE_GUN: "极速炮",
+            SHOTGUN: "滑膛炮",
+            MODULE: "模块",
+         };
+         const LEADERBOARD_CATEGORIES = [
+            { key: "score", title: T.lb_score },
+            { key: "crystals", title: T.lb_crystals },
+            { key: "golds", title: T.lb_golds },
+            { key: "efficiency", title: T.lb_efficiency },
+            { key: "stars_current", title: T.lb_stars_current },
+            { key: "stars_previous", title: T.lb_stars_previous },
+         ];
+
+         const elements = {
+            fetchButton: document.getElementById("fetchButton"),
+            monitorButton: document.getElementById("monitorButton"),
+            usernameInput: document.getElementById("username"),
+            loader: document.getElementById("loader"),
+            errorMessage: document.getElementById("errorMessage"),
+            leaderboardContainer: document.getElementById(
+               "leaderboardContainer",
+            ),
+            resultsWrapper: document.getElementById("resultsWrapper"),
+            profileSummary: document.getElementById("profileSummary"),
+            rankingsTableContainer: document.getElementById(
+               "rankingsTableContainer",
+            ),
+            listsContainer: document.getElementById("listsContainer"),
+            tabs: document.querySelectorAll(".tab-button"),
+            tabContents: document.querySelectorAll(".tab-content"),
+            changeLogContainer: document.getElementById("changeLogContainer"),
+            backButton: document.getElementById("backButton"),
+            backToLeaderboardContainer: document.getElementById(
+               "backToLeaderboardContainer",
+            ),
+         };
+         let isMonitoring = false,
+            monitoringTimeoutId = null,
+            lastProfileData = null,
+            changeLog = [],
+            currentUsername = "",
+            currentServer = "",
+            leaderboardData = null,
+            currentLeaderboardIndex = 0;
+
+         document.addEventListener("DOMContentLoaded", () => {
+            if (!new URLSearchParams(window.location.search).has("username"))
+               fetchAndRenderLeaderboard();
+            processUrlParams();
+         });
+         window.addEventListener("popstate", () => {
+            if (isMonitoring) stopMonitoring();
+            processUrlParams();
+         });
+
+         elements.fetchButton.addEventListener("click", () => {
+            updateBrowserUrl(
+               realSelect.value,
+               elements.usernameInput.value.trim(),
+            );
+            handleFetch();
+         });
+         elements.monitorButton.addEventListener("click", toggleMonitoring);
+         elements.usernameInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+               updateBrowserUrl(
+                  realSelect.value,
+                  elements.usernameInput.value.trim(),
+               );
+               handleFetch();
+            }
+         });
+         elements.backButton.addEventListener("click", () =>
+            showLeaderboardView(true),
+         );
+         elements.tabs.forEach((tab) =>
+            tab.addEventListener("click", () => {
+               elements.tabs.forEach((t) => t.classList.remove("active"));
+               elements.tabContents.forEach((c) =>
+                  c.classList.remove("active"),
+               );
+               tab.classList.add("active");
+               document
+                  .querySelector(`#${tab.dataset.tab}Content`)
+                  .classList.add("active");
+            }),
+         );
+
+         function processUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const server = params.get("server"),
+               username = params.get("username");
+            if (
+               server &&
+               realSelect.querySelector(`option[value="${server}"]`)
+            ) {
+               realSelect.value = server;
+               customServerDisplay.innerHTML = `${server === "eu" ? T.server_eu : T.server_cn} <span class="material-symbols-rounded" style="font-size:18px">arrow_drop_down</span>`;
+            }
+            if (username) {
+               elements.usernameInput.value = username;
+               handleFetch();
+            } else showLeaderboardView(false);
+         }
+         function updateBrowserUrl(server, username) {
+            if (!username) return;
+            const newUrl = `${window.location.pathname}?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}`;
+            const pageTitle = `${T.title} - ${username}`;
+            document.title = pageTitle;
+            if (window.location.href !== newUrl)
+               history.pushState({ server, username }, pageTitle, newUrl);
+         }
+
+         function translateText(text) {
+            if (typeof text !== "string" || !text) return text;
+            let translated = text;
+            if (isChinese) {
+               Object.keys(TRANSLATION_MAP)
+                  .sort((a, b) => b.length - a.length)
+                  .forEach((key) => {
+                     const regex = new RegExp(key, "gi");
+                     if (regex.test(translated))
+                        translated = translated.replace(
+                           regex,
+                           TRANSLATION_MAP[key],
+                        );
+                  });
+               return translated.replace(/[_\-\s]/g, "");
+            } else
+               return translated
+                  .toLowerCase()
+                  .split(/[_\-\s]+/)
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(" ");
+         }
+
+         function showLeaderboardView(pushState = true) {
+            elements.resultsWrapper.style.display = "none";
+            if (isMonitoring) stopMonitoring();
+            elements.usernameInput.value = "";
+            displayError("");
+            elements.leaderboardContainer.style.display = "block";
+            elements.backToLeaderboardContainer.style.display = "none";
+            if (!leaderboardData) fetchAndRenderLeaderboard();
+            if (pushState) {
+               document.title = T.title;
+               history.pushState({}, T.title, window.location.pathname);
+            }
+         }
+
+         async function fetchStarsLeaderboardData() {
+            const apiUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent("https://pages.tankionline.com/challenge-accepted")}`;
+            try {
+               const response = await fetch(apiUrl);
+               if (!response.ok) throw new Error("Status " + response.status);
+               const htmlText = await response.text();
+               const doc = new DOMParser().parseFromString(
+                  htmlText,
+                  "text/html",
+               );
+               const parseList = (selector, prizeParser) => {
+                  const list = doc.querySelector(selector);
+                  if (!list) return [];
+                  const players = [];
+                  list.querySelectorAll("ul.list-content li").forEach((li) => {
+                     const name = li.querySelector(".name")?.textContent.trim();
+                     const value = parseInt(
+                        li
+                           .querySelector(".stars")
+                           ?.textContent.trim()
+                           .replace(/\s/g, ""),
+                        10,
+                     );
+                     if (name && !isNaN(value)) {
+                        const player = { uid: name, value };
+                        if (prizeParser) player.prizes = prizeParser(li);
+                        players.push(player);
+                     }
+                  });
+                  return players;
+               };
+               const prizeParser = (li) =>
+                  Array.from(
+                     li.querySelector(".prizes")?.querySelectorAll(".prize") ||
+                        [],
+                  )
+                     .map((p) =>
+                        Array.from(p.classList).find((c) => c !== "prize"),
+                     )
+                     .filter(Boolean);
+               return {
+                  stars_current: parseList(".rating-list.active"),
+                  stars_previous: parseList(
+                     ".rating-list.old-list",
+                     prizeParser,
+                  ),
+               };
+            } catch (e) {
+               return { stars_current: [], stars_previous: [] };
+            }
+         }
+
+         async function fetchAndRenderLeaderboard() {
+            const container = elements.leaderboardContainer;
+            container.style.display = "block";
+            container.innerHTML = `<div class="loader" style="display: flex;"><div class="loader-inner"></div></div>`;
+            try {
+               const [regularDataResponse, starsData] = await Promise.all([
+                  fetch(
+                     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(API_CONFIG.leaderboardUrl)}`,
+                  ).then((res) => {
+                     if (!res.ok) throw new Error(res.status);
+                     return res.json();
+                  }),
+                  fetchStarsLeaderboardData(),
+               ]);
+               if (regularDataResponse?.response) {
+                  leaderboardData = {
+                     ...regularDataResponse.response,
+                     ...starsData,
+                  };
+                  currentLeaderboardIndex = 0;
+                  renderLeaderboardCarousel();
+               } else throw new Error("Format Error");
+            } catch (error) {
+               container.innerHTML = `<p class="no-data-message" style="color: var(--md-sys-color-error);">Error: ${error.message}</p>`;
+            }
+         }
+
+         function renderLeaderboardCarousel() {
+            elements.leaderboardContainer.innerHTML = `<h2>${T.lb_title}</h2><div class="leaderboard-carousel-container"><div id="leaderboardCarouselContent"></div><button id="leaderboardPrev" class="carousel-nav-button"><span class="material-symbols-rounded">chevron_left</span></button><button id="leaderboardNext" class="carousel-nav-button"><span class="material-symbols-rounded">chevron_right</span></button></div>`;
+            document
+               .getElementById("leaderboardPrev")
+               .addEventListener("click", showPrevLeaderboard);
+            document
+               .getElementById("leaderboardNext")
+               .addEventListener("click", showNextLeaderboard);
+            renderCurrentLeaderboard();
+         }
+
+         function renderCurrentLeaderboard() {
+            if (!leaderboardData) return;
+            const contentDiv = document.getElementById(
+               "leaderboardCarouselContent",
+            );
+            if (!contentDiv) return;
+            contentDiv.style.opacity = 0;
+            setTimeout(() => {
+               const itemsPerPage = window.innerWidth < 768 ? 1 : 2;
+               let combinedHtml = "";
+               for (let i = 0; i < itemsPerPage; i++) {
+                  const category =
+                     LEADERBOARD_CATEGORIES[
+                        (currentLeaderboardIndex + i) %
+                           LEADERBOARD_CATEGORIES.length
+                     ];
+                  const categoryData = leaderboardData[category.key];
+                  let html = `<div class="leaderboard-category"><h3 class="list-title" style="border:none; padding:0; text-align: center;">${category.title}</h3>`;
+                  if (categoryData?.length > 0) {
+                     html += '<div class="leaderboard-table-wrapper">';
+                     if (category.key === "stars_previous") {
+                        html += `<table class="leaderboard-table" style="min-width: 100%;"><thead><tr><th style="width:10%;">${T.th_rank}</th><th style="width:35%;">${T.th_name}</th><th style="width:35%;">${T.th_reward}</th><th style="width:20%;">${T.th_stars}</th></tr></thead><tbody>${categoryData.map((p, idx) => `<tr><td>${idx + 1}</td><td><a href="#" class="player-link" data-username="${p.uid}">${p.uid}</a></td><td><div class="prize-icons-container">${(p.prizes || []).map((pz) => `<div class="prize-icon ${pz.replace(/_/g, "-")}" title="${pz}"></div>`).join("")}</div></td><td>${p.value.toLocaleString()}</td></tr>`).join("")}</tbody></table>`;
+                     } else {
+                        html += `<table class="leaderboard-table"><thead><tr><th>${T.th_rank}</th><th>${T.th_name}</th><th>${T.th_value}</th></tr></thead><tbody>${categoryData.map((p, idx) => `<tr><td>${idx + 1}</td><td><a href="#" class="player-link" data-username="${p.uid}">${p.uid}</a></td><td>${category.key === "efficiency" ? (p.value / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 }) : p.value.toLocaleString()}</td></tr>`).join("")}</tbody></table>`;
+                     }
+                     html += "</div>";
+                  } else
+                     html += `<div class="no-data-message">${T.no_data_lb}</div>`;
+                  html += `</div>`;
+                  combinedHtml += html;
+               }
+               contentDiv.innerHTML = combinedHtml;
+               contentDiv.querySelectorAll(".player-link").forEach((link) =>
+                  link.addEventListener("click", (e) => {
+                     e.preventDefault();
+                     const user = e.target.dataset.username;
+                     if (user) {
+                        elements.usernameInput.value = user;
+                        updateBrowserUrl(realSelect.value, user);
+                        handleFetch();
+                     }
+                  }),
+               );
+               contentDiv.style.opacity = 1;
+            }, 150);
+         }
+
+         function showNextLeaderboard() {
+            currentLeaderboardIndex =
+               (currentLeaderboardIndex + (window.innerWidth < 768 ? 1 : 2)) %
+               LEADERBOARD_CATEGORIES.length;
+            renderCurrentLeaderboard();
+         }
+         function showPrevLeaderboard() {
+            currentLeaderboardIndex =
+               (currentLeaderboardIndex -
+                  (window.innerWidth < 768 ? 1 : 2) +
+                  LEADERBOARD_CATEGORIES.length) %
+               LEADERBOARD_CATEGORIES.length;
+            renderCurrentLeaderboard();
+         }
+
+         async function handleFetch() {
+            if (isMonitoring) {
+               displayError(T.error_monitor);
+               return;
+            }
+            currentServer = realSelect.value;
+            currentUsername = elements.usernameInput.value.trim();
+            if (!currentUsername) {
+               displayError(T.error_input_name);
+               return;
+            }
+
+            updateHistory(currentServer, currentUsername);
+            document.getElementById("searchHistory").classList.remove("active");
+            clearDisplay(true);
+            setLoading(true);
+
+            try {
+               // --- 新增：加载该账号的本地历史日志并立即显示 ---
+               const logKey = `${currentServer}_${currentUsername.toLowerCase()}`;
+               const allLogs = JSON.parse(
+                  localStorage.getItem("tanki_logs") || "{}",
+               );
+               changeLog = allLogs[logKey] || [];
+               renderChangeLog();
+
+               const profileData = await fetchProfileData(
+                  currentServer,
+                  currentUsername,
+               );
+               updateDisplay(profileData);
+               lastProfileData = profileData;
+            } catch (error) {
+               displayError(error.message);
+            } finally {
+               setLoading(false);
+            }
+         }
+         async function fetchProfileData(server, username) {
+            const targetUrl = `${API_CONFIG.baseUrls[server]}?user=${encodeURIComponent(username)}&lang=${isChinese ? "cn" : "en"}&_=${Date.now()}`;
+            const response = await fetch(
+               `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+            );
+            if (!response.ok) throw new Error(response.status);
+            const data = await response.json();
+            if (data?.responseType === "NOT_FOUND")
+               throw new Error(T.error_not_found);
+            return data.response;
+         }
+
+         function toggleMonitoring() {
+            if (isMonitoring) stopMonitoring();
+            else {
+               if (!lastProfileData) {
+                  displayError(T.error_monitor_req);
+                  return;
+               }
+               isMonitoring = true;
+               elements.monitorButton.innerHTML = `<span class="material-symbols-rounded">stop</span><span>${T.monitor_stop}</span>`;
+               elements.monitorButton.classList.add("monitoring");
+               elements.fetchButton.disabled =
+                  elements.usernameInput.disabled = true;
+               document
+                  .getElementById("customServerDisplay")
+                  .classList.add("disabled");
+               displayError(T.monitor_active);
+               performMonitoringFetch();
+            }
+         }
+         function stopMonitoring() {
+            isMonitoring = false;
+            clearTimeout(monitoringTimeoutId);
+            elements.monitorButton.innerHTML = `<span class="material-symbols-rounded">play_arrow</span><span>${T.monitor_start}</span>`;
+            elements.monitorButton.classList.remove("monitoring");
+            elements.fetchButton.disabled =
+               elements.usernameInput.disabled = false;
+            document
+               .getElementById("customServerDisplay")
+               .classList.remove("disabled");
+            displayError("");
+         }
+         async function performMonitoringFetch() {
+            if (!isMonitoring) return;
+            try {
+               const newData = await fetchProfileData(
+                  currentServer,
+                  currentUsername,
+               );
+               if (isMonitoring) displayError(T.monitor_refresh);
+               updateDisplay(newData, lastProfileData);
+               lastProfileData = newData;
+            } catch (e) {
+               if (isMonitoring)
+                  displayError(
+                     `${T.monitor_stopped}: ${e.message} (${API_CONFIG.monitorInterval / 1000}s ${T.retry})`,
+                  );
+            } finally {
+               if (isMonitoring)
+                  monitoringTimeoutId = setTimeout(
+                     performMonitoringFetch,
+                     API_CONFIG.monitorInterval,
+                  );
+            }
+         }
+
+         function updateDisplay(newData, oldData = null) {
+            if (!oldData) {
+               elements.leaderboardContainer.style.display = "none";
+               elements.resultsWrapper.style.display = "block";
+               elements.backToLeaderboardContainer.style.display = "block";
+            }
+            displayProfileSummary(newData, oldData);
+            displayRankingsTable(newData, oldData);
+            displayAllLists(newData, oldData);
+         }
+         function createChangeSpan(diff) {
+            return diff === 0 || isNaN(diff)
+               ? ""
+               : `<span class="change-indicator ${diff > 0 ? "change-increase" : "change-decrease"}">${diff > 0 ? "+" : ""}${diff.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span>`;
+         }
+         function logChange(item, oldV, newV) {
+            // 包含日期的格式化，适应跨天存储
+            const timeOptions = {
+               hour12: !isChinese,
+               month: "short",
+               day: "numeric",
+               hour: "2-digit",
+               minute: "2-digit",
+               second: "2-digit",
+            };
+
+            changeLog.unshift({
+               timestamp: new Date().toLocaleString(
+                  isChinese ? "zh-CN" : "en-US",
+                  timeOptions,
+               ),
+               item: translateText(item),
+               oldValue:
+                  oldV?.toLocaleString(undefined, {
+                     maximumFractionDigits: 3,
+                  }) || "N/A",
+               newValue:
+                  newV?.toLocaleString(undefined, {
+                     maximumFractionDigits: 3,
+                  }) || "N/A",
+            });
+
+            // 限制最多保存 100 条记录，防止塞满本地存储空间
+            if (changeLog.length > 100) changeLog.pop();
+
+            // --- 写入 LocalStorage ---
+            const logKey = `${currentServer}_${currentUsername.toLowerCase()}`;
+            const allLogs = JSON.parse(
+               localStorage.getItem("tanki_logs") || "{}",
+            );
+            allLogs[logKey] = changeLog;
+            localStorage.setItem("tanki_logs", JSON.stringify(allLogs));
+
+            renderChangeLog();
+         }
+
+         function renderChangeLog() {
+            if (changeLog.length === 0) {
+               elements.changeLogContainer.innerHTML = `<p class="no-data-message">${T.no_log}</p>`;
+               return;
+            }
+
+            // 头部：垃圾桶按钮移除了内联的 background-color，使用了新加的 trash-btn 类
+            const headerHtml = `
+               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--md-sys-color-outline-variant);">
+                  <div style="font-size: 14px; font-weight: 700; color: var(--md-sys-color-on-background);">
+                     <span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:4px;">history</span>
+                     ${T.tab_log} (${changeLog.length})
+                  </div>
+                  <button id="clearLogBtn" class="icon-btn trash-btn" title="${T.clear_log || "清空日志"}">
+                     <span class="material-symbols-rounded" style="font-size: 20px;">delete</span>
+                  </button>
+               </div>`;
+
+            // 列表内容
+            const listHtml = changeLog
+               .map(
+                  (log) => `
+               <div class="log-entry" style="display:flex; gap:12px; margin-bottom:12px; align-items: flex-start; padding: 12px; background-color: var(--md-sys-color-surface-container-high); border-radius: var(--radius-small); border: 1px solid var(--md-sys-color-outline-variant);">
+                  <div class="log-icon-wrapper" style="color:var(--md-sys-color-primary); margin-top:2px;">
+                     <span class="material-symbols-rounded" style="font-size:20px;">update</span>
+                  </div>
+                  <div class="log-text-content">
+                     <div class="log-timestamp" style="font-size:11px; color:var(--md-sys-color-secondary); margin-bottom: 4px;">${log.timestamp}</div>
+                     <div class="log-details" style="font-size:13px; color:var(--md-sys-color-on-surface);">
+                        <strong>${log.item}</strong> ${isChinese ? "从" : "from"} <span style="font-weight: 600; color: var(--md-sys-color-outline);">${log.oldValue}</span> <span style="color:var(--md-sys-color-primary); margin: 0 4px;">➔</span> <span style="font-weight: 600;">${log.newValue}</span>
+                     </div>
+                  </div>
+               </div>`,
+               )
+               .join("");
+
+            elements.changeLogContainer.innerHTML = headerHtml + listHtml;
+
+            // 绑定垃圾桶的清除事件，使用自定义弹窗 showConfirmDialog 替代原生 confirm
+            document
+               .getElementById("clearLogBtn")
+               .addEventListener("click", () => {
+                  showConfirmDialog(
+                     T.confirm_clear ||
+                        "确定要清空该玩家的所有变更记录吗？无法恢复。",
+                     () => {
+                        changeLog = [];
+                        const allLogs = JSON.parse(
+                           localStorage.getItem("tanki_logs") || "{}",
+                        );
+                        const logKey = `${currentServer}_${currentUsername.toLowerCase()}`;
+                        delete allLogs[logKey];
+                        localStorage.setItem(
+                           "tanki_logs",
+                           JSON.stringify(allLogs),
+                        );
+                        renderChangeLog();
+                     },
+                  );
+               });
+         }
+
+         function displayProfileSummary(profile, oldProfile) {
+            const getStat = (p, key, old, label) => {
+               const v = p?.[key] ?? 0;
+               if (!old) return { v: v.toLocaleString(), c: "" };
+               const ov = old?.[key] ?? 0;
+               if (v !== ov) logChange(label || key, ov, v);
+               return { v: v.toLocaleString(), c: createChangeSpan(v - ov) };
+            };
+            const s = {
+               k: getStat(profile, "kills", oldProfile, T.kill),
+               d: getStat(profile, "deaths", oldProfile, T.death),
+               sc: getStat(profile, "score", oldProfile, T.label_score),
+               g: getStat(profile, "gearScore", oldProfile, T.label_gear),
+               c: getStat(
+                  profile,
+                  "earnedCrystals",
+                  oldProfile,
+                  T.label_crystals,
+               ),
+               gb: getStat(profile, "caughtGolds", oldProfile, T.label_golds),
+            };
+            const tt = (profile.hullsPlayed || []).reduce(
+               (t, h) => t + (h.timePlayed || 0),
+               0,
+            );
+            const ts = (profile.suppliesUsage || []).reduce(
+               (t, sp) => t + (sp.usages || 0),
+               0,
+            );
+            const rankN = profile.rank || 1;
+            elements.profileSummary.innerHTML =
+               `<div class="summary-item full-width"><span class="summary-label">${T.label_nickname}</span><span class="summary-value">${profile.name || "N/A"}</span></div>` +
+               [
+                  {
+                     l: T.rank,
+                     v:
+                        rankN > 0
+                           ? rankN <= RANKS.length
+                              ? RANKS[rankN - 1]
+                              : `${RANKS[RANKS.length - 1]} ${rankN - RANKS.length}`
+                           : T.unknown_rank,
+                  },
+                  {
+                     l: T.label_score,
+                     v: `${s.sc.v}${s.sc.c} / ${profile.scoreNext?.toLocaleString() || 0}`,
+                  },
+                  {
+                     l: T.label_vip,
+                     v: profile.hasPremium ? T.vip_active : T.vip_inactive,
+                     p: profile.hasPremium,
+                  },
+                  { l: T.label_gear, v: `${s.g.v}${s.g.c}` },
+                  { l: T.label_kd, v: `${s.k.v}${s.k.c} / ${s.d.v}${s.d.c}` },
+                  {
+                     l: T.label_ratio,
+                     v:
+                        profile.deaths === 0
+                           ? "∞"
+                           : (profile.kills / profile.deaths).toFixed(2),
+                  },
+                  { l: T.label_time, v: formatTime(tt) },
+                  { l: T.label_supplies, v: ts.toLocaleString() },
+                  { l: T.label_crystals, v: `${s.c.v}${s.c.c}` },
+                  { l: T.label_golds, v: `${s.gb.v}${s.gb.c}` },
+               ]
+                  .map(
+                     (i) =>
+                        `<div class="summary-item"><span class="summary-label">${i.l}</span><span class="summary-value ${i.p ? "premium" : ""}">${i.v}</span></div>`,
+                  )
+                  .join("");
+         }
+
+         function displayRankingsTable(newData, oldData) {
+            const currentRating = newData.rating || {},
+               prevRating = newData.previousRating || {},
+               oldRating = oldData?.rating;
+            const rows = [
+               { k: "score", n: T.cat_score },
+               { k: "golds", n: T.cat_golds },
+               { k: "crystals", n: T.cat_crystals },
+               { k: "efficiency", n: T.cat_eff },
+            ]
+               .map((c) => {
+                  const cur = currentRating[c.k] || {},
+                     prv = prevRating[c.k] || {},
+                     old = oldRating?.[c.k],
+                     cv =
+                        c.k === "efficiency" && cur.value > 0
+                           ? cur.value / 1000
+                           : cur.value,
+                     ov =
+                        c.k === "efficiency" && old?.value > 0
+                           ? old.value / 1000
+                           : old?.value;
+                  let pHTML = "",
+                     vHTML = "";
+                  if (old) {
+                     if (
+                        cur.position > 0 &&
+                        old.position > 0 &&
+                        cur.position !== old.position
+                     ) {
+                        pHTML = createChangeSpan(old.position - cur.position);
+                        logChange(
+                           `${c.n} ${T.th_cur_rank}`,
+                           old.position,
+                           cur.position,
+                        );
+                     }
+                     if (cv !== ov) {
+                        vHTML = createChangeSpan(cv - ov);
+                        logChange(`${c.n} ${T.th_cur_val}`, ov, cv);
+                     }
+                  }
+                  const fmt = (v) =>
+                     v == -1 || v == null
+                        ? "-"
+                        : v.toLocaleString(undefined, {
+                             maximumFractionDigits:
+                                c.k === "efficiency" ? 3 : 0,
+                          });
+                  return `<tr><td>${c.n}</td><td>${fmt(cur.position)}${pHTML}</td><td>${fmt(cv)}${vHTML}</td><td>${fmt(prv.position)}</td><td>${fmt(c.k === "efficiency" && prv.value > 0 ? prv.value / 1000 : prv.value)}</td></tr>`;
+               })
+               .join("");
+            elements.rankingsTableContainer.innerHTML = `<h3 class="list-title" style="text-align:center;margin-bottom:12px;border:none;padding:0;">${T.weekly_rank_title}</h3><table cellpadding="0" cellspacing="0"><thead><tr><th>${T.th_cat}</th><th>${T.th_cur_rank}</th><th>${T.th_cur_val}</th><th>${T.th_prev_rank}</th><th>${T.th_prev_val}</th></tr></thead><tbody>${rows}</tbody></table>`;
+         }
+
+         function displayAllLists(newData, oldData) {
+            elements.listsContainer.innerHTML = "";
+            LIST_DATA_CONFIGS.forEach((config) => {
+               const newItems = newData[config.key] || [],
+                  oldItems = oldData?.[config.key] || [];
+               const section = document.createElement("div");
+               section.className = "list-section";
+
+               const header = document.createElement("div");
+               header.className = "list-header";
+               const title = document.createElement("h3");
+               title.className = "list-title";
+               title.textContent = config.title;
+               header.appendChild(title);
+               if (newItems.length > 0) {
+                  const btn = document.createElement("button");
+                  btn.className = "icon-btn expand-btn";
+                  btn.innerHTML =
+                     '<span class="material-symbols-rounded">fullscreen</span>';
+                  btn.onclick = () =>
+                     openFullscreenList(newItems, oldItems, config.title);
+                  header.appendChild(btn);
+               }
+               section.appendChild(header);
+
+               if (!newItems.length) {
+                  const p = document.createElement("p");
+                  p.className = "no-data-message";
+                  p.textContent = T.no_data_lb;
+                  section.appendChild(p);
+               } else {
+                  const container = document.createElement("div");
+                  container.className = "list-container";
+                  displayListData(newItems, oldItems, container, config.title);
+                  section.appendChild(container);
+               }
+               elements.listsContainer.appendChild(section);
+            });
+         }
+
+         function displayListData(newItems, oldItems, container, title) {
+            const aggNew = aggregateItems(newItems, title),
+               oldMap = new Map(
+                  aggregateItems(oldItems, title).map((i) => [i.name, i]),
+               );
+            aggNew.forEach((item) => {
+               item.changes = {};
+               item.hasChanged = false;
+               const oldI = oldMap.get(item.name);
+               if (oldI)
+                  ["scoreEarned", "timePlayed", "usages", "count"].forEach(
+                     (p) => {
+                        if ((item[p] || 0) > (oldI[p] || 0)) {
+                           item.changes[p] = item.hasChanged = true;
+                           logChange(
+                              `${item.name} ` +
+                                 (p === "scoreEarned"
+                                    ? T.cat_score
+                                    : p === "timePlayed"
+                                      ? T.th_time
+                                      : T.count),
+                              oldI[p],
+                              item[p],
+                           );
+                        }
+                     },
+                  );
+            });
+            aggNew
+               .sort(
+                  (a, b) =>
+                     b.hasChanged - a.hasChanged ||
+                     (b.timePlayed || b.usages || 0) -
+                        (a.timePlayed || a.usages || 0),
+               )
+               .forEach((item) => {
+                  const div = document.createElement("div");
+                  div.className = `data-card ${item.hasChanged ? "changed" : ""}`;
+                  let img = item.imageUrl
+                     ? item.imageUrl
+                          .replace(
+                             /s\.(eu\.tankionline|3dtank)\.com/g,
+                             isChinese
+                                ? "res.3dtank.com"
+                                : "s.eu.tankionline.com",
+                          )
+                          .replace(/\.tnk/g, ".webp")
+                     : null;
+                  if (title === T.list_modules && img)
+                     img = img.replace(/\.webp$/, ".svg");
+
+                  const cf = (l, v, p) =>
+                     `<div class="${item.changes[p] ? "field-changed" : ""}"><strong>${l}:</strong> ${v}${item.changes[p] ? createChangeSpan((item[p] || 0) - (oldMap.get(item.name)?.[p] || 0)) : ""}</div>`;
+                  let h = `<div class="item-name">${translateText(item.name) || "-"}</div>`;
+                  if (img)
+                     h += `<img src="${img}" class="item-image" loading="lazy" />`;
+                  if (item.properties != null)
+                     h += cf(
+                        T.prop,
+                        translateText(item.properties?.toLocaleString()),
+                        "properties",
+                     );
+                  if (item.grade != null && item.grade != -1)
+                     h += `<div class="grade-badge">${getGradeName(item.grade)}</div>`;
+                  if (title !== T.list_supplies && title !== T.list_presents) {
+                     if (item.timePlayed > 0) {
+                        if (item.scoreEarned != null)
+                           h += cf(
+                              T.label_score,
+                              item.scoreEarned?.toLocaleString(),
+                              "scoreEarned",
+                           );
+                        h += cf(
+                           T.th_time,
+                           formatTime(item.timePlayed),
+                           "timePlayed",
+                        );
+                     } else
+                        h += `<div style="font-size: 11px; color: var(--md-sys-color-outline); margin-top: 4px; font-style: italic;">${T.not_played}</div>`;
+                  }
+                  if (item.count != null && title === T.list_presents)
+                     h += cf(T.count, item.count?.toLocaleString(), "count");
+                  if (item.usages != null && title === T.list_supplies)
+                     h += cf(T.count, item.usages?.toLocaleString(), "usages");
+                  div.innerHTML = h;
+                  if (item.detailedGrades?.length > 1) {
+                     const btn = document.createElement("button");
+                     btn.className = "view-data-button";
+                     btn.textContent =
+                        title === T.list_modes
+                           ? T.view_types
+                           : title === T.list_paints
+                             ? T.view_versions
+                             : T.view_grades;
+                     btn.onclick = () =>
+                        showDetailedGrades(
+                           item.name,
+                           item.detailedGrades,
+                           title,
+                        );
+                     div.appendChild(btn);
+                  }
+                  container.appendChild(div);
+               });
+         }
+
+         // --- 全屏搜索与网格展示 ---
+         function openFullscreenList(newItems, oldItems, title) {
+            const container = document.createElement("div");
+            container.className = "fullscreen-grid";
+            displayListData(newItems, oldItems, container, title);
+
+            const html = `
+            <div class="fullscreen-modal" id="fsModal">
+               <div class="fs-header">
+                  <button class="icon-btn close-fs-btn" style="width: 40px; height: 40px; background: transparent; box-shadow: none; flex-shrink: 0;">
+                     <span class="material-symbols-rounded">arrow_back</span>
+                  </button>
+                  <div class="fs-search-wrapper">
+                     <span class="material-symbols-rounded">search</span>
+                     <input type="text" id="fsSearchInput" placeholder="${T.search} ${title}..." autocomplete="off" />
+                  </div>
+               </div>
+               <div id="fsContainer" style="flex-grow: 1; overflow-y: auto;"></div>
+            </div>`;
+            document.body.insertAdjacentHTML("beforeend", html);
+
+            const overlay = document.getElementById("fsModal");
+            document.getElementById("fsContainer").appendChild(container);
+
+            overlay.querySelector(".close-fs-btn").onclick = () =>
+               overlay.remove();
+
+            const searchInput = overlay.querySelector("#fsSearchInput");
+            searchInput.addEventListener("input", (e) => {
+               const term = e.target.value.toLowerCase().trim();
+               const cards = container.querySelectorAll(".data-card");
+               cards.forEach((card) => {
+                  const itemName = card
+                     .querySelector(".item-name")
+                     .textContent.toLowerCase();
+                  if (itemName.includes(term)) card.style.display = "flex";
+                  else card.style.display = "none";
+               });
+            });
+         }
+
+         function clearDisplay(full = false) {
+            elements.resultsWrapper.style.display = "none";
+            elements.profileSummary.innerHTML =
+               elements.rankingsTableContainer.innerHTML =
+               elements.listsContainer.innerHTML =
+               elements.errorMessage.textContent =
+                  "";
+            if (full) {
+               elements.backToLeaderboardContainer.style.display = "none";
+               lastProfileData = null;
+               changeLog = [];
+               renderChangeLog();
+            }
+         }
+         function showConfirmDialog(message, onConfirm) {
+            const overlay = document.createElement("div");
+            overlay.className = "modal-overlay";
+            overlay.style.zIndex = "4000"; // 确保在最顶层
+
+            const cancelText = isChinese ? "取消" : "Cancel";
+            const confirmText = isChinese ? "确定" : "Confirm";
+
+            overlay.innerHTML = `
+               <div class="modal-content" style="max-width: 320px; padding: 24px; text-align: left;">
+                  <h3 style="margin-top: 0; font-size: 18px; margin-bottom: 16px; color: var(--md-sys-color-on-surface);">
+                     ${isChinese ? "清空记录" : "Clear Logs"}
+                  </h3>
+                  <div style="font-size: 14px; color: var(--md-sys-color-on-surface); line-height: 1.5;">
+                     ${message}
+                  </div>
+                  <div class="dialog-actions">
+                     <button class="dialog-btn dialog-cancel">${cancelText}</button>
+                     <button class="dialog-btn dialog-confirm">${confirmText}</button>
+                  </div>
+               </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            const btnCancel = overlay.querySelector(".dialog-cancel");
+            const btnConfirm = overlay.querySelector(".dialog-confirm");
+
+            const closeDialog = () => overlay.remove();
+
+            btnCancel.addEventListener("click", closeDialog);
+            btnConfirm.addEventListener("click", () => {
+               onConfirm();
+               closeDialog();
+            });
+
+            // 点击弹窗外部背景也可以关闭
+            overlay.addEventListener("click", (e) => {
+               if (e.target === overlay) closeDialog();
+            });
+         }
+         function setLoading(L) {
+            elements.loader.style.display = L ? "flex" : "none";
+            elements.fetchButton.disabled = L;
+            if (L) {
+               elements.leaderboardContainer.style.display =
+                  elements.backToLeaderboardContainer.style.display = "none";
+               elements.errorMessage.textContent = "";
+            }
+         }
+         function displayError(m) {
+            elements.errorMessage.textContent = m;
+         }
+         function aggregateItems(items, title) {
+            const agg = {};
+            items.forEach((i) => {
+               const k =
+                  title === T.list_modules
+                     ? `${i.name}-${i.resistance}`
+                     : i.name;
+               if (!agg[k])
+                  agg[k] = {
+                     ...i,
+                     timePlayed: 0,
+                     scoreEarned: 0,
+                     usages: 0,
+                     count: 0,
+                     detailedGrades: [],
+                  };
+               agg[k].timePlayed += i.timePlayed || 0;
+               agg[k].scoreEarned += i.scoreEarned || 0;
+               agg[k].usages += i.usages || 0;
+               agg[k].count += i.count || 0;
+               if (i.grade > (agg[k].grade || -1)) agg[k].grade = i.grade;
+               agg[k].detailedGrades.push({ ...i });
+            });
+            return Object.values(agg);
+         }
+
+         function showDetailedGrades(name, details, title) {
+            const isM = title === T.list_modes,
+               isP = title === T.list_paints;
+            const rows = [...details]
+               .sort((a, b) =>
+                  isM
+                     ? (a.type || "").localeCompare(b.type || "")
+                     : isP
+                       ? (a.id || 0) - (b.id || 0)
+                       : (a.grade ?? -1) - (b.grade ?? -1),
+               )
+               .map(
+                  (d) =>
+                     `<tr><td>${translateText(isM ? d.type || "-" : isP ? `${d.id}` : getGradeName(d.grade))}</td><td>${formatTime(d.timePlayed)}</td><td>${d.scoreEarned?.toLocaleString() || "-"}</td></tr>`,
+               )
+               .join("");
+            const html = `<div class="modal-overlay"><div class="modal-content"><h3>${translateText(name)} - ${isM ? T.modal_types : isP ? T.modal_versions : T.modal_grades}</h3><table style="width:100%;"><thead><tr><th>${isM ? T.th_type : isP ? T.th_ver : T.th_grade}</th><th>${T.th_time}</th><th>${T.th_exp}</th></tr></thead><tbody>${rows}</tbody></table><button class="close-button">${T.close}</button></div></div>`;
+            document.body.insertAdjacentHTML("beforeend", html);
+            const ov = document.body.lastElementChild;
+            ov.addEventListener("click", (e) => {
+               if (
+                  e.target === ov ||
+                  e.target.classList.contains("close-button")
+               )
+                  ov.remove();
+            });
+         }
+         function getGradeName(grade) {
+            return grade != null && grade > -1 ? `Mk${grade + 1}` : "";
+         }
       </script>
    </body>
 </html>
