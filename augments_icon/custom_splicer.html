@@ -9,7 +9,7 @@
     <title>Tanki Online Augment Icon Splicer</title>
     <style>
         :root {
-            /* 直接使用之前的 Dark Mode 变量作为默认根变量 */
+            var(--md-sys-color-background): #001926;
             --md-sys-color-background: #001926;
             --md-sys-color-on-background: #ffffff;
             --md-sys-color-surface: #001926;
@@ -106,9 +106,7 @@
 <body>
 
     <header>
-        <!-- 这里的文字会被 JS 自动替换 -->
         <h1 id="ui-header">Tanki Online Augment Icon Splicer</h1>
-        <!-- 移除了主题切换按钮 -->
     </header>
 
     <div id="appContainer">
@@ -181,11 +179,13 @@
     <input type="hidden" id="val-equipment" value=""><input type="hidden" id="val-augment" value="">
     <input type="hidden" id="val-rarity" value="default"><input type="hidden" id="val-background" value="default">
 
+    <!-- 1. 在这里引入外部数据文件 -->
+    <script src="https://testanki1.github.io/augments_icon/data.js"></script>
+
+    <!-- 2. 主脚本维持不变，直接调用引入的数据 -->
     <script>
-        // 1. 检测是否为中文语言
         const isZh = navigator.language.toLowerCase().startsWith('zh');
 
-        // 2. 定义中文和英文的 UI 文本
         const uiTexts = {
             title: isZh ? "3D坦克装备改造图标拼接器" : "Tanki Online Augment Icon Splicer",
             header: isZh ? "3D坦克装备改造图标拼接器" : "Tanki Online Augment Icon Splicer",
@@ -205,18 +205,15 @@
             loading: isZh ? "加载中..." : "Loading...",
             note: isZh ? "注：生成的图标仅供参考" : "Note: Generated icons are for reference only.",
             
-            // 动态生成部分的文本
             dl_size: isZh ? "尺寸:" : "Size:",
             dl_png: isZh ? "保存 PNG" : "Save PNG",
             dl_svg: isZh ? "保存 SVG (矢量图)" : "Save SVG (Vector)",
             
-            // 弹窗标题
             modal_equip: isZh ? "选择装备" : "Select Equipment",
             modal_aug: isZh ? "选择装备改造" : "Select Augment",
             modal_rarity: isZh ? "选择稀有度颜色" : "Select Rarity Color",
             modal_fill: isZh ? "选择填充颜色" : "Select Fill Color",
             
-            // 稀有度名称映射
             rarity_names: {
                 "Default": isZh ? "默认" : "Default", "None": isZh ? "无" : "None", 
                 "Common": isZh ? "普通" : "Common", "Uncommon": isZh ? "罕见" : "Uncommon", 
@@ -225,7 +222,6 @@
             }
         };
 
-        // 3. 页面加载时应用这些文本
         document.title = uiTexts.title;
         document.getElementById('ui-header').textContent = uiTexts.header;
         document.getElementById('ui-lbl-equip').textContent = uiTexts.lbl_equip;
@@ -237,123 +233,17 @@
         document.getElementById('display-rarity').textContent = uiTexts.val_default;
         document.getElementById('ui-lbl-fill').textContent = uiTexts.lbl_fill;
         document.getElementById('display-background').textContent = uiTexts.val_default;
-        document.getElementById('ui-btn-reset').childNodes[2].textContent = " " + uiTexts.btn_reset; // 保留图标
+        document.getElementById('ui-btn-reset').childNodes[2].textContent = " " + uiTexts.btn_reset; 
         document.getElementById('ui-preview-txt').textContent = uiTexts.preview_txt;
         document.getElementById('loading').textContent = uiTexts.loading;
         document.getElementById('ui-note').textContent = uiTexts.note;
 
-
-        // --- 英文翻译映射 (仅当 !isZh 时使用) ---
-        const rawTranslationMap = {
-            "炮塔": "Turret", "底盘": "Hull", "射击颜色": "Shot Effect", 
-            "来自装备改造图标": "From Augment Icons", "来自射击颜色图标": "From Shot Effect Icons",
-            "火焰炮": "Firebird", "冰风暴": "Freeze", "磁力炮": "Isida", "特斯拉": "Tesla",
-            "滑膛炮": "Hammer", "离子炮": "Twins", "火龙珠": "Ricochet", "轰天炮": "Smoky",
-            "火箭炮": "Striker", "极速炮": "Vulcan", "雷暴炮": "Thunder", "海啸": "Tsunami", "蝎子": "Scorpion",
-            "激光炮": "Railgun", "马格南": "Magnum", "电磁炮": "Gauss", "镭射炮": "Shaft",
-            "终结者": "Terminator", "雪人": "Snowman", "番茄炮": "Tomato Gun",
-            "黄蜂轻甲": "Wasp", "蜂王": "Hornet", "霍珀": "Hopper", "圣骑士": "Paladin",
-            "猎人中甲": "Hunter", "十字军": "Crusader", "维京": "Viking", "独裁者": "Dictator",
-            "阿瑞斯": "Ares", "泰坦": "Titan", "猛犸象": "Mammoth",
-            "空（炮塔）": "Empty", "空（底盘）": "Empty",
-            "肾上腺素": "Adrenaline", "高压泵": "High-pressure pump", "紧凑型坦克": "Compact fuel tanks",
-            "燃烧混合物": "Incendiary mix", "磁性混合物": "Magnetic Mix", "麻痹混合物": "Paralyzing mix",
-            "有毒混合物": "Toxic Mix", "干扰混合物": "Jamming Mix", "致命混合物": "Critical Mix",
-            "脉冲星": "Pulsar", "凤凰（炮塔）": "Phoenix", "凤凰（底盘）": "Phoenix",
-            "腐蚀混合物": "Corrosive mix", "震荡冻结": "Shock freeze", "稳定混合物": "Stable Mix",
-            "宽带发射器": "Broadband radiators", "支援纳米机器人": "Support nanobots", "纳米反应器": "Nanomass reactor",
-            "干扰纳米机器人": "Jamming Nanobots", "磁性纳米机器人": "Magnetic Nanobots", "眩晕纳米机器人": "Stunning Nanobots",
-            "毒性纳米机器人": "Toxic Nanobots", "吸血鬼纳米机器人": "Vampire Nanobots", "注射冲击纳米机器人": "Shock Nanobots Injection",
-            "负能量场": "Minus-field", "加速协议": "Acceleration Protocol", "拖延协议": "Dilatory Protocol",
-            "放热闪电": "Exothermic Lightning", "吸热闪电": "Endothermic Lightning", "超导发射": "Superconducting Discharge",
-            "震撼闪电": "Shocking Lightning", "穿甲发射": "Armor-piercing Discharge", "干扰发射": "Jamming Discharge",
-            "电动炮塔": "Electroturret", "休克疗法": "Shock therapy", "重炮手": "Slugger",
-            "高容量弹鼓": "High-capacity ammo clip", "电子偶": "Duplet", "飞龙之息": "Wyvern's Breath",
-            "龙息": "Dragon's Breath", "磁性颗粒": "Magnetic Pellets", "眩晕颗粒": "Stunning Pellets",
-            "穿甲射击": "Armor-Piercing Shot", "干扰射击": "Jamming Shot", "自适应重载（1）": "Adaptive reload (1)",
-            "自适应重载（2）": "Adaptive reload (2)", "大口径短炮": "Blunderbuss", "左轮手枪": "Revolver",
-            "大口径颗粒": "Large Caliber Pellets", "突击弹药库": "Assault Magazine", "重型重炮手": "Heavy Slugger",
-            "猎人电子偶": "Hunter Duplet", "露营者": "Camper", "稳定等离子体": "Stabilized plasma",
-            "等离子体加速器": "Plasma accelerators", "重型等离子炮": "Heavy plasmagun", "低温管": "Cryotron",
-            "喷雾器": "Vaporizer", "磁控管": "Magnetron", "构造等离子体": "Tectonic Plasma",
-            "等离子注射器": "Plasma Injector", "等离子体干扰器": "Plasma Disruptor", "等离子涡轮加速器": "Plasma Turbo Accelerators",
-            "等离子发生器": "Plasmatron", "不稳定等离子体": "Destabilized plasma", "负场稳定": "Minus-field stabilization",
-            "等离子焰炬": "Plasma-torch", "低温领域": "Cryo field", "炙热领域": "Sizzling Field",
-            "构造场": "Tectonic field", "超级智能负能量场": "Super-smart Minus-Field", "干扰场": "Jamming field",
-            "狂暴": "Berserk", "赫利俄斯": "Helios", "等离子体共振器": "Plasma Resonator",
-            "突击弹药": "Assault rounds", "精确瞄准系统": "High-precision aiming system", "超累积炮弹": "Supercumulative rounds",
-            "燃烧弹": "Incendiary rounds", "冷冻炮弹": "Cryo rounds", "电磁脉冲炮弹": "EMP Rounds",
-            "麻痹炮弹": "Paralyzing Rounds", "穿甲弹": "Armor-Piercing Rounds", "干扰弹": "Jamming Rounds",
-            "分类弹药": "Sorted Ammunition", "可持续纳米机器人": "Sustainable Nanobots",
-            "导弹发射器“旋风”": "Missile launcher \"Cyclone\"", "导弹发射器“镭射”": "Missile launcher \"Shaft\"",
-            "自动加农炮": "Autocannon", "铀弹": "Uranium Shells", "钨弹": "Tungsten Shells", "爆破炮弹": "Explosive Rounds",
-            "超高速炮弹": "Hyperspeed Rounds", "远程火箭炸药": "Remote rocket explosives",
-            "导弹发射器 «猎人»": "Missile launcher «Hunter»", "导弹发射器 «旋风»": "Missile launcher «Cyclone»",
-            "燃烧导弹": "Incendiary Missiles", "冷冻导弹": "Cryo Missiles", "磁性导弹": "Magnetic Missiles",
-            "眩晕导弹": "Stunning Missiles", "穿甲导弹": "Armor-Piercing Missiles", "干扰导弹": "Jamming Missiles",
-            "导弹发射器 «轴»": "Missile launcher «Uranium»", "导弹发射器 «串联»": "Missile launcher «Tandem»",
-            "导弹发射器 «九头蛇»": "Missile launcher «Hydra»", "导弹发射器 «浮士德»": "Missile launcher «Faust»",
-            "导弹发射器 «铜指虎»": "Missile launcher «Brass Knucles»", "真空导弹": "Vacuum Missiles",
-            "导弹发射器 «流星»": "Missile Launcher «Meteor»", "射击速度调节器": "Shooting speed regulator",
-            "更快速的水平跟踪": "Reinforced aiming transmission", "燃烧带": "Incendiary band",
-            "冷冻带": "Freezing Band", "磁性带": "Magnetic Band", "眩晕带": "Stunning Band",
-            "穿甲带": "Armor-Piercing Band", "干扰带": "Jamming Band", "爆炸带": "Explosive Band",
-            "碎纸机": "Shredder", "大口径": "Large Caliber", "轻型军械自动装载机": "Small caliber charging machine",
-            "穿甲弹药": "Subcaliber rounds", "«大锤» 炮弹": "«Sledgehammer» rounds", "«飞龙» 炮弹": "«Wyvern» shells",
-            "«蝾螈» 炮弹": "«Salamander» shells", "«万磁王» 炮弹": "«Magneto» shells", "«和平卫士» 炮弹": "«Peacekeeper» shells",
-            "«腐蚀» 炮弹": "«Corrosion» shells", "«噪音» 炮弹": "«Noise» shells", "真空炮弹": "«Vacuum» shells",
-            "«纳米技术» 炮弹": "«Nanotech» shells", "«铁砧» 炮弹": "«Anvil» shells", "螺栓": "Bolter",
-            "爆炸性炮弹": "Explosive shells", "爆炸弹头": "Explosive warheads", "导弹发射器 «狼群»": "Missile launcher «Wolfpack»",
-            "眩晕弹": "Stun shells", "穿甲弹": "Armor-piercing shells",
-            "导弹发射器 «龙卷风»": "Missile launcher «Tornado»", "导弹发射器 «蜂群»": "Missile launcher «Swarm»",
-            "导弹发射器 «矛»": "Missile launcher «Spear»", "稳定轮环": "Round stabilization",
-            "电磁加速器“侦察机”": "Electromagnetic accelerator \"Scout\"", "超级穿甲弹": "Super Armor-Piercing Rounds",
-            "大口径弹药": "Large caliber rounds", "不稳定轮环": "Round destabilization", "“死亡使者” 强制器": "Death Herald compulsator",
-            "超空间炮弹": "Hyperspace rounds", "«霰弹枪» 炮弹": "«Shotgun» rounds", "加强炮架": "Reinforced gun carriage",
-            "自动火药装载机": "Automated gunpowder loading mechanism", "鱼叉导弹": "Harpoon",
-            "燃烧核心": "Incendiary core", "冷冻核心": "Freezing Core", "磁性核心": "Magnetic core",
-            "眩晕核心": "Stunning Core", "穿甲核心": "Armor-Piercing Core", "干扰核心": "Jamming Core",
-            "迫击炮": "Mortar", "轰炸机": "Bombard", "真空核心": "Vacuum core", "破坏者": "Destroyer",
-            "更快的水平跟踪": "Faster Horizontal Tracking", "入侵瞄准处理器": "Hacked Aiming Processor",
-            "燃烧齐射": "Incendiary Salvo", "冷冻齐射": "Freezing Salvo", "电磁齐射": "Electromagnetic salvo",
-            "眩晕齐射": "Stunning Salvo", "干扰齐射": "Jamming Salvo", "穿甲齐射": "Armor-Piercing Salvo",
-            "涅墨西斯": "Nemesis", "螺线管冷却": "Solenoid Cooling", "超级螺线管": "Super Solenoids",
-            "短波发射器": "Short-band emitter", "重型电容器": "Heavy capacitors", "轻型电容器": "Light capacitors",
-            "燃烧瞄准镜": "Incendiary Sight", "冷冻瞄准镜": "Freezing Sight", "电光瞄准镜": "Electrifying Sight",
-            "眩晕瞄准镜": "Stunning Sight", "穿甲瞄准镜": "Armor-Piercing Sight", "干扰瞄准镜": "Jamming Sight",
-            "快速射击模式": "Rapid-fire mode", "治疗发射器": "Healing Emitters", "类星体": "Quasar",
-            "卓越（炮塔）": "Excelsior", "卓越（底盘）": "Excelsior", "电压增强": "Increased Voltage",
-            "“双发”射击模式": "\"Duplet\" Firing Mode", "“三连发”射击模式": "\"Triplet\" Firing Mode", "“刺剑”射击模式": "\"Rapier\" Firing Mode", "北极星": "Polaris", "自适应自动加农炮": "Adaptive Autocannon", 
-            "耐热性": "Heat Resistance", "耐寒性": "Cold Resistance", "轻型结构": "Lightweight Construction",
-            "重型结构": "Heavyweight Construction", "工程师": "Engineer", "抗热": "Heat Immunity",
-            "抗寒": "Cold Immunity", "抗电磁脉冲": "EMP Immunity", "抗眩晕": "Stun Immunity",
-            "攻强免疫": "AP Immunity", "抗干扰器": "Jammer Immunity", "驱动器": "Driver",
-            "爆破手": "Blaster", "救生员": "Lifeguard", "工兵": "Miner", "榴弹兵": "Grenadier",
-            "极端轻型结构": "Extreme Lightweight Construction", "导弹发射器 «镭射»": "Missile launcher «Shaft»",
-            "仿星器": "Stellarator", "拳师": "Boxer", "«圣剑» 炮弹": "«Excalibur» rounds", "圣剑": "Excalibur", "暴风雨": "Tempest",
-            "真空炮弹": "«Vacuum» shells", "卡隆炮": "Carronade", "大和": "Yamato",
-            "深红色": "Crimson", "岩浆": "Magma", "幻影黑": "Black", "粉红色": "Pink", "粉色": "Pink",
-            "雪": "Snow", "寒冷": "Cold", "暗月": "Dark Moon", "毒（1）": "Toxic (1)", "毒（2）": "Toxic (2)",
-            "太阳": "Sun", "火": "Fire", "血液": "Blood", "日食": "Eclipse", "水": "Aqua",
-            "天空蓝": "Blue", "虚空": "Void", "金": "Gold", "紫罗兰色": "Violet", "珊瑚礁": "Coral Reef",
-            "电": "Electric", "天空": "Sky", "爆破手（绿）": "Blaster (Green)", "爆破手（红）": "Blaster (Red)",
-            "神秘的红色": "Mysterious Red", "黑暗": "Darkness", "暴力": "VioleNt", "正午": "Noon",
-            "烟雾": "Smoke", "魔法": "Magic",
-            "蓝紫色": "Blue-Purple", "蓝粉渐变色": "Blue-Pink Gradient", "红色": "Red",
-            "浅蓝色": "Light Blue", "深蓝色": "Dark Blue", "紫色": "Purple", "黄色": "Yellow",
-            "橙色": "Orange", "火红色": "Fiery Red", "蓝色": "Blue", "绿色": "Green", "黑色": "Black"
-        };
-
-        // 翻译函数：如果是中文环境，直接返回中文；否则返回英文翻译
+        // 这里的 rawTranslationMap 已经由外部 data.js 文件提供
         function t(chineseKey) {
             if (isZh) return chineseKey;
             return rawTranslationMap[chineseKey] || chineseKey;
         }
 
-        const groupedEquipments = { "炮塔": ["滑膛炮", "冰风暴", "火焰炮", "蝎子", "镭射炮", "火龙珠", "激光炮", "磁力炮", "雷暴炮", "海啸", "火箭炮", "轰天炮", "极速炮", "离子炮", "马格南", "电磁炮", "特斯拉"], "底盘": ["泰坦", "圣骑士", "猛犸象", "猎人中甲", "蜂王", "霍珀", "独裁者", "阿瑞斯", "十字军", "维京", "黄蜂轻甲"] };
-        const groupedAugments = { "炮塔": ["空（炮塔）", "肾上腺素", "螺线管冷却", "拖延协议", "加速协议", "负能量场", "震荡冻结", "入侵瞄准处理器", "射击速度调节器", "干扰弹", "更快速的水平跟踪", "铀弹", "钨弹", "轻型电容器", "重型电容器", "治疗发射器", "纳米反应器", "支援纳米机器人", "宽带发射器", "吸血鬼纳米机器人", "精确瞄准系统", "超累积炮弹", "突击弹药", "穿甲弹", "燃烧弹", "分类弹药", "自动加农炮", "高容量弹鼓", "电子偶", "重炮手", "大口径短炮", "自适应重载（1）", "自适应重载（2）", "导弹发射器“旋风”", "远程火箭炸药", "鱼叉导弹", "加强炮架", "自动火药装载机", "电磁脉冲炮弹", "迫击炮", "导弹发射器“镭射”", "负场稳定", "等离子焰炬", "狂暴", "赫利俄斯", "等离子体加速器", "重型等离子炮", "稳定等离子体", "等离子涡轮加速器", "腐蚀混合物", "等离子发生器", "紧凑型坦克", "高压泵", "脉冲星", "电磁加速器“侦察机”", "超空间炮弹", "爆炸性炮弹", "爆炸弹头", "真空炮弹", "眩晕弹", "冷冻炮弹", "«霰弹枪» 炮弹", "导弹发射器 «九头蛇»", "导弹发射器 «浮士德»", "导弹发射器 «串联»", "超高速炮弹", "碎纸机", "猎人电子偶", "重型重炮手", "突击弹药库", "大口径颗粒", "电动炮塔", "致命混合物", "可持续纳米机器人", "导弹发射器 «流星»", "轰炸机", "左轮手枪", "破坏者", "注射冲击纳米机器人", "涅墨西斯", "螺栓", "类星体", "稳定混合物", "休克疗法", "露营者", "导弹发射器 «铜指虎»", "仿星器", "拳师", "«圣剑» 炮弹", "暴风雨", "卡隆炮", "大和", "电压增强", "“双发”射击模式", "“三连发”射击模式", "“刺剑”射击模式", "北极星", "自适应自动加农炮", "卓越（炮塔）", "凤凰（炮塔）"], "底盘": ["空（底盘）", "极端轻型结构", "爆破手", "工兵", "驱动器", "轻型结构", "重型结构", "耐寒性", "耐热性", "抗干扰器", "攻强免疫", "抗电磁脉冲", "抗眩晕", "抗热", "抗寒", "救生员", "工程师", "榴弹兵", "卓越（底盘）", "凤凰（底盘）"], "射击颜色": ["深红色", "岩浆", "幻影黑", "粉红色", "雪", "寒冷", "暗月", "毒（1）", "毒（2）", "太阳", "火", "血液", "日食", "水", "天空蓝", "虚空", "金", "紫罗兰色", "珊瑚礁", "电", "天空", "爆破手（绿）", "爆破手（红）", "神秘的红色", "黑暗", "暴力", "正午", "烟雾", "魔法"] };
-        
-        // 稀有度数据 (这里只保留颜色值，名称从 uiTexts 获取)
         const rarities = [ 
             { key: "Default", value: "default", color: "#aaaaaa" }, 
             { key: "None", value: "#", color: "#333333" }, 
@@ -365,11 +255,7 @@
             { key: "Exotic", value: "#FF6666", color: "#FF6666" } 
         ];
         
-        const groupedBackgroundColors = { "来自装备改造图标": ["蓝紫色", "蓝粉渐变色", "红色", "浅蓝色", "深蓝色", "粉色", "紫色", "黄色", "橙色", "火红色", "蓝色", "绿色", "黑色"], "来自射击颜色图标": ["爆破手（红）", "爆破手（绿）", "电", "毒（1）", "毒（2）", "粉红色", "寒冷", "黑暗", "幻影黑", "火", "金", "魔法", "日食", "珊瑚礁", "深红色", "神秘的红色", "水", "太阳", "天空", "天空蓝", "虚空", "雪", "血液", "岩浆", "正午", "紫罗兰色", "暴力", "暗月", "烟雾"] };
-        
         const fileCache = {};
-
-        // Modal Logic
         const modal = document.getElementById('selectionModal');
         const modalList = document.getElementById('modalList');
         
@@ -396,22 +282,18 @@
         function renderGroupedOptions(dataObj, type) {
             Object.keys(dataObj).forEach(group => {
                 const h = document.createElement('div'); h.className = 'option-group-title'; 
-                h.textContent = t(group); // Translate Category Name
+                h.textContent = t(group); 
                 modalList.appendChild(h);
                 
                 const items = [...dataObj[group]];
                 
-                // --- 核心修改：中英文分别排序 ---
                 items.sort((a, b) => {
                     if (isZh) {
-                        // 如果是中文，使用中文拼音排序 ('zh-CN')
                         return a.localeCompare(b, 'zh-CN');
                     } else {
-                        // 如果是英文，使用翻译后的英文名称排序
                         return t(a).localeCompare(t(b));
                     }
                 });
-                // --------------------------------
 
                 items.forEach(item => {
                     const displayName = t(item);
@@ -433,7 +315,7 @@
         function renderRarityOptions() {
             const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = uiTexts.lbl_rarity; modalList.appendChild(h);
             rarities.forEach(r => {
-                const name = uiTexts.rarity_names[r.key]; // 动态获取名称
+                const name = uiTexts.rarity_names[r.key]; 
                 const el = document.createElement('div'); el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
                 el.innerHTML = `<div class="color-circle" style="background:${r.color}"></div><span>${name}</span>`;
                 el.onclick = () => selectItem('rarity', r.value, null, name, r.color);
@@ -441,14 +323,10 @@
             });
         }
 
-        // --- Actions ---
         function selectItem(type, value, group, displayOverride, colorOverride) {
-            // 保存原始值用于文件请求
             document.getElementById(`val-${type}`).value = value;
-            
             const disp = document.getElementById(`display-${type}`);
             const btn = document.getElementById(`reset-${type}`);
-            
             const showText = displayOverride || t(value);
 
             if (type === 'rarity') {
@@ -472,18 +350,14 @@
         function resetAll() {
             document.getElementById('val-equipment').value = "";
             document.getElementById('display-equipment').textContent = uiTexts.sel_equip;
-            
             document.getElementById('val-augment').value = "";
             document.getElementById('display-augment').textContent = uiTexts.sel_aug;
-            
             resetSelection('rarity');
             resetSelection('background');
-            
             document.getElementById('svgPreview').innerHTML = `<div style="color: var(--md-sys-color-outline);">${uiTexts.preview_txt}</div>`;
             document.getElementById('downloadSection').innerHTML = '';
         }
 
-        // --- Generation ---
         async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
         
         async function fetchBackgroundPreview(n, c) { 
