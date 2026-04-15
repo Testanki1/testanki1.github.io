@@ -88,26 +88,32 @@
             --elevation-hover: 0 4px 8px 2px rgba(0, 0, 0, 0.1),
                0 2px 4px 0 rgba(0, 0, 0, 0.1);
          }
-         /* ================= 全局去除默认UI与滚动条 ================= */
+         /* ================= 全局去除默认UI与精致的 MD3 滚动条 ================= */
          * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
             font-family: var(--font-family);
          }
          ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 12px;
+            height: 12px;
          }
          ::-webkit-scrollbar-track {
             background: transparent;
          }
          ::-webkit-scrollbar-thumb {
-            background: var(--md-sys-color-outline-variant);
-            border-radius: var(--radius-pill);
-            border: 2px solid var(--md-sys-color-background);
+            background-color: var(--md-sys-color-outline-variant);
+            border-radius: 10px;
+            border: 4px solid transparent;
+            background-clip: content-box;
+            transition: background-color 0.2s;
          }
          ::-webkit-scrollbar-thumb:hover {
-            background: var(--md-sys-color-outline);
+            background-color: var(--md-sys-color-outline);
+            border: 3px solid transparent;
+         }
+         ::-webkit-scrollbar-corner {
+            background: transparent;
          }
          body {
             margin: 0;
@@ -126,7 +132,6 @@
             margin: 0 auto;
             padding: 12px;
             padding-top: 56px;
-            /* 移除了导致最底部空白的 padding-bottom */
          }
          /* --- 标题 --- */
          h1 {
@@ -546,8 +551,7 @@
             background-color: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
             box-shadow: 0 4px 12px rgba(118, 255, 51, 0.3);
-         }
-         [data-theme="light"] .tab-button.active {
+         }[data-theme="light"] .tab-button.active {
             box-shadow: 0 4px 12px rgba(0, 109, 44, 0.2);
          }
          .tab-content {
@@ -854,24 +858,34 @@
             overflow-y: auto;
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
             border: 1px solid var(--md-sys-color-outline-variant);
+            position: relative; /* 保证关闭按钮绝对定位基准正确 */
          }
-         .close-button {
-            display: block;
-            margin: 20px auto 0;
-            padding: 10px 28px;
-            background-color: var(--md-sys-color-error);
-            color: var(--md-sys-color-on-error);
+
+         /* --- 弹窗的右上角关闭按钮 --- */
+         .modal-close-icon {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: transparent;
             border: none;
-            border-radius: var(--radius-pill);
+            color: var(--md-sys-color-outline);
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 700;
-            transition: box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 10;
          }
-         .close-button:hover {
-            box-shadow: var(--elevation-hover);
-            filter: brightness(1.1);
+         .modal-close-icon:hover {
+            background-color: rgba(255, 102, 102, 0.12);
+            color: var(--md-sys-color-error);
+         }[data-theme="light"] .modal-close-icon:hover {
+            background-color: rgba(186, 26, 26, 0.12);
          }
+
          .md-ripple-anim {
             position: absolute;
             border-radius: 50%;
@@ -913,50 +927,52 @@
 
          /* ================= 排行榜定制组件：表与翻页按钮 ================= */
          
-         /* 【核心修改 1】强行限定高度并允许内部滚动 */
          .leaderboard-table-wrapper {
             overflow-x: auto;
-            overflow-y: auto;          /* 开启垂直滚动 */
-            max-height: 60vh;          /* 最大高度不超过屏幕高度的 60% */
-            min-height: 300px;         /* 保证至少有一定高度 */
+            overflow-y: auto;
+            max-height: 60vh;
             border-radius: var(--radius-medium);
             border: 1px solid var(--md-sys-color-outline-variant);
             background-color: var(--md-sys-color-surface-container-high);
             margin-top: 12px;
          }
          
-         /* 【核心修改 2】强制表格严格遵照设定的百分比列宽，拒绝自适应导致右侧留白 */
+         /* 【关键修改】专门取消弹窗内部表格的大块留白，让弹窗高度紧贴内容 */
+         .modal-content .leaderboard-table-wrapper {
+            min-height: auto;
+            margin-bottom: 0;
+         }
+
          table {
             width: 100%;
-            border-collapse: separate; /* 设置为 separate 防止吸顶表头边框消失 */
+            border-collapse: separate;
             border-spacing: 0;
             font-size: 13px;
-            table-layout: fixed;       /* 强制分配列宽 */
+            table-layout: fixed;
          }
+         
          th, td {
             padding: 10px 12px;
-            text-align: left;
+            text-align: center;
             border-bottom: 1px solid var(--md-sys-color-outline-variant);
          }
          
-         /* 【核心修改 3】表头吸顶 */
          th {
             color: var(--md-sys-color-secondary);
             font-weight: 600;
             font-size: 11px;
             text-transform: uppercase;
             background-color: var(--md-sys-color-surface-container);
-            position: sticky;          /* 吸顶配置 */
+            position: sticky;
             top: 0;
             z-index: 5;
-            box-shadow: 0 1px 0 var(--md-sys-color-outline-variant); /* 替代原先在滚动时会跟着滑走的边框 */
+            box-shadow: 0 1px 0 var(--md-sys-color-outline-variant);
             border-bottom: none;
          }
          tr:last-child td {
             border-bottom: none;
          }
 
-         /* 保证长昵称不会撑破宽度，超过则显示为... */
          .name-cell {
             white-space: nowrap;
             overflow: hidden;
@@ -970,11 +986,6 @@
             vertical-align: bottom;
          }
 
-         /* 【核心修改 4】数值列靠右贴边 */
-         .text-right {
-            text-align: right !important;
-         }
-
          .player-link {
             color: var(--md-sys-color-primary);
             font-weight: 700;
@@ -986,9 +997,8 @@
             text-decoration: none; 
          }
          
-         /* 【核心修改 5】悬浮按钮居中包裹容器 */
          .leaderboard-carousel-container {
-            position: relative; /* 定位基准点 */
+            position: relative;
          }
          #leaderboardCarouselContent {
             display: flex;
@@ -996,11 +1006,10 @@
             transition: opacity 0.15s ease-in-out;
          }
 
-         /* 把按钮定位到整体高度的正中间 */
          .carousel-nav-button {
-            position: absolute;  /* 基于 .leaderboard-carousel-container 的相对绝对定位 */
-            top: 50%;            /* 高度正中间 */
-            transform: translateY(-50%); /* 垂直居中偏移修正 */
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
             width: 40px;
             height: 40px;
             border-radius: var(--radius-pill);
@@ -1019,14 +1028,13 @@
          .carousel-nav-button:hover {
             background-color: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
-            transform: translateY(-50%) scale(1.05); /* 注意保持 translateY 不变 */
+            transform: translateY(-50%) scale(1.05);
             box-shadow: 0 6px 12px rgba(0,0,0,0.5);
             opacity: 1;
          }
          .carousel-nav-button:active {
             transform: translateY(-50%) scale(0.95);
          }
-         /* 控制分布于左右边缘，防止过于遮挡表格文字 */
          #leaderboardPrev {
             left: -4px;
          }
@@ -1041,8 +1049,8 @@
             flex-wrap: wrap; 
             gap: 4px;
             align-items: center;
-            justify-content: flex-start;
-            min-width: 0; /* 允许在固定列宽中自动换行，防止撑宽表格 */
+            justify-content: center;
+            min-width: 0;
          }
          .prizes .prize {
             width: 24px !important;
@@ -1615,7 +1623,9 @@
          preciseToggle.addEventListener("change", (e) => {
             isPreciseTime = e.target.checked;
             localStorage.setItem("precise_time", isPreciseTime);
-            if (lastProfileData) updateDisplay(lastProfileData, null);
+            if (lastProfileData && elements.resultsWrapper.style.display !== "none") {
+               updateDisplay(lastProfileData, null);
+            }
          });
 
          function formatTime(ms) {
@@ -1983,11 +1993,9 @@
                   if (categoryData?.length > 0) {
                      html += '<div class="leaderboard-table-wrapper">';
                      if (category.key === "stars_previous") {
-                        // 强制为每列分配确切百分比，并把最后的表头设为统一的数值变量
-                        html += `<table class="leaderboard-table" style="min-width: 100%;"><thead><tr><th style="width:12%;">${T.th_rank}</th><th style="width:28%;">${T.th_name}</th><th style="width:40%;">${T.th_reward}</th><th style="width:20%;" class="text-right">${T.th_value}</th></tr></thead><tbody>${categoryData.map((p, idx) => `<tr><td>${idx + 1}</td><td class="name-cell"><a href="#" class="player-link" data-username="${p.uid}">${p.uid}</a></td><td><div class="prizes">${(p.prizes ||[]).map((pz) => `<div class="prize ${pz}" title="${pz}"></div>`).join("")}</div></td><td class="text-right">${p.value.toLocaleString()}</td></tr>`).join("")}</tbody></table>`;
+                        html += `<table class="leaderboard-table" style="min-width: 100%;"><thead><tr><th style="width:12%;">${T.th_rank}</th><th style="width:28%;">${T.th_name}</th><th style="width:40%;">${T.th_reward}</th><th style="width:20%;">${T.th_value}</th></tr></thead><tbody>${categoryData.map((p, idx) => `<tr><td>${idx + 1}</td><td class="name-cell"><a href="#" class="player-link" data-username="${p.uid}">${p.uid}</a></td><td><div class="prizes">${(p.prizes ||[]).map((pz) => `<div class="prize ${pz}" title="${pz}"></div>`).join("")}</div></td><td>${p.value.toLocaleString()}</td></tr>`).join("")}</tbody></table>`;
                      } else {
-                        // 加入百分比固定列宽分配，消除右边空缺
-                        html += `<table class="leaderboard-table" style="min-width: 100%;"><thead><tr><th style="width:15%;">${T.th_rank}</th><th style="width:55%;">${T.th_name}</th><th style="width:30%;" class="text-right">${T.th_value}</th></tr></thead><tbody>${categoryData.map((p, idx) => `<tr><td>${idx + 1}</td><td class="name-cell"><a href="#" class="player-link" data-username="${p.uid}">${p.uid}</a></td><td class="text-right">${category.key === "efficiency" ? (p.value / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 }) : p.value.toLocaleString()}</td></tr>`).join("")}</tbody></table>`;
+                        html += `<table class="leaderboard-table" style="min-width: 100%;"><thead><tr><th style="width:15%;">${T.th_rank}</th><th style="width:55%;">${T.th_name}</th><th style="width:30%;">${T.th_value}</th></tr></thead><tbody>${categoryData.map((p, idx) => `<tr><td>${idx + 1}</td><td class="name-cell"><a href="#" class="player-link" data-username="${p.uid}">${p.uid}</a></td><td>${category.key === "efficiency" ? (p.value / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 }) : p.value.toLocaleString()}</td></tr>`).join("")}</tbody></table>`;
                      }
                      html += "</div>";
                   } else
@@ -2059,6 +2067,8 @@
                lastProfileData = profileData;
             } catch (error) {
                displayError(error.message);
+               // 核心修复：即使查询失败，也要把左上角的返回按钮展示出来
+               elements.backToLeaderboardContainer.style.display = "block";
             } finally {
                setLoading(false);
             }
@@ -2680,13 +2690,31 @@
                      `<tr><td>${translateText(isM ? d.type || "-" : isP ? `${d.id}` : getGradeName(d.grade))}</td><td>${formatTime(d.timePlayed)}</td><td>${d.scoreEarned?.toLocaleString() || "-"}</td></tr>`,
                )
                .join("");
-            const html = `<div class="modal-overlay"><div class="modal-content"><h3>${translateText(name)} - ${isM ? T.modal_types : isP ? T.modal_versions : T.modal_grades}</h3><div class="leaderboard-table-wrapper"><table style="width:100%;"><thead><tr><th>${isM ? T.th_type : isP ? T.th_ver : T.th_grade}</th><th>${T.th_time}</th><th>${T.th_exp}</th></tr></thead><tbody>${rows}</tbody></table></div><button class="close-button">${T.close}</button></div></div>`;
+            const html = `
+            <div class="modal-overlay">
+               <div class="modal-content">
+                  <button class="modal-close-icon" title="${T.close}">
+                     <span class="material-symbols-rounded" style="font-size:20px;">close</span>
+                  </button>
+                  <h3 style="margin-top:0; margin-bottom:16px; padding-right:28px; line-height:1.3;">
+                     ${translateText(name)} - ${isM ? T.modal_types : isP ? T.modal_versions : T.modal_grades}
+                  </h3>
+                  <div class="leaderboard-table-wrapper">
+                     <table style="width:100%;">
+                        <thead>
+                           <tr><th>${isM ? T.th_type : isP ? T.th_ver : T.th_grade}</th><th>${T.th_time}</th><th>${T.th_exp}</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                     </table>
+                  </div>
+               </div>
+            </div>`;
             document.body.insertAdjacentHTML("beforeend", html);
             const ov = document.body.lastElementChild;
             ov.addEventListener("click", (e) => {
                if (
                   e.target === ov ||
-                  e.target.classList.contains("close-button")
+                  e.target.closest(".modal-close-icon")
                )
                   ov.remove();
             });
