@@ -2955,12 +2955,15 @@ let cameraTarget;
                          for (const [baseName, group] of prefabs.entries()) {
                              await new Promise((resolve) => {
                                  const exportGroup = group.clone();
-                                 exportGroup.position.set(0, 0, 0);
-                                 exportGroup.rotation.set(0, 0, 0);
-                                 exportGroup.scale.set(1, 1, 1);
-                                 
-                                 exporter.parse(
-                                     exportGroup,
+exportGroup.position.set(0, 0, 0);
+exportGroup.rotation.set(-Math.PI / 2, 0, 0);
+exportGroup.scale.set(1, 1, 1); 
+
+const rootWrapper = new THREE.Scene();
+rootWrapper.add(exportGroup);
+
+exporter.parse(
+    rootWrapper,
                                      async (gltfBuffer) => {
                                          await zipWriter.add(`models/${baseName}.glb`, new zip.Uint8ArrayReader(new Uint8Array(gltfBuffer)));
                                          processedCount++;
