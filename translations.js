@@ -573,7 +573,7 @@ const replacementDict = {
 "«Vacuum» shells": "真空炮弹",
 "«Nanotech» shells": "«纳米技术» 炮弹",
 "«Anvil» shells": "«铁砧» 炮弹",
-"Bolter": "螺栓",
+"Bolter": "爆弹枪",
 "Explosive warheads": "爆炸弹头",
 "Missile launcher «Wolfpack»": "导弹发射器 «狼群»",
 "Cryo Shells": "冷冻炮弹",
