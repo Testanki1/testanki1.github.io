@@ -655,7 +655,7 @@ const replacementDict = {
 "Autocannon": "自动加农炮",
 "Rubberized Rounds": "橡胶炮弹",
 "Explosive Rounds": "爆炸性炮弹",
-"Sorted Ammunition": "精确弹药装载",
+"Sorted Ammunition": "分类弹药",
 "Hyperspeed Rounds": "超高速炮弹",
 "Remote rocket explosives": "远程火箭炸药",
 "Missile launcher «Hunter»": "导弹发射器 «猎人»",
