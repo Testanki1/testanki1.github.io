@@ -646,6 +646,7 @@ const replacementDict = {
 'Rapier': '刺剑',
 'Polaris': '北极星',
 'Adaptive Autocannon': '自适应自动加农炮',
+"Needle Gun": "针炮",
 "Heat Resistance": "耐热性",
 "Cold Resistance": "耐寒性",
 "Lightweight Construction": "轻型结构",
