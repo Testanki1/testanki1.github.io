@@ -16,7 +16,7 @@
         -webkit-tap-highlight-color: transparent;
         }
         :root {
-            /* Dark Theme Token Palette - Custom Green/DarkBlue */
+            /* M3 Dark Theme Token Palette - Custom Green/DarkBlue */
             --md-sys-color-primary: #FFCC00;
             --md-sys-color-on-primary: #001926;
             --md-sys-color-primary-container: rgba(255, 204, 0, 0.2);
@@ -53,7 +53,7 @@
 
         h1, h2, h3, p { margin: 0; }
 
-        /* --- Components --- */
+        /* --- M3 Expressive Components --- */
 
         .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
@@ -825,27 +825,43 @@
             let r_angle = 0; let o_counter = 0;
             const checkpoints =[1, 18, 35, 52, 69, 86, 103];
 
-            // --- 修改：将上限延伸到 123 (足够覆盖螺旋区域)，保留引力数据 ---
-for (let e = 0; e <= 123; e++) { 
-    const a = Math.max(1, 0.8 * Math.sqrt(e + 1.6));
-    r_angle += 1 * Math.asin(1 / a);
-    const x = -a * Math.cos(r_angle) * 5.7;
-    const y = -a * Math.sin(r_angle) * 5.7 + 3.5;
-    const z = 14 * -a + 15.8 + 0.3 * r_angle;
+            // --- 新增：向后推算并生成 -1 和 -2 的隐形引力节点 ---
+            let backNodes = [];
+            let curr_angle = 0;
+            for (let e = -1; e >= -2; e--) {
+                // 确保根号下不为负数避免 NaN
+                let a = Math.max(1, 0.8 * Math.sqrt(Math.max(0, e + 1.6)));
+                const x = -a * Math.cos(curr_angle) * 5.7;
+                const y = -a * Math.sin(curr_angle) * 5.7 + 3.5;
+                const z = 14 * -a + 15.8 + 0.3 * curr_angle;
+                
+                // typeStr: null 确保不会生成实际的车站模型，仅提供引力
+                backNodes.unshift({ x, y, z, m: e, radius: a, theta: curr_angle, typeStr: null });
+                curr_angle -= Math.asin(1 / a);
+            }
+            trackNodes.push(...backNodes); // 将负数节点放入数组头部
 
-    if (o_counter === 4) o_counter = 0; o_counter++;
-    let typeNum = checkpoints.includes(e) ? (e === 103 ? 6 : 5) : o_counter;
-    let typeStr = 'station1';
-    
-    if (typeNum >= 1 && typeNum <= 4) typeStr = 'station' + typeNum;
-    if (typeNum === 5) typeStr = 'checkpoint';
-    if (typeNum === 6) typeStr = 'finish'; // e=103 仍是终点
-    
-    // ★ 新增：超过 103 的部分不渲染物理轨道模型，仅在后台提供引力引导
-    if (e > 103) typeStr = null; 
-    
-    trackNodes.push({ x, y, z, m: e, radius: a, theta: r_angle, typeStr });
-}
+            // --- 原始的正向生成循环 ---
+            for (let e = 0; e <= 123; e++) { 
+                const a = Math.max(1, 0.8 * Math.sqrt(e + 1.6));
+                r_angle += 1 * Math.asin(1 / a);
+                const x = -a * Math.cos(r_angle) * 5.7;
+                const y = -a * Math.sin(r_angle) * 5.7 + 3.5;
+                const z = 14 * -a + 15.8 + 0.3 * r_angle;
+
+                if (o_counter === 4) o_counter = 0; o_counter++;
+                let typeNum = checkpoints.includes(e) ? (e === 103 ? 6 : 5) : o_counter;
+                let typeStr = 'station1';
+                
+                if (typeNum >= 1 && typeNum <= 4) typeStr = 'station' + typeNum;
+                if (typeNum === 5) typeStr = 'checkpoint';
+                if (typeNum === 6) typeStr = 'finish'; // e=103 仍是终点
+                
+                // ★ 新增：超过 103 的部分不渲染物理轨道模型，仅在后台提供引力引导
+                if (e > 103) typeStr = null; 
+                
+                trackNodes.push({ x, y, z, m: e, radius: a, theta: r_angle, typeStr });
+            }
 
             trackNodes.forEach(node => {
                 if (!node.typeStr) return; 
@@ -938,21 +954,23 @@ for (let e = 0; e <= 123; e++) {
             scene.add(tankGroup);
             tankMesh = tankGroup;
 
+            // 找到真正的 0 号节点作为出生点，防止出生在 -2 的位置
+            const startNode = trackNodes.find(n => n.m === 0) || trackNodes[0];
+            
             // --- RAPIER: 创建 Box(方盒子) 坦克，真正支持平移且永不翻车 ---
-            // Box 尺寸: 宽1.2, 高0.6, 深1.8 -> Rapier要求半尺寸(Half-extents)，所以是 0.6, 0.3, 0.9
             const colliderDesc = RAPIER.ColliderDesc.roundCuboid(0.25, 0.10, 0.40, 0.05);
             const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                .setTranslation(trackNodes[0].x, trackNodes[0].y + 5, trackNodes[0].z)
+                .setTranslation(startNode.x, startNode.y + 5, startNode.z)
                 .lockRotations() // 锁死物理旋转，再也不翻车！
                 .setLinearDamping(0.0);
             
             tankBody = world.createRigidBody(rigidBodyDesc);
             world.createCollider(colliderDesc, tankBody);
             
-            gameState.lastTankMapAngle = Math.atan2(trackNodes[0].x, trackNodes[0].z);
-            gameState.lastScorePos.set(trackNodes[0].x, trackNodes[0].y + 5, trackNodes[0].z);
+            gameState.lastTankMapAngle = Math.atan2(startNode.x, startNode.z);
+            gameState.lastScorePos.set(startNode.x, startNode.y + 5, startNode.z);
         };
-
+        
         function showFloatingText(text, pos, isBad = false) {
     const div = document.createElement('div'); div.className = 'score-popup'; div.innerText = text; if (isBad) div.style.color = '#FF6666';
     const vec = pos.clone(); 
@@ -976,16 +994,19 @@ for (let e = 0; e <= 123; e++) {
             const currentPos = new THREE.Vector3(tPos.x, tPos.y, tPos.z);
             let minIndex = -1; let minDistSq = Infinity;
 
-            // ★ 修改：只检测到终点(索引103)为止。这样螺旋路段即使有引力，也不会引发通关和记分！
-const scoreEndIndex = Math.min(103, trackNodes.length - 1);
-for (let i = 0; i <= scoreEndIndex; i++) {
-    const node = trackNodes[i];
-    const distSq = currentPos.distanceToSquared(new THREE.Vector3(node.x, node.y, node.z));
-    if (distSq < minDistSq) { minDistSq = distSq; minIndex = i; }
-}
+            // ★ 修改：通过寻找真实编号 103 的节点作为计分终点
+            const scoreEndIndex = trackNodes.findIndex(n => n.m === 103);
+            for (let i = 0; i <= scoreEndIndex; i++) {
+                const node = trackNodes[i];
+                const distSq = currentPos.distanceToSquared(new THREE.Vector3(node.x, node.y, node.z));
+                if (distSq < minDistSq) { minDistSq = distSq; minIndex = i; }
+            }
 
             if (minDistSq > 4) return;
-            const targetScore = Math.min(GAME_CONFIG.maxScore, Math.max(0, minIndex - 1));
+            
+            // 获取匹配的节点，使用它自带的 m 属性来计算得分
+            const matchedNode = trackNodes[minIndex];
+            const targetScore = Math.min(GAME_CONFIG.maxScore, Math.max(0, matchedNode.m - 1));
 
             if (targetScore !== gameState.score) {
                 const oldDisplayScore = Math.max(0, gameState.score); const scoreDiff = targetScore - oldDisplayScore;
@@ -1093,7 +1114,8 @@ if (scoreDiff > 0) {
             if(!tankBody || !trackNodes[0]) return;
             let savedScore = 0;
             if (gameState.score > 0 && gameState.score < GAME_CONFIG.maxScore) { savedScore = Math.floor(gameState.score / GAME_CONFIG.pointsPerLap) * GAME_CONFIG.pointsPerLap; } else if (gameState.score < 0) { savedScore = 0; }
-            const targetNode = trackNodes[savedScore === 0 ? 0 : savedScore + 1];
+            const targetM = savedScore === 0 ? 0 : savedScore + 1;
+            const targetNode = trackNodes.find(n => n.m === targetM) || trackNodes[0];
 
             // RAPIER 强行设定坐标和速度
             tankBody.setTranslation({x: targetNode.x, y: targetNode.y + 5, z: targetNode.z}, true);
@@ -1122,7 +1144,8 @@ if (scoreDiff > 0) {
 
             let savedScore = 0;
             if (gameState.score > 0 && gameState.score < GAME_CONFIG.maxScore) { savedScore = Math.floor(gameState.score / GAME_CONFIG.pointsPerLap) * GAME_CONFIG.pointsPerLap; }
-            const targetNode = trackNodes[savedScore === 0 ? 0 : savedScore + 1];
+            const targetM = savedScore === 0 ? 0 : savedScore + 1;
+            const targetNode = trackNodes.find(n => n.m === targetM) || trackNodes[0];
 
             gameState.respawnEndTarget.set(targetNode.x, targetNode.y, targetNode.z);
             const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
