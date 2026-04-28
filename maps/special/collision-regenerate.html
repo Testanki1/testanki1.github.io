@@ -2504,10 +2504,10 @@ let cameraTarget;
                  const data = await response.json();
                  list.innerHTML = '';
 
-                 // ====== 新增：获取 URL 中的 map 参数 ======
                  const urlParams = new URLSearchParams(window.location.search);
                  const mapParam = urlParams.get('map');
                  let targetItemToClick = null;
+                 let targetMapName = "";
 
                  data.forEach(category => {
                      category.subgroups.forEach(subgroup => {
@@ -2530,40 +2530,48 @@ let cameraTarget;
                              item.onclick = () => loadMapLibrary(map.name, map.url, item, category.libraryJsonUrl);
                              list.appendChild(item);
 
-                             // ====== 新增：检查是否匹配 map 参数 ======
+                             // 检查是否匹配 URL 传参
                              if (mapParam && !targetItemToClick) {
-                                 // 从 map.url 中提取文件夹名称（在 map.bin 的上一级）
-                                 // 如：.../31466700330223/map.bin 提取出 31466700330223
                                  const parts = map.url.split('/');
                                  const folder = parts.length >= 2 ? parts[parts.length - 2] : '';
                                  let isMatch = false;
 
-                                 // 检查提取出的文件夹名是否是纯八进制数字，如果是，则转为十进制比对
                                  if (/^[0-7]+$/.test(folder)) {
                                      try {
-                                         // 使用 BigInt 防止数值过大丢失精度
                                          const decimalFolder = BigInt("0o" + folder).toString(10);
                                          if (decimalFolder === mapParam) isMatch = true;
                                      } catch (e) {}
                                  }
 
-                                 // 兼容性备用方案：也允许直接在参数中填写原始八进制 ID 或 地图名字
                                  if (folder === mapParam || map.name === mapParam) {
                                      isMatch = true;
                                  }
 
-                                 // 如果匹配，标记该元素为待点击目标
                                  if (isMatch) {
                                      targetItemToClick = item;
+                                     targetMapName = map.name;
                                  }
                              }
                          });
                      });
                  });
 
-                 // ====== 新增：如果找到了目标项，延时自动触发点击来加载该地图 ======
+                 // ====== 核心修改：如果匹配成功，跨过主界面，直接展开和加载 ======
                  if (targetItemToClick) {
-                     setTimeout(() => targetItemToClick.click(), 100);
+                     // 1. 隐藏地图列表界面，直接将右侧视图切换到“模型列表界面”
+                     document.getElementById('view-maps').style.display = 'none';
+                     document.getElementById('view-props').style.display = 'flex';
+                     
+                     // 2. 更改全局侧边栏开关变量，强制弹出右侧窗口（无视手机默认折叠的规则）
+                     isUIOpen = true;
+
+                     // 3. 提示用户正在直接加载该地图（可选体验提升）
+                     if (typeof showToast === 'function') {
+                         showToast(`Loading: ${targetMapName}...`, false);
+                     }
+
+                     // 4. 延时触发实际的数据加载
+                     setTimeout(() => targetItemToClick.click(), 50);
                  }
 
              } catch (error) {
