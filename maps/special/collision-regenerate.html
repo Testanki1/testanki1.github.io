@@ -2615,7 +2615,21 @@ let cameraTarget;
          
          async function loadMapLibrary(mapName, mapUrl, itemElement, libraryJsonUrl) {
              if (itemElement && itemElement.classList.contains('loading')) return;
-             document.getElementById('prefab-list').innerHTML = '';
+             
+             // ====== 新增：在右侧面板直接显示居中的大号加载进度 ======
+             const prefabList = document.getElementById('prefab-list');
+             prefabList.innerHTML = `
+                 <style>
+                     #right-panel-progress::after { width: 54px !important; height: 54px !important; background: var(--md-sys-color-surface) !important; }
+                 </style>
+                 <div id="loading-overlay" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; margin-top: 50%;">
+                     <div class="circular-progress" id="right-panel-progress" style="width: 64px; height: 64px; margin-bottom: 16px;">
+                         <span class="circular-progress-text" id="right-panel-text" style="font-size: 16px;">0%</span>
+                     </div>
+                     <div style="font-size: 15px; font-weight: 500; color: var(--md-sys-color-on-surface-variant);">Loading ${mapName}...</div>
+                 </div>
+             `;
+             
              thumbnailItems.length = 0;
              prefabs.clear();
              globalLoadedProps.clear();
@@ -2623,18 +2637,29 @@ let cameraTarget;
              if (itemElement) {
                  itemElement.classList.add('loading');
                  const progContainer = itemElement.querySelector('.progress-container');
-                 const progCirc = itemElement.querySelector('.circular-progress');
-                 const progText = itemElement.querySelector('.circular-progress-text');
                  if(progContainer) progContainer.style.display = 'block';
-                 var updateUI = (percent) => {
-                     const p = Math.floor(percent * 100);
+             }
+             
+             // 同步更新进度条回调
+             var updateUI = (percent) => {
+                 const p = Math.floor(percent * 100);
+                 
+                 // 如果列表项存在，更新左侧小圈
+                 if (itemElement) {
+                     const progCirc = itemElement.querySelector('.circular-progress');
+                     const progText = itemElement.querySelector('.circular-progress-text');
                      if(progCirc) progCirc.style.background = `conic-gradient(var(--md-sys-color-primary) ${p}%, transparent ${p}%)`;
                      if(progText) progText.innerText = `${p}%`;
-                 };
-                 updateUI(0);
-             } else {
-                 var updateUI = () => {};
-             }
+                 }
+                 
+                 // 更新右侧大圈
+                 const rightCirc = document.getElementById('right-panel-progress');
+                 const rightText = document.getElementById('right-panel-text');
+                 if(rightCirc) rightCirc.style.background = `conic-gradient(var(--md-sys-color-primary) ${p}%, transparent ${p}%)`;
+                 if(rightText) rightText.innerText = `${p}%`;
+             };
+             
+             updateUI(0);
          
              try {
                  window.currentLibraryUrl = libraryJsonUrl || null;
@@ -2642,6 +2667,7 @@ let cameraTarget;
                  const baseUrl = mapUrl.substring(0, mapUrl.lastIndexOf('/'));
                  window.currentMapBaseUrl = baseUrl;
          
+                 // 下载阶段
                  const mapBuf = await fetchWithProgress(mapUrl, (p) => updateUI(p * 0.15));
                  const mapData = await parseMapBin(mapBuf);
                  window.defaultMapProps = mapData.props;
@@ -2659,8 +2685,13 @@ let cameraTarget;
                  
                  window.currentLightmapData = lightmapData;
          
+                 // 渲染处理阶段
                  await processMap(mapData, false, (p) => updateUI(0.15 + p * 0.85), lightmapData);
                  updateUI(1);
+         
+                 // ====== 新增：加载完毕后移除 Loading 遮罩，展现加载好的模型缩略图 ======
+                 const overlay = document.getElementById('loading-overlay');
+                 if (overlay) overlay.remove();
          
                  setTimeout(() => {
                      document.getElementById('view-maps').style.display = 'none';
@@ -2674,6 +2705,11 @@ let cameraTarget;
              } catch (e) {
                  console.error(e);
                  showToast(`Failed to load ${mapName}`);
+                 
+                 // 加载失败时提示
+                 const overlay = document.getElementById('loading-overlay');
+                 if (overlay) overlay.innerHTML = `<div style="color: var(--md-sys-color-error); font-size: 16px;">Failed to load ${mapName}</div>`;
+
                  if (itemElement) {
                      itemElement.classList.remove('loading');
                      const progContainer = itemElement.querySelector('.progress-container');
