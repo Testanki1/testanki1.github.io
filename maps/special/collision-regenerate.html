@@ -2503,6 +2503,12 @@ let cameraTarget;
                  if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
                  const data = await response.json();
                  list.innerHTML = '';
+
+                 // ====== 新增：获取 URL 中的 map 参数 ======
+                 const urlParams = new URLSearchParams(window.location.search);
+                 const mapParam = urlParams.get('map');
+                 let targetItemToClick = null;
+
                  data.forEach(category => {
                      category.subgroups.forEach(subgroup => {
                          const subTitle = document.createElement('div');
@@ -2523,9 +2529,43 @@ let cameraTarget;
                              `;
                              item.onclick = () => loadMapLibrary(map.name, map.url, item, category.libraryJsonUrl);
                              list.appendChild(item);
+
+                             // ====== 新增：检查是否匹配 map 参数 ======
+                             if (mapParam && !targetItemToClick) {
+                                 // 从 map.url 中提取文件夹名称（在 map.bin 的上一级）
+                                 // 如：.../31466700330223/map.bin 提取出 31466700330223
+                                 const parts = map.url.split('/');
+                                 const folder = parts.length >= 2 ? parts[parts.length - 2] : '';
+                                 let isMatch = false;
+
+                                 // 检查提取出的文件夹名是否是纯八进制数字，如果是，则转为十进制比对
+                                 if (/^[0-7]+$/.test(folder)) {
+                                     try {
+                                         // 使用 BigInt 防止数值过大丢失精度
+                                         const decimalFolder = BigInt("0o" + folder).toString(10);
+                                         if (decimalFolder === mapParam) isMatch = true;
+                                     } catch (e) {}
+                                 }
+
+                                 // 兼容性备用方案：也允许直接在参数中填写原始八进制 ID 或 地图名字
+                                 if (folder === mapParam || map.name === mapParam) {
+                                     isMatch = true;
+                                 }
+
+                                 // 如果匹配，标记该元素为待点击目标
+                                 if (isMatch) {
+                                     targetItemToClick = item;
+                                 }
+                             }
                          });
                      });
                  });
+
+                 // ====== 新增：如果找到了目标项，延时自动触发点击来加载该地图 ======
+                 if (targetItemToClick) {
+                     setTimeout(() => targetItemToClick.click(), 100);
+                 }
+
              } catch (error) {
                  list.innerHTML = `
                      <div style="padding: 16px; text-align: center; background: rgba(255,102,102,0.1); border: 1px solid var(--md-sys-color-error); border-radius: 12px; margin: 0 12px;">
