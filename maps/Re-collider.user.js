@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Remastered Maps Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  Regenerate collisions for Tanki Online's Remastered maps
+// @version      2.1
+// @description  Regenerate collisions for Tanki Online's Remastered maps (With Auto-zh support)
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
 // @match        *://*.test-eu.tankionline.com/browser-public/index.html*
@@ -12,6 +12,35 @@
 
 (function() {
     'use strict';
+
+    // ==========================================
+    // Localization (i18n)
+    // ==========================================
+    const isZh = navigator.language.toLowerCase().startsWith('zh');
+    const I18N = {
+        toastMobileHint: isZh ? "从右上角向左滑动以配置碰撞" : "Swipe left from the TOP-RIGHT corner to config collisions",
+        toastPcShortcut: isZh ? "请设置快捷键以关闭此面板" : "Please setup a shortcut to close this panel",
+        shortcutDesc: isZh ? "打开/关闭此面板的快捷键：" : "Shortcut to open/close this panel:",
+        setupShortcut: isZh ? "设置快捷键" : "Setup Shortcut",
+        pressKeys: isZh ? "请按键..." : "Press keys...",
+        panelTitle: isZh ? "碰撞配置" : "Collision Config",
+        btnDefault: isZh ? "默认" : "Default",
+        broadFilterLabel: isZh ? "宽泛过滤关键词 (输入并回车)：" : "Broad Filter Keywords (Type & Enter):",
+        addKeyword: isZh ? "添加关键词..." : "Add keyword...",
+        exactModelsLabel: isZh ? "精确模型 (点击切换)：" : "Exact Models (Click to toggle):",
+        viewModels: isZh ? "查看模型" : "View Models",
+        loadingModels: isZh ? "加载模型中...<br><span style=\"font-size:10px; opacity:0.7\">或者进入地图加载。</span>" : "Loading models...<br><span style=\"font-size:10px; opacity:0.7\">Or join the map to load manually.</span>",
+        mapNames: {
+            "Highland REMASTER": isZh ? "高原 重制" : "Highland REMASTER",
+            "Parma REMASTER": isZh ? "边塞角斗场 重制" : "Parma REMASTER"
+        },
+        themeNames: {
+            "Summer Day": isZh ? "夏天的白天" : "Summer Day",
+            "Summer Evening": isZh ? "夏天的傍晚" : "Summer Evening",
+            "Autumn": isZh ? "秋天" : "Autumn",
+            "Winter Day": isZh ? "冬天的白天" : "Winter Day"
+        }
+    };
 
     // ==========================================
     // Icon SVG Resources
@@ -242,7 +271,7 @@
 
             if (this.isMobile) {
                 if (!Settings.data.hintShown) {
-                    this.showToast("Swipe left from the TOP-RIGHT corner to config collisions", 6000);
+                    this.showToast(I18N.toastMobileHint, 6000);
                 }
             } else {
                 if (!Settings.data.shortcut) {
@@ -446,17 +475,17 @@
 
             const shortcutCardHTML = this.isMobile ? '' : `
                 <div class="link-card" id="shortcut-card">
-                    <div style="font-size:13px; color:var(--on-surface-variant);">Shortcut to open/close this panel:</div>
+                    <div style="font-size:13px; color:var(--on-surface-variant);">${I18N.shortcutDesc}</div>
                     <button class="btn m3-interactive" id="shortcut-btn" style="justify-content: center; width: 100%;">
                         <span class="svg-icon" style="width:20px;height:20px;">${ICONS.keyboard}</span>
-                        <span id="shortcut-text">Setup Shortcut</span>
+                        <span id="shortcut-text">${I18N.setupShortcut}</span>
                     </button>
                 </div>
             `;
 
             this.drawer.innerHTML = `
                 <div class="header">
-                    <h2 class="title">Collision Config</h2>
+                    <h2 class="title">${I18N.panelTitle}</h2>
                     <button class="icon-btn m3-interactive" id="close-btn"><span class="svg-icon">${ICONS.close}</span></button>
                 </div>
                 <div class="content">
@@ -480,7 +509,7 @@
             if (!this.isMobile && this.shortcutBtn) {
                 this.shortcutBtn.addEventListener('click', () => {
                     this.isRecordingShortcut = true;
-                    this.shortcutText.innerText = "Press keys...";
+                    this.shortcutText.innerText = I18N.pressKeys;
                     this.shortcutBtn.style.color = "var(--error)";
                 });
 
@@ -533,7 +562,7 @@
             if (!this.isMobile && this.shortcutText) {
                 const sc = Settings.data.shortcut;
                 if (!sc) {
-                    this.shortcutText.innerText = "Setup Shortcut";
+                    this.shortcutText.innerText = I18N.setupShortcut;
                     this.shortcutBtn.classList.remove('primary');
                 } else {
                     const parts =[];
@@ -549,7 +578,7 @@
 
         showToast(msg, duration = 4000) {
             if (this.toastTimeout) clearTimeout(this.toastTimeout);
-            this.toastEl.innerText = msg;
+            this.toastEl.innerHTML = msg;
             this.toastEl.style.opacity = '1';
             this.toastEl.style.transform = 'translateX(-50%) translateY(0)';
             this.toastTimeout = setTimeout(() => {
@@ -562,7 +591,7 @@
             const nextState = force !== undefined ? force : !this.isOpen;
 
             if (!nextState && !this.isMobile && !Settings.data.shortcut) {
-                this.showToast("PC: Please setup a shortcut to close this panel");
+                this.showToast(I18N.toastPcShortcut);
                 if (this.shortcutBtn) {
                     this.shortcutBtn.style.color = "var(--error)";
                     setTimeout(() => { this.shortcutBtn.style.color = ""; }, 1000);
@@ -592,7 +621,7 @@
 
                 const mapTitle = document.createElement('div');
                 mapTitle.className = 'map-title';
-                mapTitle.innerText = mapConfig.name;
+                mapTitle.innerText = I18N.mapNames[mapConfig.name] || mapConfig.name;
                 mapCard.appendChild(mapTitle);
 
                 const tabRow = document.createElement('div');
@@ -608,13 +637,13 @@
                 mapConfig.themes.forEach((theme) => {
                     const tabBtn = document.createElement('button');
                     tabBtn.className = 'theme-tab m3-interactive';
-                    tabBtn.title = theme.name;
+                    tabBtn.title = I18N.themeNames[theme.name] || theme.name;
 
                     const iconUrl = THEME_ICONS[theme.name];
                     if (iconUrl) {
                         tabBtn.innerHTML = `<div class="theme-icon-mask" style="-webkit-mask-image: url('${iconUrl}'); mask-image: url('${iconUrl}');"></div>`;
                     } else {
-                        tabBtn.innerText = theme.name.charAt(0);
+                        tabBtn.innerText = (I18N.themeNames[theme.name] || theme.name).charAt(0);
                     }
                     tabRow.appendChild(tabBtn);
 
@@ -629,9 +658,9 @@
                     const detailsHeader = document.createElement('div');
                     detailsHeader.className = 'theme-details-header';
                     detailsHeader.innerHTML = `
-                        <span class="theme-details-title">${theme.name}</span>
+                        <span class="theme-details-title">${I18N.themeNames[theme.name] || theme.name}</span>
                         <button class="btn m3-interactive" style="padding:4px 12px; font-size:12px; border-radius:12px;">
-                            <span class="svg-icon" style="width:16px;height:16px;">${ICONS.restart_alt}</span> Default
+                            <span class="svg-icon" style="width:16px;height:16px;">${ICONS.restart_alt}</span> ${I18N.btnDefault}
                         </button>
                     `;
                     contentInner.appendChild(detailsHeader);
@@ -639,14 +668,14 @@
                     // --- Tags Input ---
                     const tagsLabel = document.createElement('div');
                     tagsLabel.style.fontSize = '12px'; tagsLabel.style.color = 'var(--on-surface-variant)';
-                    tagsLabel.innerText = 'Broad Filter Keywords (Type & Enter):';
+                    tagsLabel.innerText = I18N.broadFilterLabel;
                     contentInner.appendChild(tagsLabel);
 
                     const tagsContainer = document.createElement('div');
                     tagsContainer.className = 'tags-container';
                     const tagInput = document.createElement('input');
                     tagInput.className = 'tag-input';
-                    tagInput.placeholder = 'Add keyword...';
+                    tagInput.placeholder = I18N.addKeyword;
 
                     const renderTags = () => {
                         const tData = Settings.getThemeData(mapConfig.name, theme.name);
@@ -713,7 +742,7 @@
                     const listLabel = document.createElement('div');
                     listLabel.style.fontSize = '12px';
                     listLabel.style.color = 'var(--on-surface-variant)';
-                    listLabel.innerText = 'Exact Models (Click to toggle):';
+                    listLabel.innerText = I18N.exactModelsLabel;
 
                     const viewModelBtn = document.createElement('a');
                     viewModelBtn.href = viewerUrl;
@@ -731,7 +760,7 @@
                     viewModelBtn.style.fontWeight = '500';
                     viewModelBtn.innerHTML = `
                         <span class="svg-icon" style="width:14px; height:14px;">${ICONS.travel_explore}</span>
-                        View Models
+                        ${I18N.viewModels}
                     `;
 
                     listHeaderRow.appendChild(listLabel);
@@ -746,9 +775,9 @@
                         const tData = Settings.getThemeData(mapConfig.name, theme.name);
                         modelListContainer.innerHTML = '';
                         if (tData.knownModels.length === 0) {
-                            modelListContainer.innerHTML = '<div style="padding:16px 8px; font-size:12px; color:var(--outline); text-align:center;">Loading models...<br><span style="font-size:10px; opacity:0.7">Or join the map to load manually.</span></div>';
+                            modelListContainer.innerHTML = `<div style="padding:16px 8px; font-size:12px; color:var(--outline); text-align:center;">${I18N.loadingModels}</div>`;
                         } else {
-                            const sortedModels = [...tData.knownModels].sort((a,b) => a.localeCompare(b));
+                            const sortedModels =[...tData.knownModels].sort((a,b) => a.localeCompare(b));
                             sortedModels.forEach(modelName => {
                                 const isFiltered = Settings.isModelFiltered(mapConfig.name, theme.name, modelName);
                                 const item = document.createElement('div');
@@ -1130,7 +1159,7 @@
             const name = packet.readString();
             const pos = readV3();
             const rot = popBit() ? readV3() :[0,0,0];
-            const scale = popBit() ? readV3() : [1,1,1];
+            const scale = popBit() ? readV3() :[1,1,1];
 
             result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
         }
@@ -1348,13 +1377,24 @@
             for (const mapConfig of MAP_CONFIGS) {
                 for (const themeConfig of mapConfig.themes) {
                     if (url.includes(themeConfig.path)) {
-                        const blobUrl = await generateMapBinLocalAndGetBlobUrl(url, mapConfig, themeConfig);
-                        if (input instanceof Request) {
-                            input = new Request(blobUrl, input);
-                        } else {
-                            input = blobUrl;
-                        }
-                        return originalFetch.call(this, input, init);
+                        console.log(`[Tampermonkey] Fetch Intercepted & Mocked: ${mapConfig.name}`);
+
+                        // 1. First, fetch the official map.bin using the original fetch
+                        const res = await originalFetch.call(this, input, init);
+                        const buffer = await res.arrayBuffer();
+
+                        // 2. Generate the modified binary buffer in memory
+                        const newBuffer = await generateMapBinLocal(url, buffer, mapConfig, themeConfig);
+
+                        // 3. IMPORTANT: Construct and return a Response directly using the newBuffer, avoiding any blob: URL requests
+                        return new Response(newBuffer, {
+                            status: 200,
+                            statusText: "OK",
+                            headers: {
+                                "Content-Type": "application/octet-stream",
+                                "Content-Length": newBuffer.length.toString()
+                            }
+                        });
                     }
                 }
             }
