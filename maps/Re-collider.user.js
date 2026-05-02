@@ -2,7 +2,7 @@
 // @name         Remastered Maps Re-collider
 // @namespace    http://tampermonkey.net/
 // @version      2.2
-// @description  Regenerate collisions for Remastered maps + Offline Mode for Out-of-bounds Exploration
+// @description  Regenerate collisions for Remastered maps
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
 // @match        *://*.test-eu.tankionline.com/browser-public/index.html*
