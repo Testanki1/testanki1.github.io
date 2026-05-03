@@ -582,8 +582,11 @@
                 window.addEventListener('keydown', (e) => {
                     if (this.isRecordingShortcut) {
                         e.preventDefault();
-                        if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
-                        const sc = { ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, key: e.key.toLowerCase() };
+                        // Ignore pure modifier key presses
+                        if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key) ||['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) return;
+                        
+                        // Fix: Store e.code instead of e.key for better reliability (ignores IME and CapsLock)
+                        const sc = { ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, code: e.code };
                         Settings.data.shortcut = sc;
                         Settings.save();
                         this.isRecordingShortcut = false;
@@ -591,12 +594,18 @@
                         this.updateShortcutUI();
                     } else {
                         const sc = Settings.data.shortcut;
-                        if (sc && e.ctrlKey === sc.ctrl && e.shiftKey === sc.shift && e.altKey === sc.alt && e.key.toLowerCase() === sc.key) {
-                            e.preventDefault();
-                            this.toggle();
+                        if (sc) {
+                            // Fix: Support matching both the new 'code' format and the legacy 'key' format
+                            const matchCode = sc.code && sc.code === e.code;
+                            const matchKey = sc.key && e.key.toLowerCase() === (sc.key ? sc.key.toLowerCase() : "");
+                            
+                            if (e.ctrlKey === sc.ctrl && e.shiftKey === sc.shift && e.altKey === sc.alt && (matchCode || matchKey)) {
+                                e.preventDefault();
+                                this.toggle();
+                            }
                         }
                     }
-                }, { capture: true });
+                });
             }
 
             let touchStartX = 0; let touchStartY = 0;
@@ -622,7 +631,16 @@
                 } else {
                     const parts =[];
                     if (sc.ctrl) parts.push('Ctrl'); if (sc.alt) parts.push('Alt'); if (sc.shift) parts.push('Shift');
-                    parts.push(sc.key.toUpperCase());
+                    
+                    // Fix: Support both legacy 'key' and new 'code' formats to prevent undefined errors
+                    let keyStr = "";
+                    if (sc.code) { 
+                        keyStr = sc.code.replace('Key', '').replace('Digit', '');
+                    } else if (sc.key) { 
+                        keyStr = sc.key.toUpperCase();
+                    }
+                    parts.push(keyStr);
+                    
                     this.shortcutText.innerText = parts.join(' + '); this.shortcutBtn.classList.add('primary');
                 }
             }
