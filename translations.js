@@ -75,6 +75,7 @@ const replacementDict = {
 'Spider': '蜘蛛',
 'Armadillo': '犰狳',
 'Vulture': '秃鹰',
+'Spectrum': '光谱',
 'supply': '道具',
 'Repair Kit': '维修工具',
 'Boosted Armor': '护甲提升',
