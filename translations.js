@@ -281,7 +281,6 @@ const replacementDict = {
 "Commander": "统帅",
 "Generalissimo": "大元帅",
 "Legend": "传奇",
-"general information": "一般信息",
 "map": "地图",
 "Aleksandrovsk": "亚历山大罗夫斯克",
 "Archipelago": "群岛",
