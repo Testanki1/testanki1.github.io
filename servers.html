@@ -398,7 +398,6 @@
                 <span class="menu-card-title" data-i18n="server_global">Global</span>
             </div>
 
-            <!-- 首页的国服卡片：去掉了文字，只保留图标与数字 -->
             <div class="menu-card" onclick="goTo('cn')">
                 <img src="https://testanki1.github.io/logos/tankionline-china.svg" alt="CN">
                 <span class="menu-card-title" data-i18n="server_cn">China</span>
@@ -407,7 +406,6 @@
                     <span class="material-symbols-rounded">group</span>
                     <span class="cn-online-count">--</span>
                     
-                    <!-- CSS 绘制的美观分割线 -->
                     <div class="badge-separator"></div>
                     
                     <span class="material-symbols-rounded">swords</span>
@@ -423,14 +421,39 @@
                 </div></div>
             </a>
 
+            <!-- 经典版卡片，增加人数显示 -->
             <div class="menu-card" onclick="goTo('classic')">
                 <img src="https://testanki1.github.io/logos/tankiclassic.svg" alt="Classic">
                 <span class="menu-card-title" data-i18n="server_classic">Classic</span>
+
+                <div class="online-badge" style="margin-top: -8px;">
+                    <span class="material-symbols-rounded">group</span>
+                    <span class="classic-online-count">--</span>
+                    
+                    <div class="badge-separator"></div>
+                    
+                    <span class="material-symbols-rounded">swords</span>
+                    <span class="classic-battles-count">--</span>
+                </div>
             </div>
         </div>
 
         <!-- Classic Server View -->
         <div id="view-classic" class="view">
+            
+            <!-- 经典版内页顶端的大盘统计数据同步 -->
+            <div style="display: flex; justify-content: center; margin-top: -16px; margin-bottom: 16px;">
+                <div class="online-badge">
+                    <span class="material-symbols-rounded">group</span>
+                    <span class="classic-online-count">--</span>
+                    
+                    <div class="badge-separator"></div>
+                    
+                    <span class="material-symbols-rounded">swords</span>
+                    <span class="classic-battles-count">--</span>
+                </div>
+            </div>
+
             <div class="list-group">
                 <a href="https://tankiclassic.com/play/" class="list-item">
                     <img src="https://testanki1.github.io/logos/browser.svg" alt="Browser">
@@ -600,7 +623,6 @@
         <!-- CN Server View (国服内页) -->
         <div id="view-cn" class="view">
             
-            <!-- 国服内页顶端的大盘统计数据同步修改 -->
             <div style="display: flex; justify-content: center; margin-top: -16px; margin-bottom: 16px;">
                 <div class="online-badge">
                     <span class="material-symbols-rounded">group</span>
@@ -961,9 +983,44 @@
                 });
         }
 
+        let fetchClassicTimeoutId = null;
+        function fetchClassicServerStats() {
+            clearTimeout(fetchClassicTimeoutId);
+            const timestamp = Date.now();
+            const url = `https://test.ru.tankionline.com/status?t=${timestamp}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    let totalOnline = 0;
+                    let totalInBattles = 0;
+                    
+                    // 兼容常规的结构或者只返回大盘数字的情况
+                    if (data.nodes) {
+                        Object.values(data.nodes).forEach(node => {
+                            totalOnline += node.online || 0;
+                            totalInBattles += node.inbattles || 0;
+                        });
+                    } else {
+                        totalOnline = data.online || 0;
+                        totalInBattles = data.inbattles || 0;
+                    }
+                    
+                    document.querySelectorAll('.classic-online-count').forEach(el => el.innerText = totalOnline);
+                    document.querySelectorAll('.classic-battles-count').forEach(el => el.innerText = totalInBattles);
+
+                    fetchClassicTimeoutId = setTimeout(fetchClassicServerStats, 5000);
+                })
+                .catch(error => {
+                    console.error('获取经典版数据失败:', error);
+                    fetchClassicTimeoutId = setTimeout(fetchClassicServerStats, 2000);
+                });
+        }
+
         setLanguage();
         setupMarquees();
         fetchCNServerStats(); 
+        fetchClassicServerStats(); // 初始化获取经典版数据
 
         document.fonts.ready.then(() => {
             document.body.classList.add('loaded');
