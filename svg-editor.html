@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SVG Editor</title>
+    <!-- 引入 Material Symbols 字体图标 -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <style>
+        /* Design Tokens */
+        :root {
+            --md-sys-color-primary: #005bc0;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #d6e3ff;
+            --md-sys-color-on-primary-container: #001b3e;
+            
+            --md-sys-color-secondary-container: #dde2eb;
+            --md-sys-color-on-secondary-container: #151b23;
+            
+            --md-sys-color-error: #ba1a1a;
+            --md-sys-color-on-error: #ffffff;
+            --md-sys-color-error-container: #ffdad6;
+            --md-sys-color-on-error-container: #410002;
+            
+            --md-sys-color-background: #f8f9fa;
+            --md-sys-color-on-background: #1a1c1e;
+            
+            --md-sys-color-surface: #ffffff;
+            --md-sys-color-surface-container-lowest: #ffffff;
+            --md-sys-color-surface-container-low: #f4f3f7;
+            --md-sys-color-surface-container: #efedf1;
+            --md-sys-color-surface-container-high: #eae7ec;
+            --md-sys-color-surface-container-highest: #e4e2e6;
+            
+            --md-sys-color-outline: #74777f;
+            --md-sys-color-outline-variant: #c4c6cf;
+
+            --code-bg: #1e1e24;
+            --code-text: #e2e2e5;
+            --code-tag: #569cd6;
+            --code-attr: #9cdcfe;
+            --code-string: #ce9178;
+            --code-highlight: rgba(116, 176, 255, 0.2);
+            --code-highlight-border: #74b0ff;
+
+            --md-sys-shape-corner-full: 9999px;
+            --md-sys-shape-corner-extra-large: 28px;
+            --md-sys-shape-corner-large: 16px;
+            --md-sys-shape-corner-medium: 12px;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh; 
+            overflow: hidden; 
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--md-sys-color-outline); }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background-color: var(--md-sys-color-surface);
+            border-bottom: 1px solid var(--md-sys-color-surface-container-high);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--md-sys-color-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+            margin: 0;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .actions { display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 38px;
+            padding: 0 18px;
+            border: none;
+            border-radius: var(--md-sys-shape-corner-full);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .btn .material-symbols-rounded { font-size: 20px; }
+        .btn:hover { box-shadow: 0 2px 4px rgba(0,0,0,0.1); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0) scale(0.98); box-shadow: none; }
+
+        .btn-primary { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+        .btn-secondary { background-color: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+        .btn-error { background-color: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+        .btn-error:hover { background-color: var(--md-sys-color-error); color: var(--md-sys-color-on-error); }
+        .btn-tonal { background-color: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-background); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 导入区 */
+        #upload-state {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.3s ease-out;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .upload-card {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--md-sys-shape-corner-extra-large);
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border: 1px solid var(--md-sys-color-surface-container-highest);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+            text-align: center;
+        }
+
+        .upload-card h2 { margin: 0; font-size: 24px; color: var(--md-sys-color-on-background); }
+        .upload-card p { margin: 0; color: var(--md-sys-color-outline); font-size: 14px; }
+
+        textarea.code-input {
+            width: 100%;
+            height: 180px;
+            padding: 16px;
+            border-radius: var(--md-sys-shape-corner-large);
+            border: 2px solid var(--md-sys-color-surface-container-highest);
+            background-color: var(--md-sys-color-surface-container-lowest);
+            color: var(--md-sys-color-on-background);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            resize: none;
+            transition: all 0.2s;
+        }
+        textarea.code-input:focus { outline: none; border-color: var(--md-sys-color-primary); background-color: #fff; }
+
+        .upload-actions { display: flex; align-items: center; justify-content: center; gap: 16px; }
+        .divider { color: var(--md-sys-color-outline-variant); font-size: 14px; font-weight: 500; }
+
+        /* 编辑器状态 */
+        #editor-state {
+            display: none; 
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 16px;
+            flex: 1; 
+            min-height: 0; 
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* 卡片容器 */
+        .card {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--md-sys-shape-corner-large);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--md-sys-color-surface-container-high);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            min-height: 0; 
+            min-width: 0;
+            overflow: hidden; /* 关键修复：裁切内部直角背景，防止边角漏出 */
+        }
+
+        .card-header {
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            background-color: var(--md-sys-color-surface-container-low);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--md-sys-color-surface-container-high);
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .card-header-left { display: flex; align-items: center; gap: 8px; }
+        .card-header .material-symbols-rounded { color: var(--md-sys-color-primary); font-size: 18px; }
+
+        .selection-badge {
+            font-size: 12px;
+            font-weight: normal;
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            padding: 2px 10px;
+            border-radius: 12px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-family: monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+        }
+        .selection-badge.visible { opacity: 1; }
+
+        .preview-content, .code-content {
+            flex: 1; 
+            min-height: 0; 
+            overflow: auto; 
+        }
+
+        .preview-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background-image: 
+                linear-gradient(45deg, #e4e4e4 25%, transparent 25%), 
+                linear-gradient(-45deg, #e4e4e4 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #e4e4e4 75%), 
+                linear-gradient(-45deg, transparent 75%, #e4e4e4 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .preview-content svg {
+            max-width: 100%;
+            max-height: 100%;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+            display: block;
+        }
+
+        .preview-content svg * { cursor: pointer; transition: outline 0.1s ease, filter 0.1s ease; }
+        .preview-content svg *:not(svg):hover { outline: 2px dashed var(--md-sys-color-outline); outline-offset: 1px; }
+        .preview-content svg *.is-selected { outline: 3px solid var(--md-sys-color-primary) !important; outline-offset: 2px; filter: brightness(0.9); }
+
+        .code-content {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 12px 0;
+            font-family: 'Consolas', 'Courier New', Courier, monospace;
+            font-size: 13px;
+        }
+
+        .code-line {
+            padding: 4px 16px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            border-left: 3px solid transparent;
+        }
+
+        .element-line { cursor: pointer; transition: background-color 0.1s; }
+        .element-line:hover { background-color: rgba(255, 255, 255, 0.08); }
+        .element-line.is-selected-line { background-color: var(--code-highlight); border-left-color: var(--code-highlight-border); }
+
+        .tag-name { color: var(--code-tag); font-weight: bold; }
+        .attr-name { color: var(--code-attr); }
+        .attr-value { color: var(--code-string); }
+
+        /* ================= 移动端完美自适应 ================= */
+        @media (max-width: 900px) {
+            header { padding: 10px 14px; }
+            h1 { font-size: 18px; }
+            h1 .material-symbols-rounded { font-size: 22px !important; }
+            
+            #editor-state {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr; 
+                gap: 12px;
+                padding: 12px;
+            }
+
+            .upload-card { padding: 24px 20px; }
+            .upload-actions { flex-direction: column; gap: 12px; }
+            .upload-actions .btn { width: 100%; justify-content: center; } 
+            
+            .actions { gap: 8px; }
+            header .actions .btn {
+                width: 38px;
+                height: 38px;
+                padding: 0;
+                border-radius: 50%; 
+            }
+            header .actions .btn span[data-i18n] { display: none; } 
+            header .actions .btn .material-symbols-rounded { margin: 0; font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><span class="material-symbols-rounded">draw</span> <span data-i18n="appTitle">SVG Editor</span></h1>
+        <div class="actions">
+            <button id="btn-reset" class="btn btn-tonal" style="display: none;" title="关闭">
+                <span class="material-symbols-rounded">close</span> <span data-i18n="closeFile">Close</span>
+            </button>
+            <button id="btn-delete" class="btn btn-error" style="display: none;" title="删除">
+                <span class="material-symbols-rounded">delete</span> <span data-i18n="deleteSel">Delete</span>
+            </button>
+            <button id="btn-copy" class="btn btn-secondary" style="display: none;" title="复制">
+                <span class="material-symbols-rounded">content_copy</span> <span data-i18n="copyCode">Copy Code</span>
+            </button>
+            <button id="btn-save" class="btn btn-primary" style="display: none;" title="保存">
+                <span class="material-symbols-rounded">download</span> <span data-i18n="saveFile">Save File</span>
+            </button>
+        </div>
+    </header>
+
+    <div id="upload-state">
+        <div class="upload-card">
+            <h2 data-i18n="importSvg">Import SVG</h2>
+            <p data-i18n="importDesc">Paste your SVG source code, or upload a .svg file directly</p>
+            <textarea id="svg-input" class="code-input" data-i18n-placeholder="placeholderPaste" placeholder="Paste <svg>...</svg> code here"></textarea>
+            <div class="upload-actions">
+                <button id="btn-load-text" class="btn btn-primary">
+                    <span class="material-symbols-rounded">code</span> <span data-i18n="loadCode">Load Code</span>
+                </button>
+                <span class="divider" data-i18n="or">OR</span>
+                <!-- 移除了 accept=".svg" 限制，强迫手机唤醒真正的“文件系统”而不是只能看图片的“相册” -->
+                <input type="file" id="file-input" style="display: none;">
+                <button id="btn-upload" class="btn btn-secondary">
+                    <span class="material-symbols-rounded">folder_open</span> <span data-i18n="chooseFile">Choose File</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main id="editor-state">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-left">
+                    <span class="material-symbols-rounded">design_services</span> <span data-i18n="visualPreview">Visual Preview</span>
+                </div>
+            </div>
+            <div class="preview-content" id="preview-container">
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-left">
+                    <span class="material-symbols-rounded">integration_instructions</span> <span data-i18n="sourceCode">Source Code</span>
+                </div>
+                <div id="selection-badge" class="selection-badge"></div>
+            </div>
+            <div class="code-content" id="code-container">
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const i18nDict = {
+            en: {
+                appTitle: "SVG Editor",
+                closeFile: "Close",
+                deleteSel: "Delete",
+                copyCode: "Copy Code",
+                saveFile: "Save",
+                importSvg: "Import SVG",
+                importDesc: "Paste your SVG source code, or upload a file",
+                placeholderPaste: "Paste <svg>...</svg> code here",
+                loadCode: "Load Code",
+                or: "OR",
+                chooseFile: "Choose File",
+                visualPreview: "Visual Preview",
+                sourceCode: "Source Code",
+                copiedText: "Copied!",
+                errEmpty: "Please enter or paste SVG code!",
+                errParse: "Failed to parse SVG code. Please check the format!",
+                errNoSvg: "No valid <svg> tag found!",
+                errNotSvgFile: "Please select a valid .svg file!",
+                selectedPrefix: "Sel: "
+            },
+            zh: {
+                appTitle: "SVG 编辑器",
+                closeFile: "关闭",
+                deleteSel: "删除",
+                copyCode: "复制",
+                saveFile: "保存",
+                importSvg: "导入 SVG",
+                importDesc: "粘贴您的 SVG 源代码，或者直接浏览并上传 .svg 文件",
+                placeholderPaste: "在此粘贴 <svg>...</svg> 代码",
+                loadCode: "加载代码",
+                or: "或",
+                chooseFile: "选择文件",
+                visualPreview: "可视化预览",
+                sourceCode: "源代码",
+                copiedText: "已复制",
+                errEmpty: "请输入或粘贴 SVG 代码！",
+                errParse: "SVG 代码解析失败，请检查代码格式是否正确！",
+                errNoSvg: "未找到有效的 <svg> 标签！",
+                errNotSvgFile: "请选择 .svg 后缀的文件！",
+                selectedPrefix: "选中: "
+            }
+        };
+
+        const isZh = navigator.language.toLowerCase().startsWith('zh');
+        const lang = isZh ? 'zh' : 'en';
+        const t = i18nDict[lang];
+
+        document.documentElement.lang = isZh ? 'zh-CN' : 'en';
+        document.title = t.appTitle;
+
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.textContent = t[el.getAttribute('data-i18n')];
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            el.placeholder = t[el.getAttribute('data-i18n-placeholder')];
+        });
+
+        const uploadState = document.getElementById('upload-state');
+        const editorState = document.getElementById('editor-state');
+        const svgInput = document.getElementById('svg-input');
+        const fileInput = document.getElementById('file-input');
+        const previewContainer = document.getElementById('preview-container');
+        const codeContainer = document.getElementById('code-container');
+        const selectionBadge = document.getElementById('selection-badge');
+        
+        const btnLoadText = document.getElementById('btn-load-text');
+        const btnUpload = document.getElementById('btn-upload');
+        const btnReset = document.getElementById('btn-reset');
+        const btnDelete = document.getElementById('btn-delete');
+        const btnCopy = document.getElementById('btn-copy');
+        const btnSave = document.getElementById('btn-save');
+
+        let svgCanvas = null; 
+        let idCounter = 0;
+        let selectedId = null;
+
+        function loadSvg(svgString) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgString.trim(), "image/svg+xml");
+            
+            const parserError = doc.querySelector("parsererror");
+            if (parserError) {
+                alert(t.errParse);
+                return;
+            }
+
+            const svgEl = doc.querySelector('svg');
+            if (!svgEl) {
+                alert(t.errNoSvg);
+                return;
+            }
+
+            previewContainer.innerHTML = '';
+            svgCanvas = svgEl;
+            previewContainer.appendChild(svgCanvas);
+
+            idCounter = 0;
+            selectedId = null;
+            btnDelete.style.display = 'none';
+            selectionBadge.classList.remove('visible');
+
+            uploadState.style.display = 'none';
+            editorState.style.display = 'grid';
+            
+            btnReset.style.display = 'inline-flex';
+            btnCopy.style.display = 'inline-flex';
+            btnSave.style.display = 'inline-flex';
+
+            initEditor();
+        }
+
+        function initEditor() {
+            assignIds(svgCanvas);
+            updateCodeView();
+        }
+
+        btnLoadText.addEventListener('click', () => {
+            if (!svgInput.value.trim()) { alert(t.errEmpty); return; }
+            loadSvg(svgInput.value);
+        });
+
+        btnUpload.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // 新增：代码级拦截验证，确保用户即使选错了文件也会有提示
+                if (!file.name.toLowerCase().endsWith('.svg')) {
+                    alert(t.errNotSvgFile);
+                    fileInput.value = '';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (event) => loadSvg(event.target.result);
+                reader.readAsText(file);
+            }
+            fileInput.value = ''; 
+        });
+
+        btnReset.addEventListener('click', () => {
+            uploadState.style.display = 'flex';
+            editorState.style.display = 'none';
+            
+            btnReset.style.display = 'none';
+            btnCopy.style.display = 'none';
+            btnSave.style.display = 'none';
+            btnDelete.style.display = 'none';
+            
+            previewContainer.innerHTML = '';
+            svgInput.value = '';
+            svgCanvas = null;
+        });
+
+        function assignIds(node) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                if (!node.dataset.vId) { node.dataset.vId = 'svg-el-' + (++idCounter); }
+                Array.from(node.children).forEach(assignIds);
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function createCodeHtml(node, indentLevel = 0) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                let text = node.textContent.trim();
+                return text ? `<div class="code-line" style="padding-left: ${indentLevel * 16}px">${escapeHtml(text)}</div>` : '';
+            }
+            if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+            let id = node.dataset.vId;
+            let tagName = node.tagName.toLowerCase();
+            let attrs = '';
+
+            Array.from(node.attributes).forEach(a => {
+                if (a.name === 'data-v-id') return;
+                let val = a.value;
+                if (a.name === 'class') {
+                    val = val.replace('is-selected', '').trim();
+                    if (!val) return;
+                }
+                attrs += ` <span class="attr-name">${a.name}</span>="<span class="attr-value">${escapeHtml(val)}</span>"`;
+            });
+
+            let hasChildren = Array.from(node.childNodes).some(child => 
+                child.nodeType === Node.ELEMENT_NODE || 
+                (child.nodeType === Node.TEXT_NODE && child.textContent.trim() !== '')
+            );
+
+            let indentStr = `padding-left: ${indentLevel * 20}px`;
+
+            if (!hasChildren) {
+                return `<div class="code-line element-line" data-v-id="${id}" style="${indentStr}">&lt;<span class="tag-name">${tagName}</span>${attrs} /&gt;</div>`;
+            } else {
+                let html = `<div class="code-line element-line" data-v-id="${id}" style="${indentStr}">&lt;<span class="tag-name">${tagName}</span>${attrs}&gt;</div>`;
+                for (let child of node.childNodes) { html += createCodeHtml(child, indentLevel + 1); }
+                html += `<div class="code-line element-line" data-v-id="${id}" style="${indentStr}">&lt;/<span class="tag-name">${tagName}</span>&gt;</div>`;
+                return html;
+            }
+        }
+
+        function updateCodeView() {
+            if (!svgCanvas) return;
+            codeContainer.innerHTML = createCodeHtml(svgCanvas);
+            if (selectedId) {
+                const lines = codeContainer.querySelectorAll(`[data-v-id="${selectedId}"]`);
+                lines.forEach(l => l.classList.add('is-selected-line'));
+            }
+        }
+
+        function selectElement(id) {
+            if (selectedId && svgCanvas) {
+                const prevNode = svgCanvas.querySelector(`[data-v-id="${selectedId}"]`);
+                if (prevNode) prevNode.classList.remove('is-selected');
+                const prevLines = codeContainer.querySelectorAll(`[data-v-id="${selectedId}"]`);
+                prevLines.forEach(l => l.classList.remove('is-selected-line'));
+            }
+
+            selectedId = id;
+
+            if (selectedId && svgCanvas) {
+                const node = svgCanvas.querySelector(`[data-v-id="${selectedId}"]`);
+                if (node) {
+                    node.classList.add('is-selected');
+                    const tagName = node.tagName.toLowerCase();
+                    selectionBadge.textContent = t.selectedPrefix + `<${tagName}>`;
+                    selectionBadge.classList.add('visible');
+                    
+                    const isRoot = tagName === 'svg';
+                    btnDelete.style.display = isRoot ? 'none' : 'inline-flex';
+                }
+
+                const lines = codeContainer.querySelectorAll(`[data-v-id="${selectedId}"]`);
+                lines.forEach(l => l.classList.add('is-selected-line'));
+
+                if (lines.length > 0) {
+                    lines[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                btnDelete.style.display = 'none';
+                selectionBadge.classList.remove('visible');
+            }
+        }
+
+        previewContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+            let target = e.target;
+            while (target && target !== previewContainer && !target.dataset?.vId) { target = target.parentNode; }
+            if (target && target.dataset?.vId) { selectElement(target.dataset.vId); } 
+            else { selectElement(null); }
+        });
+
+        codeContainer.addEventListener('click', (e) => {
+            const line = e.target.closest('.element-line');
+            if (line && line.dataset.vId) { selectElement(line.dataset.vId); }
+        });
+
+        btnDelete.addEventListener('click', () => {
+            if (!selectedId || !svgCanvas) return;
+            const node = svgCanvas.querySelector(`[data-v-id="${selectedId}"]`);
+            if (node && node.tagName.toLowerCase() !== 'svg') {
+                node.remove();
+                selectedId = null;
+                btnDelete.style.display = 'none';
+                selectionBadge.classList.remove('visible');
+                updateCodeView();
+            }
+        });
+
+        function getCleanSvgString() {
+            if (!svgCanvas) return '';
+            const clone = svgCanvas.cloneNode(true);
+            const allElements = clone.querySelectorAll('*');
+            
+            allElements.forEach(el => {
+                el.removeAttribute('data-v-id');
+                el.classList.remove('is-selected');
+                if (el.getAttribute('class') === '') el.removeAttribute('class');
+            });
+            clone.removeAttribute('data-v-id');
+            clone.classList.remove('is-selected');
+            if (clone.getAttribute('class') === '') clone.removeAttribute('class');
+            
+            let str = clone.outerHTML;
+            str = str.replace(/(>)\s*(<)/g, '$1\n$2');
+            return str;
+        }
+
+        btnCopy.addEventListener('click', () => {
+            const svgCode = getCleanSvgString();
+            if (!svgCode) return;
+            navigator.clipboard.writeText(svgCode).then(() => {
+                const textSpan = btnCopy.querySelector('[data-i18n]');
+                const icon = btnCopy.querySelector('.material-symbols-rounded');
+                const originalText = textSpan.textContent;
+                
+                textSpan.textContent = t.copiedText;
+                icon.textContent = 'check';
+                
+                setTimeout(() => {
+                    textSpan.textContent = originalText;
+                    icon.textContent = 'content_copy';
+                }, 2000);
+            });
+        });
+
+        btnSave.addEventListener('click', () => {
+            const svgCode = getCleanSvgString();
+            if (!svgCode) return;
+            const blob = new Blob([svgCode], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'edited_design.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
