@@ -205,7 +205,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.03);
             min-height: 0; 
             min-width: 0;
-            overflow: hidden; /* 关键修复：裁切内部直角背景，防止边角漏出 */
+            overflow: hidden;
         }
 
         .card-header {
@@ -251,7 +251,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            padding: 40px; /* 增加内边距，防止超出边缘的阴影贴边被挡住 */
             background-image: 
                 linear-gradient(45deg, #e4e4e4 25%, transparent 25%), 
                 linear-gradient(-45deg, #e4e4e4 25%, transparent 25%), 
@@ -261,16 +261,41 @@
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
 
+        /* ======= 核心修复区域开始 ======= */
+        
         .preview-content svg {
             max-width: 100%;
             max-height: 100%;
+            
+            /* 修复被截断问题：允许 SVG 内容突破 viewBox 的限制画在外面 */
+            overflow: visible !important; 
+            
             filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
             display: block;
         }
 
-        .preview-content svg * { cursor: pointer; transition: outline 0.1s ease, filter 0.1s ease; }
-        .preview-content svg *:not(svg):hover { outline: 2px dashed var(--md-sys-color-outline); outline-offset: 1px; }
-        .preview-content svg *.is-selected { outline: 3px solid var(--md-sys-color-primary) !important; outline-offset: 2px; filter: brightness(0.9); }
+        .preview-content svg * { 
+            cursor: pointer; 
+            transition: filter 0.15s ease; 
+            /* 禁用默认的矩形框 */
+            outline: none !important; 
+        }
+
+        /* 鼠标悬停时的预览：顺着真实轮廓的浅色发光 */
+        .preview-content svg *:not(svg):hover { 
+            filter: drop-shadow(0 0 2px var(--md-sys-color-outline)) 
+                    drop-shadow(0 0 2px var(--md-sys-color-outline)); 
+        }
+
+        /* 选中状态：利用四层 drop-shadow 组合成高强度的、沿着图形实际轮廓的实线高亮！ */
+        .preview-content svg *.is-selected { 
+            filter: drop-shadow(0 0 1.5px var(--md-sys-color-primary))
+                    drop-shadow(0 0 1.5px var(--md-sys-color-primary))
+                    drop-shadow(0 0 1.5px var(--md-sys-color-primary))
+                    drop-shadow(0 0 1.5px var(--md-sys-color-primary)) !important;
+        }
+        
+        /* ======= 核心修复区域结束 ======= */
 
         .code-content {
             background-color: var(--code-bg);
@@ -295,7 +320,7 @@
         .attr-name { color: var(--code-attr); }
         .attr-value { color: var(--code-string); }
 
-        /* ================= 移动端完美自适应 ================= */
+        /* 移动端完美自适应 */
         @media (max-width: 900px) {
             header { padding: 10px 14px; }
             h1 { font-size: 18px; }
@@ -354,7 +379,6 @@
                     <span class="material-symbols-rounded">code</span> <span data-i18n="loadCode">Load Code</span>
                 </button>
                 <span class="divider" data-i18n="or">OR</span>
-                <!-- 移除了 accept=".svg" 限制，强迫手机唤醒真正的“文件系统”而不是只能看图片的“相册” -->
                 <input type="file" id="file-input" style="display: none;">
                 <button id="btn-upload" class="btn btn-secondary">
                     <span class="material-symbols-rounded">folder_open</span> <span data-i18n="chooseFile">Choose File</span>
@@ -515,7 +539,6 @@
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                // 新增：代码级拦截验证，确保用户即使选错了文件也会有提示
                 if (!file.name.toLowerCase().endsWith('.svg')) {
                     alert(t.errNotSvgFile);
                     fileInput.value = '';
