@@ -85,11 +85,14 @@ function checkCurl(url) {
   });
 }
 
+// 重构后的高鲁棒性网页检测模块 (支持跨域 iframe 穿透检测)
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
     page = await browser.newPage();
+    // 强制关闭缓存并注入伪装 UA
     await page.setCacheEnabled(false); 
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
     
     const finalUrl = targetUrl.includes('?') 
@@ -117,18 +120,42 @@ async function checkBrowserPage(browser, targetUrl) {
        return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    let hasInvitation = await page.evaluate(() => {
-      const inviteInput = document.querySelector('input#invite');
-      if (inviteInput && inviteInput.getBoundingClientRect().width > 0) return true;
-      const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
-      if (titles.some(t => /INVITATION/i.test(t.innerText))) return true;
-      const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
-      const frames = Array.from(window.frames);
-      for (let i = 0; i < frames.length; i++) {
-        try { if (keywordRegex.test(frames[i].document.body.innerText)) return true; } catch(e) {} 
+    let hasInvitation = false;
+    const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+
+    // CDP 驱动级别检测：遍历所有的子框架，包括不同源/跨域的子框架
+    const frames = page.frames();
+    for (const frame of frames) {
+      try {
+        // 在每个 frame 的独立安全上下文运行 evaluate，避免跨域报错中断
+        const frameCheck = await frame.evaluate(() => {
+          // 1. 查找是否存在有效的邀请码输入框
+          const inviteInput = document.querySelector('input#invite');
+          if (inviteInput && inviteInput.getBoundingClientRect().width > 0) {
+            return { matched: true, text: '' };
+          }
+          
+          // 2. 查找是否存在具有 "INVITATION" 的头部标题
+          const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
+          if (titles.some(t => /INVITATION/i.test(t.innerText))) {
+            return { matched: true, text: '' };
+          }
+
+          // 3. 提取当前框架的主体文本，由外部正则去比对敏感词
+          const bodyText = document.body ? document.body.innerText : '';
+          return { matched: false, text: bodyText };
+        }).catch(() => null);
+
+        if (frameCheck) {
+          if (frameCheck.matched || keywordRegex.test(frameCheck.text)) {
+            hasInvitation = true;
+            break; // 任意一个框架匹配成功即可判定
+          }
+        }
+      } catch (err) {
+        // 捕获个别跨域或加载不完全的 iframe 异常，保障主进程不中断
       }
-      return false;
-    });
+    }
 
     return { status: hasInvitation ? 'Closed' : 'Open', httpStatus: response.status() };
     
@@ -273,7 +300,6 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-  // 使用 autostash，如果本地有未提交的静默文件更新，会先暂存、拉取最新代码后再恢复，保证拉取顺畅
   try {
     execSync('git pull --rebase --autostash origin main', { stdio: 'ignore' });
   } catch (e) {
@@ -395,27 +421,25 @@ async function main() {
       
       if (isStateEqual(currentEntry, diskEntry)) {
         if (pendingChanges[baseUrl]) delete pendingChanges[baseUrl];
+        finalStatusJson[baseUrl] = diskEntry;
         continue;
       }
 
-      // 若状态与盘上最新记录不同，则进入追踪
       if (!pendingChanges[baseUrl]) {
         console.log(`[${getTime()}] 发现状态异动，等待下一次确认: ${baseUrl}`);
         pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
       } else {
-        // 如果当前状态与上一次侦测到的待确认状态完全一致，则增加确认计数
         if (isStateEqual(pendingChanges[baseUrl].entry, currentEntry)) {
           pendingChanges[baseUrl].count++;
           if (pendingChanges[baseUrl].count >= CONFIRMATION_THRESHOLD) {
             console.log(`[${getTime()}] 状态变化已连续确认 ${CONFIRMATION_THRESHOLD} 次生效: ${baseUrl}`);
             finalStatusJson[baseUrl] = currentEntry;
             newlyConfirmed.push(baseUrl);
-            delete pendingChanges[baseUrl]; // 确认后清空记录
+            delete pendingChanges[baseUrl]; 
           } else {
             console.log(`[${getTime()}] 状态确认中 (${pendingChanges[baseUrl].count}/${CONFIRMATION_THRESHOLD}): ${baseUrl}`);
           }
         } else {
-          // 在等待确认期间状态又变了，重新开始计数
           console.log(`[${getTime()}] 状态在确认期间再次改变，重置计数器: ${baseUrl}`);
           pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
         }
@@ -500,13 +524,10 @@ async function main() {
     }
     availableServers = Array.from(availableSet);
 
-    // ==============================================
-    // 关键控制：推送与通报绑定，以及无通报的静默处理
-    // ==============================================
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-      
       const pushed = await commitAndPush();
+      
       if (pushed) {
         const changeDetails = notifications.join('<br><br>'); 
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
@@ -516,8 +537,6 @@ async function main() {
       }
     } else {
       if (newlyConfirmed.length > 0) {
-        // 如果有已确认的状态变动，但不值得作为通知发出（静默变化）
-        // 仅覆盖写入本地磁盘，绝不执行 commitAndPush
         fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
         console.log(`[${getTime()}] 有新的内部静默状态更新，已写入本地，已跳过 Git 提交。`);
       } else {
