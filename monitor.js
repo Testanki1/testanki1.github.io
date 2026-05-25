@@ -201,11 +201,12 @@ function getStatusDisplay(status) {
   return '<b>未知</b>';
 }
 
-function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isConfig = false) {
+function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSubServer = false) {
   const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS:</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
   const displayStatusBold = getStatusDisplay(finalStatus);
   const oldDisplay = getStatusDisplay(oldStatus);
-  let entity = isConfig ? "配置" : "服务器";
+  // 修改这里：将“配置”改为“子服务器”
+  let entity = isSubServer ? "子服务器" : "服务器";
 
   if (!oldStatus && finalStatus !== "Offline") {
     return `首次发现${entity} (状态: ${displayStatusBold})` + jsLinkText;
@@ -366,7 +367,7 @@ async function main() {
       }
     }
 
-    // Phase 4: 产生提示信息(按你的规则隐藏/显示参数)
+    // Phase 4: 产生提示信息
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
       const committedEntry = committedStatusJson[baseUrl] || {};
@@ -380,14 +381,14 @@ async function main() {
          const c1Old = committedEntry.configs ? committedEntry.configs['1'] : null;
          const c2Old = committedEntry.configs ? committedEntry.configs['2'] : null;
 
-         // 若两配置一致，则隐藏参数，归总以基础域名播报
+         // 若两子服务器一致，则隐藏参数，归总以基础域名播报
          if (c1New === c2New) {
             const statusNew = c1New;
             const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? '混合状态' : null);
             const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
             if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
          } else {
-            // 若一开一关等不一致情况，展开附带 config 参数链接独立播报
+            // 若一开一关等不一致情况，展开附带参数链接独立播报
             const serverNum = baseUrl.match(/deploy(\d+)/)[1];
             for (const c of ['1', '2']) {
                const stNew = c === '1' ? c1New : c2New;
@@ -413,6 +414,8 @@ async function main() {
       if (!entry) continue;
 
       if (item.type === 'deploy') {
+         if (!entry.configs) continue; 
+
          const c1 = entry.configs['1'];
          const c2 = entry.configs['2'];
          if (c1 === 'Offline' && c2 === 'Offline') continue;
@@ -431,13 +434,14 @@ async function main() {
             }
          }
       } else {
-         if (entry.status !== 'Offline') {
+         if (entry.status && entry.status !== 'Offline') {
             availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(entry.status)})`);
          }
       }
     }
     availableServers = Array.from(availableSet);
 
+    // 检查最终是否执行写入状态
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
@@ -450,12 +454,17 @@ async function main() {
         await sendEmail(fullBody);
       }
     } else {
+      if (newlyConfirmed.length > 0) {
+        fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
+        commitAndPush(); 
+      }
+
       const now = Date.now();
       for (const [url, data] of Object.entries(pendingChanges)) {
         if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) delete pendingChanges[url];
         else if (!data.timestamp) pendingChanges[url].timestamp = now;
       }
-      console.log(`[${getTime()}] 无已确认的状态变化。`);
+      console.log(`[${getTime()}] 无需要通知的已确认状态变化。`);
     }
 
   } catch (err) {
