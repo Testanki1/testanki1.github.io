@@ -54,7 +54,6 @@ function checkCurl(url) {
       rejectUnauthorized: false, 
       timeout: 15000,
       headers: {
-        // 伪装成真实浏览器，防止被基础防火墙拦截
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
@@ -111,11 +110,12 @@ async function checkBrowserPage(browser, url) {
   try {
     page = await browser.newPage();
     
-    // 【防拦截伪装】去除 Headless 标识，强制关闭 webdriver 属性，绕过 Cloudflare 拦截
-    let ua = await browser.userAgent();
+    // 【防拦截深度伪装】彻底洗掉机器人指纹，防止部分检测直接抛出 403
+    const ua = await browser.userAgent();
     await page.setUserAgent(ua.replace(/HeadlessChrome/g, 'Chrome'));
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      window.chrome = { runtime: {} };
     });
 
     await page.setViewport({ width: 1280, height: 720 });
@@ -141,48 +141,49 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    try {
-      await page.waitForNetworkIdle({ timeout: 8000 });
-    } catch (e) {
-      // 网络空闲超时不报错
-    }
-    
-    // 给足页面 JS 动态挂载表单的时间
-    await new Promise(r => setTimeout(r, 4000)); 
-    refreshCount = 0; 
-    await new Promise(r => setTimeout(r, 2000));
+    // ==========================================
+    // 终极修复：动态轮询等待机制
+    // ==========================================
+    let hasInvitation = false;
+    let isAutoRefreshing = false;
 
-    if (refreshCount > 0) {
+    // GitHub Actions 机器极慢，JS渲染大型游戏可能需要 15-25 秒。
+    // 在这里轮询最多 20 次，每次 2 秒 (总计最多等待 40 秒)。
+    for (let i = 0; i < 20; i++) {
+      // 初始加载算一次，超过 1 次说明陷入了重定向死循环
+      if (refreshCount > 1) { 
+        isAutoRefreshing = true;
+        break;
+      }
+
+      try {
+        hasInvitation = await page.evaluate(() => {
+          // 1. 只要 DOM 中存在 input#invite，无论在屏幕内外，都说明是 Closed
+          if (document.querySelector('input#invite')) return true;
+          
+          // 2. 暴力扫描整个页面的纯文本
+          const bodyText = document.body.textContent || '';
+          if (/invitation|invite code|activation code|邀请码/i.test(bodyText)) return true;
+          
+          return false;
+        });
+
+        // 只要抓到一次，说明肯定上锁了，立刻停止等待跳出循环
+        if (hasInvitation) {
+          break;
+        }
+      } catch (e) {
+        // 忽略因为正在跳转等造成的 evaluate 执行失败
+      }
+
+      // 如果还没抓到，可能是 JS 还在慢慢 Loading，等 2 秒再查
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    if (isAutoRefreshing) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
-    
-    // 【增强检测逻辑】不再依赖宽高可见性，暴力匹配 DOM 和纯文本
-    let hasInvitation = await page.evaluate(() => {
-      // 1. 检查是否存在特定的 ID (只要 DOM 中存在 input#invite 就认定)
-      if (document.querySelector('input#invite')) return true;
-      
-      const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
-      
-      // 2. 检查特定类的元素中是否包含邀请文本 (使用 textContent 替代 innerText)
-      const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title, [class*="title" i]'));
-      if (titles.some(t => keywordRegex.test(t.textContent || ''))) return true;
-
-      // 3. 终极托底：扩大搜索范围，直接在整个页面的纯文本中暴力检索
-      const bodyText = document.body.textContent || '';
-      if (keywordRegex.test(bodyText)) return true;
-
-      // 4. 防止被嵌套在 iframe 中
-      const frames = Array.from(window.frames);
-      for (let i = 0; i < frames.length; i++) {
-        try {
-          if (keywordRegex.test(frames[i].document.body.textContent || '')) {
-            return true;
-          }
-        } catch(e) {} 
-      }
-      return false;
-    });
 
     return { 
       url, 
@@ -309,13 +310,11 @@ async function main() {
     if (candidatesForBrowser.length > 0) {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
       
-      // 启动 Google 官方 Puppeteer 引擎
       browser = await puppeteer.launch({ 
-        headless: true, // Google Puppeteer 最新写法，纯无头模式
+        headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
-      // 组装要在 Puppeteer 中运行的任务池
       const browserTasks = candidatesForBrowser.map(candidate => async () => {
         const res = await checkBrowserPage(browser, candidate.url);
         return {
@@ -325,7 +324,6 @@ async function main() {
         };
       });
       
-      // 调用自己手写的原生并发控制执行任务
       const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
       
       for (const res of browserResults) {
