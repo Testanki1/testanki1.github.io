@@ -31,6 +31,15 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
+// 提取并判断是否为 deploy 测试服带参数的链接，辅助后续结果合并
+function getBaseUrlAndC(url) {
+  const match = url.match(/^(https:\/\/public-deploy\d+\.test-eu\.tankionline\.com\/browser-public\/index\.html)\?config-template=https:\/\/c([12])\.public-deploy\d+\.test-eu\.tankionline\.com\/config\.xml$/);
+  if (match) {
+    return { base: match[1], c: match[2] };
+  }
+  return null;
+}
+
 // 原生 JS 实现的并发控制器（替代第三方的 p-limit）
 async function runWithLimit(tasks, limit) {
   const results = [];
@@ -237,12 +246,14 @@ function isStateEqual(a, b) {
 }
 
 async function main() {
-  const loopStart = Date.now();
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
   const urls = [];
+  // 按照需求，将同一个节点的 c1 和 c2 都放入任务列表
   for (let i = 1; i <= 10; i++) {
-    urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
+    const base = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
+    urls.push(`${base}?config-template=https://c1.public-deploy${i}.test-eu.tankionline.com/config.xml`);
+    urls.push(`${base}?config-template=https://c2.public-deploy${i}.test-eu.tankionline.com/config.xml`);
   }
   urls.push(
     "https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com",
@@ -332,7 +343,8 @@ async function main() {
       }
     }
 
-    // Phase 3: 状态比对
+    // Phase 3: 状态比对（此处仅做状态记录确认，分离提醒逻辑）
+    let newlyConfirmed = [];
     for (const url of urls) {
       const currentEntry = currentResults[url] || { status: 'Offline', hash: '', mainJsLink: '' };
       const committedEntry = committedStatusJson[url] || {};
@@ -349,59 +361,7 @@ async function main() {
         if (pending.count >= CONFIRMATION_THRESHOLD) {
           finalStatusJson[url] = currentEntry;
           delete pendingChanges[url];
-          
-          const oldStatus = committedEntry.status || null;
-          const oldHash = committedEntry.hash || null;
-          const finalStatus = currentEntry.status;
-          const hash = currentEntry.hash;
-          const mainJsLink = currentEntry.mainJsLink; 
-
-          let displayStatus = "";
-          let displayStatusBold = "";
-          if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
-          else if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
-          else if (finalStatus === "Error") { displayStatus = "错误"; displayStatusBold = "<b>错误</b>"; }
-
-          let message = "";
-          const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS:</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
-          
-          if (!oldStatus && finalStatus !== "Offline") {
-            message = `首次发现服务器 (状态: ${displayStatusBold})` + jsLinkText;
-          }
-          else if (oldStatus && finalStatus !== oldStatus) {
-            if (oldStatus === "Offline") {
-              if (finalStatus === "Error") {
-                   let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
-                   message = `服务器已上线但出现<b>错误</b>${hashMsg}`;
-              } else {
-                   let baseMsg = finalStatus === "Open" ? "服务器已上线并<b>开放</b>" : "服务器已上线，当前为<b>封闭</b>状态";
-                   let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
-                   message = baseMsg + hashMsg;
-              }
-            } 
-            else if (finalStatus === "Offline") {
-              let oldDisplay = oldStatus; 
-              if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
-              if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
-              if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
-              message = `服务器已下线 (原状态: ${oldDisplay})`;
-            }
-            else {
-               let oldDisplay = oldStatus;
-               if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
-               if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
-               if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
-               message = `服务器状态已从${oldDisplay}变为${displayStatusBold}`;
-               if (hash !== oldHash) message += `，且代码已<b>更新</b>` + jsLinkText;
-            }
-          }
-          else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
-            message = `网页代码已更新（状态: ${displayStatusBold}）` + jsLinkText;
-          }
-          
-          if (message) {
-            notifications.push(`- <a href="${url}">${url}</a>: ${message}`);
-          }
+          newlyConfirmed.push(url);
         } else {
           console.log(`[${getTime()}] 待确认 ${pending.count}/${CONFIRMATION_THRESHOLD}: ${url} -> ${currentEntry.status}`);
           finalStatusJson[url] = committedEntry;
@@ -413,18 +373,115 @@ async function main() {
       }
     }
 
-    // 生成可用服务器列表
+    // Phase 4: 生成独立或合并的提示信息
+    for (const url of newlyConfirmed) {
+      const currentEntry = finalStatusJson[url];
+      const committedEntry = committedStatusJson[url] || {};
+      
+      const oldStatus = committedEntry.status || null;
+      const oldHash = committedEntry.hash || null;
+      const finalStatus = currentEntry.status;
+      const hash = currentEntry.hash;
+      const mainJsLink = currentEntry.mainJsLink; 
+
+      let displayStatus = "";
+      let displayStatusBold = "";
+      if (finalStatus === "Open") { displayStatus = "开放"; displayStatusBold = "<b>开放</b>"; }
+      else if (finalStatus === "Closed") { displayStatus = "封闭"; displayStatusBold = "<b>封闭</b>"; }
+      else if (finalStatus === "Error") { displayStatus = "错误"; displayStatusBold = "<b>错误</b>"; }
+      else if (finalStatus === "Offline") { displayStatus = "下线"; displayStatusBold = "<b>下线</b>"; }
+
+      let message = "";
+      const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS:</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
+      
+      if (!oldStatus && finalStatus !== "Offline") {
+        message = `首次发现服务器 (状态: ${displayStatusBold})` + jsLinkText;
+      }
+      else if (oldStatus && finalStatus !== oldStatus) {
+        if (oldStatus === "Offline") {
+          if (finalStatus === "Error") {
+               let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
+               message = `服务器已上线但出现<b>错误</b>${hashMsg}`;
+          } else {
+               let baseMsg = finalStatus === "Open" ? "服务器已上线并<b>开放</b>" : "服务器已上线，当前为<b>封闭</b>状态";
+               let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
+               message = baseMsg + hashMsg;
+          }
+        } 
+        else if (finalStatus === "Offline") {
+          let oldDisplay = oldStatus; 
+          if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
+          if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
+          if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
+          message = `服务器已下线 (原状态: ${oldDisplay})`;
+        }
+        else {
+           let oldDisplay = oldStatus;
+           if (oldStatus === 'Open') oldDisplay = '<b>开放</b>';
+           if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
+           if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
+           message = `服务器状态已从${oldDisplay}变为${displayStatusBold}`;
+           if (hash !== oldHash) message += `，且代码已<b>更新</b>` + jsLinkText;
+        }
+      }
+      else if (oldStatus !== "Offline" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+        message = `网页代码已更新（状态: ${displayStatusBold}）` + jsLinkText;
+      }
+      
+      if (message) {
+        let displayUrl = url;
+        const deployMatch = getBaseUrlAndC(url);
+
+        // 检测判断并动态合并
+        if (deployMatch) {
+          const counterpartUrl = deployMatch.c === '1' 
+            ? url.replace('c1.public-deploy', 'c2.public-deploy')
+            : url.replace('c2.public-deploy', 'c1.public-deploy');
+          
+          const counterpartStatus = finalStatusJson[counterpartUrl] ? finalStatusJson[counterpartUrl].status : 'Offline';
+          
+          // 若同一节点的 c1 和 c2 最终状态一致，则抹除参数只显示主域；否则保留独立带参数链接
+          if (finalStatus === counterpartStatus) {
+            displayUrl = deployMatch.base;
+          }
+        }
+
+        const notifStr = `- <a href="${displayUrl}">${displayUrl}</a>: ${message}`;
+        if (!notifications.includes(notifStr)) {
+          notifications.push(notifStr);
+        }
+      }
+    }
+
+    // 生成可用服务器列表，应用同样的合并判定策略
+    const availableSet = new Set();
     for (const url of urls) {
       const statusEntry = finalStatusJson[url];
       if (statusEntry && statusEntry.status && statusEntry.status !== "Offline") {
+        let displayUrl = url;
         let disp = '<b>未知</b>';
         if (statusEntry.status === 'Open') disp = '<b>开放</b>';
         else if (statusEntry.status === 'Closed') disp = '<b>封闭</b>';
         else if (statusEntry.status === 'Error') disp = '<b>错误</b>';
+
+        const deployMatch = getBaseUrlAndC(url);
+        if (deployMatch) {
+          const counterpartUrl = deployMatch.c === '1' 
+            ? url.replace('c1.public-deploy', 'c2.public-deploy')
+            : url.replace('c2.public-deploy', 'c1.public-deploy');
+          
+          const counterpartStatus = finalStatusJson[counterpartUrl] ? finalStatusJson[counterpartUrl].status : 'Offline';
+          
+          if (statusEntry.status === counterpartStatus) {
+            displayUrl = deployMatch.base;
+          }
+        }
         
-        availableServers.push(`<a href="${url}">${url}</a> (状态: ${disp})`);
+        // 使用 Set 去重，避免当状态一致时列表里渲染两条纯基础链接的情况
+        availableSet.add(`<a href="${displayUrl}">${displayUrl}</a> (状态: ${disp})`);
       }
     }
+    availableServers = Array.from(availableSet);
 
     if (notifications.length > 0) {
       const success = fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
@@ -456,15 +513,20 @@ async function main() {
   }
 }
 
-// 启动逻辑
+// 启动逻辑（解决以前使用 setInterval 无视单次流程长短所带来的排队重叠灾难性隐患）
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
-  await main();
-  const intervalId = setInterval(async () => {
+  
+  const runLoop = async () => {
     if (Date.now() - START_TIME > MAX_RUNTIME) {
-      clearInterval(intervalId);
       process.exit(0);
     }
+    const loopStart = Date.now();
     await main();
-  }, CHECK_INTERVAL);
+    const elapsed = Date.now() - loopStart;
+    const delay = Math.max(0, CHECK_INTERVAL - elapsed);
+    setTimeout(runLoop, delay);
+  };
+
+  runLoop();
 })();
