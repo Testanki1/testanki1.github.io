@@ -13,7 +13,7 @@ const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
 
-let pendingChanges = {}; // 内存队列，用于跨循环追踪待确认的状态
+let pendingChanges = {}; // 内存队列
 
 // 邮件发送器配置
 const transporter = nodemailer.createTransport({
@@ -85,7 +85,7 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块：使用真实 UA 并通过跨域上下文执行机制检测 iframe
+// 网页检测模块：保留 Puppeteer 实现与跨域 iframe 穿透检测
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -125,7 +125,6 @@ async function checkBrowserPage(browser, targetUrl) {
     const frames = page.frames();
     for (const frame of frames) {
       try {
-        // 利用 frame.evaluate 进入其独立的子进程上下文读取 DOM，规避 CORS 跨域空白问题
         const frameCheck = await frame.evaluate(() => {
           const inviteInput = document.querySelector('input#invite');
           if (inviteInput && inviteInput.getBoundingClientRect().width > 0) {
@@ -148,7 +147,7 @@ async function checkBrowserPage(browser, targetUrl) {
           }
         }
       } catch (err) {
-         // 静默捕获未完全加载框架的报错
+         // 静默捕获
       }
     }
 
@@ -167,47 +166,33 @@ async function checkBrowserPage(browser, targetUrl) {
   }
 }
 
-async function commitAndPush(retries = 3) {
+// 采用第二个脚本的 commitAndPush 流程
+function commitAndPush() {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
     execSync(`git add ${STATE_FILE}`);
     
     const status = execSync('git status --porcelain').toString();
-    if (!status) return false;
+    if (!status) {
+      console.log(`[${getTime()}] 没有检测到状态文件变更，跳过推送。`);
+      return false;
+    }
 
-    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"', { stdio: 'pipe' });
+    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
+    console.log(`[${getTime()}] 正在同步远程仓库...`);
+    execSync('git pull --rebase origin main', { stdio: 'pipe' });
+    execSync('git push origin main');
+    console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
+    return true;
   } catch (e) {
-    console.error(`[${getTime()}] Git commit 失败或无更改`);
+    console.error(`[${getTime()}] Git 操作失败:`, e.message);
+    try { execSync('git rebase --abort'); } catch (abortErr) {}
     return false;
   }
-
-  for (let i = 0; i < retries; i++) {
-    try {
-      execSync('git pull --rebase origin main', { stdio: 'pipe' });
-      execSync('git push origin main', { stdio: 'pipe' });
-      console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
-      return true;
-    } catch (e) {
-      const errorMsg = (e.stderr || e.message).toString().split('\n')[0];
-      console.error(`[${getTime()}] Git push 失败 (尝试 ${i + 1}/${retries}):`, errorMsg);
-      try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (err) {}
-      
-      if (i < retries - 1) {
-        const delay = 2000 + Math.random() * 3000;
-        await new Promise(r => setTimeout(r, delay));
-      }
-    }
-  }
-
-  console.error(`[${getTime()}] Git 推送彻底失败，正在撤销本地提交以保证下一次环境干净...`);
-  try {
-    execSync('git reset --hard HEAD~1', { stdio: 'ignore' }); 
-  } catch (e) {}
-  
-  return false;
 }
 
+// 采用子服务器兼容版本的 isStateEqual 
 function isStateEqual(a, b) {
   if (!a || !b) return false;
   if (a.hash !== b.hash) return false;
@@ -274,7 +259,7 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 
     if (oldStatus === "Offline") {
       let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
-      if (finalStatus === "Error") return `${entity}已上线但出现<b>错误</b>${hashMsg}`;
+      if (finalStatus === "Error") return `${entity}已上线并出现<b>错误</b>${hashMsg}`;
       let baseMsg = finalStatus === "Open" ? `${entity}已上线并<b>开放</b>` : `${entity}已上线，当前为<b>封闭</b>状态`;
       return baseMsg + hashMsg;
     } 
@@ -295,6 +280,7 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
+  // 同步远程，避免本地冲突
   try {
     execSync('git pull --rebase --autostash origin main', { stdio: 'ignore' });
   } catch (e) {
@@ -311,12 +297,20 @@ async function main() {
     { url: "https://tankiclassic.com/play/", type: 'other' }
   );
 
-  let diskStatusJson = {};
-  if (fs.existsSync(STATE_FILE)) {
+  // 采用第二个脚本的带重试读取状态文件逻辑
+  let committedStatusJson = {};
+  let retries = 3;
+  while (retries > 0) {
     try {
-      diskStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      if (fs.existsSync(STATE_FILE)) {
+        const content = fs.readFileSync(STATE_FILE, 'utf8');
+        committedStatusJson = JSON.parse(content);
+      }
+      break;
     } catch (e) {
-      console.error(`[${getTime()}] 读取 ${STATE_FILE} 失败，将视为新状态`);
+      console.error(`[${getTime()}] 读取状态文件失败，重试...`);
+      retries--;
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
 
@@ -343,8 +337,9 @@ async function main() {
          entry.mainJsLink = curlRes.mainJsLink;
          if (item.type === 'deploy') entry.configs = { '1': 'Offline', '2': 'Offline' };
          else entry.status = 'Offline';
+         console.log(`[${getTime()}] Curl 存活: ${baseUrl} (${curlRes.statusCode})`);
       } else {
-         const oldEntry = diskStatusJson[baseUrl] || {};
+         const oldEntry = committedStatusJson[baseUrl] || {};
          entry.hash = oldEntry.hash || curlRes?.hash || '';
          entry.mainJsLink = oldEntry.mainJsLink || curlRes?.mainJsLink || '';
          entry.status = 'Offline';
@@ -377,7 +372,6 @@ async function main() {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${browserTasks.length} 个子任务...`);
       browser = await puppeteer.launch({ 
         headless: true, 
-        // 关键改动：传入关闭浏览器安全沙箱和站点隔离的参数，彻底穿透跨域 iframe
         args: [
           '--no-sandbox', 
           '--disable-setuid-sandbox', 
@@ -397,8 +391,10 @@ async function main() {
         const currentEntry = currentResults[res.baseUrl];
         if (res.c && currentEntry.configs) {
           currentEntry.configs[res.c] = finalStatus;
+          console.log(`[${getTime()}] 浏览器结果: ${res.baseUrl} (c${res.c}) -> ${finalStatus}`);
         } else {
           currentEntry.status = finalStatus;
+          console.log(`[${getTime()}] 浏览器结果: ${res.baseUrl} -> ${finalStatus}`);
         }
       }
     }
@@ -415,22 +411,23 @@ async function main() {
 
     // Phase 3: 多次确认判定逻辑
     let newlyConfirmed = [];
-    let finalStatusJson = { ...diskStatusJson };
+    let finalStatusJson = { ...committedStatusJson };
 
     for (const item of baseUrls) {
       const baseUrl = item.url;
       const currentEntry = currentResults[baseUrl];
-      const diskEntry = diskStatusJson[baseUrl] || {};
+      const committedEntry = committedStatusJson[baseUrl] || {};
       
-      if (isStateEqual(currentEntry, diskEntry)) {
+      if (isStateEqual(currentEntry, committedEntry)) {
         if (pendingChanges[baseUrl]) delete pendingChanges[baseUrl];
-        finalStatusJson[baseUrl] = diskEntry;
+        finalStatusJson[baseUrl] = committedEntry;
         continue;
       }
 
       if (!pendingChanges[baseUrl]) {
         console.log(`[${getTime()}] 发现状态异动，等待下一次确认: ${baseUrl}`);
-        pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
+        pendingChanges[baseUrl] = { entry: currentEntry, count: 1, timestamp: Date.now() };
+        finalStatusJson[baseUrl] = committedEntry;
       } else {
         if (isStateEqual(pendingChanges[baseUrl].entry, currentEntry)) {
           pendingChanges[baseUrl].count++;
@@ -441,10 +438,12 @@ async function main() {
             delete pendingChanges[baseUrl]; 
           } else {
             console.log(`[${getTime()}] 状态确认中 (${pendingChanges[baseUrl].count}/${CONFIRMATION_THRESHOLD}): ${baseUrl}`);
+            finalStatusJson[baseUrl] = committedEntry;
           }
         } else {
           console.log(`[${getTime()}] 状态在确认期间再次改变，重置计数器: ${baseUrl}`);
-          pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
+          pendingChanges[baseUrl] = { entry: currentEntry, count: 1, timestamp: Date.now() };
+          finalStatusJson[baseUrl] = committedEntry;
         }
       }
     }
@@ -452,16 +451,16 @@ async function main() {
     // Phase 4: 产生提示信息与过滤播报
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
-      const diskEntry = diskStatusJson[baseUrl] || {}; 
-      const oldHash = diskEntry.hash || null;
+      const committedEntry = committedStatusJson[baseUrl] || {}; 
+      const oldHash = committedEntry.hash || null;
       const hash = currentEntry.hash;
       const mainJsLink = currentEntry.mainJsLink;
 
       if (currentEntry.type === 'deploy') {
          const c1New = currentEntry.configs ? currentEntry.configs['1'] : (currentEntry.status || 'Offline');
          const c2New = currentEntry.configs ? currentEntry.configs['2'] : (currentEntry.status || 'Offline');
-         const c1Old = diskEntry.configs ? diskEntry.configs['1'] : (diskEntry.status || null);
-         const c2Old = diskEntry.configs ? diskEntry.configs['2'] : (diskEntry.status || null);
+         const c1Old = committedEntry.configs ? committedEntry.configs['1'] : (committedEntry.status || null);
+         const c2Old = committedEntry.configs ? committedEntry.configs['2'] : (committedEntry.status || null);
 
          if (c1New === c2New) {
             const statusNew = c1New;
@@ -486,7 +485,7 @@ async function main() {
          }
       } else {
          const statusNew = currentEntry.status;
-         const statusOld = diskEntry.status || null;
+         const statusOld = committedEntry.status || null;
          const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
          if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
       }
@@ -529,7 +528,7 @@ async function main() {
 
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-      const pushed = await commitAndPush();
+      const pushed = commitAndPush();
       
       if (pushed) {
         const changeDetails = notifications.join('<br><br>'); 
@@ -543,7 +542,17 @@ async function main() {
         fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
         console.log(`[${getTime()}] 有新的内部静默状态更新，已写入本地，已跳过 Git 提交。`);
       } else {
-        console.log(`[${getTime()}] 无状态变化。`);
+        console.log(`[${getTime()}] 无已确认的状态变化。`);
+      }
+
+      // 采用第二个脚本的 pendingChanges 过期垃圾回收逻辑
+      const now = Date.now();
+      for (const [url, data] of Object.entries(pendingChanges)) {
+        if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
+          delete pendingChanges[url];
+        } else if (!data.timestamp) {
+          pendingChanges[url].timestamp = now;
+        }
       }
     }
 
@@ -554,15 +563,15 @@ async function main() {
   }
 }
 
-// 启动定时递归器
+// 采用第二个脚本的定时器启动逻辑 (使用 setInterval + 明确的上限时间)
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
-  const runLoop = async () => {
-    if (Date.now() - START_TIME > MAX_RUNTIME) process.exit(0);
-    const loopStart = Date.now();
+  await main();
+  const intervalId = setInterval(async () => {
+    if (Date.now() - START_TIME > MAX_RUNTIME) {
+      clearInterval(intervalId);
+      process.exit(0);
+    }
     await main();
-    const elapsed = Date.now() - loopStart;
-    setTimeout(runLoop, Math.max(0, CHECK_INTERVAL - elapsed));
-  };
-  runLoop();
+  }, CHECK_INTERVAL);
 })();
