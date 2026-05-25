@@ -11,6 +11,9 @@ const CHECK_INTERVAL = 60 * 1000;
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
+const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
+
+let pendingChanges = {}; // 内存队列，用于跨循环追踪待确认的状态
 
 // 邮件发送器配置
 const transporter = nodemailer.createTransport({
@@ -28,7 +31,6 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 原生 JS 实现的并发控制器
 async function runWithLimit(tasks, limit) {
   const results = [];
   const executing = [];
@@ -143,7 +145,6 @@ async function checkBrowserPage(browser, targetUrl) {
   }
 }
 
-// ================== 重写的 Git 提交模块，抗并发、带重试与回滚 ==================
 async function commitAndPush(retries = 3) {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
@@ -168,11 +169,9 @@ async function commitAndPush(retries = 3) {
     } catch (e) {
       const errorMsg = (e.stderr || e.message).toString().split('\n')[0];
       console.error(`[${getTime()}] Git push 失败 (尝试 ${i + 1}/${retries}):`, errorMsg);
-      // 中断可能残留的错乱 rebase 状态
       try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (err) {}
       
       if (i < retries - 1) {
-        // 随机延迟 2 到 5 秒避让其他正在推送的进程
         const delay = 2000 + Math.random() * 3000;
         await new Promise(r => setTimeout(r, delay));
       }
@@ -181,7 +180,6 @@ async function commitAndPush(retries = 3) {
 
   console.error(`[${getTime()}] Git 推送彻底失败，正在撤销本地提交以保证下一次环境干净...`);
   try {
-    // 强制丢弃刚刚生成但没推上去的 commit，避免下个循环卡死
     execSync('git reset --hard HEAD~1', { stdio: 'ignore' }); 
   } catch (e) {}
   
@@ -246,9 +244,7 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
   if (oldStatus && finalStatus !== oldStatus) {
     if (oldStatus === "Mixed") {
       let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
-      
       if (finalStatus === "Offline") return `${entity}已下线 (原状态: ${oldDisplay})`;
-      
       if (finalStatus === "Error") return `${entity}出现<b>错误</b>${hashMsg}`;
       if (finalStatus === "Open") return `${entity}已统一<b>开放</b>${hashMsg}`;
       if (finalStatus === "Closed") return `${entity}已统一转为<b>封闭</b>状态${hashMsg}`;
@@ -277,9 +273,9 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-  // 前置清理保护：防范上一次如果发生异常冲突导致的遗留 rebase 问题
+  // 使用 autostash，如果本地有未提交的静默文件更新，会先暂存、拉取最新代码后再恢复，保证拉取顺畅
   try {
-    execSync('git pull --rebase origin main', { stdio: 'pipe' });
+    execSync('git pull --rebase --autostash origin main', { stdio: 'ignore' });
   } catch (e) {
     try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (err) {}
   }
@@ -388,6 +384,7 @@ async function main() {
       }
     }
 
+    // Phase 3: 多次确认判定逻辑
     let newlyConfirmed = [];
     let finalStatusJson = { ...diskStatusJson };
 
@@ -396,13 +393,36 @@ async function main() {
       const currentEntry = currentResults[baseUrl];
       const diskEntry = diskStatusJson[baseUrl] || {};
       
-      if (!isStateEqual(currentEntry, diskEntry)) {
-        console.log(`[${getTime()}] 检测到最新状态与文件不一致: ${baseUrl}`);
-        finalStatusJson[baseUrl] = currentEntry;
-        newlyConfirmed.push(baseUrl);
+      if (isStateEqual(currentEntry, diskEntry)) {
+        if (pendingChanges[baseUrl]) delete pendingChanges[baseUrl];
+        continue;
+      }
+
+      // 若状态与盘上最新记录不同，则进入追踪
+      if (!pendingChanges[baseUrl]) {
+        console.log(`[${getTime()}] 发现状态异动，等待下一次确认: ${baseUrl}`);
+        pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
+      } else {
+        // 如果当前状态与上一次侦测到的待确认状态完全一致，则增加确认计数
+        if (isStateEqual(pendingChanges[baseUrl].entry, currentEntry)) {
+          pendingChanges[baseUrl].count++;
+          if (pendingChanges[baseUrl].count >= CONFIRMATION_THRESHOLD) {
+            console.log(`[${getTime()}] 状态变化已连续确认 ${CONFIRMATION_THRESHOLD} 次生效: ${baseUrl}`);
+            finalStatusJson[baseUrl] = currentEntry;
+            newlyConfirmed.push(baseUrl);
+            delete pendingChanges[baseUrl]; // 确认后清空记录
+          } else {
+            console.log(`[${getTime()}] 状态确认中 (${pendingChanges[baseUrl].count}/${CONFIRMATION_THRESHOLD}): ${baseUrl}`);
+          }
+        } else {
+          // 在等待确认期间状态又变了，重新开始计数
+          console.log(`[${getTime()}] 状态在确认期间再次改变，重置计数器: ${baseUrl}`);
+          pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
+        }
       }
     }
 
+    // Phase 4: 产生提示信息与过滤播报
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
       const diskEntry = diskStatusJson[baseUrl] || {}; 
@@ -481,14 +501,12 @@ async function main() {
     availableServers = Array.from(availableSet);
 
     // ==============================================
-    // 关键修改区：保证 Git 推送和发邮件是 1 对 1 绑定
+    // 关键控制：推送与通报绑定，以及无通报的静默处理
     // ==============================================
     if (notifications.length > 0) {
-      // 只有在存在需要通告的变化时，才写入文件并向 Github 推送
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-      const pushed = await commitAndPush();
       
-      // 推送成功后发送邮件
+      const pushed = await commitAndPush();
       if (pushed) {
         const changeDetails = notifications.join('<br><br>'); 
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
@@ -498,10 +516,10 @@ async function main() {
       }
     } else {
       if (newlyConfirmed.length > 0) {
-        // 发现变化但这些变化被逻辑判定为“不值得发邮件提醒”
-        // 仅在本地缓存更新以便下一次循环对比，但绝不会进行 commitAndPush
+        // 如果有已确认的状态变动，但不值得作为通知发出（静默变化）
+        // 仅覆盖写入本地磁盘，绝不执行 commitAndPush
         fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-        console.log(`[${getTime()}] 无需通知的新状态变化，仅更新本地状态，已跳过 Git 推送。`);
+        console.log(`[${getTime()}] 有新的内部静默状态更新，已写入本地，已跳过 Git 提交。`);
       } else {
         console.log(`[${getTime()}] 无状态变化。`);
       }
