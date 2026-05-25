@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer'); // 换用 Google 官方的无头浏览器库
+const puppeteer = require('puppeteer'); 
 const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
@@ -31,7 +31,7 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 原生 JS 实现的并发控制器（替代第三方的 p-limit）
+// 原生 JS 实现的并发控制器
 async function runWithLimit(tasks, limit) {
   const results = [];
   const executing = [];
@@ -47,13 +47,18 @@ async function runWithLimit(tasks, limit) {
   return Promise.all(results);
 }
 
+// 阶段 1：Curl 网页探活并提取 JS 链接
 function checkCurl(url) {
   return new Promise((resolve) => {
     const req = https.get(url, { 
       rejectUnauthorized: false, 
       timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        // 伪装成真实浏览器，防止被基础防火墙拦截
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache'
       }
     }, (res) => {
       const { statusCode } = res;
@@ -99,12 +104,20 @@ function checkCurl(url) {
   });
 }
 
+// 阶段 2：无头浏览器深度检测
 async function checkBrowserPage(browser, url) {
   let page = null;
   
   try {
     page = await browser.newPage();
-    // 移除硬编码的带版本号的 User-Agent，允许引擎自动采用匹配当前内核的最新 UA
+    
+    // 【防拦截伪装】去除 Headless 标识，强制关闭 webdriver 属性，绕过 Cloudflare 拦截
+    let ua = await browser.userAgent();
+    await page.setUserAgent(ua.replace(/HeadlessChrome/g, 'Chrome'));
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+
     await page.setViewport({ width: 1280, height: 720 });
     
     const targetUrl = url.includes('?') 
@@ -134,8 +147,8 @@ async function checkBrowserPage(browser, url) {
       // 网络空闲超时不报错
     }
     
-    // Puppeteer 最新版废弃了 waitForTimeout，使用原生 Promise 延迟
-    await new Promise(r => setTimeout(r, 3000)); 
+    // 给足页面 JS 动态挂载表单的时间
+    await new Promise(r => setTimeout(r, 4000)); 
     refreshCount = 0; 
     await new Promise(r => setTimeout(r, 2000));
 
@@ -144,24 +157,29 @@ async function checkBrowserPage(browser, url) {
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    // Google Puppeteer 页面 DOM 检测（原 Playwright 写法的转化）
+    // 【增强检测逻辑】不再依赖宽高可见性，暴力匹配 DOM 和纯文本
     let hasInvitation = await page.evaluate(() => {
-      const inviteInput = document.querySelector('input#invite');
-      const inputVisible = inviteInput && inviteInput.getBoundingClientRect().width > 0;
-      if (inputVisible) return true;
+      // 1. 检查是否存在特定的 ID (只要 DOM 中存在 input#invite 就认定)
+      if (document.querySelector('input#invite')) return true;
       
-      const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
-      const titleVisible = titles.some(t => /INVITATION/i.test(t.innerText));
-      if (titleVisible) return true;
-
       const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+      
+      // 2. 检查特定类的元素中是否包含邀请文本 (使用 textContent 替代 innerText)
+      const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title, [class*="title" i]'));
+      if (titles.some(t => keywordRegex.test(t.textContent || ''))) return true;
+
+      // 3. 终极托底：扩大搜索范围，直接在整个页面的纯文本中暴力检索
+      const bodyText = document.body.textContent || '';
+      if (keywordRegex.test(bodyText)) return true;
+
+      // 4. 防止被嵌套在 iframe 中
       const frames = Array.from(window.frames);
       for (let i = 0; i < frames.length; i++) {
         try {
-          if (keywordRegex.test(frames[i].document.body.innerText)) {
+          if (keywordRegex.test(frames[i].document.body.textContent || '')) {
             return true;
           }
-        } catch(e) {} // 忽略跨域等报错
+        } catch(e) {} 
       }
       return false;
     });
@@ -223,7 +241,7 @@ async function sendEmail(body) {
       from: `"3D坦克测试服监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "3D坦克测试服务器状态更新",
-      html: `${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
+      html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
     });
     console.log(`[${getTime()}] 邮件已发送。`);
   } catch (error) {
