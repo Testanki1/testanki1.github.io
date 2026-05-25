@@ -85,7 +85,7 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块：保留 Puppeteer 实现与跨域 iframe 穿透检测
+// 网页检测模块：使用智能轮询和全文本/属性检测，规避加载延迟、语言回退及混淆类名带来的漏检
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -110,41 +110,66 @@ async function checkBrowserPage(browser, targetUrl) {
     }
 
     try { await page.waitForNetworkIdle({ timeout: 8000 }); } catch (e) {}
-    await new Promise(r => setTimeout(r, 3000)); 
+    
+    // 1. 智能轮询：检查所有 Frame 中是否已经成功渲染出了 <input> 输入框（意味着登录/邀请表单加载完成，而非 Loading 动画）
+    let isAppLoaded = false;
+    for (let poll = 0; poll < 10; poll++) {
+      const frames = page.frames();
+      for (const frame of frames) {
+        try {
+          const hasInput = await frame.evaluate(() => document.querySelector('input') !== null);
+          if (hasInput) {
+            isAppLoaded = true;
+            break;
+          }
+        } catch (err) {}
+      }
+      if (isAppLoaded) break;
+      await new Promise(r => setTimeout(r, 1500)); // 每次轮询间隔 1.5 秒
+    }
+
     refreshCount = 0; 
     await new Promise(r => setTimeout(r, 2000));
 
-    if (refreshCount > 0) {
+    // 允许 1 次以内的合法的路由转换（比如 React 内部重定向），大于 1 次才视为异常循环
+    if (refreshCount > 1) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${targetUrl}`);
        return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
     let hasInvitation = false;
-    const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+    // 扩展关键字正则：涵盖中、英、俄语下的“邀请、激活、инвайт-код、активация”等，避免多语言包加载导致的漏检
+    const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац/i;
 
     const frames = page.frames();
     for (const frame of frames) {
       try {
-        const frameCheck = await frame.evaluate(() => {
-          const inviteInput = document.querySelector('input#invite');
-          if (inviteInput && inviteInput.getBoundingClientRect().width > 0) {
+        // 类名无关检测逻辑
+        const frameCheck = await frame.evaluate((regexStr) => {
+          const regex = new RegExp(regexStr, 'i');
+          
+          // A. 检索页面所有 input 的属性值，如果发现包含 "invite", "code", "инвайт", "邀请" 等，直接标记
+          const inputs = Array.from(document.querySelectorAll('input'));
+          const hasInviteInput = inputs.some(input => {
+            const id = input.id || '';
+            const placeholder = input.placeholder || '';
+            const name = input.name || '';
+            const className = input.className || '';
+            return /invite|code|инвайт|активац|邀请|码/i.test(id + ' ' + placeholder + ' ' + name + ' ' + className);
+          });
+          
+          if (hasInviteInput) {
             return { matched: true, text: '' };
           }
           
-          const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
-          if (titles.some(t => /INVITATION/i.test(t.innerText))) {
-            return { matched: true, text: '' };
-          }
-
+          // B. 兜底全局文本关键字匹配
           const bodyText = document.body ? document.body.innerText : '';
-          return { matched: false, text: bodyText };
-        }).catch(() => null);
+          return { matched: regex.test(bodyText), text: bodyText };
+        }, keywordRegex.source).catch(() => null);
 
-        if (frameCheck) {
-          if (frameCheck.matched || keywordRegex.test(frameCheck.text)) {
-            hasInvitation = true;
-            break; 
-          }
+        if (frameCheck && frameCheck.matched) {
+          hasInvitation = true;
+          break; 
         }
       } catch (err) {
          // 静默捕获
@@ -166,7 +191,6 @@ async function checkBrowserPage(browser, targetUrl) {
   }
 }
 
-// 采用第二个脚本的 commitAndPush 流程
 function commitAndPush() {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
@@ -192,7 +216,6 @@ function commitAndPush() {
   }
 }
 
-// 采用子服务器兼容版本的 isStateEqual 
 function isStateEqual(a, b) {
   if (!a || !b) return false;
   if (a.hash !== b.hash) return false;
@@ -280,7 +303,6 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-  // 同步远程，避免本地冲突
   try {
     execSync('git pull --rebase --autostash origin main', { stdio: 'ignore' });
   } catch (e) {
@@ -297,7 +319,6 @@ async function main() {
     { url: "https://tankiclassic.com/play/", type: 'other' }
   );
 
-  // 采用第二个脚本的带重试读取状态文件逻辑
   let committedStatusJson = {};
   let retries = 3;
   while (retries > 0) {
@@ -545,7 +566,6 @@ async function main() {
         console.log(`[${getTime()}] 无已确认的状态变化。`);
       }
 
-      // 采用第二个脚本的 pendingChanges 过期垃圾回收逻辑
       const now = Date.now();
       for (const [url, data] of Object.entries(pendingChanges)) {
         if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) {
@@ -563,7 +583,6 @@ async function main() {
   }
 }
 
-// 采用第二个脚本的定时器启动逻辑 (使用 setInterval + 明确的上限时间)
 (async () => {
   console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
   await main();
