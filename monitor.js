@@ -113,21 +113,24 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try { await page.waitForNetworkIdle({ timeout: 8000 }); } catch (e) {}
     
-    // 1. 轮询等待任意输入框加载完成（表明 React/登录组件已完成渲染）
+    // 1. 轮询等待 React(包含input输入框) 或 WebGL(包含canvas画布) 渲染完成
+    // 从而保证 Open 状态下无需无谓等待，瞬间完成加载判定
     let isAppLoaded = false;
-    for (let poll = 0; poll < 12; poll++) {
+    for (let poll = 0; poll < 15; poll++) {
       const frames = page.frames();
       for (const frame of frames) {
         try {
-          const hasInput = await frame.evaluate(() => document.querySelector('input') !== null);
-          if (hasInput) {
+          const hasAppElement = await frame.evaluate(() => {
+            return document.querySelector('input') !== null || document.querySelector('canvas') !== null;
+          });
+          if (hasAppElement) {
             isAppLoaded = true;
             break;
           }
         } catch (err) {}
       }
       if (isAppLoaded) break;
-      await new Promise(r => setTimeout(r, 2000)); // 24秒最大容错
+      await new Promise(r => setTimeout(r, 1500)); // 每次轮询间隔 1.5 秒
     }
 
     refreshCount = 0; 
@@ -138,11 +141,9 @@ async function checkBrowserPage(browser, targetUrl) {
        return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
 
-    // 核心修正点：
-    // 如果 HTTP 返回了 200，但最大等待时间内页面上【没有任何输入框】被渲染出来，说明卡在 Loading 动画/白屏/脚本崩溃
-    // 这属于不稳定状态（Error），而非 Offline（网络/服务器层错误）或 Open
+    // 如果最大等待时间内【既没有渲染出输入框，也没有渲染出画布】，说明卡在 Loading 动画/白屏/脚本崩溃
     if (!isAppLoaded) {
-       console.log(`[${getTime()}] 页面载入成功但未渲染出交互组件(卡在Loading中) - ${targetUrl}`);
+       console.log(`[${getTime()}] 页面成功载入但未渲染出交互组件(卡在Loading中) - ${targetUrl}`);
        return { status: 'Error', error: 'Page stayed on loading screen or crashed' };
     }
     
@@ -192,7 +193,6 @@ async function checkBrowserPage(browser, targetUrl) {
        return { status: 'Error', error: e.message };
     }
     
-    // 只有真正的网络连接被拒、网络不可达才算 Offline
     console.log(`[${getTime()}] 判定为 Offline - ${targetUrl}: ${e.message}`);
     return { status: 'Offline', error: e.message };
   } finally {
