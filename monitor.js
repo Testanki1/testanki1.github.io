@@ -494,8 +494,6 @@ async function main() {
             const p2 = getPriority(c2New);
 
             for (const c of ['1', '2']) {
-               if (c === '1' && p1 < p2) continue;
-               if (c === '2' && p2 < p1) continue;
 
                const stNew = c === '1' ? c1New : c2New;
                const stOld = c === '1' ? c1Old : c2Old;
