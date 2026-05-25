@@ -2,34 +2,39 @@ name: 3D坦克测试服监测
 
 on:
   schedule:
+    # 每5小时自动启动一次，配合脚本内的循环实现近乎全天候监测
     - cron: '0 */5 * * *'
-  workflow_dispatch: 
+  workflow_dispatch: # 支持手动触发
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    # 授予写入权限，以便脚本可以更新 server_status.json 并推送到仓库
     permissions:
       contents: write
     
     steps:
       - name: 检出代码
-        uses: actions/checkout@main # 移除 @v4 版本号，改为拉取最新主分支
+        uses: actions/checkout@main # 放弃带版本号的包，始终跟随官方最新代码
         with:
           persist-credentials: true
 
       - name: 设置 Node.js 环境
-        uses: actions/setup-node@main # 移除 @v4 版本号，改为拉取最新主分支
+        uses: actions/setup-node@main # 放弃带版本号的包，始终跟随官方最新代码
         with:
-          node-version: '*' # 移除固定的 '20' 版本，始终调用最新 Node.js
+          node-version: '*' # 不写死 20，始终调用最新版的 Node.js 环境
 
       - name: 安装依赖
         run: |
-          npm install playwright nodemailer p-limit # NPM 默认行为即是不加版本号拉取最新库
-          npx playwright install chromium
+          # 自动获取并安装最新版本的 Google Puppeteer 和 Nodemailer（NPM 默认无版本号即最新）
+          # Google Puppeteer 会在安装时自动拉取与之匹配的最新稳定版 Chromium
+          npm install puppeteer nodemailer
 
       - name: 运行监测器
         env:
+          # 必须在仓库 Settings -> Secrets -> Actions 中配置以下变量
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+        # 运行独立的脚本文件
         run: node monitor.js
