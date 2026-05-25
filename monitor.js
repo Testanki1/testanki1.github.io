@@ -89,7 +89,7 @@ function checkCurl(url) {
 async function checkBrowserPage(browser, url) {
   let page = null;
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    // 移除硬编码的带版本号的 User-Agent，将自动应用拉取到的最新 Chromium 的内置 UA
     viewport: { width: 1280, height: 720 },
     locale: 'en-US'
   });
