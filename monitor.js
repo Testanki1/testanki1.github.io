@@ -105,25 +105,20 @@ async function checkBrowserPage(browser, targetUrl) {
     page.on('framenavigated', navListener);
 
     const response = await page.goto(finalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    
-    // 只有真正的网络层 HTTP 错误（如 404, 502 等）才直接判定为 Offline
-    if (!response || response.status() >= 400) {
+    if (!response || !response.ok()) {
       return { status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
     try { await page.waitForNetworkIdle({ timeout: 8000 }); } catch (e) {}
     
-    // 1. 轮询等待 React(包含input输入框) 或 WebGL(包含canvas画布) 渲染完成
-    // 从而保证 Open 状态下无需无谓等待，瞬间完成加载判定
+    // 1. 智能轮询：检查所有 Frame 中是否已经成功渲染出了 <input> 输入框（意味着登录/邀请表单加载完成，而非 Loading 动画）
     let isAppLoaded = false;
-    for (let poll = 0; poll < 15; poll++) {
+    for (let poll = 0; poll < 10; poll++) {
       const frames = page.frames();
       for (const frame of frames) {
         try {
-          const hasAppElement = await frame.evaluate(() => {
-            return document.querySelector('input') !== null || document.querySelector('canvas') !== null;
-          });
-          if (hasAppElement) {
+          const hasInput = await frame.evaluate(() => document.querySelector('input') !== null);
+          if (hasInput) {
             isAppLoaded = true;
             break;
           }
@@ -136,26 +131,24 @@ async function checkBrowserPage(browser, targetUrl) {
     refreshCount = 0; 
     await new Promise(r => setTimeout(r, 2000));
 
+    // 允许 1 次以内的合法的路由转换（比如 React 内部重定向），大于 1 次才视为异常循环
     if (refreshCount > 1) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${targetUrl}`);
        return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
-
-    // 如果最大等待时间内【既没有渲染出输入框，也没有渲染出画布】，说明卡在 Loading 动画/白屏/脚本崩溃
-    if (!isAppLoaded) {
-       console.log(`[${getTime()}] 页面成功载入但未渲染出交互组件(卡在Loading中) - ${targetUrl}`);
-       return { status: 'Error', error: 'Page stayed on loading screen or crashed' };
-    }
     
     let hasInvitation = false;
+    // 扩展关键字正则：涵盖中、英、俄语下的“邀请、激活、инвайт-код、активация”等，避免多语言包加载导致的漏检
     const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац/i;
 
     const frames = page.frames();
     for (const frame of frames) {
       try {
+        // 类名无关检测逻辑
         const frameCheck = await frame.evaluate((regexStr) => {
           const regex = new RegExp(regexStr, 'i');
           
+          // A. 检索页面所有 input 的属性值，如果发现包含 "invite", "code", "инвайт", "邀请" 等，直接标记
           const inputs = Array.from(document.querySelectorAll('input'));
           const hasInviteInput = inputs.some(input => {
             const id = input.id || '';
@@ -169,9 +162,10 @@ async function checkBrowserPage(browser, targetUrl) {
             return { matched: true, text: '' };
           }
           
+          // B. 兜底全局文本关键字匹配
           const bodyText = document.body ? document.body.innerText : '';
           return { matched: regex.test(bodyText), text: bodyText };
-        }, keywordRegex.source);
+        }, keywordRegex.source).catch(() => null);
 
         if (frameCheck && frameCheck.matched) {
           hasInvitation = true;
@@ -186,13 +180,10 @@ async function checkBrowserPage(browser, targetUrl) {
     
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
-    
-    // 区分不稳定状态（Error）与网络层错误（Offline）
     if (msg.includes('navigating') || msg.includes('execution context') || msg.includes('destroyed') || msg.includes('timeout') || msg.includes('redirect')) {
        console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${targetUrl}: ${e.message}`);
        return { status: 'Error', error: e.message };
     }
-    
     console.log(`[${getTime()}] 判定为 Offline - ${targetUrl}: ${e.message}`);
     return { status: 'Offline', error: e.message };
   } finally {
