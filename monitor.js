@@ -480,11 +480,15 @@ async function main() {
     }
     availableServers = Array.from(availableSet);
 
-    // 修改：所有 commitAndPush 调用的地方加上 await
+    // ==============================================
+    // 关键修改区：保证 Git 推送和发邮件是 1 对 1 绑定
+    // ==============================================
     if (notifications.length > 0) {
+      // 只有在存在需要通告的变化时，才写入文件并向 Github 推送
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = await commitAndPush();
       
+      // 推送成功后发送邮件
       if (pushed) {
         const changeDetails = notifications.join('<br><br>'); 
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
@@ -494,10 +498,13 @@ async function main() {
       }
     } else {
       if (newlyConfirmed.length > 0) {
+        // 发现变化但这些变化被逻辑判定为“不值得发邮件提醒”
+        // 仅在本地缓存更新以便下一次循环对比，但绝不会进行 commitAndPush
         fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-        await commitAndPush(); 
+        console.log(`[${getTime()}] 无需通知的新状态变化，仅更新本地状态，已跳过 Git 推送。`);
+      } else {
+        console.log(`[${getTime()}] 无状态变化。`);
       }
-      console.log(`[${getTime()}] 无需通知的新状态变化。`);
     }
 
   } catch (err) {
