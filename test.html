@@ -267,6 +267,15 @@
         let serverStatusData = {};
         let isChecking = false; 
 
+        // 提取服务器优先级，以确保在"一开一关"时只显示更开放的那一个
+        function getPriority(status) {
+            if (status === 'Open') return 4;
+            if (status === 'Closed') return 3;
+            if (status === 'Error') return 2;
+            if (status === 'Offline') return 1;
+            return 0;
+        }
+
         // 请求服务器状态 JSON，带时间戳防止缓存
         async function fetchServerStatus() {
             try {
@@ -341,29 +350,40 @@
             return container;
         }
 
-        async function fetchCounts(url) {
+        // 修改：先获取并返回完整 JSON 数据，用于后续按需提取
+        async function fetchBalancerData(url) {
             const noCacheUrl = `${url}?t=${Date.now()}`;
             try {
                 const response = await fetch(noCacheUrl);
-                const data = await response.json();
-                
-                if (data.nodes) {
-                    const onlineCount = Object.values(data.nodes).reduce((sum, node) => sum + node.online, 0);
-                    const inbattlesCount = Object.values(data.nodes).reduce((sum, node) => sum + node.inbattles, 0);
-                    return { onlineCount, inbattlesCount };
-                } else if (data.online !== undefined) {
-                    return { 
-                        onlineCount: data.online, 
-                        inbattlesCount: data.inbattles !== undefined ? data.inbattles : 0 
-                    };
-                }
-                return { onlineCount: 0, inbattlesCount: 0 };
+                return await response.json();
             } catch (error) {
-                return { onlineCount: 0, inbattlesCount: 0 };
+                return null;
             }
         }
 
-        // 修改为分离网络请求的全新渲染方法，允许传入特定的状态
+        // 修改：增加 subNode 参数，如果提供且存在，则只返回指定子服务器的数据
+        function extractCounts(data, subNode = null) {
+            if (!data) return { onlineCount: 0, inbattlesCount: 0 };
+            
+            if (data.nodes) {
+                if (subNode && data.nodes[subNode]) {
+                    return {
+                        onlineCount: data.nodes[subNode].online || 0,
+                        inbattlesCount: data.nodes[subNode].inbattles || 0
+                    };
+                }
+                const onlineCount = Object.values(data.nodes).reduce((sum, node) => sum + (node.online || 0), 0);
+                const inbattlesCount = Object.values(data.nodes).reduce((sum, node) => sum + (node.inbattles || 0), 0);
+                return { onlineCount, inbattlesCount };
+            } else if (data.online !== undefined) {
+                return { 
+                    onlineCount: data.online, 
+                    inbattlesCount: data.inbattles !== undefined ? data.inbattles : 0 
+                };
+            }
+            return { onlineCount: 0, inbattlesCount: 0 };
+        }
+
         function renderButton(containerId, elementId, label, targetUrl, counts, status, sortOrder) {
             const container = document.getElementById(containerId);
             let element = document.getElementById(elementId);
@@ -415,7 +435,6 @@
                 
                 let fetchTasks = [];
 
-                // 核心逻辑修改：对 Deploy 节点配置状态进行自动判断（合并还是拆分展示）
                 for (let i = 1; i <= 10; i++) {
                     const deployBalancer = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
                     const baseUrl = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
@@ -426,31 +445,46 @@
                         const idC2 = `deploy-${i}-c2`;
 
                         if (isAccessible) {
-                            const counts = await fetchCounts(deployBalancer);
+                            const balancerData = await fetchBalancerData(deployBalancer);
                             const serverInfo = serverStatusData[baseUrl];
                             
                             if (serverInfo && serverInfo.type === 'deploy' && serverInfo.configs) {
                                 const c1 = serverInfo.configs['1'] || 'Offline';
                                 const c2 = serverInfo.configs['2'] || 'Offline';
                                 
-                                // 两者状态相同，合并显示为一个按钮
+                                // 两者状态相同，合并显示为一个按钮，合并在线人数
                                 if (c1 === c2) {
                                     removeButton(idC1);
                                     removeButton(idC2);
+                                    const counts = extractCounts(balancerData); // 合计
                                     renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, c1, i * 10);
                                 } else {
-                                    // 状态不一致，拆分为两个按钮
+                                    // 状态不一致，计算优先级，根据高低筛选，且提取特定子服务器在线人数
                                     removeButton(idSingle);
-                                    const t1 = `${baseUrl}?config-template=https://c1.public-deploy${i}.test-eu.tankionline.com/config.xml`;
-                                    const t2 = `${baseUrl}?config-template=https://c2.public-deploy${i}.test-eu.tankionline.com/config.xml`;
                                     
-                                    renderButton('deploy-results', idC1, `Deploy ${i} (c1)`, t1, counts, c1, i * 10 + 1);
-                                    renderButton('deploy-results', idC2, `Deploy ${i} (c2)`, t2, counts, c2, i * 10 + 2);
+                                    const p1 = getPriority(c1);
+                                    const p2 = getPriority(c2);
+                                    
+                                    if (c1 !== 'Offline' && p1 >= p2) {
+                                        const t1 = `${baseUrl}?config-template=https://c1.public-deploy${i}.test-eu.tankionline.com/config.xml`;
+                                        const countsC1 = extractCounts(balancerData, 'c1');
+                                        renderButton('deploy-results', idC1, `Deploy ${i} (c1)`, t1, countsC1, c1, i * 10 + 1);
+                                    } else {
+                                        removeButton(idC1);
+                                    }
+                                    
+                                    if (c2 !== 'Offline' && p2 >= p1) {
+                                        const t2 = `${baseUrl}?config-template=https://c2.public-deploy${i}.test-eu.tankionline.com/config.xml`;
+                                        const countsC2 = extractCounts(balancerData, 'c2');
+                                        renderButton('deploy-results', idC2, `Deploy ${i} (c2)`, t2, countsC2, c2, i * 10 + 2);
+                                    } else {
+                                        removeButton(idC2);
+                                    }
                                 }
                             } else {
-                                // 如果暂无 Json 数据（全新开启情况），采用备用策略显示单按钮
                                 removeButton(idC1);
                                 removeButton(idC2);
+                                const counts = extractCounts(balancerData);
                                 renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, 'Offline', i * 10);
                             }
                         } else {
@@ -468,7 +502,8 @@
                 
                 fetchTasks.push(checkURL(classicBalancer).then(async isAccessible => {
                     if (isAccessible) {
-                        const counts = await fetchCounts(classicBalancer);
+                        const balancerData = await fetchBalancerData(classicBalancer);
+                        const counts = extractCounts(balancerData);
                         const serverInfo = serverStatusData[classicLink];
                         const status = (serverInfo && serverInfo.status) ? serverInfo.status : 'Offline';
                         
