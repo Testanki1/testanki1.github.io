@@ -223,7 +223,7 @@ async function sendEmail(body) {
       from: `"3D坦克测试服监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "3D坦克测试服务器状态更新",
-      html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
+      html: `${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
     });
     console.log(`[${getTime()}] 邮件已发送。`);
   } catch (error) {
