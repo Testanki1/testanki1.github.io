@@ -205,6 +205,15 @@ function getStatusDisplay(status) {
   return '<b>未知</b>';
 }
 
+// 提取服务器优先级，以确保在"一开一关"时只显示"开"的
+function getPriority(status) {
+  if (status === 'Open') return 4;
+  if (status === 'Closed') return 3;
+  if (status === 'Error') return 2;
+  if (status === 'Offline') return 1;
+  return 0;
+}
+
 function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSubServer = false) {
   const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS:</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
   const displayStatusBold = getStatusDisplay(finalStatus);
@@ -422,9 +431,16 @@ async function main() {
             const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
             if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
          } else {
-            // 若一开一关等不一致情况，展开附带参数链接独立播报
+            // 若一开一关等不一致情况，根据要求仅播报状态更好的（“开”的）那个子服务器
             const serverNum = baseUrl.match(/deploy(\d+)/)[1];
+            const p1 = getPriority(c1New);
+            const p2 = getPriority(c2New);
+
             for (const c of ['1', '2']) {
+               // 过滤：当二者状态不同，只处理并播报优先级较高的（忽略相对“关”的）
+               if (c === '1' && p1 < p2) continue;
+               if (c === '2' && p2 < p1) continue;
+
                const stNew = c === '1' ? c1New : c2New;
                const stOld = c === '1' ? c1Old : c2Old;
                const targetUrl = `${baseUrl}?config-template=https://c${c}.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
@@ -456,11 +472,15 @@ async function main() {
             availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(c1)})`);
          } else {
             const serverNum = baseUrl.match(/deploy(\d+)/)[1];
-            if (c1 !== 'Offline') {
+            const p1 = getPriority(c1);
+            const p2 = getPriority(c2);
+
+            // 若一开一关等不一致情况，同样仅向列表中添加优先级高（“开”）的子服务器链接
+            if (c1 !== 'Offline' && p1 >= p2) {
                const t1 = `${baseUrl}?config-template=https://c1.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
                availableSet.add(`<a href="${t1}">${t1}</a> (状态: ${getStatusDisplay(c1)})`);
             }
-            if (c2 !== 'Offline') {
+            if (c2 !== 'Offline' && p2 >= p1) {
                const t2 = `${baseUrl}?config-template=https://c2.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
                availableSet.add(`<a href="${t2}">${t2}</a> (状态: ${getStatusDisplay(c2)})`);
             }
