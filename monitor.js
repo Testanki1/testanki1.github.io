@@ -167,6 +167,21 @@ function commitAndPush() {
   }
 }
 
+// 优化：比对状态时，自动兼容旧版的 configs 和新版整洁的 status
+function isStateEqual(a, b) {
+  if (!a || !b) return false;
+  if (a.hash !== b.hash) return false;
+  if (a.type !== b.type) return false;
+  if (a.type === 'deploy') {
+    const a1 = a.configs ? a.configs['1'] : (a.status || 'Offline');
+    const a2 = a.configs ? a.configs['2'] : (a.status || 'Offline');
+    const b1 = b.configs ? b.configs['1'] : (b.status || 'Offline');
+    const b2 = b.configs ? b.configs['2'] : (b.status || 'Offline');
+    return a1 === b1 && a2 === b2;
+  }
+  return a.status === b.status;
+}
+
 async function sendEmail(body) {
   try {
     await transporter.sendMail({
@@ -179,17 +194,6 @@ async function sendEmail(body) {
   } catch (error) {
     console.error(`[${getTime()}] 邮件发送失败:`, error);
   }
-}
-
-function isStateEqual(a, b) {
-  if (!a || !b) return false;
-  if (a.hash !== b.hash) return false;
-  if (a.type !== b.type) return false;
-  if (a.type === 'deploy') {
-    if (!a.configs || !b.configs) return false;
-    return a.configs['1'] === b.configs['1'] && a.configs['2'] === b.configs['2'];
-  }
-  return a.status === b.status;
 }
 
 function getStatusDisplay(status) {
@@ -205,14 +209,28 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
   const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS:</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
   const displayStatusBold = getStatusDisplay(finalStatus);
   const oldDisplay = getStatusDisplay(oldStatus);
-  // 修改这里：将“配置”改为“子服务器”
   let entity = isSubServer ? "子服务器" : "服务器";
 
   if (!oldStatus && finalStatus !== "Offline") {
     return `首次发现${entity} (状态: ${displayStatusBold})` + jsLinkText;
   }
+  
   if (oldStatus && finalStatus !== oldStatus) {
-    if (oldStatus === "Offline" || oldStatus === "混合状态") {
+    // 专门处理原先是一开一关（混合状态），现在统一了的情况
+    if (oldStatus === "混合状态") {
+      let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
+      if (finalStatus === "Offline") {
+        return `所有子服务器均已<b>下线</b>`;
+      } else if (finalStatus === "Error") {
+        return `所有子服务器均出现<b>错误</b>${hashMsg}`;
+      } else if (finalStatus === "Open") {
+        return `所有子服务器均已<b>开放</b>${hashMsg}`;
+      } else if (finalStatus === "Closed") {
+        return `所有子服务器均已转为<b>封闭</b>状态${hashMsg}`;
+      }
+    }
+
+    if (oldStatus === "Offline") {
       let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
       if (finalStatus === "Error") return `${entity}已上线但出现<b>错误</b>${hashMsg}`;
       let baseMsg = finalStatus === "Open" ? `${entity}已上线并<b>开放</b>` : `${entity}已上线，当前为<b>封闭</b>状态`;
@@ -235,7 +253,6 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-  // 使用基础链接构建监测列表，并在 json 中做为主键
   const baseUrls = [];
   for (let i = 1; i <= 10; i++) {
     baseUrls.push({ url: `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`, type: 'deploy' });
@@ -257,7 +274,6 @@ async function main() {
     }
   }
 
-  // 清理旧 json 中废弃的不符合基础 URL 标准的旧带参数链接数据
   let finalStatusJson = {};
   for (const item of baseUrls) {
     if (committedStatusJson[item.url]) finalStatusJson[item.url] = committedStatusJson[item.url];
@@ -281,16 +297,18 @@ async function main() {
       const curlRes = curlResults[baseUrl];
       
       let entry = { type: item.type, hash: '', mainJsLink: '' };
-      if (item.type === 'deploy') entry.configs = { '1': 'Offline', '2': 'Offline' };
-      else entry.status = 'Offline';
-
+      
       if (curlRes && curlRes.isAlive) {
          entry.hash = curlRes.hash;
          entry.mainJsLink = curlRes.mainJsLink;
+         // 如果活着，暂时挂载 configs，如果待会查出都死掉会在 Phase 2 清除它
+         if (item.type === 'deploy') entry.configs = { '1': 'Offline', '2': 'Offline' };
+         else entry.status = 'Offline';
       } else {
          const oldEntry = committedStatusJson[baseUrl] || {};
          entry.hash = oldEntry.hash || curlRes?.hash || '';
          entry.mainJsLink = oldEntry.mainJsLink || curlRes?.mainJsLink || '';
+         entry.status = 'Offline'; // 只要 Curl 挂了，直接设置为单一下线状态，JSON中将不再携带多余的 configs
       }
       currentResults[baseUrl] = entry;
     }
@@ -331,8 +349,23 @@ async function main() {
         if (finalStatus === 'Offline' && !res.error) finalStatus = 'Closed'; 
         
         const currentEntry = currentResults[res.baseUrl];
-        if (res.c) currentEntry.configs[res.c] = finalStatus;
-        else currentEntry.status = finalStatus;
+        if (res.c && currentEntry.configs) {
+          currentEntry.configs[res.c] = finalStatus;
+        } else {
+          currentEntry.status = finalStatus;
+        }
+      }
+    }
+
+    // 关键步骤：清理 JSON 中多余的离线子服务器节点
+    for (const item of baseUrls) {
+      const currentEntry = currentResults[item.url];
+      if (item.type === 'deploy' && currentEntry.configs) {
+        // 如果网页还能访问，但两个子服务器都测出 Offline，抹去子参数并精简为整体 Offline
+        if (currentEntry.configs['1'] === 'Offline' && currentEntry.configs['2'] === 'Offline') {
+          currentEntry.status = 'Offline';
+          delete currentEntry.configs;
+        }
       }
     }
 
@@ -376,12 +409,13 @@ async function main() {
       const mainJsLink = currentEntry.mainJsLink;
 
       if (currentEntry.type === 'deploy') {
-         const c1New = currentEntry.configs['1'];
-         const c2New = currentEntry.configs['2'];
-         const c1Old = committedEntry.configs ? committedEntry.configs['1'] : null;
-         const c2Old = committedEntry.configs ? committedEntry.configs['2'] : null;
+         // 解析新状态，如果已被精简为 status，则提取 fallback 给 c1New, c2New
+         const c1New = currentEntry.configs ? currentEntry.configs['1'] : (currentEntry.status || 'Offline');
+         const c2New = currentEntry.configs ? currentEntry.configs['2'] : (currentEntry.status || 'Offline');
+         const c1Old = committedEntry.configs ? committedEntry.configs['1'] : (committedEntry.status || null);
+         const c2Old = committedEntry.configs ? committedEntry.configs['2'] : (committedEntry.status || null);
 
-         // 若两子服务器一致，则隐藏参数，归总以基础域名播报
+         // 若两子服务器一致（包括全离线情况），则合并播报
          if (c1New === c2New) {
             const statusNew = c1New;
             const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? '混合状态' : null);
@@ -414,10 +448,8 @@ async function main() {
       if (!entry) continue;
 
       if (item.type === 'deploy') {
-         if (!entry.configs) continue; 
-
-         const c1 = entry.configs['1'];
-         const c2 = entry.configs['2'];
+         const c1 = entry.configs ? entry.configs['1'] : (entry.status || 'Offline');
+         const c2 = entry.configs ? entry.configs['2'] : (entry.status || 'Offline');
          if (c1 === 'Offline' && c2 === 'Offline') continue;
          
          if (c1 === c2) {
@@ -441,7 +473,6 @@ async function main() {
     }
     availableServers = Array.from(availableSet);
 
-    // 检查最终是否执行写入状态
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
