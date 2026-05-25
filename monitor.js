@@ -85,12 +85,11 @@ function checkCurl(url) {
   });
 }
 
-// 重构后的高鲁棒性网页检测模块 (支持跨域 iframe 穿透检测)
+// 网页检测模块：使用真实 UA 并通过跨域上下文执行机制检测 iframe
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
     page = await browser.newPage();
-    // 强制关闭缓存并注入伪装 UA
     await page.setCacheEnabled(false); 
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
@@ -123,25 +122,21 @@ async function checkBrowserPage(browser, targetUrl) {
     let hasInvitation = false;
     const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
 
-    // CDP 驱动级别检测：遍历所有的子框架，包括不同源/跨域的子框架
     const frames = page.frames();
     for (const frame of frames) {
       try {
-        // 在每个 frame 的独立安全上下文运行 evaluate，避免跨域报错中断
+        // 利用 frame.evaluate 进入其独立的子进程上下文读取 DOM，规避 CORS 跨域空白问题
         const frameCheck = await frame.evaluate(() => {
-          // 1. 查找是否存在有效的邀请码输入框
           const inviteInput = document.querySelector('input#invite');
           if (inviteInput && inviteInput.getBoundingClientRect().width > 0) {
             return { matched: true, text: '' };
           }
           
-          // 2. 查找是否存在具有 "INVITATION" 的头部标题
           const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
           if (titles.some(t => /INVITATION/i.test(t.innerText))) {
             return { matched: true, text: '' };
           }
 
-          // 3. 提取当前框架的主体文本，由外部正则去比对敏感词
           const bodyText = document.body ? document.body.innerText : '';
           return { matched: false, text: bodyText };
         }).catch(() => null);
@@ -149,11 +144,11 @@ async function checkBrowserPage(browser, targetUrl) {
         if (frameCheck) {
           if (frameCheck.matched || keywordRegex.test(frameCheck.text)) {
             hasInvitation = true;
-            break; // 任意一个框架匹配成功即可判定
+            break; 
           }
         }
       } catch (err) {
-        // 捕获个别跨域或加载不完全的 iframe 异常，保障主进程不中断
+         // 静默捕获未完全加载框架的报错
       }
     }
 
@@ -382,7 +377,15 @@ async function main() {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${browserTasks.length} 个子任务...`);
       browser = await puppeteer.launch({ 
         headless: true, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--incognito']
+        // 关键改动：传入关闭浏览器安全沙箱和站点隔离的参数，彻底穿透跨域 iframe
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-dev-shm-usage', 
+          '--incognito',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process'
+        ]
       });
       
       const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
