@@ -11,9 +11,6 @@ const CHECK_INTERVAL = 60 * 1000;
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const BROWSER_CONCURRENCY = 3; 
-const CONFIRMATION_THRESHOLD = 2; 
-
-let pendingChanges = {};
 
 // 邮件发送器配置
 const transporter = nodemailer.createTransport({
@@ -90,6 +87,8 @@ async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
     page = await browser.newPage();
+    // 强制关闭浏览器缓存，确保网页状态绝对即时
+    await page.setCacheEnabled(false); 
     await page.setViewport({ width: 1280, height: 720 });
     
     // 追加绕过参数
@@ -205,7 +204,7 @@ function getStatusDisplay(status) {
   return '<b>未知</b>';
 }
 
-// 提取服务器优先级，以确保在"一开一关"时只显示"开"的
+// 提取服务器优先级，以确保在"一开一关"时只显示更开放的那一个
 function getPriority(status) {
   if (status === 'Open') return 4;
   if (status === 'Closed') return 3;
@@ -225,18 +224,12 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
   }
   
   if (oldStatus && finalStatus !== oldStatus) {
-    // 专门处理原先是一开一关（混合状态），现在统一了的情况
     if (oldStatus === "混合状态") {
       let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
-      if (finalStatus === "Offline") {
-        return `所有子服务器均已<b>下线</b>`;
-      } else if (finalStatus === "Error") {
-        return `所有子服务器均出现<b>错误</b>${hashMsg}`;
-      } else if (finalStatus === "Open") {
-        return `所有子服务器均已<b>开放</b>${hashMsg}`;
-      } else if (finalStatus === "Closed") {
-        return `所有子服务器均已转为<b>封闭</b>状态${hashMsg}`;
-      }
+      if (finalStatus === "Offline") return `所有子服务器均已<b>下线</b>`;
+      if (finalStatus === "Error") return `所有子服务器均出现<b>错误</b>${hashMsg}`;
+      if (finalStatus === "Open") return `所有子服务器均已<b>开放</b>${hashMsg}`;
+      if (finalStatus === "Closed") return `所有子服务器均已转为<b>封闭</b>状态${hashMsg}`;
     }
 
     if (oldStatus === "Offline") {
@@ -262,6 +255,13 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
+  // 前置尝试拉取远程最新仓库记录，杜绝因分布式实例造成的“本地文件过期充当缓存”的问题
+  try {
+    execSync('git pull --rebase origin main', { stdio: 'ignore' });
+  } catch (e) {
+    // 忽略错误，仅仅是为了尽力保持本地状态最新
+  }
+
   const baseUrls = [];
   for (let i = 1; i <= 10; i++) {
     baseUrls.push({ url: `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`, type: 'deploy' });
@@ -272,20 +272,14 @@ async function main() {
     { url: "https://tankiclassic.com/play/", type: 'other' }
   );
 
-  let committedStatusJson = {};
-  for (let retries = 3; retries > 0; retries--) {
+  // 直接读取状态文件 server_status.json，作为唯一比对基准（去掉了所有的中间内存缓存变量）
+  let diskStatusJson = {};
+  if (fs.existsSync(STATE_FILE)) {
     try {
-      if (fs.existsSync(STATE_FILE)) committedStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      break;
+      diskStatusJson = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     } catch (e) {
-      console.error(`[${getTime()}] 读取状态文件失败，重试...`);
-      await new Promise(r => setTimeout(r, 1000));
+      console.error(`[${getTime()}] 读取 ${STATE_FILE} 失败，将视为新状态`);
     }
-  }
-
-  let finalStatusJson = {};
-  for (const item of baseUrls) {
-    if (committedStatusJson[item.url]) finalStatusJson[item.url] = committedStatusJson[item.url];
   }
 
   let notifications = [];
@@ -310,14 +304,13 @@ async function main() {
       if (curlRes && curlRes.isAlive) {
          entry.hash = curlRes.hash;
          entry.mainJsLink = curlRes.mainJsLink;
-         // 如果活着，暂时挂载 configs，如果待会查出都死掉会在 Phase 2 清除它
          if (item.type === 'deploy') entry.configs = { '1': 'Offline', '2': 'Offline' };
          else entry.status = 'Offline';
       } else {
-         const oldEntry = committedStatusJson[baseUrl] || {};
+         const oldEntry = diskStatusJson[baseUrl] || {};
          entry.hash = oldEntry.hash || curlRes?.hash || '';
          entry.mainJsLink = oldEntry.mainJsLink || curlRes?.mainJsLink || '';
-         entry.status = 'Offline'; // 只要 Curl 挂了，直接设置为单一下线状态，JSON中将不再携带多余的 configs
+         entry.status = 'Offline';
       }
       currentResults[baseUrl] = entry;
     }
@@ -348,7 +341,7 @@ async function main() {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${browserTasks.length} 个子任务...`);
       browser = await puppeteer.launch({ 
         headless: true, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--incognito'] // 添加无痕模式避免隐性缓存
       });
       
       const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
@@ -366,11 +359,9 @@ async function main() {
       }
     }
 
-    // 关键步骤：清理 JSON 中多余的离线子服务器节点
     for (const item of baseUrls) {
       const currentEntry = currentResults[item.url];
       if (item.type === 'deploy' && currentEntry.configs) {
-        // 如果网页还能访问，但两个子服务器都测出 Offline，抹去子参数并精简为整体 Offline
         if (currentEntry.configs['1'] === 'Offline' && currentEntry.configs['2'] === 'Offline') {
           currentEntry.status = 'Offline';
           delete currentEntry.configs;
@@ -378,66 +369,49 @@ async function main() {
       }
     }
 
-    // Phase 3: 状态比对及多阶段确认
+    // Phase 3: 直接与 server_status.json 内容比对（无内存缓存逻辑）
     let newlyConfirmed = [];
+    let finalStatusJson = { ...diskStatusJson };
+
     for (const item of baseUrls) {
       const baseUrl = item.url;
       const currentEntry = currentResults[baseUrl];
-      const committedEntry = finalStatusJson[baseUrl] || {};
+      const diskEntry = diskStatusJson[baseUrl] || {};
       
-      if (isStateEqual(currentEntry, committedEntry)) {
-        if (pendingChanges[baseUrl]) delete pendingChanges[baseUrl];
-        finalStatusJson[baseUrl] = committedEntry;
-        continue;
-      }
-
-      const pending = pendingChanges[baseUrl];
-      if (pending && isStateEqual(pending.entry, currentEntry)) {
-        pending.count++;
-        if (pending.count >= CONFIRMATION_THRESHOLD) {
-          finalStatusJson[baseUrl] = currentEntry;
-          delete pendingChanges[baseUrl];
-          newlyConfirmed.push(baseUrl);
-        } else {
-          console.log(`[${getTime()}] 待确认 ${pending.count}/${CONFIRMATION_THRESHOLD}: ${baseUrl} 状态异动`);
-          finalStatusJson[baseUrl] = committedEntry;
-        }
-      } else {
-        console.log(`[${getTime()}] 发现潜在变化: ${baseUrl}`);
-        pendingChanges[baseUrl] = { entry: currentEntry, count: 1 };
-        finalStatusJson[baseUrl] = committedEntry;
+      // 如果当前获得的状态与文件读取的 JSON 数据有差异，直接认定为状态异动
+      if (!isStateEqual(currentEntry, diskEntry)) {
+        console.log(`[${getTime()}] 检测到最新状态与文件不一致: ${baseUrl}`);
+        finalStatusJson[baseUrl] = currentEntry;
+        newlyConfirmed.push(baseUrl);
       }
     }
 
-    // Phase 4: 产生提示信息
+    // Phase 4: 产生提示信息与过滤播报
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
-      const committedEntry = committedStatusJson[baseUrl] || {};
-      const oldHash = committedEntry.hash || null;
+      const diskEntry = diskStatusJson[baseUrl] || {}; // 从文件中提取旧状态来生成消息
+      const oldHash = diskEntry.hash || null;
       const hash = currentEntry.hash;
       const mainJsLink = currentEntry.mainJsLink;
 
       if (currentEntry.type === 'deploy') {
-         // 解析新状态，如果已被精简为 status，则提取 fallback 给 c1New, c2New
          const c1New = currentEntry.configs ? currentEntry.configs['1'] : (currentEntry.status || 'Offline');
          const c2New = currentEntry.configs ? currentEntry.configs['2'] : (currentEntry.status || 'Offline');
-         const c1Old = committedEntry.configs ? committedEntry.configs['1'] : (committedEntry.status || null);
-         const c2Old = committedEntry.configs ? committedEntry.configs['2'] : (committedEntry.status || null);
+         const c1Old = diskEntry.configs ? diskEntry.configs['1'] : (diskEntry.status || null);
+         const c2Old = diskEntry.configs ? diskEntry.configs['2'] : (diskEntry.status || null);
 
-         // 若两子服务器一致（包括全离线情况），则合并播报
          if (c1New === c2New) {
             const statusNew = c1New;
             const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? '混合状态' : null);
             const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
             if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
          } else {
-            // 若一开一关等不一致情况，根据要求仅播报状态更好的（“开”的）那个子服务器
             const serverNum = baseUrl.match(/deploy(\d+)/)[1];
             const p1 = getPriority(c1New);
             const p2 = getPriority(c2New);
 
+            // 当二者状态不同，根据优先级仅仅保留并播报更好的（开的）那一个配置链接
             for (const c of ['1', '2']) {
-               // 过滤：当二者状态不同，只处理并播报优先级较高的（忽略相对“关”的）
                if (c === '1' && p1 < p2) continue;
                if (c === '2' && p2 < p1) continue;
 
@@ -450,13 +424,13 @@ async function main() {
          }
       } else {
          const statusNew = currentEntry.status;
-         const statusOld = committedEntry.status || null;
+         const statusOld = diskEntry.status || null;
          const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
          if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
       }
     }
 
-    // 生成可用服务器列表 (基于同样的动态合并隐藏参数逻辑)
+    // 生成可用服务器列表 (基于状态过滤同样生效)
     const availableSet = new Set();
     for (const item of baseUrls) {
       const baseUrl = item.url;
@@ -475,7 +449,7 @@ async function main() {
             const p1 = getPriority(c1);
             const p2 = getPriority(c2);
 
-            // 若一开一关等不一致情况，同样仅向列表中添加优先级高（“开”）的子服务器链接
+            // 一开一关时只展示更高优先级（通常即 "开"）的直链
             if (c1 !== 'Offline' && p1 >= p2) {
                const t1 = `${baseUrl}?config-template=https://c1.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
                availableSet.add(`<a href="${t1}">${t1}</a> (状态: ${getStatusDisplay(c1)})`);
@@ -493,6 +467,7 @@ async function main() {
     }
     availableServers = Array.from(availableSet);
 
+    // 将改变结果直接写回 server_status.json
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
@@ -509,13 +484,7 @@ async function main() {
         fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
         commitAndPush(); 
       }
-
-      const now = Date.now();
-      for (const [url, data] of Object.entries(pendingChanges)) {
-        if (data.timestamp && (now - data.timestamp > 10 * 60 * 1000)) delete pendingChanges[url];
-        else if (!data.timestamp) pendingChanges[url].timestamp = now;
-      }
-      console.log(`[${getTime()}] 无需要通知的已确认状态变化。`);
+      console.log(`[${getTime()}] 无需通知的新状态变化。`);
     }
 
   } catch (err) {
