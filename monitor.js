@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const puppeteer = require('puppeteer'); // 换用 Google 官方的无头浏览器库
 const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
@@ -31,6 +31,22 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
+// 原生 JS 实现的并发控制器（替代第三方的 p-limit）
+async function runWithLimit(tasks, limit) {
+  const results = [];
+  const executing = [];
+  for (const task of tasks) {
+    const p = task();
+    results.push(p);
+    const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+    executing.push(e);
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.all(results);
+}
+
 function checkCurl(url) {
   return new Promise((resolve) => {
     const req = https.get(url, { 
@@ -47,17 +63,14 @@ function checkCurl(url) {
         const isAlive = statusCode >= 200 && statusCode < 300 && data.length > 100;
         const hash = isAlive ? crypto.createHash('sha256').update(data).digest('hex') : '';
         
-        // 尝试提取 main.js 超链接
         let mainJsLink = '';
         if (isAlive) {
-          // 匹配 src 中包含 main.xxxx.js 或 main.js 的链接
           const match = data.match(/src=["']([^"']*\/?main(?:\.[a-z0-9]+)?\.js)["']/i);
           if (match) {
             try {
-              // 自动补全相对路径为绝对路径
               mainJsLink = new URL(match[1], url).href;
             } catch(e) {
-              mainJsLink = match[1]; // 若补全失败则回退至原始路径
+              mainJsLink = match[1]; 
             }
           }
         }
@@ -88,19 +101,16 @@ function checkCurl(url) {
 
 async function checkBrowserPage(browser, url) {
   let page = null;
-  const context = await browser.newContext({
-    // 移除硬编码的带版本号的 User-Agent，将自动应用拉取到的最新 Chromium 的内置 UA
-    viewport: { width: 1280, height: 720 },
-    locale: 'en-US'
-  });
   
   try {
+    page = await browser.newPage();
+    // 移除硬编码的带版本号的 User-Agent，允许引擎自动采用匹配当前内核的最新 UA
+    await page.setViewport({ width: 1280, height: 720 });
+    
     const targetUrl = url.includes('?') 
       ? url + '&skipEntranceAnyKey&locale=en' 
       : url + '?skipEntranceAnyKey&locale=en';
     
-    page = await context.newPage();
-
     let refreshCount = 0;
     const navListener = (frame) => {
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') {
@@ -114,49 +124,48 @@ async function checkBrowserPage(browser, url) {
       timeout: 45000 
     });
     
-    if (!response || response.status() >= 400) {
+    if (!response || !response.ok()) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
     try {
-      await page.waitForLoadState('networkidle', { timeout: 8000 });
+      await page.waitForNetworkIdle({ timeout: 8000 });
     } catch (e) {
       // 网络空闲超时不报错
     }
     
-    await page.waitForTimeout(3000); 
+    // Puppeteer 最新版废弃了 waitForTimeout，使用原生 Promise 延迟
+    await new Promise(r => setTimeout(r, 3000)); 
     refreshCount = 0; 
-    await page.waitForTimeout(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     if (refreshCount > 0) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
-    let hasInvitation = false;
-    const inviteInput = page.locator('input#invite');
-    const inviteTitle = page.locator('.EntranceComponentStyle-title', { hasText: /INVITATION/i });
-    
-    if ((await inviteInput.isVisible().catch(() => false)) || 
-        (await inviteTitle.isVisible().catch(() => false))) {
-        hasInvitation = true;
-    }
+    // Google Puppeteer 页面 DOM 检测（原 Playwright 写法的转化）
+    let hasInvitation = await page.evaluate(() => {
+      const inviteInput = document.querySelector('input#invite');
+      const inputVisible = inviteInput && inviteInput.getBoundingClientRect().width > 0;
+      if (inputVisible) return true;
+      
+      const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
+      const titleVisible = titles.some(t => /INVITATION/i.test(t.innerText));
+      if (titleVisible) return true;
 
-    if (!hasInvitation) {
-        const frames = page.frames();
-        const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+      const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+      const frames = Array.from(window.frames);
+      for (let i = 0; i < frames.length; i++) {
+        try {
+          if (keywordRegex.test(frames[i].document.body.innerText)) {
+            return true;
+          }
+        } catch(e) {} // 忽略跨域等报错
+      }
+      return false;
+    });
 
-        for (const frame of frames) {
-            try {
-                const visibleText = await frame.locator('body').innerText().catch(() => '');
-                if (keywordRegex.test(visibleText)) {
-                    hasInvitation = true;
-                    break;
-                }
-            } catch (err) {}
-        }
-    }
-    
     return { 
       url, 
       status: hasInvitation ? 'Closed' : 'Open',
@@ -167,7 +176,6 @@ async function checkBrowserPage(browser, url) {
     const msg = e.message ? e.message.toLowerCase() : "";
     if (
       msg.includes('navigating') || 
-      msg.includes('retrieve content') || 
       msg.includes('execution context') || 
       msg.includes('destroyed') ||
       msg.includes('timeout') ||
@@ -180,7 +188,7 @@ async function checkBrowserPage(browser, url) {
     console.log(`[${getTime()}] 判定为 Offline - ${url}: ${e.message}`);
     return { url, status: 'Offline', error: e.message };
   } finally {
-    await context.close().catch(() => {});
+    if (page) await page.close().catch(() => {});
   }
 }
 
@@ -232,7 +240,7 @@ async function main() {
   const loopStart = Date.now();
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-  const urls =[];
+  const urls = [];
   for (let i = 1; i <= 10; i++) {
     urls.push(`https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`);
   }
@@ -260,19 +268,18 @@ async function main() {
 
   let finalStatusJson = { ...committedStatusJson };
   let notifications = [];
-  let availableServers =[];
+  let availableServers = [];
   let browser = null;
   let currentResults = {};
 
   try {
     console.log(`[${getTime()}] Phase 1: Curl 检测 ${urls.length} 个 URL...`);
     const curlResults = await Promise.all(urls.map(url => checkCurl(url)));
-    const candidatesForBrowser =[];
+    const candidatesForBrowser = [];
 
     for (const res of curlResults) {
       const { url, isAlive, hash, statusCode, mainJsLink } = res;
       if (isAlive) {
-        // 保存提取出的 mainJsLink 并传递给下一个阶段
         candidatesForBrowser.push({ url, hash, mainJsLink });
         console.log(`[${getTime()}] Curl 存活: ${url} (${statusCode})`);
       } else {
@@ -283,23 +290,25 @@ async function main() {
 
     if (candidatesForBrowser.length > 0) {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
-      browser = await chromium.launch({ 
-        headless: true,
-        args:['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      
+      // 启动 Google 官方 Puppeteer 引擎
+      browser = await puppeteer.launch({ 
+        headless: true, // Google Puppeteer 最新写法，纯无头模式
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
-      const { default: pLimit } = await import('p-limit');
-      const limit = pLimit(BROWSER_CONCURRENCY);
-      
-      const browserPromises = candidatesForBrowser.map(candidate => 
-        limit(() => checkBrowserPage(browser, candidate.url).then(res => ({
+      // 组装要在 Puppeteer 中运行的任务池
+      const browserTasks = candidatesForBrowser.map(candidate => async () => {
+        const res = await checkBrowserPage(browser, candidate.url);
+        return {
           ...res,
           hash: candidate.hash,
-          mainJsLink: candidate.mainJsLink // 从上面透传下来
-        })))
-      );
+          mainJsLink: candidate.mainJsLink
+        };
+      });
       
-      const browserResults = await Promise.all(browserPromises);
+      // 调用自己手写的原生并发控制执行任务
+      const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
       
       for (const res of browserResults) {
         const { url, status, hash, error, mainJsLink } = res;
@@ -314,7 +323,6 @@ async function main() {
           ? oldEntry.hash 
           : hash;
         
-        // 同样在离线状态下保留之前旧版本的 JS 超链接信息
         const linkToSave = (finalStatus === 'Offline') && oldEntry.mainJsLink 
           ? oldEntry.mainJsLink 
           : mainJsLink;
@@ -346,7 +354,7 @@ async function main() {
           const oldHash = committedEntry.hash || null;
           const finalStatus = currentEntry.status;
           const hash = currentEntry.hash;
-          const mainJsLink = currentEntry.mainJsLink; // 取出刚抓取的JS链接
+          const mainJsLink = currentEntry.mainJsLink; 
 
           let displayStatus = "";
           let displayStatusBold = "";
@@ -384,7 +392,6 @@ async function main() {
                if (oldStatus === 'Closed') oldDisplay = '<b>封闭</b>';
                if (oldStatus === 'Error') oldDisplay = '<b>错误</b>';
                message = `服务器状态已从${oldDisplay}变为${displayStatusBold}`;
-               // 如果服务器状态改变且发生哈希变化，附加JS代码链接
                if (hash !== oldHash) message += `，且代码已<b>更新</b>` + jsLinkText;
             }
           }
@@ -424,7 +431,7 @@ async function main() {
       const pushed = commitAndPush();
       
       if (pushed) {
-        const changeDetails = notifications.join('<br><br>'); // 增大行距方便查看 JS 链接
+        const changeDetails = notifications.join('<br><br>'); 
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
         const availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
         const fullBody = `检测到状态变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
