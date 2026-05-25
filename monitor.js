@@ -143,7 +143,8 @@ async function checkBrowserPage(browser, targetUrl) {
   }
 }
 
-function commitAndPush() {
+// ================== 重写的 Git 提交模块，抗并发、带重试与回滚 ==================
+async function commitAndPush(retries = 3) {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
@@ -152,16 +153,39 @@ function commitAndPush() {
     const status = execSync('git status --porcelain').toString();
     if (!status) return false;
 
-    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
-    execSync('git pull --rebase origin main', { stdio: 'pipe' });
-    execSync('git push origin main');
-    console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
-    return true;
+    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"', { stdio: 'pipe' });
   } catch (e) {
-    console.error(`[${getTime()}] Git 操作失败:`, e.message);
-    try { execSync('git rebase --abort'); } catch (err) {}
+    console.error(`[${getTime()}] Git commit 失败或无更改`);
     return false;
   }
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      execSync('git pull --rebase origin main', { stdio: 'pipe' });
+      execSync('git push origin main', { stdio: 'pipe' });
+      console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
+      return true;
+    } catch (e) {
+      const errorMsg = (e.stderr || e.message).toString().split('\n')[0];
+      console.error(`[${getTime()}] Git push 失败 (尝试 ${i + 1}/${retries}):`, errorMsg);
+      // 中断可能残留的错乱 rebase 状态
+      try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (err) {}
+      
+      if (i < retries - 1) {
+        // 随机延迟 2 到 5 秒避让其他正在推送的进程
+        const delay = 2000 + Math.random() * 3000;
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+
+  console.error(`[${getTime()}] Git 推送彻底失败，正在撤销本地提交以保证下一次环境干净...`);
+  try {
+    // 强制丢弃刚刚生成但没推上去的 commit，避免下个循环卡死
+    execSync('git reset --hard HEAD~1', { stdio: 'ignore' }); 
+  } catch (e) {}
+  
+  return false;
 }
 
 function isStateEqual(a, b) {
@@ -192,17 +216,15 @@ async function sendEmail(body) {
   }
 }
 
-// UI 翻译字典，消除代码内部状态流转中的中文
 function getStatusDisplay(status) {
   if (status === 'Open') return '<b>开放</b>';
   if (status === 'Closed') return '<b>封闭</b>';
   if (status === 'Error') return '<b>错误</b>';
   if (status === 'Offline') return '<b>下线</b>';
   if (status === 'Mixed') return '<b>一开一关</b>';
-  return `<b>${status}</b>`; // 其余纯英文原样输出，不再使用"未知"
+  return `<b>${status}</b>`; 
 }
 
-// 提取服务器优先级
 function getPriority(status) {
   if (status === 'Open') return 4;
   if (status === 'Closed') return 3;
@@ -222,11 +244,9 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
   }
   
   if (oldStatus && finalStatus !== oldStatus) {
-    // 专门处理原先是一开一关（Mixed），现在统一了的情况
     if (oldStatus === "Mixed") {
       let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
       
-      // 整体下线，直接提示整个服务器已下线即可，不再啰嗦子服务器
       if (finalStatus === "Offline") return `${entity}已下线 (原状态: ${oldDisplay})`;
       
       if (finalStatus === "Error") return `${entity}出现<b>错误</b>${hashMsg}`;
@@ -257,9 +277,12 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
+  // 前置清理保护：防范上一次如果发生异常冲突导致的遗留 rebase 问题
   try {
-    execSync('git pull --rebase origin main', { stdio: 'ignore' });
-  } catch (e) {}
+    execSync('git pull --rebase origin main', { stdio: 'pipe' });
+  } catch (e) {
+    try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (err) {}
+  }
 
   const baseUrls = [];
   for (let i = 1; i <= 10; i++) {
@@ -380,7 +403,6 @@ async function main() {
       }
     }
 
-    // Phase 4: 产生提示信息与过滤播报
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
       const diskEntry = diskStatusJson[baseUrl] || {}; 
@@ -396,7 +418,6 @@ async function main() {
 
          if (c1New === c2New) {
             const statusNew = c1New;
-            // 完全消除使用中文 "混合状态" 的逻辑，统一改为 'Mixed'
             const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? 'Mixed' : null);
             const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
             if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
@@ -459,9 +480,10 @@ async function main() {
     }
     availableServers = Array.from(availableSet);
 
+    // 修改：所有 commitAndPush 调用的地方加上 await
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-      const pushed = commitAndPush();
+      const pushed = await commitAndPush();
       
       if (pushed) {
         const changeDetails = notifications.join('<br><br>'); 
@@ -473,7 +495,7 @@ async function main() {
     } else {
       if (newlyConfirmed.length > 0) {
         fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
-        commitAndPush(); 
+        await commitAndPush(); 
       }
       console.log(`[${getTime()}] 无需通知的新状态变化。`);
     }
