@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer'); 
+const puppeteer = require('puppeteer'); // 换用 Google 官方的无头浏览器库
 const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
@@ -31,7 +31,7 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 原生 JS 实现的并发控制器
+// 原生 JS 实现的并发控制器（替代第三方的 p-limit）
 async function runWithLimit(tasks, limit) {
   const results = [];
   const executing = [];
@@ -47,17 +47,13 @@ async function runWithLimit(tasks, limit) {
   return Promise.all(results);
 }
 
-// 阶段 1：Curl 网页探活并提取 JS 链接
 function checkCurl(url) {
   return new Promise((resolve) => {
     const req = https.get(url, { 
       rejectUnauthorized: false, 
       timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     }, (res) => {
       const { statusCode } = res;
@@ -103,21 +99,12 @@ function checkCurl(url) {
   });
 }
 
-// 阶段 2：无头浏览器深度检测
 async function checkBrowserPage(browser, url) {
   let page = null;
   
   try {
     page = await browser.newPage();
-    
-    // 【防拦截深度伪装】彻底洗掉机器人指纹，防止部分检测直接抛出 403
-    const ua = await browser.userAgent();
-    await page.setUserAgent(ua.replace(/HeadlessChrome/g, 'Chrome'));
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      window.chrome = { runtime: {} };
-    });
-
+    // 移除硬编码的带版本号的 User-Agent，允许引擎自动采用匹配当前内核的最新 UA
     await page.setViewport({ width: 1280, height: 720 });
     
     const targetUrl = url.includes('?') 
@@ -141,49 +128,43 @@ async function checkBrowserPage(browser, url) {
       return { url, status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    // ==========================================
-    // 终极修复：动态轮询等待机制
-    // ==========================================
-    let hasInvitation = false;
-    let isAutoRefreshing = false;
-
-    // GitHub Actions 机器极慢，JS渲染大型游戏可能需要 15-25 秒。
-    // 在这里轮询最多 20 次，每次 2 秒 (总计最多等待 40 秒)。
-    for (let i = 0; i < 20; i++) {
-      // 初始加载算一次，超过 1 次说明陷入了重定向死循环
-      if (refreshCount > 1) { 
-        isAutoRefreshing = true;
-        break;
-      }
-
-      try {
-        hasInvitation = await page.evaluate(() => {
-          // 1. 只要 DOM 中存在 input#invite，无论在屏幕内外，都说明是 Closed
-          if (document.querySelector('input#invite')) return true;
-          
-          // 2. 暴力扫描整个页面的纯文本
-          const bodyText = document.body.textContent || '';
-          if (/invitation|invite code|activation code|邀请码/i.test(bodyText)) return true;
-          
-          return false;
-        });
-
-        // 只要抓到一次，说明肯定上锁了，立刻停止等待跳出循环
-        if (hasInvitation) {
-          break;
-        }
-      } catch (e) {
-        // 忽略因为正在跳转等造成的 evaluate 执行失败
-      }
-
-      // 如果还没抓到，可能是 JS 还在慢慢 Loading，等 2 秒再查
-      await new Promise(r => setTimeout(r, 2000));
+    try {
+      await page.waitForNetworkIdle({ timeout: 8000 });
+    } catch (e) {
+      // 网络空闲超时不报错
     }
+    
+    // Puppeteer 最新版废弃了 waitForTimeout，使用原生 Promise 延迟
+    await new Promise(r => setTimeout(r, 3000)); 
+    refreshCount = 0; 
+    await new Promise(r => setTimeout(r, 2000));
 
-    if (isAutoRefreshing) {
+    if (refreshCount > 0) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${url}`);
        return { url, status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
+    
+    // Google Puppeteer 页面 DOM 检测（原 Playwright 写法的转化）
+    let hasInvitation = await page.evaluate(() => {
+      const inviteInput = document.querySelector('input#invite');
+      const inputVisible = inviteInput && inviteInput.getBoundingClientRect().width > 0;
+      if (inputVisible) return true;
+      
+      const titles = Array.from(document.querySelectorAll('.EntranceComponentStyle-title'));
+      const titleVisible = titles.some(t => /INVITATION/i.test(t.innerText));
+      if (titleVisible) return true;
+
+      const keywordRegex = /invitation|invite code|activation code|邀请码|邀请/i;
+      const frames = Array.from(window.frames);
+      for (let i = 0; i < frames.length; i++) {
+        try {
+          if (keywordRegex.test(frames[i].document.body.innerText)) {
+            return true;
+          }
+        } catch(e) {} // 忽略跨域等报错
+      }
+      return false;
+    });
 
     return { 
       url, 
@@ -310,11 +291,13 @@ async function main() {
     if (candidatesForBrowser.length > 0) {
       console.log(`[${getTime()}] Phase 2: 浏览器检测 ${candidatesForBrowser.length} 个候选...`);
       
+      // 启动 Google 官方 Puppeteer 引擎
       browser = await puppeteer.launch({ 
-        headless: true,
+        headless: true, // Google Puppeteer 最新写法，纯无头模式
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
+      // 组装要在 Puppeteer 中运行的任务池
       const browserTasks = candidatesForBrowser.map(candidate => async () => {
         const res = await checkBrowserPage(browser, candidate.url);
         return {
@@ -324,6 +307,7 @@ async function main() {
         };
       });
       
+      // 调用自己手写的原生并发控制执行任务
       const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
       
       for (const res of browserResults) {
