@@ -85,7 +85,7 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块：使用智能轮询和全文本/属性检测，规避加载延迟、语言回退及混淆类名带来的漏检
+// 网页检测模块...
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -111,7 +111,7 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try { await page.waitForNetworkIdle({ timeout: 8000 }); } catch (e) {}
     
-    // 1. 智能轮询：检查所有 Frame 中是否已经成功渲染出了 <input> 输入框（意味着登录/邀请表单加载完成，而非 Loading 动画）
+    // 1. 智能轮询
     let isAppLoaded = false;
     for (let poll = 0; poll < 10; poll++) {
       const frames = page.frames();
@@ -125,30 +125,25 @@ async function checkBrowserPage(browser, targetUrl) {
         } catch (err) {}
       }
       if (isAppLoaded) break;
-      await new Promise(r => setTimeout(r, 1500)); // 每次轮询间隔 1.5 秒
+      await new Promise(r => setTimeout(r, 1500));
     }
 
     refreshCount = 0; 
     await new Promise(r => setTimeout(r, 2000));
 
-    // 允许 1 次以内的合法的路由转换（比如 React 内部重定向），大于 1 次才视为异常循环
     if (refreshCount > 1) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${targetUrl}`);
        return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
     let hasInvitation = false;
-    // 扩展关键字正则：涵盖中、英、俄语下的“邀请、激活、инвайт-код、активация”等，避免多语言包加载导致的漏检
     const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац/i;
 
     const frames = page.frames();
     for (const frame of frames) {
       try {
-        // 类名无关检测逻辑
         const frameCheck = await frame.evaluate((regexStr) => {
           const regex = new RegExp(regexStr, 'i');
-          
-          // A. 检索页面所有 input 的属性值，如果发现包含 "invite", "code", "инвайт", "邀请" 等，直接标记
           const inputs = Array.from(document.querySelectorAll('input'));
           const hasInviteInput = inputs.some(input => {
             const id = input.id || '';
@@ -157,12 +152,7 @@ async function checkBrowserPage(browser, targetUrl) {
             const className = input.className || '';
             return /invite|code|инвайт|активац|邀请|码/i.test(id + ' ' + placeholder + ' ' + name + ' ' + className);
           });
-          
-          if (hasInviteInput) {
-            return { matched: true, text: '' };
-          }
-          
-          // B. 兜底全局文本关键字匹配
+          if (hasInviteInput) return { matched: true, text: '' };
           const bodyText = document.body ? document.body.innerText : '';
           return { matched: regex.test(bodyText), text: bodyText };
         }, keywordRegex.source).catch(() => null);
@@ -171,20 +161,38 @@ async function checkBrowserPage(browser, targetUrl) {
           hasInvitation = true;
           break; 
         }
+      } catch (err) {}
+    }
+
+    // ================== 新增：截图排查逻辑 ==================
+    if (!hasInvitation) {
+      try {
+        // 生成具有辨识度的文件名，例如: debug_public-deploy1_c1_open.png
+        const urlObj = new URL(targetUrl);
+        const hostPrefix = urlObj.hostname.split('.')[0];
+        let configSuffix = '';
+        if (targetUrl.includes('c1.')) configSuffix = '_c1';
+        if (targetUrl.includes('c2.')) configSuffix = '_c2';
+        
+        const screenshotPath = `debug_${hostPrefix}${configSuffix}_open.png`;
+        
+        // 截取全页
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log(`[${getTime()}] 未匹配到封闭特征(疑似Open)，已保存截图进行人工核对: ${screenshotPath}`);
       } catch (err) {
-         // 静默捕获
+        console.log(`[${getTime()}] 保存排查截图失败: ${err.message}`);
       }
     }
+    // =========================================================
 
     return { status: hasInvitation ? 'Closed' : 'Open', httpStatus: response.status() };
     
   } catch (e) {
+    // 错误捕获保持不变...
     const msg = e.message ? e.message.toLowerCase() : "";
     if (msg.includes('navigating') || msg.includes('execution context') || msg.includes('destroyed') || msg.includes('timeout') || msg.includes('redirect')) {
-       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${targetUrl}: ${e.message}`);
        return { status: 'Error', error: e.message };
     }
-    console.log(`[${getTime()}] 判定为 Offline - ${targetUrl}: ${e.message}`);
     return { status: 'Offline', error: e.message };
   } finally {
     if (page) await page.close().catch(() => {});
