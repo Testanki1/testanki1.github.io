@@ -252,7 +252,6 @@ function getStatusStyles(status) {
   return `background-color: ${bg}; color: ${color}; display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; vertical-align: middle;`;
 }
 
-// 修改点 1：控制 generateMessage 返回的 jsLink 仅在网页代码真正更新时非空
 function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSubServer = false) {
   let text = "";
   const displayStatusBold = `<span style="${getStatusStyles(finalStatus)}">${getStatusDisplay(finalStatus)}</span>`;
@@ -286,14 +285,14 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
     text = `网页代码已更新（当前状态：${displayStatusBold}）`;
   }
 
-  // 只有在代码更新(isCodeUpdated为true)且存在JS链接时，才对外提供jsLink
   return { text, jsLink: isCodeUpdated ? mainJsLink : "" };
 }
 
+// 修改点：优化移动端 padding
 function createCard(url, text, jsLink) {
   let jsHtml = jsLink ? `<div style="font-size: 12px; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; word-break: break-all; color: #BFD5FF;">▶ <b>提取JS：</b> <a href="${jsLink}" style="color: #76FF33; text-decoration: none;">${jsLink}</a></div>` : "";
   return `
-  <div style="background-color: #0c2634; border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #1a3b4c;">
+  <div style="background-color: #0c2634; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid #1a3b4c;">
       <div style="font-size: 14px; margin-bottom: 8px; word-break: break-all;">
           <a href="${url}" style="color: #76FF33; text-decoration: none; font-weight: 500;">${url}</a>
       </div>
@@ -302,18 +301,11 @@ function createCard(url, text, jsLink) {
   </div>`;
 }
 
-// 修改点 2：外层嵌套 <a>，让整个服务器卡片行支持点击跳转，而不仅仅是左边的文字
+// 修改点：移除 SVG 图标，对移动端界面布局宽度、内边距进行优化调整
 function createServerButton(url, status) {
-  const svgs = {
-      error: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 24px; height: 24px;"><circle opacity="0.4" cx="16" cy="16" r="16" fill="#FF6666"/><circle cx="16" cy="16" r="12" fill="#FF6666"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 22V20H18V22H14ZM14 10L14 18H15.3333C16.8061 18 18 15.3333V10H14Z" fill="#001926"/></svg>`,
-      open: `<svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 24px; height: 24px;"><circle cx="15" cy="15" r="8" fill="#76FF33"/><circle cx="15" cy="15" r="11.5" stroke="#76FF33" stroke-opacity="0.25" stroke-width="7"/></svg>`,
-      closed: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 24px; height: 24px;"><path fill-rule="evenodd" clip-rule="evenodd" d="M32 20H35.4477C35.8013 20 36.1405 20.1405 36.3905 20.3905L37.6095 21.6095C37.8595 21.8595 38 22.1987 38 22.5523V37.4477C38 37.8013 37.8595 38.1405 37.6095 38.3905L36.3905 39.6095C36.1405 39.8595 35.8013 40 35.4477 40H12.5523C12.1987 40 11.8595 39.8595 11.6095 39.6095L10.3905 38.3905C10.1405 38.1405 10 37.8013 10 37.4477V22.5523C10 22.1987 10.1405 21.8595 10.3905 21.6095L11.6095 20.3905C11.8595 20.1405 12.1987 20 12.5523 20H16V16C16 11.5817 19.5817 8 24 8C28.4183 8 32 11.5817 32 16V20ZM29 20V16C29 13.2386 26.7614 11 24 11C21.2386 11 19 13.2386 19 16V20H29ZM20 30L24 26L28 30L24 34L20 30Z" fill="#BFD5FF"/></svg>`
-  };
-  
-  let icon = svgs.closed;
   let color = "#BFD5FF";
-  if (status === 'Open') { icon = svgs.open; color = "#76FF33"; }
-  else if (status === 'Error') { icon = svgs.error; color = "#FF6666"; }
+  if (status === 'Open') { color = "#76FF33"; }
+  else if (status === 'Error') { color = "#FF6666"; }
 
   let name = url;
   if (url.includes('public-deploy')) {
@@ -321,11 +313,11 @@ function createServerButton(url, status) {
       if (match) name = `Deploy ${match[1]}`;
       if (url.includes('c1.')) name += ' (c1)';
       if (url.includes('c2.')) name += ' (c2)';
-      if (url.includes('deploy-classic')) name = 'Classic';
+      if (url.includes('deploy-classic')) name = 'Classic (Test)';
   } else if (url.includes('test.ru.tankionline')) {
       name = 'Test RU';
   } else if (url.includes('tankiclassic')) {
-      name = 'Tanki Classic';
+      name = 'Classic';
   } else {
       try { name = new URL(url).hostname; } catch(e){}
   }
@@ -334,12 +326,11 @@ function createServerButton(url, status) {
   <a href="${url}" target="_blank" style="text-decoration: none; display: block; margin-bottom: 8px;">
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0c2634; border-radius: 12px; border: 1px solid #1a3b4c; table-layout: fixed;">
           <tr>
-              <td style="padding: 16px 20px; font-size: 16px; font-weight: 500; color: ${color}; word-break: break-all;">
+              <td style="padding: 14px 16px; font-size: 15px; font-weight: 500; color: ${color}; word-break: break-all;">
                   ${name}
               </td>
-              <td align="right" style="padding: 16px 20px; width: 130px; white-space: nowrap;">
-                  <span style="${getStatusStyles(status)} margin-right: 8px; vertical-align: middle;">${getStatusDisplay(status)}</span>
-                  <span style="display: inline-block; width: 24px; height: 24px; vertical-align: middle;">${icon}</span>
+              <td align="right" style="padding: 14px 16px; width: 80px; white-space: nowrap;">
+                  <span style="${getStatusStyles(status)}">${getStatusDisplay(status)}</span>
               </td>
           </tr>
       </table>
@@ -617,34 +608,41 @@ async function main() {
       const pushed = commitAndPush();
 
       if (pushed) {
-        // --- 组装带全新 UI 与边距优化的 Email ---
+        // --- 组装带响应式 UI 与媒体查询边距优化的 Email ---
         const changeDetails = notifications.join('');
-        const availableListHeader = `<div style="font-size: 16px; color: #76FF33; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">当前已上线的服务器列表（${availableServers.length}个）</div>`;
+        const availableListHeader = `<div style="font-size: 15px; color: #76FF33; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">当前已上线的服务器列表（${availableServers.length}个）</div>`;
         const availableListBody = availableServers.length > 0 
             ? availableServers.map(s => createServerButton(s.url, s.status)).join('') 
             : `<div style="text-align: center; opacity: 0.6; margin-top: 20px; color: #BFD5FF;">当前暂无服务器</div>`;
         
-        // 修改点 3：通过嵌套外层 Table 增加 16px 左右侧边距，避免移动设备上两侧无间隙
+        // 修改点：加入了 <style> 来在移动端压制内边距，移除固定外框导致的不必要留白
         const fullBody = `
         <!DOCTYPE html>
         <html lang="zh">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                @media only screen and (max-width: 600px) {
+                    .container { width: 100% !important; max-width: 100% !important; }
+                    .outer-td { padding: 16px 10px !important; }
+                    .header-title { font-size: 20px !important; }
+                }
+            </style>
         </head>
-        <body style="font-family: 'Rubik', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #001926; color: #BFD5FF; margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
-            <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #001926;">
+        <body style="font-family: 'Rubik', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #001926; color: #BFD5FF; margin: 0; padding: 0; width: 100%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+            <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #001926; width: 100%;">
                 <tr>
-                    <td align="center" style="padding: 24px 16px;">
-                        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px; text-align: left;">
+                    <td align="center" style="padding: 24px 16px;" class="outer-td">
+                        <table width="100%" border="0" cellpadding="0" cellspacing="0" class="container" style="max-width: 600px; text-align: left; width: 100%;">
                             <tr>
                                 <td>
                                     <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid rgba(191, 213, 255, 0.1); margin-bottom: 20px;">
-                                        <h1 style="margin: 0; font-size: 24px; color: #fff; font-weight: 500;">3D坦克测试服务器</h1>
+                                        <h1 class="header-title" style="margin: 0; font-size: 24px; color: #fff; font-weight: 500;">3D坦克测试服务器</h1>
                                         <span style="display: inline-block; font-size: 12px; color: #76FF33; background-color: rgba(118, 255, 51, 0.1); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(118, 255, 51, 0.3); margin-top: 8px;">状态更新通知</span>
                                     </div>
                                     
-                                    <div style="font-size: 16px; color: #76FF33; margin-top: 10px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">检测到状态变化</div>
+                                    <div style="font-size: 15px; color: #76FF33; margin-top: 10px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">检测到状态变化</div>
                                     ${changeDetails}
                                     
                                     ${availableListHeader}
