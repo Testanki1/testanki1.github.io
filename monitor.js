@@ -85,7 +85,7 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块：包含按键模拟和更严格的等待逻辑
+// 网页检测模块：包含增强按键模拟和排查输出
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -111,25 +111,27 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) {}
     
-    // ================== 关键优化 1：突破“按任意键继续”拦截屏 ==================
+    // ================== 强化：突破拦截屏 ==================
     try {
-      // 模拟用户点击屏幕中央并按下空格/回车，触发拦截屏卸载
+      // 1. 多等 2 秒，确保页面事件监听器(React hydrate)已经完全绑定
+      await new Promise(r => setTimeout(r, 2000)); 
+      // 2. 强制页面获取焦点
+      await page.bringToFront();
+      // 3. 点击并按键
       await page.mouse.click(640, 360);
       await page.keyboard.press('Space');
       await page.keyboard.press('Enter');
-      // 给前端 React 留出时间渲染真正的 INVITATION 表单
-      await new Promise(r => setTimeout(r, 2500));
+      // 4. 再给前端 3 秒时间渲染真正的 INVITATION 表单
+      await new Promise(r => setTimeout(r, 3000));
     } catch (e) {}
-    // =======================================================================
+    // ======================================================
 
-    // ================== 关键优化 2：智能轮询可见输入框 ==================
     let isAppLoaded = false;
     for (let poll = 0; poll < 15; poll++) {
       const frames = page.frames();
       for (const frame of frames) {
         try {
           isAppLoaded = await frame.evaluate(() => {
-            // 不仅要找到 input，还要确保它是肉眼可见的（宽/高 > 0）
             const inputs = Array.from(document.querySelectorAll('input'));
             const visibleInput = inputs.find(i => i.offsetWidth > 0 && i.offsetHeight > 0);
             return !!visibleInput;
@@ -142,17 +144,13 @@ async function checkBrowserPage(browser, targetUrl) {
     }
 
     refreshCount = 0; 
-    // 发现 input 后再多给 3 秒，防止文本动画还没播完
     await new Promise(r => setTimeout(r, 3000));
 
     if (refreshCount > 1) {
-       console.log(`[${getTime()}] 检测到自动刷新循环 - ${targetUrl}`);
        return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
     
     let hasInvitation = false;
-    // ================== 关键优化 3：扩展检测字典 ==================
-    // 加入了维护、关闭等常见的非开放状态提示词
     const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац|maintenance|closed server|доступ закрыт/i;
 
     const frames = page.frames();
@@ -184,21 +182,52 @@ async function checkBrowserPage(browser, targetUrl) {
       } catch (err) {}
     }
 
+    // ================== 调试输出逻辑：同时保存 HTML 和 PNG ==================
+    if (!hasInvitation) {
+      try {
+        const urlObj = new URL(targetUrl);
+        const hostPrefix = urlObj.hostname.split('.')[0];
+        let configSuffix = '';
+        if (targetUrl.includes('c1.')) configSuffix = '_c1';
+        if (targetUrl.includes('c2.')) configSuffix = '_c2';
+        
+        const baseFileName = `debug_${hostPrefix}${configSuffix}_open`;
+        
+        // 1. 保存 HTML（包含所有 Frame）
+        let fullHtml = await page.content();
+        for (const f of page.frames()) {
+          if (f !== page.mainFrame()) {
+            fullHtml += `\n\n<!-- ================= FRAME: ${f.url()} ================= -->\n`;
+            try { fullHtml += await f.content(); } catch (frameErr) {}
+          }
+        }
+        fs.writeFileSync(`${baseFileName}.html`, fullHtml);
+
+        // 2. 保存截图 (极度建议保留，万一界面变成 Canvas 渲染，HTML是看不出内容的)
+        await page.screenshot({ path: `${baseFileName}.png`, fullPage: true });
+
+        console.log(`[${getTime()}] 未匹配到封闭特征，疑似被误判为 Open。已保存排查文件: ${baseFileName}.html/png`);
+      } catch (err) {
+        console.log(`[${getTime()}] 保存排查文件失败: ${err.message}`);
+      }
+    }
+    // =======================================================================
+
     return { status: hasInvitation ? 'Closed' : 'Open', httpStatus: response.status() };
     
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
     if (msg.includes('navigating') || msg.includes('execution context') || msg.includes('destroyed') || msg.includes('timeout') || msg.includes('redirect')) {
-       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${targetUrl}: ${e.message}`);
        return { status: 'Error', error: e.message };
     }
-    console.log(`[${getTime()}] 判定为 Offline - ${targetUrl}: ${e.message}`);
     return { status: 'Offline', error: e.message };
   } finally {
     if (page) await page.close().catch(() => {});
   }
 }
 
+// ... 下方的 commitAndPush, isStateEqual, sendEmail 等函数保持完全不变 ...
+// 为了节约版面省略，请将剩下的所有代码一并贴入。
 function commitAndPush() {
   try {
     execSync('git config --global user.name "github-actions[bot]"');
