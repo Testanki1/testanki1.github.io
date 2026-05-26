@@ -1,26 +1,25 @@
-const puppeteer = require('puppeteer'); 
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const nodemailer = require('nodemailer');
 
-// --- 配置 ---
+// --- 配置 --- 
 const STATE_FILE = 'server_status.json';
-const CHECK_INTERVAL = 60 * 1000;
+const CHECK_INTERVAL = 60 * 1000; // 严格的 1 分钟周期
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
-const BROWSER_CONCURRENCY = 3; 
 const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
 
 let pendingChanges = {}; // 内存队列
 
-// 邮件发送器配置
+// 邮件发送器配置 
 const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
-  family: 4, 
+  family: 4,
   auth: {
     user: process.env.MAIL_USERNAME,
     pass: process.env.MAIL_PASSWORD
@@ -31,41 +30,23 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-async function runWithLimit(tasks, limit) {
-  const results = [];
-  const executing = [];
-  for (const task of tasks) {
-    const p = task();
-    results.push(p);
-    const e = p.then(() => executing.splice(executing.indexOf(e), 1));
-    executing.push(e);
-    if (executing.length >= limit) {
-      await Promise.race(executing);
-    }
-  }
-  return Promise.all(results);
-}
-
-// 已移除 headers 里的自定义 User-Agent
+// 已移除 headers 里的自定义 User-Agent 
 function checkCurl(url) {
   return new Promise((resolve) => {
-    const req = https.get(url, { 
-      rejectUnauthorized: false, 
-      timeout: 15000
-    }, (res) => {
+    const req = https.get(url, { rejectUnauthorized: false, timeout: 15000 }, (res) => {
       const { statusCode } = res;
       let data = '';
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
         const isAlive = statusCode >= 200 && statusCode < 300 && data.length > 100;
         const hash = isAlive ? crypto.createHash('sha256').update(data).digest('hex') : '';
-        
+
         let mainJsLink = '';
         if (isAlive) {
           const match = data.match(/src=["']([^"']*\/?main(?:\.[a-z0-9]+)?\.js)["']/i);
           if (match) {
-            try { mainJsLink = new URL(match[1], url).href; } 
-            catch(e) { mainJsLink = match[1]; }
+            try { mainJsLink = new URL(match[1], url).href; }
+            catch (e) { mainJsLink = match[1]; }
           }
         }
         resolve({ url, statusCode, hash, isAlive, dataLength: data.length, mainJsLink });
@@ -83,17 +64,17 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块：已移除 setUserAgent 和 setViewport
+// 网页检测模块
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
     page = await browser.newPage();
-    await page.setCacheEnabled(false); 
-    
-    const finalUrl = targetUrl.includes('?') 
-      ? targetUrl + '&skipEntranceAnyKey&locale=en' 
+    await page.setCacheEnabled(false);
+
+    const finalUrl = targetUrl.includes('?')
+      ? targetUrl + '&skipEntranceAnyKey&locale=en'
       : targetUrl + '?skipEntranceAnyKey&locale=en';
-    
+
     let refreshCount = 0;
     const navListener = (frame) => {
       if (frame === page.mainFrame() && frame.url() !== 'about:blank') refreshCount++;
@@ -105,17 +86,17 @@ async function checkBrowserPage(browser, targetUrl) {
       return { status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) {}
-    
+    try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) { }
+
     // ================== 强化：突破拦截屏 ==================
     try {
-      await new Promise(r => setTimeout(r, 2000)); 
+      await new Promise(r => setTimeout(r, 2000));
       await page.bringToFront(); // 强制页面获取焦点
       await page.mouse.click(400, 300); // 适应默认 800x600 视口，点击屏幕中心
       await page.keyboard.press('Space');
       await page.keyboard.press('Enter');
       await new Promise(r => setTimeout(r, 3000)); // 留给 React 渲染表单的时间
-    } catch (e) {}
+    } catch (e) { }
     // ======================================================
 
     let isAppLoaded = false;
@@ -129,19 +110,19 @@ async function checkBrowserPage(browser, targetUrl) {
             return !!visibleInput;
           });
           if (isAppLoaded) break;
-        } catch (err) {}
+        } catch (err) { }
       }
       if (isAppLoaded) break;
       await new Promise(r => setTimeout(r, 1500));
     }
 
-    refreshCount = 0; 
+    refreshCount = 0;
     await new Promise(r => setTimeout(r, 3000));
 
     if (refreshCount > 1) {
-       return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
+      return { status: 'Error', error: 'Page auto-refreshes repeatedly' };
     }
-    
+
     let hasInvitation = false;
     const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац|maintenance|closed server|доступ закрыт/i;
 
@@ -158,34 +139,36 @@ async function checkBrowserPage(browser, targetUrl) {
             const className = input.className || '';
             return /invite|code|инвайт|активац|邀请|码/i.test(id + ' ' + placeholder + ' ' + name + ' ' + className);
           });
-          
+
           if (hasInviteInput) {
             return { matched: true, text: '' };
           }
-          
+
           const bodyText = document.body ? document.body.innerText : '';
           return { matched: regex.test(bodyText), text: bodyText };
         }, keywordRegex.source).catch(() => null);
 
         if (frameCheck && frameCheck.matched) {
           hasInvitation = true;
-          break; 
+          break;
         }
-      } catch (err) {}
+      } catch (err) { }
     }
 
     return { status: hasInvitation ? 'Closed' : 'Open', httpStatus: response.status() };
-    
+
   } catch (e) {
     const msg = e.message ? e.message.toLowerCase() : "";
-    if (msg.includes('navigating') || msg.includes('execution context') || msg.includes('destroyed') || msg.includes('timeout') || msg.includes('redirect')) {
-       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${targetUrl}: ${e.message}`);
-       return { status: 'Error', error: e.message };
+    if (msg.includes('navigating') || msg.includes('execution context') ||
+      msg.includes('destroyed') || msg.includes('timeout') ||
+      msg.includes('redirect')) {
+      console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${targetUrl}: ${e.message}`);
+      return { status: 'Error', error: e.message };
     }
     console.log(`[${getTime()}] 判定为 Offline - ${targetUrl}: ${e.message}`);
     return { status: 'Offline', error: e.message };
   } finally {
-    if (page) await page.close().catch(() => {});
+    if (page) await page.close().catch(() => { });
   }
 }
 
@@ -194,7 +177,7 @@ function commitAndPush() {
     execSync('git config --global user.name "github-actions[bot]"');
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
     execSync(`git add ${STATE_FILE}`);
-    
+
     const status = execSync('git status --porcelain').toString();
     if (!status) {
       console.log(`[${getTime()}] 没有检测到状态文件变更，跳过推送。`);
@@ -207,9 +190,10 @@ function commitAndPush() {
     execSync('git push origin main');
     console.log(`[${getTime()}] Git 状态已更新并推送成功。`);
     return true;
+
   } catch (e) {
     console.error(`[${getTime()}] Git 操作失败:`, e.message);
-    try { execSync('git rebase --abort'); } catch (abortErr) {}
+    try { execSync('git rebase --abort'); } catch (abortErr) { }
     return false;
   }
 }
@@ -234,7 +218,7 @@ async function sendEmail(body) {
       from: `"3D坦克测试服监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "3D坦克测试服务器状态更新",
-      html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
+      html: `${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
     });
     console.log(`[${getTime()}] 邮件已发送。`);
   } catch (error) {
@@ -243,12 +227,12 @@ async function sendEmail(body) {
 }
 
 function getStatusDisplay(status) {
-  if (status === 'Open') return '<b>开放</b>';
-  if (status === 'Closed') return '<b>封闭</b>';
-  if (status === 'Error') return '<b>错误</b>';
-  if (status === 'Offline') return '<b>下线</b>';
-  if (status === 'Mixed') return '<b>一开一关</b>';
-  return `<b>${status}</b>`; 
+  if (status === 'Open') return '开放';
+  if (status === 'Closed') return '封闭';
+  if (status === 'Error') return '错误';
+  if (status === 'Offline') return '下线';
+  if (status === 'Mixed') return '一开一关';
+  return `<b>${status}</b>`;
 }
 
 function getPriority(status) {
@@ -268,14 +252,14 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
   if (!oldStatus && finalStatus !== "Offline") {
     return `首次发现${entity} (状态: ${displayStatusBold})` + jsLinkText;
   }
-  
+
   if (oldStatus && finalStatus !== oldStatus) {
     if (oldStatus === "Mixed") {
-      let hashMsg = (hash !== oldHash) ? "，且检测到<b>更新</b>" + jsLinkText : "，且<b>无更新</b>";
+      let hashMsg = (hash !== oldHash) ? "，且检测到更新" + jsLinkText : "，且无更新";
       if (finalStatus === "Offline") return `${entity}已下线 (原状态: ${oldDisplay})`;
-      if (finalStatus === "Error") return `${entity}出现<b>错误</b>${hashMsg}`;
-      if (finalStatus === "Open") return `${entity}已统一<b>开放</b>${hashMsg}`;
-      if (finalStatus === "Closed") return `${entity}已统一转为<b>封闭</b>状态${hashMsg}`;
+      if (finalStatus === "Error") return `${entity}出现<b>错误</b>` + hashMsg;
+      if (finalStatus === "Open") return `${entity}已统一<b>开放</b>` + hashMsg;
+      if (finalStatus === "Closed") return `${entity}已统一转为<b>封闭</b>状态` + hashMsg;
     }
 
     if (oldStatus === "Offline") {
@@ -283,16 +267,14 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
       if (finalStatus === "Error") return `${entity}已上线并出现<b>错误</b>${hashMsg}`;
       let baseMsg = finalStatus === "Open" ? `${entity}已上线并<b>开放</b>` : `${entity}已上线，当前为<b>封闭</b>状态`;
       return baseMsg + hashMsg;
-    } 
-    else if (finalStatus === "Offline") {
+    } else if (finalStatus === "Offline") {
       return `${entity}已下线 (原状态: ${oldDisplay})`;
     } else {
-       let msg = `${entity}状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
-       if (hash !== oldHash) msg += `，且代码已<b>更新</b>` + jsLinkText;
-       return msg;
+      let msg = `${entity}状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
+      if (hash !== oldHash) msg += `，且代码已<b>更新</b>` + jsLinkText;
+      return msg;
     }
-  }
-  else if (oldStatus !== "Offline" && oldStatus !== "Mixed" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
+  } else if (oldStatus !== "Offline" && oldStatus !== "Mixed" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
     return `网页代码已更新（状态: ${displayStatusBold}）` + jsLinkText;
   }
   return "";
@@ -301,15 +283,18 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
 async function main() {
   console.log(`\n[${getTime()}] ========== 监测循环开始 ==========`);
 
-  try {
-    execSync('git pull --rebase --autostash origin main', { stdio: 'ignore' });
-  } catch (e) {
-    try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (err) {}
+  try { execSync('git pull --rebase --autostash origin main', { stdio: 'ignore' }); }
+  catch (e) {
+    try { execSync('git rebase --abort', { stdio: 'ignore' }); }
+    catch (err) { }
   }
 
   const baseUrls = [];
   for (let i = 1; i <= 10; i++) {
-    baseUrls.push({ url: `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`, type: 'deploy' });
+    baseUrls.push({
+      url: `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`,
+      type: 'deploy'
+    });
   }
   baseUrls.push(
     { url: "https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com", type: 'other' },
@@ -333,10 +318,7 @@ async function main() {
     }
   }
 
-  let notifications = [];
-  let availableServers = [];
-  let browser = null;
-  let currentResults = {};
+  let notifications = []; let availableServers = []; let browser = null; let currentResults = {};
 
   try {
     console.log(`[${getTime()}] Phase 1: Curl 检测 ${baseUrls.length} 个基础 URL...`);
@@ -348,20 +330,20 @@ async function main() {
     for (const item of baseUrls) {
       const baseUrl = item.url;
       const curlRes = curlResults[baseUrl];
-      
+
       let entry = { type: item.type, hash: '', mainJsLink: '' };
-      
+
       if (curlRes && curlRes.isAlive) {
-         entry.hash = curlRes.hash;
-         entry.mainJsLink = curlRes.mainJsLink;
-         if (item.type === 'deploy') entry.configs = { '1': 'Offline', '2': 'Offline' };
-         else entry.status = 'Offline';
-         console.log(`[${getTime()}] Curl 存活: ${baseUrl} (${curlRes.statusCode})`);
+        entry.hash = curlRes.hash;
+        entry.mainJsLink = curlRes.mainJsLink;
+        if (item.type === 'deploy') entry.configs = { '1': 'Offline', '2': 'Offline' };
+        else entry.status = 'Offline';
+        console.log(`[${getTime()}] Curl 存活: ${baseUrl} (${curlRes.statusCode})`);
       } else {
-         const oldEntry = committedStatusJson[baseUrl] || {};
-         entry.hash = oldEntry.hash || curlRes?.hash || '';
-         entry.mainJsLink = oldEntry.mainJsLink || curlRes?.mainJsLink || '';
-         entry.status = 'Offline';
+        const oldEntry = committedStatusJson[baseUrl] || {};
+        entry.hash = oldEntry.hash || curlRes?.hash || '';
+        entry.mainJsLink = oldEntry.mainJsLink || curlRes?.mainJsLink || '';
+        entry.status = 'Offline';
       }
       currentResults[baseUrl] = entry;
     }
@@ -369,7 +351,7 @@ async function main() {
     const browserTasks = [];
     for (const item of baseUrls) {
       if (!curlResults[item.url] || !curlResults[item.url].isAlive) continue;
-      
+
       if (item.type === 'deploy') {
         const serverNum = item.url.match(/deploy(\d+)/)[1];
         for (const c of ['1', '2']) {
@@ -388,25 +370,26 @@ async function main() {
     }
 
     if (browserTasks.length > 0) {
-      console.log(`[${getTime()}] Phase 2: 浏览器检测 ${browserTasks.length} 个子任务...`);
-      browser = await puppeteer.launch({ 
-        headless: true, 
+      console.log(`[${getTime()}] Phase 2: 浏览器并发检测 ${browserTasks.length} 个子任务...`);
+      browser = await puppeteer.launch({
+        headless: true,
         args: [
-          '--no-sandbox', 
-          '--disable-setuid-sandbox', 
-          '--disable-dev-shm-usage', 
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
           '--incognito',
           '--disable-web-security',
           '--disable-features=IsolateOrigins,site-per-process'
         ]
       });
-      
-      const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
-      
+
+      // 改动：移除 runWithLimit，使用 Promise.all 并发所有浏览器请求！
+      const browserResults = await Promise.all(browserTasks.map(task => task()));
+
       for (const res of browserResults) {
         let finalStatus = res.status;
-        if (finalStatus === 'Offline' && !res.error) finalStatus = 'Closed'; 
-        
+        if (finalStatus === 'Offline' && !res.error) finalStatus = 'Closed';
+
         const currentEntry = currentResults[res.baseUrl];
         if (res.c && currentEntry.configs) {
           currentEntry.configs[res.c] = finalStatus;
@@ -436,7 +419,7 @@ async function main() {
       const baseUrl = item.url;
       const currentEntry = currentResults[baseUrl];
       const committedEntry = committedStatusJson[baseUrl] || {};
-      
+
       if (isStateEqual(currentEntry, committedEntry)) {
         if (pendingChanges[baseUrl]) delete pendingChanges[baseUrl];
         finalStatusJson[baseUrl] = committedEntry;
@@ -454,7 +437,7 @@ async function main() {
             console.log(`[${getTime()}] 状态变化已连续确认 ${CONFIRMATION_THRESHOLD} 次生效: ${baseUrl}`);
             finalStatusJson[baseUrl] = currentEntry;
             newlyConfirmed.push(baseUrl);
-            delete pendingChanges[baseUrl]; 
+            delete pendingChanges[baseUrl];
           } else {
             console.log(`[${getTime()}] 状态确认中 (${pendingChanges[baseUrl].count}/${CONFIRMATION_THRESHOLD}): ${baseUrl}`);
             finalStatusJson[baseUrl] = committedEntry;
@@ -470,38 +453,38 @@ async function main() {
     // Phase 4: 产生提示信息与过滤播报
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
-      const committedEntry = committedStatusJson[baseUrl] || {}; 
+      const committedEntry = committedStatusJson[baseUrl] || {};
       const oldHash = committedEntry.hash || null;
       const hash = currentEntry.hash;
       const mainJsLink = currentEntry.mainJsLink;
 
       if (currentEntry.type === 'deploy') {
-         const c1New = currentEntry.configs ? currentEntry.configs['1'] : (currentEntry.status || 'Offline');
-         const c2New = currentEntry.configs ? currentEntry.configs['2'] : (currentEntry.status || 'Offline');
-         const c1Old = committedEntry.configs ? committedEntry.configs['1'] : (committedEntry.status || null);
-         const c2Old = committedEntry.configs ? committedEntry.configs['2'] : (committedEntry.status || null);
+        const c1New = currentEntry.configs ? currentEntry.configs['1'] : (currentEntry.status || 'Offline');
+        const c2New = currentEntry.configs ? currentEntry.configs['2'] : (currentEntry.status || 'Offline');
+        const c1Old = committedEntry.configs ? committedEntry.configs['1'] : (committedEntry.status || null);
+        const c2Old = committedEntry.configs ? committedEntry.configs['2'] : (committedEntry.status || null);
 
-         if (c1New === c2New) {
-            const statusNew = c1New;
-            const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? 'Mixed' : null);
-            const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
-            if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
-         } else {
-            const serverNum = baseUrl.match(/deploy(\d+)/)[1];
-            
-            for (const c of ['1', '2']) {
-               const stNew = c === '1' ? c1New : c2New;
-               const stOld = c === '1' ? c1Old : c2Old;
-               const targetUrl = `${baseUrl}?config-template=https://c${c}.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
-               const msg = generateMessage(stOld, stNew, oldHash, hash, mainJsLink, true);
-               if (msg) notifications.push(`- <a href="${targetUrl}">${targetUrl}</a>: ${msg}`);
-            }
-         }
+        if (c1New === c2New) {
+          const statusNew = c1New;
+          const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? 'Mixed' : null);
+          const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
+          if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
+        } else {
+          const serverNum = baseUrl.match(/deploy(\d+)/)[1];
+
+          for (const c of ['1', '2']) {
+            const stNew = c === '1' ? c1New : c2New;
+            const stOld = c === '1' ? c1Old : c2Old;
+            const targetUrl = `${baseUrl}?config-template=https://c${c}.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
+            const msg = generateMessage(stOld, stNew, oldHash, hash, mainJsLink, true);
+            if (msg) notifications.push(`- <a href="${targetUrl}">${targetUrl}</a>: ${msg}`);
+          }
+        }
       } else {
-         const statusNew = currentEntry.status;
-         const statusOld = committedEntry.status || null;
-         const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
-         if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
+        const statusNew = currentEntry.status;
+        const statusOld = committedEntry.status || null;
+        const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
+        if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
       }
     }
 
@@ -512,30 +495,30 @@ async function main() {
       if (!entry) continue;
 
       if (item.type === 'deploy') {
-         const c1 = entry.configs ? entry.configs['1'] : (entry.status || 'Offline');
-         const c2 = entry.configs ? entry.configs['2'] : (entry.status || 'Offline');
-         if (c1 === 'Offline' && c2 === 'Offline') continue;
-         
-         if (c1 === c2) {
-            availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(c1)})`);
-         } else {
-            const serverNum = baseUrl.match(/deploy(\d+)/)[1];
-            const p1 = getPriority(c1);
-            const p2 = getPriority(c2);
+        const c1 = entry.configs ? entry.configs['1'] : (entry.status || 'Offline');
+        const c2 = entry.configs ? entry.configs['2'] : (entry.status || 'Offline');
+        if (c1 === 'Offline' && c2 === 'Offline') continue;
 
-            if (c1 !== 'Offline' && p1 >= p2) {
-               const t1 = `${baseUrl}?config-template=https://c1.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
-               availableSet.add(`<a href="${t1}">${t1}</a> (状态: ${getStatusDisplay(c1)})`);
-            }
-            if (c2 !== 'Offline' && p2 >= p1) {
-               const t2 = `${baseUrl}?config-template=https://c2.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
-               availableSet.add(`<a href="${t2}">${t2}</a> (状态: ${getStatusDisplay(c2)})`);
-            }
-         }
+        if (c1 === c2) {
+          availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(c1)})`);
+        } else {
+          const serverNum = baseUrl.match(/deploy(\d+)/)[1];
+          const p1 = getPriority(c1);
+          const p2 = getPriority(c2);
+
+          if (c1 !== 'Offline' && p1 >= p2) {
+            const t1 = `${baseUrl}?config-template=https://c1.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
+            availableSet.add(`<a href="${t1}">${t1}</a> (状态: ${getStatusDisplay(c1)})`);
+          }
+          if (c2 !== 'Offline' && p2 >= p1) {
+            const t2 = `${baseUrl}?config-template=https://c2.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
+            availableSet.add(`<a href="${t2}">${t2}</a> (状态: ${getStatusDisplay(c2)})`);
+          }
+        }
       } else {
-         if (entry.status && entry.status !== 'Offline') {
-            availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(entry.status)})`);
-         }
+        if (entry.status && entry.status !== 'Offline') {
+          availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(entry.status)})`);
+        }
       }
     }
     availableServers = Array.from(availableSet);
@@ -543,9 +526,9 @@ async function main() {
     if (notifications.length > 0) {
       fs.writeFileSync(STATE_FILE, JSON.stringify(finalStatusJson, null, 2));
       const pushed = commitAndPush();
-      
+
       if (pushed) {
-        const changeDetails = notifications.join('<br><br>'); 
+        const changeDetails = notifications.join('<br><br>');
         const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
         const availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
         const fullBody = `检测到状态变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
@@ -572,18 +555,27 @@ async function main() {
   } catch (err) {
     console.error(`[${getTime()}] 主循环错误:`, err);
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (browser) await browser.close().catch(() => { });
   }
 }
 
+// 核心改动：采用含时间补偿的并发执行循环，弃用容易堆叠的 setInterval
 (async () => {
   console.log(`[${getTime()}] 监测器启动...`);
-  await main();
-  const intervalId = setInterval(async () => {
-    if (Date.now() - START_TIME > MAX_RUNTIME) {
-      clearInterval(intervalId);
-      process.exit(0);
-    }
+  while (Date.now() - START_TIME <= MAX_RUNTIME) {
+    const loopStartTime = Date.now();
     await main();
-  }, CHECK_INTERVAL);
+    
+    // 计算上一轮耗时，从 1 分钟周期内扣除
+    const elapsed = Date.now() - loopStartTime;
+    const sleepTime = Math.max(0, CHECK_INTERVAL - elapsed);
+    
+    if (Date.now() - START_TIME + sleepTime > MAX_RUNTIME) {
+      break;
+    }
+    
+    // 恰好等待剩余的秒数以凑够精确的 1 分钟周期
+    await new Promise(resolve => setTimeout(resolve, sleepTime));
+  }
+  process.exit(0);
 })();
