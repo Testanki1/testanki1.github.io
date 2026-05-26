@@ -46,14 +46,12 @@ async function runWithLimit(tasks, limit) {
   return Promise.all(results);
 }
 
+// 已移除 headers 里的自定义 User-Agent
 function checkCurl(url) {
   return new Promise((resolve) => {
     const req = https.get(url, { 
       rejectUnauthorized: false, 
-      timeout: 15000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+      timeout: 15000
     }, (res) => {
       const { statusCode } = res;
       let data = '';
@@ -85,14 +83,12 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块：已移除调试功能，保留稳定的按键突破逻辑
+// 网页检测模块：已移除 setUserAgent 和 setViewport
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
     page = await browser.newPage();
     await page.setCacheEnabled(false); 
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1280, height: 720 });
     
     const finalUrl = targetUrl.includes('?') 
       ? targetUrl + '&skipEntranceAnyKey&locale=en' 
@@ -115,7 +111,7 @@ async function checkBrowserPage(browser, targetUrl) {
     try {
       await new Promise(r => setTimeout(r, 2000)); 
       await page.bringToFront(); // 强制页面获取焦点
-      await page.mouse.click(640, 360);
+      await page.mouse.click(400, 300); // 适应默认 800x600 视口，点击屏幕中心
       await page.keyboard.press('Space');
       await page.keyboard.press('Enter');
       await new Promise(r => setTimeout(r, 3000)); // 留给 React 渲染表单的时间
@@ -205,7 +201,7 @@ function commitAndPush() {
       return false;
     }
 
-    execSync('git commit -m "chore: 自动更新服务器状态 [skip ci]"');
+    execSync('git commit -m "chore: 测试服务器状态更新"');
     console.log(`[${getTime()}] 正在同步远程仓库...`);
     execSync('git pull --rebase origin main', { stdio: 'pipe' });
     execSync('git push origin main');
@@ -581,7 +577,7 @@ async function main() {
 }
 
 (async () => {
-  console.log(`[${getTime()}] 监测器启动 (Standalone Mode)...`);
+  console.log(`[${getTime()}] 监测器启动...`);
   await main();
   const intervalId = setInterval(async () => {
     if (Date.now() - START_TIME > MAX_RUNTIME) {
