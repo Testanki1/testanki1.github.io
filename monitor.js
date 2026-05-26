@@ -164,23 +164,38 @@ async function checkBrowserPage(browser, targetUrl) {
       } catch (err) {}
     }
 
-    // ================== 新增：截图排查逻辑 ==================
+    // ================== 新增：HTML 源码排查逻辑 ==================
     if (!hasInvitation) {
       try {
-        // 生成具有辨识度的文件名，例如: debug_public-deploy1_c1_open.png
         const urlObj = new URL(targetUrl);
         const hostPrefix = urlObj.hostname.split('.')[0];
         let configSuffix = '';
         if (targetUrl.includes('c1.')) configSuffix = '_c1';
         if (targetUrl.includes('c2.')) configSuffix = '_c2';
         
-        const screenshotPath = `debug_${hostPrefix}${configSuffix}_open.png`;
+        const htmlPath = `debug_${hostPrefix}${configSuffix}_open.html`;
         
-        // 截取全页
-        await page.screenshot({ path: screenshotPath, fullPage: true });
-        console.log(`[${getTime()}] 未匹配到封闭特征(疑似Open)，已保存截图进行人工核对: ${screenshotPath}`);
+        // 抓取主页面的 HTML
+        let fullHtml = await page.content();
+        
+        // 抓取所有可能存在的 iframe 的 HTML 追加在后面
+        const allFrames = page.frames();
+        for (const f of allFrames) {
+          if (f !== page.mainFrame()) {
+            fullHtml += `\n\n<!-- ================= FRAME: ${f.url()} ================= -->\n`;
+            try {
+               fullHtml += await f.content();
+            } catch (frameErr) {
+               fullHtml += `<!-- 无法获取此 Frame 源码: ${frameErr.message} -->`;
+            }
+          }
+        }
+        
+        // 写入文件 (最上方已经 require('fs')，可直接使用)
+        fs.writeFileSync(htmlPath, fullHtml);
+        console.log(`[${getTime()}] 未匹配到封闭特征(疑似Open)，已保存 HTML 源码进行人工核对: ${htmlPath}`);
       } catch (err) {
-        console.log(`[${getTime()}] 保存排查截图失败: ${err.message}`);
+        console.log(`[${getTime()}] 保存 HTML 源码失败: ${err.message}`);
       }
     }
     // =========================================================
