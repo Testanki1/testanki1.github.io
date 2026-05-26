@@ -11,7 +11,7 @@ const CHECK_INTERVAL = 60 * 1000; // 严格的 1 分钟周期
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
-const BROWSER_CONCURRENCY = 8; // 恢复并发限制：防止 2核 CPU 被瞬间撑爆导致网页加载失败或焦点错乱
+const BROWSER_CONCURRENCY = 8; // 并发限制
 
 let pendingChanges = {}; // 内存队列
 
@@ -31,7 +31,7 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 并发控制器（核心修复：防止所有网页一起加载互相抢夺焦点）
+// 并发控制器
 async function runWithLimit(tasks, limit) {
   const results = [];
   const executing = [];
@@ -105,7 +105,7 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try {
       await new Promise(r => setTimeout(r, 2000));
-      await page.bringToFront(); // 如果没有并发限制，多个页面一起运行这句会导致焦点错乱
+      await page.bringToFront(); 
       await page.mouse.click(400, 300); 
       await page.keyboard.press('Space');
       await page.keyboard.press('Enter');
@@ -245,7 +245,7 @@ function getStatusDisplay(status) {
   if (status === 'Error') return '错误';
   if (status === 'Offline') return '下线';
   if (status === 'Mixed') return '一开一关';
-  return `<b>${status}</b>`;
+  return status;
 }
 
 function getPriority(status) {
@@ -257,19 +257,21 @@ function getPriority(status) {
 }
 
 function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSubServer = false) {
-  const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS:</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
-  const displayStatusBold = getStatusDisplay(finalStatus);
-  const oldDisplay = getStatusDisplay(oldStatus);
+  // 英文冒号改为中文冒号
+  const jsLinkText = mainJsLink ? `<br>▶ <b>提取JS：</b> <a href="${mainJsLink}">${mainJsLink}</a>` : "";
+  const displayStatusBold = `<b>${getStatusDisplay(finalStatus)}</b>`;
+  const oldDisplay = `<b>${getStatusDisplay(oldStatus)}</b>`;
   let entity = isSubServer ? "子服务器" : "服务器";
 
   if (!oldStatus && finalStatus !== "Offline") {
-    return `首次发现${entity} (状态: ${displayStatusBold})` + jsLinkText;
+    // 英文括号与冒号改为中文全角
+    return `首次发现${entity}（状态：${displayStatusBold}）` + jsLinkText;
   }
 
   if (oldStatus && finalStatus !== oldStatus) {
     if (oldStatus === "Mixed") {
       let hashMsg = (hash !== oldHash) ? "，且检测到更新" + jsLinkText : "，且无更新";
-      if (finalStatus === "Offline") return `${entity}已下线 (原状态: ${oldDisplay})`;
+      if (finalStatus === "Offline") return `${entity}已下线（原状态：${oldDisplay}）`;
       if (finalStatus === "Error") return `${entity}出现<b>错误</b>` + hashMsg;
       if (finalStatus === "Open") return `${entity}已统一<b>开放</b>` + hashMsg;
       if (finalStatus === "Closed") return `${entity}已统一转为<b>封闭</b>状态` + hashMsg;
@@ -281,14 +283,14 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
       let baseMsg = finalStatus === "Open" ? `${entity}已上线并<b>开放</b>` : `${entity}已上线，当前为<b>封闭</b>状态`;
       return baseMsg + hashMsg;
     } else if (finalStatus === "Offline") {
-      return `${entity}已下线 (原状态: ${oldDisplay})`;
+      return `${entity}已下线（原状态：${oldDisplay}）`;
     } else {
-      let msg = `${entity}状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
+      let msg = `${entity}状态已从${oldDisplay}变为${displayStatusBold}`;
       if (hash !== oldHash) msg += `，且代码已<b>更新</b>` + jsLinkText;
       return msg;
     }
   } else if (oldStatus !== "Offline" && oldStatus !== "Mixed" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
-    return `网页代码已更新（状态: ${displayStatusBold}）` + jsLinkText;
+    return `网页代码已更新（状态：${displayStatusBold}）` + jsLinkText;
   }
   return "";
 }
@@ -396,7 +398,6 @@ async function main() {
         ]
       });
 
-      // 恢复使用限制并发数来执行（每次3个）
       const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
 
       for (const res of browserResults) {
@@ -481,7 +482,7 @@ async function main() {
           const statusNew = c1New;
           const statusOld = (c1Old && c1Old === c2Old) ? c1Old : (c1Old ? 'Mixed' : null);
           const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
-          if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
+          if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>：${msg}`); // 这里的英文冒号也改为了中文冒号
         } else {
           const serverNum = baseUrl.match(/deploy(\d+)/)[1];
 
@@ -490,14 +491,14 @@ async function main() {
             const stOld = c === '1' ? c1Old : c2Old;
             const targetUrl = `${baseUrl}?config-template=https://c${c}.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
             const msg = generateMessage(stOld, stNew, oldHash, hash, mainJsLink, true);
-            if (msg) notifications.push(`- <a href="${targetUrl}">${targetUrl}</a>: ${msg}`);
+            if (msg) notifications.push(`- <a href="${targetUrl}">${targetUrl}</a>：${msg}`); // 这里的英文冒号也改为了中文冒号
           }
         }
       } else {
         const statusNew = currentEntry.status;
         const statusOld = committedEntry.status || null;
         const msg = generateMessage(statusOld, statusNew, oldHash, hash, mainJsLink, false);
-        if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
+        if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>：${msg}`); // 这里的英文冒号也改为了中文冒号
       }
     }
 
@@ -513,7 +514,8 @@ async function main() {
         if (c1 === 'Offline' && c2 === 'Offline') continue;
 
         if (c1 === c2) {
-          availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(c1)})`);
+          // 英文括号冒号改为中文全角
+          availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> （状态：${getStatusDisplay(c1)}）`);
         } else {
           const serverNum = baseUrl.match(/deploy(\d+)/)[1];
           const p1 = getPriority(c1);
@@ -521,16 +523,16 @@ async function main() {
 
           if (c1 !== 'Offline' && p1 >= p2) {
             const t1 = `${baseUrl}?config-template=https://c1.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
-            availableSet.add(`<a href="${t1}">${t1}</a> (状态: ${getStatusDisplay(c1)})`);
+            availableSet.add(`<a href="${t1}">${t1}</a> （状态：${getStatusDisplay(c1)}）`);
           }
           if (c2 !== 'Offline' && p2 >= p1) {
             const t2 = `${baseUrl}?config-template=https://c2.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
-            availableSet.add(`<a href="${t2}">${t2}</a> (状态: ${getStatusDisplay(c2)})`);
+            availableSet.add(`<a href="${t2}">${t2}</a> （状态：${getStatusDisplay(c2)}）`);
           }
         }
       } else {
         if (entry.status && entry.status !== 'Offline') {
-          availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> (状态: ${getStatusDisplay(entry.status)})`);
+          availableSet.add(`<a href="${baseUrl}">${baseUrl}</a> （状态：${getStatusDisplay(entry.status)}）`);
         }
       }
     }
@@ -542,7 +544,8 @@ async function main() {
 
       if (pushed) {
         const changeDetails = notifications.join('<br><br>');
-        const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length} 个）:</b><br>`;
+        // 英文括号冒号改为中文全角
+        const availableListHeader = `<br><hr><b>当前已上线的服务器列表（${availableServers.length}个）：</b><br>`;
         const availableListBody = availableServers.length > 0 ? availableServers.join('<br>') : "目前没有已上线的服务器。";
         const fullBody = `检测到状态变化：<br>${changeDetails}${availableListHeader}${availableListBody}`;
         await sendEmail(fullBody);
@@ -572,14 +575,12 @@ async function main() {
   }
 }
 
-// 时间补偿器：不论检测花了多少秒，都精准保证两次检测间隔刚好 1 分钟
 (async () => {
   console.log(`[${getTime()}] 监测器启动...`);
   while (Date.now() - START_TIME <= MAX_RUNTIME) {
     const loopStartTime = Date.now();
     await main();
     
-    // 计算上一轮耗时，从 1 分钟（60000ms）周期内扣除
     const elapsed = Date.now() - loopStartTime;
     const sleepTime = Math.max(0, CHECK_INTERVAL - elapsed);
     
@@ -587,7 +588,6 @@ async function main() {
       break;
     }
     
-    // 恰好等待剩余的秒数以凑够精确的 1 分钟周期
     await new Promise(resolve => setTimeout(resolve, sleepTime));
   }
   process.exit(0);
