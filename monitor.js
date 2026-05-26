@@ -11,7 +11,8 @@ const CHECK_INTERVAL = 60 * 1000; // 严格的 1 分钟周期
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
-const BROWSER_CONCURRENCY = 8; // 并发限制
+// 【优化】降低并发数到 4。由于 GA 免费版只有 2 核 CPU，并发太高会导致游戏加载缓慢从而错过检测窗口
+const BROWSER_CONCURRENCY = 4; 
 
 let pendingChanges = {}; // 内存队列
 
@@ -80,24 +81,32 @@ function checkCurl(url) {
   });
 }
 
+// 【全新优化的浏览器检测逻辑】
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
     page = await browser.newPage();
+    
+    // 1. 设置固定视口尺寸，确保后续点击坐标精准
+    await page.setViewport({ width: 1280, height: 720 });
     await page.setCacheEnabled(false);
 
-    // 【新增】突破游戏后台暂停限制：强制让页面认为自己始终在前台可见
-    // 这样在并发(8个页面同时跑)的情况下，即使不使用 bringToFront，游戏也不会暂停加载
+    // 2. 使用 Chrome 开发者协议 (CDP) 强制给当前页面分配虚拟焦点，完美支持并发
+    const client = await page.target().createCDPSession();
+    await client.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+
+    // 3. 突破 JS 层面的焦点检测，避免游戏因失去焦点暂停加载
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
       Object.defineProperty(document, 'hidden', { get: () => false });
+      Object.defineProperty(document, 'hasFocus', { get: () => true });
       window.addEventListener('visibilitychange', e => e.stopImmediatePropagation(), true);
       window.addEventListener('blur', e => e.stopImmediatePropagation(), true);
     });
 
     const finalUrl = targetUrl.includes('?')
-      ? targetUrl + '&skipEntranceAnyKey&locale=en'
-      : targetUrl + '?skipEntranceAnyKey&locale=en';
+      ? targetUrl + '&skipEntranceAnyKey=true&locale=en'
+      : targetUrl + '?skipEntranceAnyKey=true&locale=en';
 
     let refreshCount = 0;
     const navListener = (frame) => {
@@ -112,12 +121,12 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) { }
 
-    // 【修改】将点击与等待逻辑与轮询检测结合
+    // 4. 轮询突破与深层检索：一边尝试突破防线，一边检测是否到达登录页面
     let isAppLoaded = false;
-    for (let poll = 0; poll < 15; poll++) {
-      // 每次循环都尝试点击和按键，避免只点一次错过时机
+    for (let poll = 0; poll < 20; poll++) {
       try {
-        await page.mouse.click(400, 300); 
+        // 点击屏幕正中央 (1280x720 的中心点)
+        await page.mouse.click(640, 360);
         await page.keyboard.press('Space');
         await page.keyboard.press('Enter');
       } catch (e) { }
@@ -126,18 +135,23 @@ async function checkBrowserPage(browser, targetUrl) {
       for (const frame of frames) {
         try {
           isAppLoaded = await frame.evaluate(() => {
-            const inputs = Array.from(document.querySelectorAll('input'));
-            const visibleInput = inputs.find(i => i.offsetWidth > 0 && i.offsetHeight > 0);
-            return !!visibleInput;
+            // 穿透 Shadow DOM，有些游戏UI被封装在自定义标签里
+            function getAllInputs(root) {
+              let inputs = Array.from(root.querySelectorAll('input'));
+              const elements = root.querySelectorAll('*');
+              for (const el of elements) {
+                if (el.shadowRoot) inputs = inputs.concat(getAllInputs(el.shadowRoot));
+              }
+              return inputs;
+            }
+            const inputs = getAllInputs(document);
+            return inputs.some(i => i.offsetWidth > 0 && i.offsetHeight > 0);
           });
           if (isAppLoaded) break;
         } catch (err) { }
       }
-      
-      // 一旦检测到输入框加载出来了，立刻跳出循环，不再重复点击
       if (isAppLoaded) break;
-      
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     refreshCount = 0;
@@ -155,8 +169,18 @@ async function checkBrowserPage(browser, targetUrl) {
       try {
         const frameCheck = await frame.evaluate((regexStr) => {
           const regex = new RegExp(regexStr, 'i');
-          const inputs = Array.from(document.querySelectorAll('input'));
-          const hasInviteInput = inputs.some(input => {
+          
+          function getAllInputs(root) {
+            let inputs = Array.from(root.querySelectorAll('input'));
+            const elements = root.querySelectorAll('*');
+            for (const el of elements) {
+              if (el.shadowRoot) inputs = inputs.concat(getAllInputs(el.shadowRoot));
+            }
+            return inputs;
+          }
+          
+          const allInputs = getAllInputs(document);
+          const hasInviteInput = allInputs.some(input => {
             const id = input.id || '';
             const placeholder = input.placeholder || '';
             const name = input.name || '';
@@ -456,6 +480,8 @@ async function main() {
 
     if (browserTasks.length > 0) {
       console.log(`[${getTime()}] Phase 2: 浏览器并发检测 ${browserTasks.length} 个子任务 (最大并发数: ${BROWSER_CONCURRENCY})...`);
+      
+      // 【优化参数】加入反节流、防后台挂起等核心参数
       browser = await puppeteer.launch({
         headless: true,
         args: [
@@ -464,7 +490,11 @@ async function main() {
           '--disable-dev-shm-usage',
           '--incognito',
           '--disable-web-security',
-          '--disable-features=IsolateOrigins,site-per-process'
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--window-size=1280,720'
         ]
       });
 
