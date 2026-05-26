@@ -11,8 +11,8 @@ const CHECK_INTERVAL = 60 * 1000; // 严格的 1 分钟周期
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
-// 【优化】降低并发数到 4。由于 GA 免费版只有 2 核 CPU，并发太高会导致游戏加载缓慢从而错过检测窗口
-const BROWSER_CONCURRENCY = 4; 
+// 【优化】降低并发数。由于 GA 免费版只有 2 核 CPU，并发太高会导致游戏加载缓慢从而错过检测窗口
+const BROWSER_CONCURRENCY = 8; 
 
 let pendingChanges = {}; // 内存队列
 
