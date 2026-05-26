@@ -2,39 +2,41 @@ name: 3D坦克测试服监测
 
 on:
   schedule:
-    # 每5小时自动启动一次，配合脚本内的循环实现近乎全天候监测
     - cron: '0 */5 * * *'
-  workflow_dispatch: # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    # 授予写入权限，以便脚本可以更新 server_status.json 并推送到仓库
     permissions:
       contents: write
     
     steps:
       - name: 检出代码
-        uses: actions/checkout@main # 放弃带版本号的包，始终跟随官方最新代码
+        uses: actions/checkout@main
         with:
           persist-credentials: true
 
       - name: 设置 Node.js 环境
-        uses: actions/setup-node@main # 放弃带版本号的包，始终跟随官方最新代码
+        uses: actions/setup-node@main
         with:
-          node-version: '*' # 不写死 20，始终调用最新版的 Node.js 环境
+          node-version: '*'
 
       - name: 安装依赖
-        run: |
-          # 自动获取并安装最新版本的 Google Puppeteer 和 Nodemailer（NPM 默认无版本号即最新）
-          # Google Puppeteer 会在安装时自动拉取与之匹配的最新稳定版 Chromium
-          npm install puppeteer nodemailer
+        run: npm install puppeteer nodemailer
 
       - name: 运行监测器
         env:
-          # 必须在仓库 Settings -> Secrets -> Actions 中配置以下变量
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
-        # 运行独立的脚本文件
         run: node monitor.js
+
+      # --- 新增：把生成的排查截图上传到 GitHub ---
+      - name: 保存排查截图 (Artifacts)
+        uses: actions/upload-artifact@v4 # 推荐使用 v4，速度最快
+        if: always() # 确保即使前面的 node monitor.js 被中断或报错，也会执行上传
+        with:
+          name: debug-screenshots
+          path: debug_*.png  # 抓取所有以 debug_ 开头的 png 图片
+          retention-days: 5  # 文件保留 5 天（避免占用过多 GitHub 免费存储空间）
