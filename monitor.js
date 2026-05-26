@@ -11,6 +11,7 @@ const CHECK_INTERVAL = 60 * 1000; // 严格的 1 分钟周期
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
 const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
+const BROWSER_CONCURRENCY = 8; // 恢复并发限制：防止 2核 CPU 被瞬间撑爆导致网页加载失败或焦点错乱
 
 let pendingChanges = {}; // 内存队列
 
@@ -30,7 +31,22 @@ function getTime() {
   return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }
 
-// 已移除 headers 里的自定义 User-Agent 
+// 并发控制器（核心修复：防止所有网页一起加载互相抢夺焦点）
+async function runWithLimit(tasks, limit) {
+  const results = [];
+  const executing = [];
+  for (const task of tasks) {
+    const p = task();
+    results.push(p);
+    const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+    executing.push(e);
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.all(results);
+}
+
 function checkCurl(url) {
   return new Promise((resolve) => {
     const req = https.get(url, { rejectUnauthorized: false, timeout: 15000 }, (res) => {
@@ -64,7 +80,6 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -88,16 +103,14 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) { }
 
-    // ================== 强化：突破拦截屏 ==================
     try {
       await new Promise(r => setTimeout(r, 2000));
-      await page.bringToFront(); // 强制页面获取焦点
-      await page.mouse.click(400, 300); // 适应默认 800x600 视口，点击屏幕中心
+      await page.bringToFront(); // 如果没有并发限制，多个页面一起运行这句会导致焦点错乱
+      await page.mouse.click(400, 300); 
       await page.keyboard.press('Space');
       await page.keyboard.press('Enter');
-      await new Promise(r => setTimeout(r, 3000)); // 留给 React 渲染表单的时间
+      await new Promise(r => setTimeout(r, 3000)); 
     } catch (e) { }
-    // ======================================================
 
     let isAppLoaded = false;
     for (let poll = 0; poll < 15; poll++) {
@@ -218,7 +231,7 @@ async function sendEmail(body) {
       from: `"3D坦克测试服监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
       subject: "3D坦克测试服务器状态更新",
-      html: `${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
+      html: `你好，<br><br>${body}<br><br>此邮件由 GitHub Actions 自动监测发送。`
     });
     console.log(`[${getTime()}] 邮件已发送。`);
   } catch (error) {
@@ -370,7 +383,7 @@ async function main() {
     }
 
     if (browserTasks.length > 0) {
-      console.log(`[${getTime()}] Phase 2: 浏览器并发检测 ${browserTasks.length} 个子任务...`);
+      console.log(`[${getTime()}] Phase 2: 浏览器并发检测 ${browserTasks.length} 个子任务 (最大并发数: ${BROWSER_CONCURRENCY})...`);
       browser = await puppeteer.launch({
         headless: true,
         args: [
@@ -383,8 +396,8 @@ async function main() {
         ]
       });
 
-      // 改动：移除 runWithLimit，使用 Promise.all 并发所有浏览器请求！
-      const browserResults = await Promise.all(browserTasks.map(task => task()));
+      // 恢复使用限制并发数来执行（每次3个）
+      const browserResults = await runWithLimit(browserTasks, BROWSER_CONCURRENCY);
 
       for (const res of browserResults) {
         let finalStatus = res.status;
@@ -559,14 +572,14 @@ async function main() {
   }
 }
 
-// 核心改动：采用含时间补偿的并发执行循环，弃用容易堆叠的 setInterval
+// 时间补偿器：不论检测花了多少秒，都精准保证两次检测间隔刚好 1 分钟
 (async () => {
   console.log(`[${getTime()}] 监测器启动...`);
   while (Date.now() - START_TIME <= MAX_RUNTIME) {
     const loopStartTime = Date.now();
     await main();
     
-    // 计算上一轮耗时，从 1 分钟周期内扣除
+    // 计算上一轮耗时，从 1 分钟（60000ms）周期内扣除
     const elapsed = Date.now() - loopStartTime;
     const sleepTime = Math.max(0, CHECK_INTERVAL - elapsed);
     
