@@ -85,7 +85,7 @@ function checkCurl(url) {
   });
 }
 
-// 网页检测模块...
+// 网页检测模块：包含按键模拟和更严格的等待逻辑
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -109,19 +109,32 @@ async function checkBrowserPage(browser, targetUrl) {
       return { status: 'Offline', httpStatus: response?.status() || 0 };
     }
 
-    try { await page.waitForNetworkIdle({ timeout: 8000 }); } catch (e) {}
+    try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) {}
     
-    // 1. 智能轮询
+    // ================== 关键优化 1：突破“按任意键继续”拦截屏 ==================
+    try {
+      // 模拟用户点击屏幕中央并按下空格/回车，触发拦截屏卸载
+      await page.mouse.click(640, 360);
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Enter');
+      // 给前端 React 留出时间渲染真正的 INVITATION 表单
+      await new Promise(r => setTimeout(r, 2500));
+    } catch (e) {}
+    // =======================================================================
+
+    // ================== 关键优化 2：智能轮询可见输入框 ==================
     let isAppLoaded = false;
-    for (let poll = 0; poll < 10; poll++) {
+    for (let poll = 0; poll < 15; poll++) {
       const frames = page.frames();
       for (const frame of frames) {
         try {
-          const hasInput = await frame.evaluate(() => document.querySelector('input') !== null);
-          if (hasInput) {
-            isAppLoaded = true;
-            break;
-          }
+          isAppLoaded = await frame.evaluate(() => {
+            // 不仅要找到 input，还要确保它是肉眼可见的（宽/高 > 0）
+            const inputs = Array.from(document.querySelectorAll('input'));
+            const visibleInput = inputs.find(i => i.offsetWidth > 0 && i.offsetHeight > 0);
+            return !!visibleInput;
+          });
+          if (isAppLoaded) break;
         } catch (err) {}
       }
       if (isAppLoaded) break;
@@ -129,7 +142,8 @@ async function checkBrowserPage(browser, targetUrl) {
     }
 
     refreshCount = 0; 
-    await new Promise(r => setTimeout(r, 2000));
+    // 发现 input 后再多给 3 秒，防止文本动画还没播完
+    await new Promise(r => setTimeout(r, 3000));
 
     if (refreshCount > 1) {
        console.log(`[${getTime()}] 检测到自动刷新循环 - ${targetUrl}`);
@@ -137,7 +151,9 @@ async function checkBrowserPage(browser, targetUrl) {
     }
     
     let hasInvitation = false;
-    const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац/i;
+    // ================== 关键优化 3：扩展检测字典 ==================
+    // 加入了维护、关闭等常见的非开放状态提示词
+    const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац|maintenance|closed server|доступ закрыт/i;
 
     const frames = page.frames();
     for (const frame of frames) {
@@ -152,7 +168,11 @@ async function checkBrowserPage(browser, targetUrl) {
             const className = input.className || '';
             return /invite|code|инвайт|активац|邀请|码/i.test(id + ' ' + placeholder + ' ' + name + ' ' + className);
           });
-          if (hasInviteInput) return { matched: true, text: '' };
+          
+          if (hasInviteInput) {
+            return { matched: true, text: '' };
+          }
+          
           const bodyText = document.body ? document.body.innerText : '';
           return { matched: regex.test(bodyText), text: bodyText };
         }, keywordRegex.source).catch(() => null);
@@ -164,50 +184,15 @@ async function checkBrowserPage(browser, targetUrl) {
       } catch (err) {}
     }
 
-    // ================== 新增：HTML 源码排查逻辑 ==================
-    if (!hasInvitation) {
-      try {
-        const urlObj = new URL(targetUrl);
-        const hostPrefix = urlObj.hostname.split('.')[0];
-        let configSuffix = '';
-        if (targetUrl.includes('c1.')) configSuffix = '_c1';
-        if (targetUrl.includes('c2.')) configSuffix = '_c2';
-        
-        const htmlPath = `debug_${hostPrefix}${configSuffix}_open.html`;
-        
-        // 抓取主页面的 HTML
-        let fullHtml = await page.content();
-        
-        // 抓取所有可能存在的 iframe 的 HTML 追加在后面
-        const allFrames = page.frames();
-        for (const f of allFrames) {
-          if (f !== page.mainFrame()) {
-            fullHtml += `\n\n<!-- ================= FRAME: ${f.url()} ================= -->\n`;
-            try {
-               fullHtml += await f.content();
-            } catch (frameErr) {
-               fullHtml += `<!-- 无法获取此 Frame 源码: ${frameErr.message} -->`;
-            }
-          }
-        }
-        
-        // 写入文件 (最上方已经 require('fs')，可直接使用)
-        fs.writeFileSync(htmlPath, fullHtml);
-        console.log(`[${getTime()}] 未匹配到封闭特征(疑似Open)，已保存 HTML 源码进行人工核对: ${htmlPath}`);
-      } catch (err) {
-        console.log(`[${getTime()}] 保存 HTML 源码失败: ${err.message}`);
-      }
-    }
-    // =========================================================
-
     return { status: hasInvitation ? 'Closed' : 'Open', httpStatus: response.status() };
     
   } catch (e) {
-    // 错误捕获保持不变...
     const msg = e.message ? e.message.toLowerCase() : "";
     if (msg.includes('navigating') || msg.includes('execution context') || msg.includes('destroyed') || msg.includes('timeout') || msg.includes('redirect')) {
+       console.log(`[${getTime()}] 捕获不稳定状态(Error) - ${targetUrl}: ${e.message}`);
        return { status: 'Error', error: e.message };
     }
+    console.log(`[${getTime()}] 判定为 Offline - ${targetUrl}: ${e.message}`);
     return { status: 'Offline', error: e.message };
   } finally {
     if (page) await page.close().catch(() => {});
@@ -513,11 +498,8 @@ async function main() {
             if (msg) notifications.push(`- <a href="${baseUrl}">${baseUrl}</a>: ${msg}`);
          } else {
             const serverNum = baseUrl.match(/deploy(\d+)/)[1];
-            const p1 = getPriority(c1New);
-            const p2 = getPriority(c2New);
-
+            
             for (const c of ['1', '2']) {
-
                const stNew = c === '1' ? c1New : c2New;
                const stOld = c === '1' ? c1Old : c2Old;
                const targetUrl = `${baseUrl}?config-template=https://c${c}.public-deploy${serverNum}.test-eu.tankionline.com/config.xml`;
