@@ -137,7 +137,7 @@ async function checkBrowserPage(browser, targetUrl) {
     }
 
     let hasInvitation = false;
-    const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац|maintenance|closed server|доступ закрыт/i;
+    const keywordRegex = /invitation|invite|activation|邀请|инвайт|приглаш|активац|maintenance|closed server|доступ закры特/i;
 
     const frames = page.frames();
     for (const frame of frames) {
@@ -252,36 +252,42 @@ function getStatusStyles(status) {
   return `background-color: ${bg}; color: ${color}; display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; vertical-align: middle;`;
 }
 
+// 修改点 1：控制 generateMessage 返回的 jsLink 仅在网页代码真正更新时非空
 function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSubServer = false) {
   let text = "";
   const displayStatusBold = `<span style="${getStatusStyles(finalStatus)}">${getStatusDisplay(finalStatus)}</span>`;
   const oldDisplay = `<span style="${getStatusStyles(oldStatus)}">${getStatusDisplay(oldStatus)}</span>`;
   let entity = isSubServer ? "子服务器" : "服务器";
 
+  // 判定是否属于“网页代码真正更新”
+  const isCodeUpdated = (oldHash && hash && hash !== oldHash);
+
   if (!oldStatus && finalStatus !== "Offline") {
     text = `首次发现${entity}（当前状态：${displayStatusBold}）`;
   } else if (oldStatus && finalStatus !== oldStatus) {
     if (oldStatus === "Mixed") {
-      let hashMsg = (hash !== oldHash) ? "，且检测到代码更新" : "，且代码无更新";
+      let hashMsg = isCodeUpdated ? "，且检测到代码更新" : "，且代码无更新";
       if (finalStatus === "Offline") text = `${entity}已下线（原状态：${oldDisplay}）`;
       else if (finalStatus === "Error") text = `${entity}出现错误` + hashMsg;
       else if (finalStatus === "Open") text = `${entity}已统一开放` + hashMsg;
       else if (finalStatus === "Closed") text = `${entity}已统一转为封闭状态` + hashMsg;
     } else if (oldStatus === "Offline") {
-      let hashMsg = (hash !== oldHash) ? "，且检测到代码更新" : "，且代码无更新";
+      let hashMsg = isCodeUpdated ? "，且检测到代码更新" : "，且代码无更新";
       if (finalStatus === "Error") text = `${entity}已上线并出现错误${hashMsg}`;
       else text = (finalStatus === "Open" ? `${entity}已上线并开放` : `${entity}已上线，当前为封闭状态`) + hashMsg;
     } else if (finalStatus === "Offline") {
       text = `${entity}已下线（原状态：${oldDisplay}）`;
     } else {
       let msg = `${entity}状态已从 ${oldDisplay} 变为 ${displayStatusBold}`;
-      if (hash !== oldHash) msg += `，且代码已更新`;
+      if (isCodeUpdated) msg += `，且代码已更新`;
       text = msg;
     }
   } else if (oldStatus !== "Offline" && oldStatus !== "Mixed" && finalStatus !== "Offline" && oldHash && hash !== oldHash) {
     text = `网页代码已更新（当前状态：${displayStatusBold}）`;
   }
-  return { text, jsLink: mainJsLink };
+
+  // 只有在代码更新(isCodeUpdated为true)且存在JS链接时，才对外提供jsLink
+  return { text, jsLink: isCodeUpdated ? mainJsLink : "" };
 }
 
 function createCard(url, text, jsLink) {
@@ -296,11 +302,12 @@ function createCard(url, text, jsLink) {
   </div>`;
 }
 
+// 修改点 2：外层嵌套 <a>，让整个服务器卡片行支持点击跳转，而不仅仅是左边的文字
 function createServerButton(url, status) {
   const svgs = {
-      error: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle opacity="0.4" cx="16" cy="16" r="16" fill="#FF6666"/><circle cx="16" cy="16" r="12" fill="#FF6666"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 22V20H18V22H14ZM14 10L14 18H15.3333C16.8061 18 18 15.3333V10H14Z" fill="#001926"/></svg>`,
-      open: `<svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="15" cy="15" r="8" fill="#76FF33"/><circle cx="15" cy="15" r="11.5" stroke="#76FF33" stroke-opacity="0.25" stroke-width="7"/></svg>`,
-      closed: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M32 20H35.4477C35.8013 20 36.1405 20.1405 36.3905 20.3905L37.6095 21.6095C37.8595 21.8595 38 22.1987 38 22.5523V37.4477C38 37.8013 37.8595 38.1405 37.6095 38.3905L36.3905 39.6095C36.1405 39.8595 35.8013 40 35.4477 40H12.5523C12.1987 40 11.8595 39.8595 11.6095 39.6095L10.3905 38.3905C10.1405 38.1405 10 37.8013 10 37.4477V22.5523C10 22.1987 10.1405 21.8595 10.3905 21.6095L11.6095 20.3905C11.8595 20.1405 12.1987 20 12.5523 20H16V16C16 11.5817 19.5817 8 24 8C28.4183 8 32 11.5817 32 16V20ZM29 20V16C29 13.2386 26.7614 11 24 11C21.2386 11 19 13.2386 19 16V20H29ZM20 30L24 26L28 30L24 34L20 30Z" fill="#BFD5FF"/></svg>`
+      error: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 24px; height: 24px;"><circle opacity="0.4" cx="16" cy="16" r="16" fill="#FF6666"/><circle cx="16" cy="16" r="12" fill="#FF6666"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 22V20H18V22H14ZM14 10L14 18H15.3333C16.8061 18 18 15.3333V10H14Z" fill="#001926"/></svg>`,
+      open: `<svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 24px; height: 24px;"><circle cx="15" cy="15" r="8" fill="#76FF33"/><circle cx="15" cy="15" r="11.5" stroke="#76FF33" stroke-opacity="0.25" stroke-width="7"/></svg>`,
+      closed: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 24px; height: 24px;"><path fill-rule="evenodd" clip-rule="evenodd" d="M32 20H35.4477C35.8013 20 36.1405 20.1405 36.3905 20.3905L37.6095 21.6095C37.8595 21.8595 38 22.1987 38 22.5523V37.4477C38 37.8013 37.8595 38.1405 37.6095 38.3905L36.3905 39.6095C36.1405 39.8595 35.8013 40 35.4477 40H12.5523C12.1987 40 11.8595 39.8595 11.6095 39.6095L10.3905 38.3905C10.1405 38.1405 10 37.8013 10 37.4477V22.5523C10 22.1987 10.1405 21.8595 10.3905 21.6095L11.6095 20.3905C11.8595 20.1405 12.1987 20 12.5523 20H16V16C16 11.5817 19.5817 8 24 8C28.4183 8 32 11.5817 32 16V20ZM29 20V16C29 13.2386 26.7614 11 24 11C21.2386 11 19 13.2386 19 16V20H29ZM20 30L24 26L28 30L24 34L20 30Z" fill="#BFD5FF"/></svg>`
   };
   
   let icon = svgs.closed;
@@ -323,19 +330,20 @@ function createServerButton(url, status) {
       try { name = new URL(url).hostname; } catch(e){}
   }
 
-  // 使用 Table 进行布局，以完美适配各类古老/现代邮件客户端
   return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0c2634; border-radius: 12px; margin-bottom: 8px; border: 1px solid #1a3b4c; table-layout: fixed;">
-      <tr>
-          <td style="padding: 16px 20px; font-size: 16px; font-weight: 500;">
-              <a href="${url}" style="text-decoration: none; color: ${color}; word-break: break-all;">${name}</a>
-          </td>
-          <td align="right" style="padding: 16px 20px; width: 130px; white-space: nowrap;">
-              <span style="${getStatusStyles(status)} margin-right: 8px;">${getStatusDisplay(status)}</span>
-              <span style="display: inline-block; width: 24px; height: 24px; vertical-align: middle;">${icon}</span>
-          </td>
-      </tr>
-  </table>`;
+  <a href="${url}" target="_blank" style="text-decoration: none; display: block; margin-bottom: 8px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0c2634; border-radius: 12px; border: 1px solid #1a3b4c; table-layout: fixed;">
+          <tr>
+              <td style="padding: 16px 20px; font-size: 16px; font-weight: 500; color: ${color}; word-break: break-all;">
+                  ${name}
+              </td>
+              <td align="right" style="padding: 16px 20px; width: 130px; white-space: nowrap;">
+                  <span style="${getStatusStyles(status)} margin-right: 8px; vertical-align: middle;">${getStatusDisplay(status)}</span>
+                  <span style="display: inline-block; width: 24px; height: 24px; vertical-align: middle;">${icon}</span>
+              </td>
+          </tr>
+      </table>
+  </a>`;
 }
 
 // =======================
@@ -523,7 +531,7 @@ async function main() {
       }
     }
 
-    // Phase 4: 产生提示信息与过滤播报 (改为了使用新 UI 构建方式)
+    // Phase 4: 产生提示信息与过滤播报
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
       const committedEntry = committedStatusJson[baseUrl] || {};
@@ -609,37 +617,49 @@ async function main() {
       const pushed = commitAndPush();
 
       if (pushed) {
-        // --- 组装带全新 UI 的 Email ---
+        // --- 组装带全新 UI 与边距优化的 Email ---
         const changeDetails = notifications.join('');
         const availableListHeader = `<div style="font-size: 16px; color: #76FF33; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">当前已上线的服务器列表（${availableServers.length}个）</div>`;
         const availableListBody = availableServers.length > 0 
             ? availableServers.map(s => createServerButton(s.url, s.status)).join('') 
             : `<div style="text-align: center; opacity: 0.6; margin-top: 20px; color: #BFD5FF;">当前暂无服务器</div>`;
         
+        // 修改点 3：通过嵌套外层 Table 增加 16px 左右侧边距，避免移动设备上两侧无间隙
         const fullBody = `
         <!DOCTYPE html>
         <html lang="zh">
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
-        <body style="font-family: 'Rubik', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #001926; color: #BFD5FF; margin: 0; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: #001926;">
-                <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid rgba(191, 213, 255, 0.1); margin-bottom: 20px;">
-                    <h1 style="margin: 0; font-size: 24px; color: #fff; font-weight: 500;">3D坦克测试服务器</h1>
-                    <span style="display: inline-block; font-size: 12px; color: #76FF33; background-color: rgba(118, 255, 51, 0.1); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(118, 255, 51, 0.3); margin-top: 8px;">状态更新通知</span>
-                </div>
-                
-                <div style="font-size: 16px; color: #76FF33; margin-top: 10px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">检测到状态变化</div>
-                ${changeDetails}
-                
-                ${availableListHeader}
-                ${availableListBody}
+        <body style="font-family: 'Rubik', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #001926; color: #BFD5FF; margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+            <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #001926;">
+                <tr>
+                    <td align="center" style="padding: 24px 16px;">
+                        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px; text-align: left;">
+                            <tr>
+                                <td>
+                                    <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid rgba(191, 213, 255, 0.1); margin-bottom: 20px;">
+                                        <h1 style="margin: 0; font-size: 24px; color: #fff; font-weight: 500;">3D坦克测试服务器</h1>
+                                        <span style="display: inline-block; font-size: 12px; color: #76FF33; background-color: rgba(118, 255, 51, 0.1); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(118, 255, 51, 0.3); margin-top: 8px;">状态更新通知</span>
+                                    </div>
+                                    
+                                    <div style="font-size: 16px; color: #76FF33; margin-top: 10px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">检测到状态变化</div>
+                                    ${changeDetails}
+                                    
+                                    ${availableListHeader}
+                                    ${availableListBody}
 
-                <div style="text-align: center; font-size: 12px; color: rgba(191, 213, 255, 0.4); margin-top: 40px; border-top: 1px solid rgba(191, 213, 255, 0.1); padding-top: 20px; line-height: 1.8;">
-                    此邮件由 GitHub Actions 自动监测发送。<br>
-                    生成时间: ${getTime()}
-                </div>
-            </div>
+                                    <div style="text-align: center; font-size: 12px; color: rgba(191, 213, 255, 0.4); margin-top: 40px; border-top: 1px solid rgba(191, 213, 255, 0.1); padding-top: 20px; line-height: 1.8;">
+                                        此邮件由 GitHub Actions 自动监测发送。<br>
+                                        生成时间: ${getTime()}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
         </body>
         </html>`;
 
