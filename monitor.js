@@ -86,6 +86,15 @@ async function checkBrowserPage(browser, targetUrl) {
     page = await browser.newPage();
     await page.setCacheEnabled(false);
 
+    // 【新增】突破游戏后台暂停限制：强制让页面认为自己始终在前台可见
+    // 这样在并发(8个页面同时跑)的情况下，即使不使用 bringToFront，游戏也不会暂停加载
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+      Object.defineProperty(document, 'hidden', { get: () => false });
+      window.addEventListener('visibilitychange', e => e.stopImmediatePropagation(), true);
+      window.addEventListener('blur', e => e.stopImmediatePropagation(), true);
+    });
+
     const finalUrl = targetUrl.includes('?')
       ? targetUrl + '&skipEntranceAnyKey&locale=en'
       : targetUrl + '?skipEntranceAnyKey&locale=en';
@@ -103,17 +112,16 @@ async function checkBrowserPage(browser, targetUrl) {
 
     try { await page.waitForNetworkIdle({ timeout: 5000 }); } catch (e) { }
 
-    try {
-      await new Promise(r => setTimeout(r, 2000));
-      await page.bringToFront(); 
-      await page.mouse.click(400, 300); 
-      await page.keyboard.press('Space');
-      await page.keyboard.press('Enter');
-      await new Promise(r => setTimeout(r, 3000)); 
-    } catch (e) { }
-
+    // 【修改】将点击与等待逻辑与轮询检测结合
     let isAppLoaded = false;
     for (let poll = 0; poll < 15; poll++) {
+      // 每次循环都尝试点击和按键，避免只点一次错过时机
+      try {
+        await page.mouse.click(400, 300); 
+        await page.keyboard.press('Space');
+        await page.keyboard.press('Enter');
+      } catch (e) { }
+
       const frames = page.frames();
       for (const frame of frames) {
         try {
@@ -125,7 +133,10 @@ async function checkBrowserPage(browser, targetUrl) {
           if (isAppLoaded) break;
         } catch (err) { }
       }
+      
+      // 一旦检测到输入框加载出来了，立刻跳出循环，不再重复点击
       if (isAppLoaded) break;
+      
       await new Promise(r => setTimeout(r, 1500));
     }
 
