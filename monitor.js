@@ -10,7 +10,7 @@ const STATE_FILE = 'server_status.json';
 const CHECK_INTERVAL = 60 * 1000; // 严格的 1 分钟周期
 const MAX_RUNTIME = 4.95 * 60 * 60 * 1000;
 const START_TIME = Date.now();
-const CONFIRMATION_THRESHOLD = 2; // 连续 2 次检测到相同的新状态才判定为生效
+const CONFIRMATION_THRESHOLD = 3; // 连续 3 次检测到相同的新状态才判定为生效
 const BROWSER_CONCURRENCY = 4; // 并发限制
 
 let pendingChanges = {}; // 内存队列
@@ -637,11 +637,6 @@ async function main() {
                         <table width="100%" border="0" cellpadding="0" cellspacing="0" class="container" style="max-width: 600px; text-align: left; width: 100%;">
                             <tr>
                                 <td>
-                                    <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid rgba(191, 213, 255, 0.1); margin-bottom: 20px;">
-                                        <h1 class="header-title" style="margin: 0; font-size: 24px; color: #fff; font-weight: 500;">3D坦克测试服务器</h1>
-                                        <span style="display: inline-block; font-size: 12px; color: #76FF33; background-color: rgba(118, 255, 51, 0.1); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(118, 255, 51, 0.3); margin-top: 8px;">状态更新通知</span>
-                                    </div>
-                                    
                                     <div style="font-size: 15px; color: #76FF33; margin-top: 10px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">检测到状态变化</div>
                                     ${changeDetails}
                                     
