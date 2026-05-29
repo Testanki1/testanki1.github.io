@@ -158,8 +158,12 @@
             transition: opacity 0.3s;
         }
 
-        .online-badge .material-symbols-rounded {
-            font-size: 16px;
+        /* 更新图标大小并继承字体颜色 (#76FF33) */
+        .online-badge svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            fill: currentColor;
         }
 
         .badge-separator {
@@ -212,6 +216,18 @@
     </style>
 </head>
 <body>
+    <!-- 全局 SVG 资源定义 -->
+    <svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <symbol id="icon-online" viewBox="0 0 16 16">
+                <path d="M8.00228 8C10.2104 7.99877 12 6.20838 12 4C12 1.79086 10.2091 0 8 0C5.79086 0 4 1.79086 4 4C4 6.20838 5.78963 7.99877 7.99772 8L0 8C0 12.4183 3.58172 16 8 16C12.4183 16 16 12.4183 16 8L8.00228 8Z" fill="currentColor"/>
+            </symbol>
+            <symbol id="icon-battles" viewBox="6 6 12 12">
+                <path d="M10.875 16.875L10.125 16.125L16.409 9.84099C17.4277 8.8223 18 7.44065 18 6C16.5593 6 15.1777 6.5723 14.159 7.59099L12 9.75L9.84099 7.59099C8.82229 6.5723 7.44065 6 6 6C6 7.44065 6.5723 8.8223 7.59099 9.84099L9.74999 12L7.875 13.875L7.125 13.125L6.375 13.875L7.875 15.375L6.375 16.875C6.16789 17.0821 6.16789 17.4179 6.375 17.625C6.58211 17.8321 6.91789 17.8321 7.125 17.625L8.625 16.125L10.125 17.625L10.875 16.875ZM16.875 17.625C17.0821 17.8321 17.4179 17.8321 17.625 17.625C17.8321 17.4179 17.8321 17.0821 17.625 16.875L16.125 15.375L17.625 13.875L16.875 13.125L16.125 13.875L15 12.75L12.75 15L13.875 16.125L13.125 16.875L13.875 17.625L15.375 16.125L16.875 17.625Z" fill="currentColor"/>
+            </symbol>
+        </defs>
+    </svg>
+
     <div class="header">
         <h1>
             <span id="header-title-text">3D坦克测试服务器</span>
@@ -267,7 +283,6 @@
         let serverStatusData = {};
         let isChecking = false; 
 
-        // 提取服务器优先级，以确保在"一开一关"时只显示更开放的那一个
         function getPriority(status) {
             if (status === 'Open') return 4;
             if (status === 'Closed') return 3;
@@ -276,7 +291,6 @@
             return 0;
         }
 
-        // 请求服务器状态 JSON，带时间戳防止缓存
         async function fetchServerStatus() {
             try {
                 const response = await fetch(`https://testanki1.github.io/server_status.json?t=${Date.now()}`);
@@ -313,9 +327,16 @@
             const badgeWrapper = document.createElement('div');
             badgeWrapper.className = 'online-badge';
 
-            const iconGroup = document.createElement('span');
-            iconGroup.className = 'material-symbols-rounded';
-            iconGroup.textContent = 'group';
+            // 辅助函数，用来快速生成 <svg><use href="id"/></svg> 节点
+            const createSvgIcon = (id) => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+                use.setAttribute('href', id);
+                svg.appendChild(use);
+                return svg;
+            };
+
+            const iconGroup = createSvgIcon('#icon-online');
 
             const onlineCount = document.createElement('span');
             onlineCount.className = 'online-count';
@@ -324,9 +345,7 @@
             const separator = document.createElement('div');
             separator.className = 'badge-separator';
 
-            const iconSwords = document.createElement('span');
-            iconSwords.className = 'material-symbols-rounded';
-            iconSwords.textContent = 'swords';
+            const iconSwords = createSvgIcon('#icon-battles');
 
             const inbattlesCount = document.createElement('span');
             inbattlesCount.className = 'inbattles-count';
@@ -350,7 +369,6 @@
             return container;
         }
 
-        // 修改：先获取并返回完整 JSON 数据，用于后续按需提取
         async function fetchBalancerData(url) {
             const noCacheUrl = `${url}?t=${Date.now()}`;
             try {
@@ -361,7 +379,6 @@
             }
         }
 
-        // 修改：增加 subNode 参数，如果提供且存在，则只返回指定子服务器的数据
         function extractCounts(data, subNode = null) {
             if (!data) return { onlineCount: 0, inbattlesCount: 0 };
             
@@ -391,11 +408,11 @@
             if (!element) {
                 element = createButtonElement(label, targetUrl);
                 element.id = elementId;
-                element.style.order = sortOrder; // 纯数字适配 flex order
+                element.style.order = sortOrder;
                 container.appendChild(element);
             }
 
-            element.href = targetUrl; // 确保 URL 正确
+            element.href = targetUrl; 
 
             element.querySelector('.online-count').textContent = counts.onlineCount;
             element.querySelector('.inbattles-count').textContent = counts.inbattlesCount;
@@ -409,7 +426,7 @@
             } else if (status === 'Error') {
                 statusIconEl.innerHTML = svgs.error;
             } else {
-                statusIconEl.innerHTML = svgs.closed; // Fallback
+                statusIconEl.innerHTML = svgs.closed; 
             }
         }
 
@@ -452,14 +469,12 @@
                                 const c1 = serverInfo.configs['1'] || 'Offline';
                                 const c2 = serverInfo.configs['2'] || 'Offline';
                                 
-                                // 两者状态相同，合并显示为一个按钮，合并在线人数
                                 if (c1 === c2) {
                                     removeButton(idC1);
                                     removeButton(idC2);
-                                    const counts = extractCounts(balancerData); // 合计
+                                    const counts = extractCounts(balancerData); 
                                     renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, c1, i * 10);
                                 } else {
-                                    // 状态不一致，计算优先级，根据高低筛选，且提取特定子服务器在线人数
                                     removeButton(idSingle);
                                     
                                     const p1 = getPriority(c1);
@@ -488,7 +503,6 @@
                                 renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, 'Offline', i * 10);
                             }
                         } else {
-                            // 节点挂掉，全清除
                             removeButton(idSingle);
                             removeButton(idC1);
                             removeButton(idC2);
@@ -531,7 +545,6 @@
         }
 
         checkURLs(true);
-        // 背景持续刷新轮询
         setInterval(function() {
             fetchServerStatus().then(() => checkURLs(false));
         }, 5000);
