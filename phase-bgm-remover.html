@@ -318,7 +318,7 @@
     <div class="app-container">
         <header>
             <h1>背景音乐消除器</h1>
-            <p class="subtitle">基于相位抵消算法 · 纯本地处理 · 非 AI</p>
+            <p class="subtitle">基于相位抵消与动态包络跟踪 · 纯本地处理</p>
         </header>
 
         <!-- Upload Card -->
@@ -342,7 +342,7 @@
                 <div id="statusText" class="status-msg"></div>
                 <button id="autoAlignBtn" class="btn btn-filled" disabled>
                     <svg class="icon-svg" style="width:18px;height:18px;" viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-                    开始自动对齐
+                    智能分析与对齐
                 </button>
             </div>
         </div>
@@ -420,14 +420,11 @@
         let animationFrameId;
         
         // Processing Parameters
-        // offsetTime > 0: Mix 滞后 (BGM 需要延迟开始)
-        // offsetTime < 0: Mix 超前 (BGM 需要跳过开头)
         let offsetTime = 0;
-        let amplitude = 1.0;
-        let invertPhase = true;
+        let envelopeCurve = null; // 存储整首音频随时间变化的体积包络数组
+        let actualStepDuration = 0.1; // 每一个小窗口所占的时间（默认0.1秒）
 
         // --- Audio Loading ---
-
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100});
         }
@@ -460,19 +457,18 @@
             }
         });
 
-        // --- Alignment Logic ---
-
+        // --- Alignment & Dynamic Envelope Logic ---
         autoAlignBtn.addEventListener('click', () => {
             if (!mixBuffer || !bgmBuffer) return;
             
             autoAlignBtn.disabled = true;
-            statusText.textContent = "正在计算对齐...";
+            statusText.textContent = "正在计算对齐与动态包络...";
             statusText.className = "status-msg";
             
             setTimeout(() => {
                 try {
                     performAutoAlign();
-                    statusText.textContent = "对齐成功";
+                    statusText.textContent = "分析成功";
                     statusText.className = "status-msg success";
                     
                     playerCard.classList.add('active');
@@ -480,29 +476,25 @@
                     autoAlignBtn.disabled = false;
                 } catch (e) {
                     console.error(e);
-                    statusText.textContent = "对齐失败";
+                    statusText.textContent = "分析失败";
                     statusText.className = "status-msg error";
                     autoAlignBtn.disabled = false;
                 }
-            }, 100);
+            }, 50);
         });
 
         function performAutoAlign() {
             if (!mixBuffer || !bgmBuffer) return;
-
             const sampleRate = mixBuffer.sampleRate;
             
-            // 1. 选取特征明显的片段
-            // 取中间 10 秒，时间越长，抗人声干扰能力越强
+            // 1. 寻找特征片段以进行粗细对齐 (固定分析中部10秒用于计算起始差值)
             const analysisDuration = 10; 
             const startSec = mixBuffer.duration / 2 - (analysisDuration / 2);
-            // 确保起始点不小于0
             const safeStartSec = Math.max(0, startSec);
             
             const len = Math.floor(analysisDuration * sampleRate); 
             const startIdx = Math.floor(safeStartSec * sampleRate);
             
-            // 边界检查
             if (startIdx + len >= mixBuffer.length) {
                 console.error("音频太短无法分析");
                 return;
@@ -510,11 +502,8 @@
 
             const mixData = mixBuffer.getChannelData(0);
             const bgmData = bgmBuffer.getChannelData(0);
-            
-            // Mix片段
             const mixChunk = mixData.slice(startIdx, startIdx + len);
             
-            // BGM 搜索窗口：在 Mix 位置的前后各找 5 秒
             const searchWindowSec = 5.0;
             const searchWindowSamples = Math.floor(searchWindowSec * sampleRate);
             
@@ -522,106 +511,101 @@
             const bgmEndIdx = Math.min(bgmData.length, startIdx + len + searchWindowSamples);
             const bgmChunk = bgmData.slice(bgmStartIdx, bgmEndIdx);
             
-            // --- 第一步：粗略对齐 (Coarse Alignment) ---
-            // 目的：快速找到大致位置
+            // 粗对齐
             let bestOffset = 0;
-            let maxAbsCorr = -1; // 注意：我们要找绝对值最大的
-            
-            // 步长 10 (降低精度换速度)
+            let maxAbsCorr = -1; 
             for (let i = 0; i < bgmChunk.length - mixChunk.length; i += 10) {
                 let sum = 0;
-                // 内部采样步长 50
                 for (let j = 0; j < mixChunk.length; j += 50) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
-                
-                // 关键修改：取绝对值 Math.abs(sum)
-                // 这样无论相位是正还是反，都能找到对齐点
                 if (Math.abs(sum) > maxAbsCorr) {
                     maxAbsCorr = Math.abs(sum);
                     bestOffset = i;
                 }
             }
             
-            // --- 第二步：精细对齐 (Fine Alignment) ---
-            // 目的：在粗略点附近精确定位到 1 个采样点
+            // 精细对齐
             let refinedOffset = bestOffset;
             let refinedMaxAbs = -1;
-            
-            // 搜索范围：粗略点前后 500 采样
             const fineRange = 500; 
             const fineStart = Math.max(0, bestOffset - fineRange);
             const fineEnd = Math.min(bgmChunk.length - mixChunk.length, bestOffset + fineRange);
-            
             for (let i = fineStart; i < fineEnd; i++) {
                 let sum = 0;
-                // 精度提高：内部步长 10
                 for (let j = 0; j < mixChunk.length; j += 10) {
                     sum += mixChunk[j] * bgmChunk[i + j];
                 }
-                
                 if (Math.abs(sum) > refinedMaxAbs) {
                     refinedMaxAbs = Math.abs(sum);
                     refinedOffset = i;
                 }
             }
 
-            // 计算最终的时间偏移
+            // 计算全局固定的时间偏移量
             const finalBgmIndex = bgmStartIdx + refinedOffset;
             const offsetSamples = startIdx - finalBgmIndex;
-            
-            // --- 第三步：最小二乘法计算最佳抵消音量 ---
-            // 此时已经逐点对齐，我们计算这一段的线性回归系数
-            
-            let dotProduct = 0; // Mix · BGM
-            let sumBgmSq = 0;   // BGM · BGM
-            
-            // 使用较高的采样率计算音量，确保准确
-            for(let k = 0; k < mixChunk.length; k += 2) {
-                const m = mixChunk[k];
-                const b = bgmChunk[refinedOffset + k];
-                
-                dotProduct += m * b;
-                sumBgmSq += b * b;
-            }
-            
-            // 公式：alpha = (A·B) / (B·B)
-            // 如果 alpha 是正数，说明相位相同；如果是负数，说明相位相反
-            let rawAmp = sumBgmSq > 0 ? (dotProduct / sumBgmSq) : 0;
-            
-            console.log("-----------------------");
-            console.log("对齐偏移(样本):", offsetSamples);
-            console.log("对齐偏移(秒):", offsetSamples / sampleRate);
-            console.log("原始计算倍率:", rawAmp);
-            
             offsetTime = offsetSamples / sampleRate;
             
-            // 这里的逻辑很重要：
-            // 如果 rawAmp 是正数（例如 0.8），说明 BGM 正相，我们需要反相(-0.8)来抵消。
-            // 如果 rawAmp 是负数（例如 -0.8），说明 BGM 已经是反相的，我们需要同相(+0.8)来抵消。
-            // 播放器逻辑中使用了 `invertPhase ? -amplitude : amplitude`。
-            // 为了配合播放器逻辑，我们把 amplitude 设为绝对值。
-            // 此时无论 rawAmp 正负，只要 invertPhase 为 true，我们可能需要根据 rawAmp 的符号动态调整 invertPhase。
+            console.log("对齐偏移(秒):", offsetTime);
+
+            // --- 第二步：滑动窗口计算动态包络 ---
+            // 放弃单一固定的音量倍率，改为全程跟踪扫描（彻底解决BGM忽高忽低的问题）
+            const stepSamples = Math.floor(sampleRate * 0.1); // 每0.1秒一个步进值
+            actualStepDuration = stepSamples / sampleRate;
+            const windowSamples = Math.floor(sampleRate * 1.5); // 1.5秒的大窗口保证算出来的系数稳定
             
-            amplitude = Math.abs(rawAmp);
+            const numSteps = Math.ceil(mixData.length / stepSamples);
+            const rawCurve = new Float32Array(numSteps);
             
-            // 自动判断是否需要反相
-            // 如果计算出 rawAmp 是正的，说明两个波形方向一致，需要反相相加才能抵消 -> invertPhase = true
-            // 如果计算出 rawAmp 是负的，说明两个波形方向相反，直接相加就能抵消（或者说需要反相一个负数）-> invertPhase = false
-            // 但为了兼容你的播放器逻辑 (val = invertPhase ? -amp : amp)，我们这样设定：
-            
-            if (rawAmp > 0) {
-                invertPhase = true; // 正正得负，抵消
-            } else {
-                invertPhase = false; // 已经是反的了，直接加
+            for (let i = 0; i < numSteps; i++) {
+                const center = i * stepSamples;
+                const s = Math.max(0, center - Math.floor(windowSamples / 2));
+                const e = Math.min(mixData.length, center + Math.floor(windowSamples / 2));
+                
+                let dot = 0;
+                let sq = 0;
+                
+                // 跳帧加速采集
+                for (let k = s; k < e; k += 10) {
+                    const m = mixData[k];
+                    const bgmIdx = k - offsetSamples;
+                    
+                    if (bgmIdx >= 0 && bgmIdx < bgmData.length) {
+                        const b = bgmData[bgmIdx];
+                        dot += m * b;
+                        sq += b * b;
+                    }
+                }
+                
+                // 计算此窗口的抵消倍率
+                let alpha = sq > 0.01 ? (dot / sq) : 0;
+                if (alpha > 3) alpha = 3;   // 限制过大倍数防爆音
+                if (alpha < -3) alpha = -3;
+                
+                // 我们直接将系数反相 (-alpha)，这不仅完美应对抵消，还能自动处理素材本身正负相的问题
+                rawCurve[i] = -alpha;
             }
             
-            console.log("最终应用音量:", amplitude);
-            console.log("是否反相:", invertPhase);
-            console.log("-----------------------");
+            // --- 第三步：通过滑动平均算法平滑曲线，防止毛刺抖动 ---
+            envelopeCurve = new Float32Array(numSteps);
+            const smoothRadius = 5; // 前后各取 0.5 秒 (5 * 0.1) 进行平滑
+            for (let i = 0; i < numSteps; i++) {
+                let sum = 0;
+                let count = 0;
+                for (let j = i - smoothRadius; j <= i + smoothRadius; j++) {
+                    if (j >= 0 && j < numSteps) {
+                        sum += rawCurve[j];
+                        count++;
+                    }
+                }
+                envelopeCurve[i] = sum / count;
+            }
+            
+            console.log("包络曲线计算完成，节点数量:", numSteps);
         }
-        // --- Playback Logic ---
 
+        // --- Playback Logic ---
         function togglePlay() {
             if (isPlaying) pause();
             else play();
@@ -642,20 +626,13 @@
             bgmGain = audioCtx.createGain();
             masterGain = audioCtx.createGain();
             
-            // Anti-pop
+            // 防爆音
             masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
-            // Phase Inversion
-            const val = invertPhase ? -amplitude : amplitude;
-            bgmGain.gain.value = val;
-
-            // Connections
-            // Mix 直接走，不加延迟，保证视频同步
+            // 路由连接
             mixSource.connect(masterGain);
-            // BGM 走 Gain
             bgmSource.connect(bgmGain);
             bgmGain.connect(masterGain);
-            
             masterGain.connect(audioCtx.destination);
             
             const now = audioCtx.currentTime;
@@ -663,25 +640,39 @@
             const playDuration = mixBuffer.duration - pauseTime;
             
             if (playDuration > 0) {
-                // 1. 启动 Mix (绝对基准)
                 mixSource.start(syncTime, pauseTime, playDuration);
 
-                // 2. 计算 BGM 在当前 Mix 进度下的对应位置
-                // 公式: BGM时间 = Mix时间 - offset
+                // 根据对齐数据推演当前的播放位置
                 const bgmCurrentTime = pauseTime - offsetTime;
 
                 if (bgmCurrentTime >= 0) {
-                    // BGM 已经开始，跳过前面部分
                     if (bgmCurrentTime < bgmBuffer.duration) {
                         bgmSource.start(syncTime, bgmCurrentTime, playDuration);
                     }
                 } else {
-                    // BGM 还没开始，需要等待
                     const waitTime = Math.abs(bgmCurrentTime);
                     bgmSource.start(syncTime + waitTime, 0, Math.max(0, playDuration - waitTime));
                 }
                 
-                // Anti-pop fade in
+                // 完美贴合播放位置的「动态包络控制」
+                if (envelopeCurve && envelopeCurve.length > 0) {
+                    const startIndex = Math.floor(pauseTime / actualStepDuration);
+                    const safeStartIndex = Math.min(startIndex, envelopeCurve.length - 1);
+                    const subCurve = envelopeCurve.subarray(safeStartIndex);
+                    const curvePlayDuration = subCurve.length * actualStepDuration;
+                    
+                    if (subCurve.length > 1) {
+                        try {
+                            bgmGain.gain.setValueCurveAtTime(subCurve, syncTime, curvePlayDuration);
+                        } catch (e) {
+                            console.warn("Curve assignment fallback", e);
+                            bgmGain.gain.value = subCurve[0];
+                        }
+                    } else {
+                        bgmGain.gain.value = subCurve[0] || 0;
+                    }
+                }
+                
                 masterGain.gain.setValueAtTime(0, syncTime);
                 masterGain.gain.linearRampToValueAtTime(1.0, syncTime + 0.05);
             }
@@ -780,7 +771,7 @@
 
         function endDrag(e) {
             if (!isDragging) return;
-            pauseTime = handleSeek(e); // Final position
+            pauseTime = handleSeek(e); 
             if (wasPlayingBeforeDrag) play();
             isDragging = false;
         }
@@ -788,7 +779,6 @@
         progressContainer.addEventListener('mousedown', startDrag);
         document.addEventListener('mousemove', onDrag);
         document.addEventListener('mouseup', endDrag);
-        
         progressContainer.addEventListener('touchstart', startDrag, {passive: false});
         document.addEventListener('touchmove', onDrag, {passive: false});
         document.addEventListener('touchend', endDrag);
@@ -796,7 +786,6 @@
         togglePlayBtn.addEventListener('click', togglePlay);
 
         // --- Export Logic ---
-
         exportBtn.addEventListener('click', async () => {
             if (!mixBuffer || !bgmBuffer) return;
             
@@ -813,27 +802,27 @@
             offBgm.buffer = bgmBuffer;
             
             const offBgmGain = offlineCtx.createGain();
-            offBgmGain.gain.value = invertPhase ? -amplitude : amplitude;
 
-            // Mix: 直接连接，从0开始
             offMix.connect(offlineCtx.destination);
-            
-            // BGM: 连接 Gain -> Destination
             offBgm.connect(offBgmGain);
             offBgmGain.connect(offlineCtx.destination);
             
             offMix.start(0);
 
-            // BGM 对齐计算
-            // PauseTime = 0, so bgmTime = -offsetTime
             const bgmStartTime = -offsetTime;
 
             if (bgmStartTime >= 0) {
-                // BGM 跳过开头 (Skip)
                 offBgm.start(0, bgmStartTime);
             } else {
-                // BGM 延迟开始 (Delay)
                 offBgm.start(Math.abs(bgmStartTime), 0);
+            }
+            
+            // 离线渲染时同样加载完整的动态包络
+            if (envelopeCurve && envelopeCurve.length > 1) {
+                const totalDuration = envelopeCurve.length * actualStepDuration;
+                offBgmGain.gain.setValueCurveAtTime(envelopeCurve, 0, totalDuration);
+            } else if (envelopeCurve && envelopeCurve.length === 1) {
+                offBgmGain.gain.value = envelopeCurve[0];
             }
             
             const renderedBuffer = await offlineCtx.startRendering();
@@ -859,22 +848,17 @@
             const channels = [];
             let i, sample, offset = 0, pos = 0;
 
-            // RIFF chunk descriptor
             setUint32(0x46464952); // "RIFF"
             setUint32(length - 8); 
             setUint32(0x45564157); // "WAVE"
-
-            // fmt sub-chunk
             setUint32(0x20746d66); // "fmt "
             setUint32(16); 
-            setUint16(1); // PCM (1)
+            setUint16(1); 
             setUint16(numOfChan);
             setUint32(buffer.sampleRate);
             setUint32(buffer.sampleRate * 2 * numOfChan); 
             setUint16(numOfChan * 2); 
             setUint16(16); 
-
-            // data sub-chunk
             setUint32(0x61746164); // "data"
             setUint32(length - pos - 4);
 
