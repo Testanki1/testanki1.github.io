@@ -316,7 +316,7 @@ function createServerButton(url, status) {
       if (url.includes('deploy-china')) name = 'China (Test)';
       if (url.includes('deploy-classic')) name = 'Classic (Test)';
   } else if (url.includes('test.ru.tankionline')) {
-      name = 'Test RU';
+      name = 'RU (Test)';
   } else if (url.includes('tankiclassic')) {
       name = 'Classic';
   } else {
