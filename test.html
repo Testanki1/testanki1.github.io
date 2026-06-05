@@ -84,7 +84,7 @@
             vertical-align: middle;
         }
 
-        #deploy-results, #classic-results {
+        #deploy-results, #other-results {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -93,7 +93,7 @@
             margin-bottom: 10px;
         }
 
-        #classic-results:not(:empty) {
+        #other-results:not(:empty) {
             margin-top: 10px;
             border-top: 1px solid rgba(118, 255, 51, 0.2);
             padding-top: 20px;
@@ -158,7 +158,6 @@
             transition: opacity 0.3s;
         }
 
-        /* 更新图标大小并继承字体颜色 (#76FF33) */
         .online-badge svg {
             width: 16px;
             height: 16px;
@@ -251,7 +250,7 @@
     </div>
 
     <div id="deploy-results"></div>
-    <div id="classic-results"></div>
+    <div id="other-results"></div>
     
     <div id="no-servers" class="hidden">当前暂无服务器</div>
 
@@ -327,7 +326,6 @@
             const badgeWrapper = document.createElement('div');
             badgeWrapper.className = 'online-badge';
 
-            // 辅助函数，用来快速生成 <svg><use href="id"/></svg> 节点
             const createSvgIcon = (id) => {
                 const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
@@ -452,6 +450,7 @@
                 
                 let fetchTasks = [];
 
+                // 1. 获取部署(Deploy)服务器
                 for (let i = 1; i <= 10; i++) {
                     const deployBalancer = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
                     const baseUrl = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
@@ -510,22 +509,46 @@
                     }));
                 }
 
-                const classicBalancer = 'https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer';
-                const classicLink = 'https://public-deploy-classic.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-classic.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer';
-                const classicId = 'classic-btn';
-                
-                fetchTasks.push(checkURL(classicBalancer).then(async isAccessible => {
-                    if (isAccessible) {
-                        const balancerData = await fetchBalancerData(classicBalancer);
-                        const counts = extractCounts(balancerData);
-                        const serverInfo = serverStatusData[classicLink];
-                        const status = (serverInfo && serverInfo.status) ? serverInfo.status : 'Offline';
-                        
-                        renderButton('classic-results', classicId, 'Classic', classicLink, counts, status, 100);
-                    } else {
-                        removeButton(classicId);
+                // 2. 获取其他(Other)独立服务器: Classic / Test RU / China
+                // 调整 order 让 Test RU 排名在前 (101)，China 在后 (102)
+                const extraServers = [
+                    {
+                        id: 'classic-btn',
+                        name: 'Classic (Test)',
+                        balancer: 'https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer',
+                        link: 'https://public-deploy-classic.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-classic.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer',
+                        order: 100
+                    },
+                    {
+                        id: 'ru-btn',
+                        name: 'Test RU',
+                        balancer: 'https://balancer.ru.tankionline.com/balancer',
+                        link: 'https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com',
+                        order: 101
+                    },
+                    {
+                        id: 'china-btn',
+                        name: 'China (Test)',
+                        balancer: 'https://balancer.public-deploy-china.test-eu.tankionline.com/balancer',
+                        link: 'https://public-deploy-china.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-china.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-china.test-eu.tankionline.com/balancer',
+                        order: 102
                     }
-                }));
+                ];
+
+                extraServers.forEach(server => {
+                    fetchTasks.push(checkURL(server.balancer).then(async isAccessible => {
+                        if (isAccessible) {
+                            const balancerData = await fetchBalancerData(server.balancer);
+                            const counts = extractCounts(balancerData);
+                            const serverInfo = serverStatusData[server.link];
+                            const status = (serverInfo && serverInfo.status) ? serverInfo.status : 'Offline';
+                            
+                            renderButton('other-results', server.id, server.name, server.link, counts, status, server.order);
+                        } else {
+                            removeButton(server.id);
+                        }
+                    }));
+                });
 
                 await Promise.allSettled(fetchTasks);
 
