@@ -313,6 +313,7 @@ function createServerButton(url, status) {
       if (match) name = `Deploy ${match[1]}`;
       if (url.includes('c1.')) name += ' (c1)';
       if (url.includes('c2.')) name += ' (c2)';
+      if (url.includes('deploy-china')) name = 'China (Test)';
       if (url.includes('deploy-classic')) name = 'Classic (Test)';
   } else if (url.includes('test.ru.tankionline')) {
       name = 'Test RU';
@@ -371,6 +372,7 @@ async function main() {
   }
   baseUrls.push(
     { url: "https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com", type: 'other' },
+    { url: "https://public-deploy-china.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-china.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-china.test-eu.tankionline.com/balancer", type: 'other' },
     { url: "https://public-deploy-classic.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-classic.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer", type: 'other' },
     { url: "https://tankiclassic.com/play/", type: 'other' }
   );
