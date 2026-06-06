@@ -198,6 +198,7 @@
             opt_summary: isZh ? "可选参数 (稀有度/填充)" : "Optional (Rarity / Fill)",
             lbl_rarity: isZh ? "稀有度颜色" : "Rarity Color",
             val_default: isZh ? "默认" : "Default",
+            val_none: isZh ? "无" : "None",
             lbl_fill: isZh ? "填充颜色" : "Fill Color",
             
             btn_reset: isZh ? "全部重置" : "Reset All",
@@ -272,7 +273,14 @@
                 modalList.appendChild(def);
                 renderGroupedOptions(groupedBackgroundColors, type);
             }
-            else if (type === 'equipment') renderGroupedOptions(groupedEquipments, type);
+            else if (type === 'equipment') {
+                const noneEl = document.createElement('div');
+                noneEl.className = `option-item ${document.getElementById('val-equipment').value==='none'?'selected':''}`;
+                noneEl.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>${uiTexts.val_none}</span>`;
+                noneEl.onclick = () => selectItem('equipment', 'none', null, uiTexts.val_none);
+                modalList.appendChild(noneEl);
+                renderGroupedOptions(groupedEquipments, type);
+            }
             else if (type === 'augment') renderGroupedOptions(groupedAugments, type);
             else if (type === 'rarity') renderRarityOptions();
         }
@@ -386,13 +394,17 @@
 
             document.getElementById("loading").style.display = "block";
             Promise.all([
-                fetchTextCached('https://testanki1.github.io/augments_icon/equipments/'+encodeURIComponent(txtName)+'.txt'),
+                txtName === 'none' ? Promise.resolve('') : fetchTextCached('https://testanki1.github.io/augments_icon/equipments/'+encodeURIComponent(txtName)+'.txt'),
                 fetchTextCached('https://testanki1.github.io/augments_icon/augments/'+encodeURIComponent(svgName)+'.svg'),
                 background!=='default' ? fetchTextCached('https://testanki1.github.io/augments_icon/colors/'+encodeURIComponent(background)+'.txt') : null
             ]).then(([txt, svg, bg]) => {
+                if (!svg) {
+                    document.getElementById("loading").style.display = "none";
+                    return;
+                }
                 if (bg) svg = svg.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${bg}</radialGradient>`);
                 const defs = svg.indexOf('<defs>');
-                let final = defs !== -1 ? svg.slice(0, defs) + txt + svg.slice(defs) : svg.replace('>', '>' + txt);
+                let final = defs !== -1 ? svg.slice(0, defs) + (txt || '') + svg.slice(defs) : svg.replace('>', '>' + (txt || ''));
                 if (quality !== 'default') final = final.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
 
                 const preview = document.getElementById("svgPreview");
@@ -404,7 +416,7 @@
                     const blob = new Blob([final], { type: 'image/svg+xml' });
                     const url = URL.createObjectURL(blob);
                     
-                    const downloadName = `${t(txtName)}-${t(svgName)}`;
+                    const downloadName = txtName === 'none' ? t(svgName) : `${t(txtName)}-${t(svgName)}`;
 
                     const dlSection = document.getElementById("downloadSection");
                     dlSection.className = "results-container";
