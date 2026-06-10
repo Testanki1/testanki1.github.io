@@ -288,7 +288,6 @@ function generateMessage(oldStatus, finalStatus, oldHash, hash, mainJsLink, isSu
   return { text, jsLink: isCodeUpdated ? mainJsLink : "" };
 }
 
-// 修改点：优化移动端 padding
 function createCard(url, text, jsLink) {
   let jsHtml = jsLink ? `<div style="font-size: 12px; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; word-break: break-all; color: #BFD5FF;">▶ <b>提取JS：</b> <a href="${jsLink}" style="color: #76FF33; text-decoration: none;">${jsLink}</a></div>` : "";
   return `
@@ -301,7 +300,6 @@ function createCard(url, text, jsLink) {
   </div>`;
 }
 
-// 修改点：移除 SVG 图标，对移动端界面布局宽度、内边距进行优化调整
 function createServerButton(url, status) {
   let color = "#BFD5FF";
   if (status === 'Open') { color = "#76FF33"; }
@@ -340,15 +338,18 @@ function createServerButton(url, status) {
 
 // =======================
 
-async function sendEmail(bodyHtml) {
+// 修改点1：加入 hasCodeUpdate 参数动态修改主题
+async function sendEmail(bodyHtml, hasCodeUpdate = false) {
+  const mailSubject = hasCodeUpdate ? "【含代码更新】3D坦克测试服务器状态更新" : "3D坦克测试服务器状态更新";
+  
   try {
     await transporter.sendMail({
       from: `"3D坦克测试服监测器" <${process.env.MAIL_USERNAME}>`,
       to: process.env.MAIL_TO,
-      subject: "3D坦克测试服务器状态更新",
+      subject: mailSubject,
       html: bodyHtml
     });
-    console.log(`[${getTime()}] 邮件已发送。`);
+    console.log(`[${getTime()}] 邮件已发送。主题: ${mailSubject}`);
   } catch (error) {
     console.error(`[${getTime()}] 邮件发送失败:`, error);
   }
@@ -525,12 +526,19 @@ async function main() {
     }
 
     // Phase 4: 产生提示信息与过滤播报
+    let hasGlobalCodeUpdate = false; // 修改点2：用于标记本次播报的服务器中是否包含代码更新
+    
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
       const committedEntry = committedStatusJson[baseUrl] || {};
       const oldHash = committedEntry.hash || null;
       const hash = currentEntry.hash;
       const mainJsLink = currentEntry.mainJsLink;
+
+      // 判断本次更新批次中是否存在真实的代码更新
+      if (oldHash && hash && hash !== oldHash) {
+          hasGlobalCodeUpdate = true;
+      }
 
       if (currentEntry.type === 'deploy') {
         const c1New = currentEntry.configs ? currentEntry.configs['1'] : (currentEntry.status || 'Offline');
@@ -617,7 +625,6 @@ async function main() {
             ? availableServers.map(s => createServerButton(s.url, s.status)).join('') 
             : `<div style="text-align: center; opacity: 0.6; margin-top: 20px; color: #BFD5FF;">当前暂无服务器</div>`;
         
-        // 修改点：加入了 <style> 来在移动端压制内边距，移除固定外框导致的不必要留白
         const fullBody = `
         <!DOCTYPE html>
         <html lang="zh">
@@ -658,7 +665,8 @@ async function main() {
         </body>
         </html>`;
 
-        await sendEmail(fullBody);
+        // 修改点3：将 hasGlobalCodeUpdate 作为参数传给 sendEmail
+        await sendEmail(fullBody, hasGlobalCodeUpdate);
       }
     } else {
       if (newlyConfirmed.length > 0) {
