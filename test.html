@@ -127,11 +127,31 @@
             transform: translateY(-2px);
         }
 
+        /* 新增：包裹名称与版本号的容器 */
+        .name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
         .server-name {
             font-size: 1.1rem;
             font-weight: 500;
             color: var(--md-sys-color-primary);
             letter-spacing: 0.5px;
+        }
+
+        /* 新增：版本号标签样式（无前缀） */
+        .server-version {
+            font-size: 0.75rem;
+            color: #88AABB;
+            background-color: rgba(255, 255, 255, 0.12);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+            vertical-align: middle;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .info-wrapper {
@@ -311,14 +331,24 @@
             }
         }
 
+        // 修改：在按钮中注入包裹版本号和名称的容器结构
         function createButtonElement(label, link) {
             const container = document.createElement('a');
             container.className = 'button-container';
             container.href = link; 
             
+            const nameWrapper = document.createElement('div');
+            nameWrapper.className = 'name-wrapper';
+
             const nameSpan = document.createElement('span');
             nameSpan.textContent = label;
             nameSpan.className = 'server-name';
+            
+            const versionSpan = document.createElement('span');
+            versionSpan.className = 'server-version hidden';
+
+            nameWrapper.appendChild(nameSpan);
+            nameWrapper.appendChild(versionSpan);
             
             const infoWrapper = document.createElement('div');
             infoWrapper.className = 'info-wrapper';
@@ -361,7 +391,7 @@
             infoWrapper.appendChild(badgeWrapper);
             infoWrapper.appendChild(statusIcon);
 
-            container.appendChild(nameSpan);
+            container.appendChild(nameWrapper);
             container.appendChild(infoWrapper);
             
             return container;
@@ -399,7 +429,8 @@
             return { onlineCount: 0, inbattlesCount: 0 };
         }
 
-        function renderButton(containerId, elementId, label, targetUrl, counts, status, sortOrder) {
+        // 修改：渲染时接收并动态更新版本号信息（无前缀）
+        function renderButton(containerId, elementId, label, targetUrl, counts, status, sortOrder, version) {
             const container = document.getElementById(containerId);
             let element = document.getElementById(elementId);
 
@@ -414,6 +445,17 @@
 
             element.querySelector('.online-count').textContent = counts.onlineCount;
             element.querySelector('.inbattles-count').textContent = counts.inbattlesCount;
+
+            // 动态控制版本号的显示
+            const versionEl = element.querySelector('.server-version');
+            if (versionEl) {
+                if (version) {
+                    versionEl.textContent = version;
+                    versionEl.classList.remove('hidden');
+                } else {
+                    versionEl.classList.add('hidden');
+                }
+            }
 
             const statusIconEl = element.querySelector('.status-icon');
             
@@ -463,6 +505,7 @@
                         if (isAccessible) {
                             const balancerData = await fetchBalancerData(deployBalancer);
                             const serverInfo = serverStatusData[baseUrl];
+                            const version = balancerData ? balancerData.serverVersion : null; // 获取版本号
                             
                             if (serverInfo && serverInfo.type === 'deploy' && serverInfo.configs) {
                                 const c1 = serverInfo.configs['1'] || 'Offline';
@@ -472,7 +515,7 @@
                                     removeButton(idC1);
                                     removeButton(idC2);
                                     const counts = extractCounts(balancerData); 
-                                    renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, c1, i * 10);
+                                    renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, c1, i * 10, version);
                                 } else {
                                     removeButton(idSingle);
                                     
@@ -482,7 +525,7 @@
                                     if (c1 !== 'Offline' && p1 >= p2) {
                                         const t1 = `${baseUrl}?config-template=https://c1.public-deploy${i}.test-eu.tankionline.com/config.xml`;
                                         const countsC1 = extractCounts(balancerData, 'c1');
-                                        renderButton('deploy-results', idC1, `Deploy ${i} (c1)`, t1, countsC1, c1, i * 10 + 1);
+                                        renderButton('deploy-results', idC1, `Deploy ${i} (c1)`, t1, countsC1, c1, i * 10 + 1, version);
                                     } else {
                                         removeButton(idC1);
                                     }
@@ -490,7 +533,7 @@
                                     if (c2 !== 'Offline' && p2 >= p1) {
                                         const t2 = `${baseUrl}?config-template=https://c2.public-deploy${i}.test-eu.tankionline.com/config.xml`;
                                         const countsC2 = extractCounts(balancerData, 'c2');
-                                        renderButton('deploy-results', idC2, `Deploy ${i} (c2)`, t2, countsC2, c2, i * 10 + 2);
+                                        renderButton('deploy-results', idC2, `Deploy ${i} (c2)`, t2, countsC2, c2, i * 10 + 2, version);
                                     } else {
                                         removeButton(idC2);
                                     }
@@ -499,7 +542,7 @@
                                 removeButton(idC1);
                                 removeButton(idC2);
                                 const counts = extractCounts(balancerData);
-                                renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, 'Offline', i * 10);
+                                renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, 'Offline', i * 10, version);
                             }
                         } else {
                             removeButton(idSingle);
@@ -543,7 +586,10 @@
                             const serverInfo = serverStatusData[server.link];
                             const status = (serverInfo && serverInfo.status) ? serverInfo.status : 'Offline';
                             
-                            renderButton('other-results', server.id, server.name, server.link, counts, status, server.order);
+                            // 排除 Classic，RU 和 China 测试服正常获取版本号
+                            const version = server.id === 'classic-btn' ? null : (balancerData ? balancerData.serverVersion : null);
+                            
+                            renderButton('other-results', server.id, server.name, server.link, counts, status, server.order, version);
                         } else {
                             removeButton(server.id);
                         }
