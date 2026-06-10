@@ -80,6 +80,52 @@ function checkCurl(url) {
   });
 }
 
+// === 解析并获取服务器 serverVersion 的助手函数 ===
+function getBalancerUrl(url) {
+  // 两款经典版测试服排除在外
+  if (url.includes('classic') || url.includes('tankiclassic')) return null;
+
+  // 尝试匹配 url 中显式包含的 balancer 参数
+  const matchBalancer = url.match(/balancer=([^&]+)/);
+  if (matchBalancer) return decodeURIComponent(matchBalancer[1]);
+
+  // 根据 deploy 号推导 balancer 地址
+  let deployMatch = url.match(/public-deploy(\d+)/);
+  if (deployMatch) return `https://balancer.public-deploy${deployMatch[1]}.test-eu.tankionline.com/balancer`;
+
+  // RU 测试服的默认规则兜底
+  if (url.includes('test.ru.tankionline')) return 'https://balancer.ru.tankionline.com/balancer';
+
+  return null;
+}
+
+function fetchServerVersion(url) {
+  return new Promise((resolve) => {
+    const req = https.get(url, { rejectUnauthorized: false, timeout: 5000 }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve(parsed.serverVersion || null);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', (err) => {
+      console.log(`[${getTime()}] 获取 serverVersion 错误 ${url}: ${err.message}`);
+      resolve(null);
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      console.log(`[${getTime()}] 获取 serverVersion 超时 ${url}`);
+      resolve(null);
+    });
+  });
+}
+// ==========================================================
+
 async function checkBrowserPage(browser, targetUrl) {
   let page = null;
   try {
@@ -300,7 +346,8 @@ function createCard(url, text, jsLink) {
   </div>`;
 }
 
-function createServerButton(url, status) {
+// 渲染服务器项，无前缀显示从 Balancer 获取到的版本号
+function createServerButton(url, status, version) {
   let color = "#BFD5FF";
   if (status === 'Open') { color = "#76FF33"; }
   else if (status === 'Error') { color = "#FF6666"; }
@@ -321,14 +368,17 @@ function createServerButton(url, status) {
       try { name = new URL(url).hostname; } catch(e){}
   }
 
+  // 此处已去除 "v" 前缀
+  let versionHtml = version ? `<span style="font-size: 11px; color: #88AABB; margin-left: 8px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; vertical-align: middle; white-space: nowrap;">${version}</span>` : '';
+
   return `
   <a href="${url}" target="_blank" style="text-decoration: none; display: block; margin-bottom: 8px;">
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0c2634; border-radius: 12px; border: 1px solid #1a3b4c; table-layout: fixed;">
           <tr>
-              <td style="padding: 14px 16px; font-size: 15px; font-weight: 500; color: ${color}; word-break: break-all;">
-                  ${name}
+              <td style="padding: 14px 16px; font-size: 15px; font-weight: 500; color: ${color}; word-break: break-all; vertical-align: middle;">
+                  ${name}${versionHtml}
               </td>
-              <td align="right" style="padding: 14px 16px; width: 80px; white-space: nowrap;">
+              <td align="right" style="padding: 14px 16px; width: 80px; white-space: nowrap; vertical-align: middle;">
                   <span style="${getStatusStyles(status)}">${getStatusDisplay(status)}</span>
               </td>
           </tr>
@@ -338,7 +388,6 @@ function createServerButton(url, status) {
 
 // =======================
 
-// 修改点1：加入 hasCodeUpdate 参数动态修改主题
 async function sendEmail(bodyHtml, hasCodeUpdate = false) {
   const mailSubject = hasCodeUpdate ? "【含代码更新】3D坦克测试服务器状态更新" : "3D坦克测试服务器状态更新";
   
@@ -526,7 +575,7 @@ async function main() {
     }
 
     // Phase 4: 产生提示信息与过滤播报
-    let hasGlobalCodeUpdate = false; // 修改点2：用于标记本次播报的服务器中是否包含代码更新
+    let hasGlobalCodeUpdate = false; 
     
     for (const baseUrl of newlyConfirmed) {
       const currentEntry = finalStatusJson[baseUrl];
@@ -535,7 +584,6 @@ async function main() {
       const hash = currentEntry.hash;
       const mainJsLink = currentEntry.mainJsLink;
 
-      // 判断本次更新批次中是否存在真实的代码更新
       if (oldHash && hash && hash !== oldHash) {
           hasGlobalCodeUpdate = true;
       }
@@ -618,11 +666,29 @@ async function main() {
       const pushed = commitAndPush();
 
       if (pushed) {
+        // --- 请求并获取各可用服务器的版本号 ---
+        console.log(`[${getTime()}] 获取各可用服务器的 serverVersion...`);
+        const balancerCache = {};
+        for (const srv of availableServers) {
+            const bUrl = getBalancerUrl(srv.url);
+            if (bUrl && !balancerCache[bUrl]) {
+                balancerCache[bUrl] = fetchServerVersion(bUrl); // 并发请求
+            }
+        }
+        for (const srv of availableServers) {
+            const bUrl = getBalancerUrl(srv.url);
+            if (bUrl) {
+                srv.version = await balancerCache[bUrl]; // 确保拿到结果
+            } else {
+                srv.version = null;
+            }
+        }
+        
         // --- 组装带响应式 UI 与媒体查询边距优化的 Email ---
         const changeDetails = notifications.join('');
         const availableListHeader = `<div style="font-size: 15px; color: #76FF33; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px dashed rgba(118, 255, 51, 0.3); padding-bottom: 5px;">当前已上线的服务器列表（${availableServers.length}个）</div>`;
         const availableListBody = availableServers.length > 0 
-            ? availableServers.map(s => createServerButton(s.url, s.status)).join('') 
+            ? availableServers.map(s => createServerButton(s.url, s.status, s.version)).join('') 
             : `<div style="text-align: center; opacity: 0.6; margin-top: 20px; color: #BFD5FF;">当前暂无服务器</div>`;
         
         const fullBody = `
@@ -665,7 +731,6 @@ async function main() {
         </body>
         </html>`;
 
-        // 修改点3：将 hasGlobalCodeUpdate 作为参数传给 sendEmail
         await sendEmail(fullBody, hasGlobalCodeUpdate);
       }
     } else {
