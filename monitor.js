@@ -368,8 +368,8 @@ function createServerButton(url, status, version) {
       try { name = new URL(url).hostname; } catch(e){}
   }
 
-  // 此处已去除 "v" 前缀
-  let versionHtml = version ? `<span style="font-size: 11px; color: #88AABB; margin-left: 8px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; vertical-align: middle; white-space: nowrap;">${version}</span>` : '';
+  // 调整为与主页完全一致的 BFD5FF 配色
+  let versionHtml = version ? `<span style="font-size: 11px; color: #BFD5FF; margin-left: 8px; background: rgba(191, 213, 255, 0.12); padding: 2px 6px; border-radius: 4px; vertical-align: middle; white-space: nowrap; border: 1px solid rgba(191, 213, 255, 0.05); font-weight: 500;">${version}</span>` : '';
 
   return `
   <a href="${url}" target="_blank" style="text-decoration: none; display: block; margin-bottom: 8px;">
