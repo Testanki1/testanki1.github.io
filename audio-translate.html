@@ -206,6 +206,14 @@
             flex-wrap: wrap;
         }
 
+        /* 分段下载按钮容器 */
+        .download-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
         #statusText {
             font-size: 0.85rem;
             color: var(--md-sys-color-on-surface-variant);
@@ -289,7 +297,6 @@
                 <span id="fileName">未选择...</span>
             </div>
 
-            <!-- 选择音频后才显示的区域 -->
             <div id="splitSettingsWrapper">
                 <div class="split-setting-header">
                     <div class="split-setting-title">
@@ -307,7 +314,7 @@
                 </div>
 
                 <div style="font-size: 0.8rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; margin-top: 16px;">
-                    * 提示：接口存在约10分钟的单次连接限制，建议在长音频的9分钟（09:00）左右设置切割点。程序会自动排队合并。
+                    * 提示：接口存在单次连接时长限制，建议在长音频的 9 分钟左右设置切割点。程序会根据切割点将音频切分为多个片段，处理完成后为您提供独立的下载文件。
                 </div>
             </div>
 
@@ -329,14 +336,10 @@
                     <md-icon slot="icon">stop</md-icon>
                     停止
                 </md-outlined-button>
-
-                <a id="downloadLink" download="translated_audio.wav" style="display: none; text-decoration: none;">
-                    <md-elevated-button id="downloadBtn">
-                        <md-icon slot="icon">download</md-icon>
-                        下载音频
-                    </md-elevated-button>
-                </a>
             </div>
+
+            <!-- 分段音频下载按钮将会在这里动态生成 -->
+            <div id="downloadContainer" class="download-area"></div>
         </div>
 
         <div class="m3-card" style="padding-top: 24px;">
@@ -355,7 +358,7 @@
         const fileNameDisplay = document.getElementById('fileName');
         const btnStart = document.getElementById('startBtn');
         const btnStop = document.getElementById('stopBtn');
-        const downloadLink = document.getElementById('downloadLink');
+        const downloadContainer = document.getElementById('downloadContainer');
         const statusText = document.getElementById('statusText');
         const translationArea = document.getElementById('translationArea');
         
@@ -371,11 +374,13 @@
 
         let session = null;
         let isTranslating = false;
-        let globalOutputAudioChunks = []; 
+        
+        // 变动：取消全局汇总数组，改为仅存储当前正在跑的这个分段的音频块
+        let currentSegmentChunks = []; 
+        
         let fullInt16Data = null;
         let totalDurationSec = 0; 
-        
-        let globalPreviewAudioDuration = 0; // 选中的音频真实秒数（用于 UI 拦截）
+        let globalPreviewAudioDuration = 0; 
         
         let tasks = [];            
         let currentTaskIndex = 0;  
@@ -398,7 +403,6 @@
         const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
         const timerWorker = new Worker(URL.createObjectURL(workerBlob));
 
-        // 格式化秒数为 MM:SS
         function formatTime(seconds) {
             if (isNaN(seconds) || seconds < 0) return "00:00";
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -406,14 +410,10 @@
             return `${m}:${s}`;
         }
 
-        // ==========================================
-        // 核心拦截逻辑：动态创建切割行并物理限制输入
-        // ==========================================
         function createSplitRow() {
             const row = document.createElement('div');
             row.className = 'split-row';
             
-            // 去除了 value="0" 让输入框默认处于纯空状态
             row.innerHTML = `
                 <div class="split-row-label">切割点</div>
                 <div class="time-input-group">
@@ -427,26 +427,23 @@
             const minInput = row.querySelector('.min-input');
             const secInput = row.querySelector('.sec-input');
 
-            // 拦截分钟输入：不得超过音频总分钟数
             minInput.addEventListener('input', (e) => {
                 let val = parseInt(e.target.value);
-                if (isNaN(val)) return; // 留空时不作拦截
+                if (isNaN(val)) return; 
                 
                 const maxMin = Math.floor(globalPreviewAudioDuration / 60);
                 if (val > maxMin) e.target.value = maxMin.toString();
                 if (val < 0) e.target.value = '0';
                 
-                // 如果分钟拉满，触发一次秒数修正
                 const evt = new Event('change');
                 minInput.dispatchEvent(evt);
             });
 
-            // 拦截秒数输入：常规不得超过59，到达最大分钟时不得超过最大秒数
             secInput.addEventListener('input', (e) => {
                 let val = parseInt(e.target.value);
-                if (isNaN(val)) return; // 留空时不作拦截
+                if (isNaN(val)) return; 
                 
-                let currentMin = parseInt(minInput.value) || 0; // 若分钟为空当0处理
+                let currentMin = parseInt(minInput.value) || 0; 
                 const maxMin = Math.floor(globalPreviewAudioDuration / 60);
                 const maxSecOfLastMin = Math.floor(globalPreviewAudioDuration % 60);
 
@@ -459,7 +456,6 @@
                 if (val < 0) e.target.value = '0';
             });
 
-            // 当分钟数发生变化时，如果秒数此时处于越界状态，自动拉回
             minInput.addEventListener('change', (e) => {
                 let currentMin = parseInt(e.target.value) || 0;
                 const maxMin = Math.floor(globalPreviewAudioDuration / 60);
@@ -493,27 +489,20 @@
             createSplitRow();
         });
 
-        // ==========================================
-        // 文件选择监听：毫秒级获取真实时长并解锁UI
-        // ==========================================
         fileBtn.addEventListener('click', () => audioFileInput.click());
         audioFileInput.addEventListener('change', () => {
             const file = audioFileInput.files[0];
             progressContainer.style.display = 'none';
-            splitPointsContainer.innerHTML = ''; // 清空上一首歌的切割点
+            splitPointsContainer.innerHTML = ''; 
 
             if (file) {
                 fileNameDisplay.textContent = file.name;
-                
-                // 利用 Audio 对象瞬间读取媒体元数据，无需深度重采样解码
                 const objectUrl = URL.createObjectURL(file);
                 const audioObj = new Audio(objectUrl);
                 
                 audioObj.addEventListener('loadedmetadata', () => {
                     globalPreviewAudioDuration = audioObj.duration;
                     audioDurationHint.textContent = `全长 ${formatTime(globalPreviewAudioDuration)}`;
-                    
-                    // 显示分段设置区域
                     splitSettingsWrapper.style.display = 'block';
                     URL.revokeObjectURL(objectUrl);
                 });
@@ -604,20 +593,19 @@
 
             btnStart.disabled = true;
             btnStop.disabled = false;
-            downloadLink.style.display = 'none';
+            
+            // 每次重新开始时，清空老文件下载区的内容
+            downloadContainer.innerHTML = '';
             translationArea.innerHTML = '';
             
-            globalOutputAudioChunks = [];
             tasks = [];
             currentTaskIndex = 0;
             isTranslating = true;
 
             try {
-                // 真实解码并计算最终时长
                 fullInt16Data = await decodeAndResampleAudio(file);
                 totalDurationSec = fullInt16Data.length / 16000;
                 
-                // 抓取并合并合法的切割点
                 const rawPoints = [];
                 const rows = splitPointsContainer.querySelectorAll('.split-row');
                 
@@ -631,7 +619,6 @@
                     }
                 }
                 
-                // 构建排队任务，全量时长永远是最后一刀
                 let points = [0, ...rawPoints, totalDurationSec];
                 points.sort((a, b) => a - b);
                 points = [...new Set(points)];
@@ -667,9 +654,13 @@
             
             appendTranslation(`[ 第 ${currentTaskIndex + 1} 部分 ${formatTime(task.start)} - ${formatTime(task.end)} ]`, true);
 
+            // 变动：在给 API 发送前，执行物理裁切
             const startIndex = Math.floor(task.start * 16000);
             const endIndex = Math.floor(task.end * 16000);
             const targetInt16Data = fullInt16Data.subarray(startIndex, endIndex);
+
+            // 变动：清空上一段积累的音频碎片，保证片段独立
+            currentSegmentChunks = [];
 
             const apiKey = apiKeyInput.value.trim();
             const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -705,13 +696,13 @@
                                         for (let i = 0; i < binaryStr.length; i++) {
                                             bytes[i] = binaryStr.charCodeAt(i);
                                         }
-                                        globalOutputAudioChunks.push(bytes);
+                                        currentSegmentChunks.push(bytes); // 只存到当前段的数组中
                                     }
                                 }
                             }
                         },
                         onerror: (e) => {
-                            setStatus(`第 ${currentTaskIndex + 1} 段连接断开或错误: ${e?.message || '未知'}，将在6秒后尝试继续...`, true);
+                            setStatus(`第 ${currentTaskIndex + 1} 段连接断开或错误: ${e?.message || '未知'}，将在 6 秒后尝试继续...`, true);
                         },
                         onclose: () => {
                             console.log(`Connection closed for segment ${currentTaskIndex + 1}`);
@@ -736,7 +727,27 @@
                     setStatus(`第 ${currentTaskIndex + 1}/${tasks.length} 段推流完毕，等待接收最终响应...`);
                     progressBar.indeterminate = true;
                     
+                    // 变动：某一个片段的响应全部接收完毕后，打包并生成下载按钮
                     segmentTimeoutId = setTimeout(() => {
+                        if (currentSegmentChunks.length > 0) {
+                            const blob = generateWavBlob(currentSegmentChunks);
+                            const url = URL.createObjectURL(blob);
+                            
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `translated_part_${currentTaskIndex + 1}_${new Date().getTime()}.wav`;
+                            a.style.textDecoration = 'none';
+                            
+                            const btn = document.createElement('md-elevated-button');
+                            btn.innerHTML = `<md-icon slot="icon">download</md-icon> 下载第 ${currentTaskIndex + 1} 部分`;
+                            a.appendChild(btn);
+                            
+                            downloadContainer.appendChild(a);
+                            appendTranslation(`[ 第 ${currentTaskIndex + 1} 部分音频已生成可下载 ]`, true);
+                        } else {
+                            appendTranslation(`[ 第 ${currentTaskIndex + 1} 部分未检测到有效语音 ]`, true);
+                        }
+
                         session = null;
                         currentTaskIndex++;
                         processNextTask();
@@ -778,7 +789,7 @@
         }
 
         btnStop.addEventListener('click', () => {
-            setStatus("已手动中止排队任务，正在生成已处理的片段...");
+            setStatus("已手动中止任务，正在为您结算已处理的片段...");
             finishAllTasks(false);
         });
 
@@ -792,19 +803,24 @@
             progressPercent.textContent = "100%";
             progressText.textContent = `${formatTime(totalDurationSec)} / ${formatTime(totalDurationSec)}`;
 
-            if (globalOutputAudioChunks.length > 0) {
-                setStatus("全部处理合并完毕，请点击下方按钮下载完整音频文件。");
-                appendTranslation("[ 所有分段处理完成 ]", true);
-
-                const blob = generateWavBlob(globalOutputAudioChunks);
+            // 变动：如果用户是中途点击的停止，我们需要把正在跑的那段残留数据也生成出来
+            if (currentSegmentChunks && currentSegmentChunks.length > 0 && session) {
+                const blob = generateWavBlob(currentSegmentChunks);
                 const url = URL.createObjectURL(blob);
                 
-                downloadLink.href = url;
-                downloadLink.download = `translated_full_${new Date().getTime()}.wav`;
-                downloadLink.style.display = 'block';
-            } else {
-                setStatus("结束：未获取到任何有效的返回音频数据", true);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `translated_part_${currentTaskIndex + 1}_partial.wav`;
+                a.style.textDecoration = 'none';
+                
+                const btn = document.createElement('md-elevated-button');
+                btn.innerHTML = `<md-icon slot="icon">download</md-icon> 下载第 ${currentTaskIndex + 1} 部分 (已中断)`;
+                a.appendChild(btn);
+                downloadContainer.appendChild(a);
             }
+
+            setStatus("处理任务结束，请在上方点击按钮下载各分段的音频文件。");
+            appendTranslation("[ 处理任务结束 ]", true);
 
             btnStart.disabled = false;
             btnStop.disabled = true;
