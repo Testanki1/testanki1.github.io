@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频实时翻译</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
+
+    <style>
+        :root {
+            --md-sys-color-primary: #0b57d0;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-surface: #f8f9fa;
+            --md-sys-color-surface-container-lowest: #ffffff;
+            --md-sys-color-surface-container: #e9eef6;
+            --md-sys-color-surface-container-high: #dde3ec;
+            --md-sys-color-on-surface: #1f1f1f;
+            --md-sys-color-on-surface-variant: #444746;
+            --md-sys-color-error: #b3261e;
+            
+            --md-sys-shape-corner-extra-large: 28px;
+            --md-sys-shape-corner-large: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Google Sans', system-ui, sans-serif;
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            display: grid;
+            gap: 24px;
+        }
+
+        .m3-card {
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-extra-large);
+            padding: 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-top: 0;
+            margin-bottom: 32px;
+            color: var(--md-sys-color-primary);
+        }
+
+        h2 {
+            font-size: 1.3rem;
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--md-sys-color-on-surface);
+        }
+
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .file-picker-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--md-sys-color-surface-container-high);
+            padding: 16px 24px;
+            border-radius: var(--md-sys-shape-corner-large);
+            overflow: hidden; 
+        }
+
+        #fileName {
+            font-size: 0.95rem;
+            color: var(--md-sys-color-on-surface-variant);
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0; /* 修复长文件名撑破屏幕的关键代码 */
+        }
+
+        /* 进度条区域 */
+        .progress-container {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--md-sys-color-on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+
+        md-linear-progress {
+            width: 100%;
+            border-radius: 4px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+            flex-wrap: wrap;
+        }
+
+        /* 状态指示文本 */
+        #statusText {
+            font-size: 0.85rem;
+            color: var(--md-sys-color-on-surface-variant);
+            margin-bottom: 16px;
+            font-weight: 500;
+            min-height: 20px;
+        }
+        
+        #statusText.error {
+            color: var(--md-sys-color-error);
+        }
+
+        /* 连续段落式翻译结果区域 */
+        #translationArea {
+            background-color: var(--md-sys-color-surface-container-lowest);
+            border-radius: var(--md-sys-shape-corner-large);
+            padding: 24px;
+            height: 380px;
+            overflow-y: auto;
+            border: 1px solid var(--md-sys-color-surface-container-high);
+            scroll-behavior: smooth;
+            
+            font-size: 1.15rem;
+            line-height: 1.8;
+            color: var(--md-sys-color-on-surface);
+            text-align: justify;
+            word-break: break-all;
+        }
+
+        .translation-segment {
+            transition: opacity 0.3s ease;
+        }
+
+        md-filled-text-field {
+            width: 100%;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "@google/genai": "https://esm.run/@google/genai",
+                "@material/web/": "https://esm.run/@material/web/"
+            }
+        }
+    </script>
+    <script type="module">
+        import '@material/web/all.js';
+    </script>
+</head>
+<body>
+
+    <div class="container">
+        <div class="m3-card">
+            <h1>音频实时翻译</h1>
+            
+            <div class="form-row">
+                <md-filled-text-field id="apiKey" label="API Key" type="password">
+                    <md-icon slot="leading-icon">key</md-icon>
+                </md-filled-text-field>
+            </div>
+
+            <div class="file-picker-container">
+                <input type="file" id="audioFileInput" accept="audio/*" style="display: none">
+                <md-filled-tonal-button id="fileBtn">
+                    <md-icon slot="icon">audio_file</md-icon>
+                    选择本地音频
+                </md-filled-tonal-button>
+                <span id="fileName">未选择文件...</span>
+            </div>
+
+            <!-- 时长与进度条容器 -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-labels">
+                    <span id="progressText">00:00 / 00:00</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <md-linear-progress id="progressBar" value="0"></md-linear-progress>
+            </div>
+
+            <div class="actions">
+                <md-filled-button id="startBtn">
+                    <md-icon slot="icon">play_arrow</md-icon>
+                    开始翻译
+                </md-filled-button>
+                
+                <md-outlined-button id="stopBtn" disabled>
+                    <md-icon slot="icon">stop</md-icon>
+                    停止并生成
+                </md-outlined-button>
+
+                <a id="downloadLink" download="translated_audio.wav" style="display: none; text-decoration: none;">
+                    <md-elevated-button id="downloadBtn">
+                        <md-icon slot="icon">download</md-icon>
+                        下载翻译音频
+                    </md-elevated-button>
+                </a>
+            </div>
+        </div>
+
+        <div class="m3-card" style="padding-top: 24px;">
+            <h2>翻译结果</h2>
+            <div id="statusText">等待操作 (自动跳过静音片段)</div>
+            <div id="translationArea"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenAI, Modality } from '@google/genai';
+
+        const apiKeyInput = document.getElementById('apiKey');
+        const audioFileInput = document.getElementById('audioFileInput');
+        const fileBtn = document.getElementById('fileBtn');
+        const fileNameDisplay = document.getElementById('fileName');
+        const btnStart = document.getElementById('startBtn');
+        const btnStop = document.getElementById('stopBtn');
+        const downloadLink = document.getElementById('downloadLink');
+        const statusText = document.getElementById('statusText');
+        const translationArea = document.getElementById('translationArea');
+        
+        const progressContainer = document.getElementById('progressContainer');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressBar = document.getElementById('progressBar');
+
+        let session = null;
+        let isTranslating = false;
+        let outputAudioChunks = []; 
+
+        // ==========================================
+        // 【核心改进】：使用 Web Worker 充当后台定时器
+        // ==========================================
+        const workerCode = `
+            let timer = null;
+            self.onmessage = function(e) {
+                if (e.data === 'start') {
+                    if (timer) clearInterval(timer);
+                    // 在 Worker 线程中每 100ms 触发一次，永远不会被浏览器后台降速
+                    timer = setInterval(() => self.postMessage('tick'), 100);
+                } else if (e.data === 'stop') {
+                    if (timer) {
+                        clearInterval(timer);
+                        timer = null;
+                    }
+                }
+            };
+        `;
+        const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+        const timerWorker = new Worker(URL.createObjectURL(workerBlob));
+        // ==========================================
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00";
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        fileBtn.addEventListener('click', () => audioFileInput.click());
+        audioFileInput.addEventListener('change', () => {
+            const file = audioFileInput.files[0];
+            fileNameDisplay.textContent = file ? file.name : '未选择文件...';
+            progressContainer.style.display = 'none';
+        });
+
+        function setStatus(text, isError = false) {
+            if (!text || text === 'undefined') return;
+            statusText.textContent = text;
+            statusText.className = isError ? 'error' : '';
+        }
+
+        function appendTranslation(text) {
+            if (typeof text !== 'string' || text.trim() === '' || text.includes('undefined')) return;
+            const span = document.createElement('span');
+            span.className = 'translation-segment';
+            span.textContent = text; 
+            translationArea.appendChild(span);
+            translationArea.scrollTop = translationArea.scrollHeight;
+        }
+
+        async function decodeAndResampleAudio(file) {
+            setStatus(`正在解析和重采样: ${file.name}...`);
+            const arrayBuffer = await file.arrayBuffer();
+            const audioCtx = new AudioContext();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+            const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineCtx.destination);
+            source.start();
+            
+            const resampledBuffer = await offlineCtx.startRendering();
+            const floatData = resampledBuffer.getChannelData(0);
+            
+            const int16Data = new Int16Array(floatData.length);
+            for (let i = 0; i < floatData.length; i++) {
+                let s = Math.max(-1, Math.min(1, floatData[i]));
+                int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            setStatus("音频已准备完毕，准备推流");
+            return int16Data;
+        }
+
+        function generateWavBlob(pcmChunks) {
+            const totalLen = pcmChunks.reduce((acc, val) => acc + val.length, 0);
+            const wavData = new Uint8Array(44 + totalLen);
+            const view = new DataView(wavData.buffer);
+
+            const writeString = (view, offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + totalLen, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, 1, true); 
+            view.setUint32(24, 24000, true); 
+            view.setUint32(28, 24000 * 2, true); 
+            view.setUint16(32, 2, true); 
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, totalLen, true);
+
+            let offset = 44;
+            for (let chunk of pcmChunks) {
+                wavData.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            return new Blob([wavData], { type: 'audio/wav' });
+        }
+
+        btnStart.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            const file = audioFileInput.files[0];
+
+            if (!apiKey) return alert("请在上方输入 API Key");
+            if (!file) return alert("请先选择音频文件");
+
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            downloadLink.style.display = 'none';
+            translationArea.innerHTML = '';
+            outputAudioChunks = [];
+            
+            progressContainer.style.display = 'flex';
+            progressBar.value = 0;
+            progressBar.indeterminate = false;
+            progressText.textContent = `00:00 / 00:00`;
+            progressPercent.textContent = `0%`;
+
+            try {
+                const int16Data = await decodeAndResampleAudio(file);
+                const ai = new GoogleGenAI({ apiKey: apiKey });
+                const config = {
+                    responseModalities: [Modality.AUDIO],
+                    outputAudioTranscription: {}, 
+                    translationConfig: {
+                        targetLanguageCode: 'zh-Hans', 
+                        echoTargetLanguage: false
+                    }
+                };
+
+                setStatus('正在建立直连通道...');
+
+                session = await ai.live.connect({
+                    model: 'gemini-3.5-live-translate-preview',
+                    config: config,
+                    callbacks: {
+                        onopen: () => {
+                            setStatus('连接成功！正在进行同声传译...');
+                            startSendingAudio(int16Data);
+                        },
+                        onmessage: (message) => {
+                            const content = message.serverContent;
+                            
+                            if (content?.outputTranscription?.text) {
+                                appendTranslation(content.outputTranscription.text);
+                            }
+                            
+                            if (content?.modelTurn?.parts) {
+                                for (const part of content.modelTurn.parts) {
+                                    if (part.inlineData && part.inlineData.data) {
+                                        const binaryStr = atob(part.inlineData.data);
+                                        const bytes = new Uint8Array(binaryStr.length);
+                                        for (let i = 0; i < binaryStr.length; i++) {
+                                            bytes[i] = binaryStr.charCodeAt(i);
+                                        }
+                                        outputAudioChunks.push(bytes);
+                                    }
+                                }
+                            }
+                        },
+                        onerror: (e) => {
+                            if (e && e.message) setStatus(`连接错误: ${e.message}`, true);
+                        },
+                        onclose: () => {
+                            setStatus(`连接已断开`);
+                            finishTranslation();
+                        },
+                    },
+                });
+
+            } catch (error) {
+                if (error && error.message) setStatus(`初始化失败: ${error.message}`, true);
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+            }
+        });
+
+        function startSendingAudio(int16Data) {
+            const chunkSize = 1600; // 100ms 的 16kHz 音频数据
+            let offset = 0;
+            isTranslating = true;
+            const totalSeconds = int16Data.length / 16000;
+
+            // 监听 Worker 传来的时钟信号进行推流
+            timerWorker.onmessage = () => {
+                if (!isTranslating) return;
+
+                if (offset >= int16Data.length) {
+                    timerWorker.postMessage('stop');
+                    setStatus("本地推流完毕，等待模型进行最终响应...");
+                    progressBar.indeterminate = true;
+                    return;
+                }
+
+                const currentSeconds = offset / 16000;
+                const progressRatio = offset / int16Data.length;
+                progressBar.value = progressRatio;
+                progressText.textContent = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
+                progressPercent.textContent = `${Math.floor(progressRatio * 100)}%`;
+
+                const chunk = int16Data.subarray(offset, offset + chunkSize);
+                const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+
+                let binaryStr = '';
+                for (let i = 0; i < uint8.byteLength; i++) {
+                    binaryStr += String.fromCharCode(uint8[i]);
+                }
+
+                try {
+                    session.sendRealtimeInput({
+                        audio: {
+                            data: btoa(binaryStr),
+                            mimeType: 'audio/pcm;rate=16000'
+                        }
+                    });
+                } catch (e) {
+                    if (e && e.message) setStatus(`流传输中断: ${e.message}`, true);
+                }
+
+                offset += chunkSize;
+            };
+
+            // 启动后台定时器 Worker
+            timerWorker.postMessage('start');
+        }
+
+        btnStop.addEventListener('click', () => {
+            setStatus("已手动停止任务");
+            finishTranslation();
+        });
+
+        function finishTranslation() {
+            if (!isTranslating) return; 
+            isTranslating = false;
+            
+            // 停止后台定时器 Worker
+            timerWorker.postMessage('stop');
+            
+            progressBar.indeterminate = false;
+            progressBar.value = 1;
+
+            if (outputAudioChunks.length > 0) {
+                setStatus("处理完毕，请点击下方按钮下载翻译音频文件");
+                const blob = generateWavBlob(outputAudioChunks);
+                const url = URL.createObjectURL(blob);
+                
+                downloadLink.href = url;
+                downloadLink.style.display = 'block';
+            } else {
+                setStatus("结束：未获取到有效的返回音频数据", true);
+            }
+
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+            session = null;
+        }
+    </script>
+</body>
+</html>
