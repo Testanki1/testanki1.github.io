@@ -6,7 +6,7 @@
     <title>音频实时翻译</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
 
     <style>
         :root {
@@ -34,7 +34,7 @@
             background-color: var(--md-sys-color-surface);
             color: var(--md-sys-color-on-surface);
             margin: 0;
-            padding: 40px 20px;
+            padding: 20px 16px;
             display: flex;
             justify-content: center;
         }
@@ -49,17 +49,17 @@
         .m3-card {
             background-color: var(--md-sys-color-surface-container);
             border-radius: var(--md-sys-shape-corner-extra-large);
-            padding: 32px;
+            padding: 24px 20px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.03);
             overflow: hidden;
         }
 
         h1 {
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
             letter-spacing: -0.5px;
             margin-top: 0;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
             color: var(--md-sys-color-primary);
         }
 
@@ -75,15 +75,15 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .file-picker-container {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             background: var(--md-sys-color-surface-container-high);
-            padding: 16px 24px;
+            padding: 12px 16px;
             border-radius: var(--md-sys-shape-corner-large);
             overflow: hidden; 
         }
@@ -95,10 +95,90 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            min-width: 0; /* 修复长文件名撑破屏幕的关键代码 */
+            min-width: 0; 
         }
 
-        /* 进度条区域 */
+        /* -------------------------------------
+           分段设置区域样式 (默认隐藏)
+        ------------------------------------- */
+        #splitSettingsWrapper {
+            display: none; 
+            margin-top: 28px;
+        }
+
+        .split-setting-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .split-setting-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        #audioDurationHint {
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: var(--md-sys-color-primary);
+            background: var(--md-sys-color-surface-container-high);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .split-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .split-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--md-sys-color-surface-container-lowest);
+            padding: 8px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--md-sys-color-surface-container-high);
+        }
+
+        .split-row-label {
+            font-size: 0.85rem;
+            color: var(--md-sys-color-on-surface-variant);
+            white-space: nowrap;
+        }
+
+        .time-input-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-grow: 1;
+            min-width: 0; 
+        }
+
+        .time-input {
+            width: 100%;
+            min-width: 0; 
+        }
+
+        .time-separator {
+            font-weight: bold;
+            color: var(--md-sys-color-on-surface-variant);
+            flex-shrink: 0;
+        }
+
+        .remove-btn {
+            flex-shrink: 0;
+            margin-left: -4px;
+        }
+
+        /* 进度条样式 */
         .progress-container {
             display: none;
             flex-direction: column;
@@ -121,12 +201,11 @@
 
         .actions {
             display: flex;
-            gap: 16px;
-            margin-top: 32px;
+            gap: 12px;
+            margin-top: 24px;
             flex-wrap: wrap;
         }
 
-        /* 状态指示文本 */
         #statusText {
             font-size: 0.85rem;
             color: var(--md-sys-color-on-surface-variant);
@@ -139,11 +218,10 @@
             color: var(--md-sys-color-error);
         }
 
-        /* 连续段落式翻译结果区域 */
         #translationArea {
             background-color: var(--md-sys-color-surface-container-lowest);
             border-radius: var(--md-sys-shape-corner-large);
-            padding: 24px;
+            padding: 20px;
             height: 380px;
             overflow-y: auto;
             border: 1px solid var(--md-sys-color-surface-container-high);
@@ -158,6 +236,19 @@
 
         .translation-segment {
             transition: opacity 0.3s ease;
+        }
+
+        .translation-divider {
+            display: block;
+            color: var(--md-sys-color-primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 20px 0 10px 0;
+            text-align: center;
+            background: var(--md-sys-color-surface-container);
+            border-radius: 8px;
+            padding: 6px;
+            user-select: none;
         }
 
         md-filled-text-field {
@@ -193,12 +284,33 @@
                 <input type="file" id="audioFileInput" accept="audio/*" style="display: none">
                 <md-filled-tonal-button id="fileBtn">
                     <md-icon slot="icon">audio_file</md-icon>
-                    选择本地音频
+                    选择音频
                 </md-filled-tonal-button>
-                <span id="fileName">未选择文件...</span>
+                <span id="fileName">未选择...</span>
             </div>
 
-            <!-- 时长与进度条容器 -->
+            <!-- 选择音频后才显示的区域 -->
+            <div id="splitSettingsWrapper">
+                <div class="split-setting-header">
+                    <div class="split-setting-title">
+                        音频分段设置
+                        <span id="audioDurationHint"></span>
+                    </div>
+                    <md-text-button id="addSplitBtn">
+                        <md-icon slot="icon">add</md-icon>
+                        添加切割点
+                    </md-text-button>
+                </div>
+                
+                <div id="splitPointsContainer" class="split-list">
+                    <!-- 动态添加的切割行 -->
+                </div>
+
+                <div style="font-size: 0.8rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; margin-top: 16px;">
+                    * 提示：接口存在约10分钟的单次连接限制，建议在长音频的9分钟（09:00）左右设置切割点。程序会自动排队合并。
+                </div>
+            </div>
+
             <div class="progress-container" id="progressContainer">
                 <div class="progress-labels">
                     <span id="progressText">00:00 / 00:00</span>
@@ -210,18 +322,18 @@
             <div class="actions">
                 <md-filled-button id="startBtn">
                     <md-icon slot="icon">play_arrow</md-icon>
-                    开始翻译
+                    开始处理
                 </md-filled-button>
                 
                 <md-outlined-button id="stopBtn" disabled>
                     <md-icon slot="icon">stop</md-icon>
-                    停止并生成
+                    停止
                 </md-outlined-button>
 
                 <a id="downloadLink" download="translated_audio.wav" style="display: none; text-decoration: none;">
                     <md-elevated-button id="downloadBtn">
                         <md-icon slot="icon">download</md-icon>
-                        下载翻译音频
+                        下载音频
                     </md-elevated-button>
                 </a>
             </div>
@@ -229,7 +341,7 @@
 
         <div class="m3-card" style="padding-top: 24px;">
             <h2>翻译结果</h2>
-            <div id="statusText">等待操作 (自动跳过静音片段)</div>
+            <div id="statusText">等待操作...</div>
             <div id="translationArea"></div>
         </div>
     </div>
@@ -247,6 +359,11 @@
         const statusText = document.getElementById('statusText');
         const translationArea = document.getElementById('translationArea');
         
+        const splitSettingsWrapper = document.getElementById('splitSettingsWrapper');
+        const audioDurationHint = document.getElementById('audioDurationHint');
+        const splitPointsContainer = document.getElementById('splitPointsContainer');
+        const addSplitBtn = document.getElementById('addSplitBtn');
+
         const progressContainer = document.getElementById('progressContainer');
         const progressText = document.getElementById('progressText');
         const progressPercent = document.getElementById('progressPercent');
@@ -254,17 +371,21 @@
 
         let session = null;
         let isTranslating = false;
-        let outputAudioChunks = []; 
+        let globalOutputAudioChunks = []; 
+        let fullInt16Data = null;
+        let totalDurationSec = 0; 
+        
+        let globalPreviewAudioDuration = 0; // 选中的音频真实秒数（用于 UI 拦截）
+        
+        let tasks = [];            
+        let currentTaskIndex = 0;  
+        let segmentTimeoutId = null; 
 
-        // ==========================================
-        // 【核心改进】：使用 Web Worker 充当后台定时器
-        // ==========================================
         const workerCode = `
             let timer = null;
             self.onmessage = function(e) {
                 if (e.data === 'start') {
                     if (timer) clearInterval(timer);
-                    // 在 Worker 线程中每 100ms 触发一次，永远不会被浏览器后台降速
                     timer = setInterval(() => self.postMessage('tick'), 100);
                 } else if (e.data === 'stop') {
                     if (timer) {
@@ -276,20 +397,131 @@
         `;
         const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
         const timerWorker = new Worker(URL.createObjectURL(workerBlob));
-        // ==========================================
 
+        // 格式化秒数为 MM:SS
         function formatTime(seconds) {
-            if (isNaN(seconds)) return "00:00";
+            if (isNaN(seconds) || seconds < 0) return "00:00";
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
             const s = Math.floor(seconds % 60).toString().padStart(2, '0');
             return `${m}:${s}`;
         }
 
+        // ==========================================
+        // 核心拦截逻辑：动态创建切割行并物理限制输入
+        // ==========================================
+        function createSplitRow() {
+            const row = document.createElement('div');
+            row.className = 'split-row';
+            
+            // 去除了 value="0" 让输入框默认处于纯空状态
+            row.innerHTML = `
+                <div class="split-row-label">切割点</div>
+                <div class="time-input-group">
+                    <md-outlined-text-field type="number" class="time-input min-input" label="分钟" min="0"></md-outlined-text-field>
+                    <span class="time-separator">:</span>
+                    <md-outlined-text-field type="number" class="time-input sec-input" label="秒" min="0"></md-outlined-text-field>
+                </div>
+                <md-icon-button class="remove-btn" title="删除"><md-icon>delete</md-icon></md-icon-button>
+            `;
+            
+            const minInput = row.querySelector('.min-input');
+            const secInput = row.querySelector('.sec-input');
+
+            // 拦截分钟输入：不得超过音频总分钟数
+            minInput.addEventListener('input', (e) => {
+                let val = parseInt(e.target.value);
+                if (isNaN(val)) return; // 留空时不作拦截
+                
+                const maxMin = Math.floor(globalPreviewAudioDuration / 60);
+                if (val > maxMin) e.target.value = maxMin.toString();
+                if (val < 0) e.target.value = '0';
+                
+                // 如果分钟拉满，触发一次秒数修正
+                const evt = new Event('change');
+                minInput.dispatchEvent(evt);
+            });
+
+            // 拦截秒数输入：常规不得超过59，到达最大分钟时不得超过最大秒数
+            secInput.addEventListener('input', (e) => {
+                let val = parseInt(e.target.value);
+                if (isNaN(val)) return; // 留空时不作拦截
+                
+                let currentMin = parseInt(minInput.value) || 0; // 若分钟为空当0处理
+                const maxMin = Math.floor(globalPreviewAudioDuration / 60);
+                const maxSecOfLastMin = Math.floor(globalPreviewAudioDuration % 60);
+
+                if (currentMin >= maxMin) {
+                    if (val > maxSecOfLastMin) e.target.value = maxSecOfLastMin.toString();
+                } else {
+                    if (val > 59) e.target.value = '59';
+                }
+                
+                if (val < 0) e.target.value = '0';
+            });
+
+            // 当分钟数发生变化时，如果秒数此时处于越界状态，自动拉回
+            minInput.addEventListener('change', (e) => {
+                let currentMin = parseInt(e.target.value) || 0;
+                const maxMin = Math.floor(globalPreviewAudioDuration / 60);
+                
+                if (currentMin >= maxMin) {
+                    const maxSecOfLastMin = Math.floor(globalPreviewAudioDuration % 60);
+                    let currentSec = parseInt(secInput.value);
+                    if (!isNaN(currentSec) && currentSec > maxSecOfLastMin) {
+                        secInput.value = maxSecOfLastMin.toString();
+                    }
+                }
+            });
+
+            row.querySelector('.remove-btn').addEventListener('click', () => {
+                row.remove();
+                updateSplitRowLabels();
+            });
+            
+            splitPointsContainer.appendChild(row);
+            updateSplitRowLabels();
+        }
+
+        function updateSplitRowLabels() {
+            const rows = splitPointsContainer.querySelectorAll('.split-row');
+            rows.forEach((row, index) => {
+                row.querySelector('.split-row-label').textContent = `点 ${index + 1}`;
+            });
+        }
+
+        addSplitBtn.addEventListener('click', () => {
+            createSplitRow();
+        });
+
+        // ==========================================
+        // 文件选择监听：毫秒级获取真实时长并解锁UI
+        // ==========================================
         fileBtn.addEventListener('click', () => audioFileInput.click());
         audioFileInput.addEventListener('change', () => {
             const file = audioFileInput.files[0];
-            fileNameDisplay.textContent = file ? file.name : '未选择文件...';
             progressContainer.style.display = 'none';
+            splitPointsContainer.innerHTML = ''; // 清空上一首歌的切割点
+
+            if (file) {
+                fileNameDisplay.textContent = file.name;
+                
+                // 利用 Audio 对象瞬间读取媒体元数据，无需深度重采样解码
+                const objectUrl = URL.createObjectURL(file);
+                const audioObj = new Audio(objectUrl);
+                
+                audioObj.addEventListener('loadedmetadata', () => {
+                    globalPreviewAudioDuration = audioObj.duration;
+                    audioDurationHint.textContent = `全长 ${formatTime(globalPreviewAudioDuration)}`;
+                    
+                    // 显示分段设置区域
+                    splitSettingsWrapper.style.display = 'block';
+                    URL.revokeObjectURL(objectUrl);
+                });
+                
+            } else {
+                fileNameDisplay.textContent = '未选择...';
+                splitSettingsWrapper.style.display = 'none';
+            }
         });
 
         function setStatus(text, isError = false) {
@@ -298,10 +530,10 @@
             statusText.className = isError ? 'error' : '';
         }
 
-        function appendTranslation(text) {
+        function appendTranslation(text, isDivider = false) {
             if (typeof text !== 'string' || text.trim() === '' || text.includes('undefined')) return;
             const span = document.createElement('span');
-            span.className = 'translation-segment';
+            span.className = isDivider ? 'translation-divider' : 'translation-segment';
             span.textContent = text; 
             translationArea.appendChild(span);
             translationArea.scrollTop = translationArea.scrollHeight;
@@ -327,7 +559,6 @@
                 let s = Math.max(-1, Math.min(1, floatData[i]));
                 int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
-            setStatus("音频已准备完毕，准备推流");
             return int16Data;
         }
 
@@ -375,35 +606,89 @@
             btnStop.disabled = false;
             downloadLink.style.display = 'none';
             translationArea.innerHTML = '';
-            outputAudioChunks = [];
             
-            progressContainer.style.display = 'flex';
-            progressBar.value = 0;
-            progressBar.indeterminate = false;
-            progressText.textContent = `00:00 / 00:00`;
-            progressPercent.textContent = `0%`;
+            globalOutputAudioChunks = [];
+            tasks = [];
+            currentTaskIndex = 0;
+            isTranslating = true;
 
             try {
-                const int16Data = await decodeAndResampleAudio(file);
-                const ai = new GoogleGenAI({ apiKey: apiKey });
-                const config = {
-                    responseModalities: [Modality.AUDIO],
-                    outputAudioTranscription: {}, 
-                    translationConfig: {
-                        targetLanguageCode: 'zh-Hans', 
-                        echoTargetLanguage: false
+                // 真实解码并计算最终时长
+                fullInt16Data = await decodeAndResampleAudio(file);
+                totalDurationSec = fullInt16Data.length / 16000;
+                
+                // 抓取并合并合法的切割点
+                const rawPoints = [];
+                const rows = splitPointsContainer.querySelectorAll('.split-row');
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const minVal = parseInt(rows[i].querySelector('.min-input').value) || 0;
+                    const secVal = parseInt(rows[i].querySelector('.sec-input').value) || 0;
+                    const totalSec = minVal * 60 + secVal;
+                    
+                    if (totalSec > 0 && totalSec < totalDurationSec) {
+                        rawPoints.push(totalSec);
                     }
-                };
+                }
+                
+                // 构建排队任务，全量时长永远是最后一刀
+                let points = [0, ...rawPoints, totalDurationSec];
+                points.sort((a, b) => a - b);
+                points = [...new Set(points)];
 
-                setStatus('正在建立直连通道...');
+                for (let i = 0; i < points.length - 1; i++) {
+                    tasks.push({ start: points[i], end: points[i+1] });
+                }
 
+                progressContainer.style.display = 'flex';
+                progressBar.value = 0;
+                progressText.textContent = `00:00 / ${formatTime(totalDurationSec)}`;
+                progressPercent.textContent = `0%`;
+
+                processNextTask();
+
+            } catch (error) {
+                if (error && error.message) setStatus(`初始化失败: ${error.message}`, true);
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+            }
+        });
+
+        async function processNextTask() {
+            if (!isTranslating) return;
+
+            if (currentTaskIndex >= tasks.length) {
+                finishAllTasks();
+                return;
+            }
+
+            const task = tasks[currentTaskIndex];
+            setStatus(`正在处理第 ${currentTaskIndex + 1}/${tasks.length} 段... (${formatTime(task.start)} ~ ${formatTime(task.end)})`);
+            
+            appendTranslation(`[ 第 ${currentTaskIndex + 1} 部分 ${formatTime(task.start)} - ${formatTime(task.end)} ]`, true);
+
+            const startIndex = Math.floor(task.start * 16000);
+            const endIndex = Math.floor(task.end * 16000);
+            const targetInt16Data = fullInt16Data.subarray(startIndex, endIndex);
+
+            const apiKey = apiKeyInput.value.trim();
+            const ai = new GoogleGenAI({ apiKey: apiKey });
+            const config = {
+                responseModalities: [Modality.AUDIO],
+                outputAudioTranscription: {}, 
+                translationConfig: {
+                    targetLanguageCode: 'zh-Hans', 
+                    echoTargetLanguage: false
+                }
+            };
+
+            try {
                 session = await ai.live.connect({
                     model: 'gemini-3.5-live-translate-preview',
                     config: config,
                     callbacks: {
                         onopen: () => {
-                            setStatus('连接成功！正在进行同声传译...');
-                            startSendingAudio(int16Data);
+                            startSendingAudio(targetInt16Data, task.start);
                         },
                         onmessage: (message) => {
                             const content = message.serverContent;
@@ -420,49 +705,52 @@
                                         for (let i = 0; i < binaryStr.length; i++) {
                                             bytes[i] = binaryStr.charCodeAt(i);
                                         }
-                                        outputAudioChunks.push(bytes);
+                                        globalOutputAudioChunks.push(bytes);
                                     }
                                 }
                             }
                         },
                         onerror: (e) => {
-                            if (e && e.message) setStatus(`连接错误: ${e.message}`, true);
+                            setStatus(`第 ${currentTaskIndex + 1} 段连接断开或错误: ${e?.message || '未知'}，将在6秒后尝试继续...`, true);
                         },
                         onclose: () => {
-                            setStatus(`连接已断开`);
-                            finishTranslation();
+                            console.log(`Connection closed for segment ${currentTaskIndex + 1}`);
                         },
                     },
                 });
-
             } catch (error) {
-                if (error && error.message) setStatus(`初始化失败: ${error.message}`, true);
-                btnStart.disabled = false;
-                btnStop.disabled = true;
+                setStatus(`建立连接失败: ${error.message}`, true);
+                finishAllTasks(true);
             }
-        });
+        }
 
-        function startSendingAudio(int16Data) {
-            const chunkSize = 1600; // 100ms 的 16kHz 音频数据
+        function startSendingAudio(int16Data, startSec) {
+            const chunkSize = 1600; 
             let offset = 0;
-            isTranslating = true;
-            const totalSeconds = int16Data.length / 16000;
 
-            // 监听 Worker 传来的时钟信号进行推流
             timerWorker.onmessage = () => {
                 if (!isTranslating) return;
 
                 if (offset >= int16Data.length) {
                     timerWorker.postMessage('stop');
-                    setStatus("本地推流完毕，等待模型进行最终响应...");
+                    setStatus(`第 ${currentTaskIndex + 1}/${tasks.length} 段推流完毕，等待接收最终响应...`);
                     progressBar.indeterminate = true;
+                    
+                    segmentTimeoutId = setTimeout(() => {
+                        session = null;
+                        currentTaskIndex++;
+                        processNextTask();
+                    }, 6000); 
+                    
                     return;
                 }
 
-                const currentSeconds = offset / 16000;
-                const progressRatio = offset / int16Data.length;
+                const currentProcessedSec = offset / 16000;
+                const absoluteCurrentSec = startSec + currentProcessedSec;
+                const progressRatio = absoluteCurrentSec / totalDurationSec;
+                
                 progressBar.value = progressRatio;
-                progressText.textContent = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
+                progressText.textContent = `${formatTime(absoluteCurrentSec)} / ${formatTime(totalDurationSec)}`;
                 progressPercent.textContent = `${Math.floor(progressRatio * 100)}%`;
 
                 const chunk = int16Data.subarray(offset, offset + chunkSize);
@@ -481,40 +769,41 @@
                         }
                     });
                 } catch (e) {
-                    if (e && e.message) setStatus(`流传输中断: ${e.message}`, true);
                 }
 
                 offset += chunkSize;
             };
 
-            // 启动后台定时器 Worker
             timerWorker.postMessage('start');
         }
 
         btnStop.addEventListener('click', () => {
-            setStatus("已手动停止任务");
-            finishTranslation();
+            setStatus("已手动中止排队任务，正在生成已处理的片段...");
+            finishAllTasks(false);
         });
 
-        function finishTranslation() {
-            if (!isTranslating) return; 
-            isTranslating = false;
-            
-            // 停止后台定时器 Worker
+        function finishAllTasks(isError = false) {
+            isTranslating = false; 
             timerWorker.postMessage('stop');
+            if (segmentTimeoutId) clearTimeout(segmentTimeoutId);
             
             progressBar.indeterminate = false;
             progressBar.value = 1;
+            progressPercent.textContent = "100%";
+            progressText.textContent = `${formatTime(totalDurationSec)} / ${formatTime(totalDurationSec)}`;
 
-            if (outputAudioChunks.length > 0) {
-                setStatus("处理完毕，请点击下方按钮下载翻译音频文件");
-                const blob = generateWavBlob(outputAudioChunks);
+            if (globalOutputAudioChunks.length > 0) {
+                setStatus("全部处理合并完毕，请点击下方按钮下载完整音频文件。");
+                appendTranslation("[ 所有分段处理完成 ]", true);
+
+                const blob = generateWavBlob(globalOutputAudioChunks);
                 const url = URL.createObjectURL(blob);
                 
                 downloadLink.href = url;
+                downloadLink.download = `translated_full_${new Date().getTime()}.wav`;
                 downloadLink.style.display = 'block';
             } else {
-                setStatus("结束：未获取到有效的返回音频数据", true);
+                setStatus("结束：未获取到任何有效的返回音频数据", true);
             }
 
             btnStart.disabled = false;
