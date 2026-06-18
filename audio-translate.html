@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频实时翻译（3D坦克专用版）</title>
+    <title>音频实时翻译</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
@@ -296,9 +296,24 @@
 
     <div class="container">
         <div class="m3-card">
-            <h1>音频实时翻译（3D坦克专用版）</h1>
+            <h1>音频实时翻译</h1>
             
             <div class="form-row">
+                <!-- 模式切换区 -->
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="font-weight: 500; font-size: 0.95rem; color: var(--md-sys-color-on-surface-variant);">翻译模式</div>
+                    <div style="display: flex; gap: 24px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--md-sys-color-on-surface);">
+                            <md-radio id="modeTank" name="translationMode" value="tank" checked></md-radio>
+                            <span>3D坦克专用</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--md-sys-color-on-surface);">
+                            <md-radio id="modeGeneral" name="translationMode" value="general"></md-radio>
+                            <span>通用模式</span>
+                        </label>
+                    </div>
+                </div>
+
                 <md-filled-text-field id="apiKey" label="API Key" type="password">
                     <md-icon slot="leading-icon">key</md-icon>
                 </md-filled-text-field>
@@ -629,21 +644,27 @@
             currentTaskIndex = 0;
             isTranslating = true;
 
-            // 1. 尝试拉取并加载专有名词词典
-            if (!customDictionary) {
-                setStatus("正在拉取专有名词词典...");
-                try {
-                    const dictUrl = "https://raw.githubusercontent.com/Testanki1/testanki1.github.io/refs/heads/main/translations.js";
-                    const dictRes = await fetch(dictUrl);
-                    if (dictRes.ok) {
-                        customDictionary = await dictRes.text();
-                        logDebug("专有名词词典加载成功！", "#28a745");
-                    } else {
-                        logDebug(`词典拉取失败 (Status: ${dictRes.status})，将使用默认翻译模式。`, "#ffc107");
+            const currentMode = document.getElementById('modeTank').checked ? 'tank' : 'general';
+
+            // 1. 如果选择了3D坦克专用模式，尝试拉取并加载专有名词词典
+            if (currentMode === 'tank') {
+                if (!customDictionary) {
+                    setStatus("正在拉取专有名词词典...");
+                    try {
+                        const dictUrl = "https://raw.githubusercontent.com/Testanki1/testanki1.github.io/refs/heads/main/translations.js";
+                        const dictRes = await fetch(dictUrl);
+                        if (dictRes.ok) {
+                            customDictionary = await dictRes.text();
+                            logDebug("专有名词词典加载成功！", "#28a745");
+                        } else {
+                            logDebug(`词典拉取失败 (Status: ${dictRes.status})，将使用默认翻译模式。`, "#ffc107");
+                        }
+                    } catch (err) {
+                        logDebug(`网络原因导致词典拉取失败: ${err.message}，将使用默认翻译模式。`, "#ffc107");
                     }
-                } catch (err) {
-                    logDebug(`网络原因导致词典拉取失败: ${err.message}，将使用默认翻译模式。`, "#ffc107");
                 }
+            } else {
+                logDebug("已选择通用模式，不加载专用词典。", "#17a2b8");
             }
 
             try {
@@ -746,8 +767,10 @@
                 }
             };
 
-            // 如果成功拉取到了词典，只下达极简参考指令，去除角色设定废话
-            if (customDictionary) {
+            const currentMode = document.getElementById('modeTank').checked ? 'tank' : 'general';
+
+            // 仅在坦克模式且词典拉取成功时，才加入专用参考词典的设定指令
+            if (currentMode === 'tank' && customDictionary) {
                 config.systemInstruction = {
                     parts: [{
                         text: `翻译时请参考以下专有名词词典：\n\n${customDictionary}`
