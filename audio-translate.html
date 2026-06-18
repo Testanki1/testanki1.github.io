@@ -271,7 +271,6 @@
             user-select: none;
         }
 
-        /* 强制覆盖 Material 图标组件，采用 Rounded 样式 */
         md-icon {
             font-family: 'Material Symbols Rounded', sans-serif !important;
             --md-icon-font: 'Material Symbols Rounded' !important;
@@ -405,6 +404,9 @@
         
         let segmentTimeoutId = null; 
         let aiSilenceTimer = null;   
+
+        // 缓存词典数据的全局变量
+        let customDictionary = ""; 
 
         const workerCode = `
             let timer = null;
@@ -628,7 +630,25 @@
             currentTaskIndex = 0;
             isTranslating = true;
 
+            // 1. 尝试拉取并加载专有名词词典
+            if (!customDictionary) {
+                setStatus("正在拉取专有名词词典...");
+                try {
+                    const dictUrl = "https://raw.githubusercontent.com/Testanki1/testanki1.github.io/refs/heads/main/translations.js";
+                    const dictRes = await fetch(dictUrl);
+                    if (dictRes.ok) {
+                        customDictionary = await dictRes.text();
+                        logDebug("专有名词词典加载成功！", "#28a745");
+                    } else {
+                        logDebug(`词典拉取失败 (Status: ${dictRes.status})，将使用默认翻译模式。`, "#ffc107");
+                    }
+                } catch (err) {
+                    logDebug(`网络原因导致词典拉取失败: ${err.message}，将使用默认翻译模式。`, "#ffc107");
+                }
+            }
+
             try {
+                setStatus("正在解码并重采样音频...");
                 fullInt16Data = await decodeAndResampleAudio(file);
                 totalDurationSec = fullInt16Data.length / 16000;
                 logDebug(`重采样精确换算出的总时长: ${totalDurationSec.toFixed(2)} 秒`);
@@ -665,7 +685,7 @@
 
                 progressContainer.style.display = 'flex';
                 progressBar.value = 0;
-                progressBar.indeterminate = false; // 初始状态重置为线性状态
+                progressBar.indeterminate = false; 
                 progressText.textContent = `00:00 / ${formatTime(totalDurationSec)}`;
                 progressPercent.textContent = `0%`;
 
@@ -702,7 +722,6 @@
             setStatus(`正在处理第 ${thisTaskIndex + 1}/${tasks.length} 段...`);
             appendTranslation(`[ 第 ${thisTaskIndex + 1} 部分开始 ]`, true);
 
-            // 彻底删除 2 秒重叠逻辑，完全按照切割点精准提取
             const actualStartSec = task.start;
             
             const startIndex = Math.floor(actualStartSec * 16000);
@@ -718,6 +737,8 @@
 
             const apiKey = apiKeyInput.value.trim();
             const ai = new GoogleGenAI({ apiKey: apiKey });
+
+            // 2. 将词典内容注入到系统的基础配置中
             const config = {
                 responseModalities: [Modality.AUDIO],
                 outputAudioTranscription: {}, 
@@ -727,13 +748,21 @@
                 }
             };
 
+            // 如果成功拉取到了词典，则组装 systemInstruction 添加到 config
+            if (customDictionary) {
+                config.systemInstruction = {
+                    parts: [{
+                        text: `你是一个专业的音频实时翻译助手。请务必严格按照以下提供的【专有名词词典】进行翻译，遇到词典中的英文词汇时，必须使用对应的中文翻译词。\n\n【专有名词词典内容如下】\n${customDictionary}`
+                    }]
+                };
+            }
+
             try {
                 session = await ai.live.connect({
                     model: 'gemini-3.5-live-translate-preview',
                     config: config,
                     callbacks: {
                         onopen: () => {
-                            // 修复：每次连接成功开始推流时，重置进度条为线性状态（取消 Indeterminate 环形加载状态）
                             progressBar.indeterminate = false; 
                             
                             logDebug(`[网络连接] 第 ${thisTaskIndex + 1} 段 WebSocket 管道建立成功。开始推流...`);
