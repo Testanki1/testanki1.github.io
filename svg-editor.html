@@ -566,11 +566,17 @@
         });
 
         function assignIds(node) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                if (!node.dataset.vId) { node.dataset.vId = 'svg-el-' + (++idCounter); }
-                Array.from(node.children).forEach(assignIds);
-            }
+    // 只处理元素节点（ELEMENT_NODE === 1）
+    if (node.nodeType === Node.ELEMENT_NODE) {
+        if (!node.dataset.vId) { 
+            node.dataset.vId = 'svg-el-' + (++idCounter); 
         }
+        // 递归处理所有子元素节点
+        if (node.children) {
+            Array.from(node.children).forEach(assignIds);
+        }
+    }
+}
 
         function escapeHtml(unsafe) {
             return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
