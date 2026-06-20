@@ -746,11 +746,18 @@
             
             const startIndex = Math.floor(actualStartSec * 16000);
             const endIndex = Math.floor(task.end * 16000);
-            const targetInt16Data = fullInt16Data.subarray(startIndex, endIndex);
+            const rawTargetData = fullInt16Data.subarray(startIndex, endIndex);
+
+            // 【核心修复：防开头吞字】自动在真实音频前补充 3 秒的绝对静音（全 0 数据）作为大模型预热缓冲
+            const WARMUP_SECONDS = 3;
+            const WARMUP_SAMPLES = WARMUP_SECONDS * 16000;
+            // new Int16Array 默认所有元素初始值都是 0，也就是纯粹的静音
+            const targetInt16Data = new Int16Array(WARMUP_SAMPLES + rawTargetData.length);
+            targetInt16Data.set(rawTargetData, WARMUP_SAMPLES); // 将真实音频拼在静音后面
 
             logDebug(`[切片诊断] 第 ${thisTaskIndex + 1} 段：切割起止时间 = ${actualStartSec.toFixed(2)}s ~ ${task.end.toFixed(2)}s`);
             logDebug(`[切片诊断] 截取的 PCM 采样点数组下标 = ${startIndex} 到 ${endIndex}`);
-            logDebug(`[切片诊断] 准备推流给大模型的音频净长度 = ${((endIndex - startIndex)/16000).toFixed(2)} 秒`, "#17a2b8");
+            logDebug(`[切片诊断] 已在前端自动补充 ${WARMUP_SECONDS} 秒静音预热，推流总长度 = ${(targetInt16Data.length / 16000).toFixed(2)} 秒`, "#17a2b8");
 
             currentSegmentChunks = [];
             isLocalStreamDone = false; 
@@ -849,8 +856,14 @@
                     return;
                 }
 
-                const currentProcessedSec = offset / 16000;
-                const absoluteCurrentSec = startSec + currentProcessedSec;
+                // 扣除预热静音的 1.5 秒，让前端 UI 进度条准确显示真实音频的进度
+                const WARMUP_SAMPLES = 1.5 * 16000;
+                let currentProcessedSec = (offset - WARMUP_SAMPLES) / 16000;
+                if (currentProcessedSec < 0) currentProcessedSec = 0; // 预热静音期间，真实进度算作 0 秒
+                
+                let absoluteCurrentSec = startSec + currentProcessedSec;
+                if (absoluteCurrentSec > totalDurationSec) absoluteCurrentSec = totalDurationSec; // 防止溢出
+
                 const progressRatio = absoluteCurrentSec / totalDurationSec;
                 
                 progressBar.value = progressRatio;
