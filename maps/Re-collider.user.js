@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Remastered Maps Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Regenerate collisions for Remastered maps + Offline Mode for Out-of-bounds Exploration
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -28,16 +28,11 @@
 
             const wsProxy = new Proxy(ws, {
                 get(obj, prop) {
-                    if (prop === 'readyState') {
-                        return window._offlineMode ? 1 : obj.readyState; // Keep readyState as OPEN (1)
-                    }
+                    if (prop === 'readyState') return window._offlineMode ? 1 : obj.readyState;
                     if (prop === 'addEventListener') {
                         return function(type, listener, options) {
                             const wrapped = function(event) {
-                                if (window._offlineMode && (type === 'close' || type === 'error')) {
-                                    console.log(`[Offline] Blocked ${type} event.`);
-                                    return; // Silently intercept disconnect events
-                                }
+                                if (window._offlineMode && (type === 'close' || type === 'error')) return;
                                 return listener.apply(this, arguments);
                             };
                             listenerMap.set(listener, wrapped);
@@ -52,13 +47,11 @@
                     }
                     if (prop === 'send') {
                         return function(data) {
-                            if (window._offlineMode) return; // Drop packets
+                            if (window._offlineMode) return;
                             try { return obj.send(data); } catch(e) {}
                         };
                     }
-                    if (typeof obj[prop] === 'function') {
-                        return obj[prop].bind(obj);
-                    }
+                    if (typeof obj[prop] === 'function') return obj[prop].bind(obj);
                     return obj[prop];
                 },
                 set(obj, prop, value) {
@@ -97,6 +90,7 @@
         loadingModels: isZh ? "加载模型中...<br><span style=\"font-size:10px; opacity:0.7\">或者进入地图加载。</span>" : "Loading models...<br><span style=\"font-size:10px; opacity:0.7\">Or join the map to load manually.</span>",
         mapNames: {
             "Highland REMASTER": isZh ? "高原 重制" : "Highland REMASTER",
+            "Cross REMASTER": isZh ? "十字路口 重制" : "Cross REMASTER",
             "Parma REMASTER": isZh ? "边塞角斗场 重制" : "Parma REMASTER"
         },
         themeNames: {
@@ -113,9 +107,6 @@
         toastOfflineAlreadyActive: isZh ? "已处于脱机状态。若想恢复请刷新网页。" : "Already offline. Refresh the page to play normally."
     };
 
-    // ==========================================
-    // Icon SVG Resources
-    // ==========================================
     const ICONS = {
         close: `<svg viewBox="0 -960 960 960"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></svg>`,
         travel_explore: `<svg viewBox="0 -960 960 960"><path d="M80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q127 0 226.5 70T851-629q7 17 .5 34T828-572q-16 5-30.5-3T777-599q-24-60-69-106t-108-71v16q0 33-23.5 56.5T520-680h-80v80q0 17-11.5 28.5T400-560h-80v80h40q17 0 28.5 11.5T400-440v80h-40L168-552q-3 18-5.5 36t-2.5 36q0 122 80.5 213T443-162q16 2 26.5 13.5T480-120q0 17-11.5 28.5T441-82Q288-97 184-210T80-480Zm736 352L716-228q-21 12-45 20t-51 8q-75 0-127.5-52.5T440-380q0-75 52.5-127.5T620-560q75 0 127.5 52.5T800-380q0 27-8 51t-20 45l100 100q11 11 11 28t-11 28q-11 11-28 11t-28-11ZM691-309q29-29 29-71t-29-71q-29-29-71-29t-71 29q-29 29-29 71t29 71q29 29 71 29t71-29Z"/></svg>`,
@@ -133,59 +124,82 @@
         "Winter Day": "https://s.eu.tankionline.com/static/images/winter_day.618f73d3.svg"
     };
 
-    // ==========================================
-    // Resource Path Detection Logic (Pre-fetch URLs)
-    // ==========================================
     function getResourceBase() {
         const search = window.location.search;
         const params = new URLSearchParams(search);
         const resParam = params.get('resources');
-
         if (resParam) {
             if (resParam.startsWith('http')) return resParam.replace(/\/$/, '');
             if (resParam.startsWith('../')) return window.location.origin + resParam.substring(2).replace(/\/$/, '');
             return window.location.origin + (resParam.startsWith('/') ? '' : '/') + resParam.replace(/\/$/, '');
         }
-
         const host = window.location.hostname;
-        if (host.includes('3dtank.com')) {
-            return 'https://res.3dtank.com';
-        } else if (host.includes('tankionline.com') && !host.includes('test-eu')) {
-            return 'https://s.eu.tankionline.com';
-        } else if (host.includes('test-eu.tankionline.com')) {
-            return window.location.origin + '/resources';
-        }
+        if (host.includes('3dtank.com')) return 'https://res.3dtank.com';
+        else if (host.includes('tankionline.com') && !host.includes('test-eu')) return 'https://s.eu.tankionline.com';
+        else if (host.includes('test-eu.tankionline.com')) return window.location.origin + '/resources';
         return window.location.origin;
     }
 
-    // ==========================================
-    // Configuration and Data Structures
-    // ==========================================
     const MAP_CONFIGS =[
         {
             name: "Highland REMASTER",
             themes:[
-                { name: "Summer Day", path: "570/174542/371/116/31466700330223" },
-                { name: "Summer Evening", path: "570/174542/371/160/31627625355227" },
-                { name: "Autumn", path: "570/174542/371/121/31466510627011" },
-                { name: "Winter Day", path: "570/174542/371/124/31466554330716" }
+                { name: "Summer Day", id: "1619091716430", version: "1775742428832" },
+                { name: "Summer Evening", id: "1619091716464", version: "1775742429697" },
+                { name: "Autumn", id: "1619091716433", version: "1775742428825" },
+                { name: "Winter Day", id: "1619091716436", version: "1775742428840" }
             ],
             defaultBlacklist:['tank','birch','beech','brick_pile','bd','forest','landscape','mount','chest','road','conc_pile','tree_flat','bush_flat','plane','tetrapod','tree','grass','flower','bush','river','pipe','ivy','rdecal','block']
         },
         {
+            name: "Cross REMASTER",
+            themes:[
+                { name: "Summer Day", id: "1619091716440", version: "1775742428778" },
+                { name: "Summer Evening", id: "1619091716454", version: "1775742428771" },
+                { name: "Autumn", id: "1619091716443", version: "1775742428768" },
+                { name: "Winter Day", id: "1619091716446", version: "1775742428785" }
+            ],
+            defaultBlacklist:['tank','crowler','beech','mount','road_','soil','tree','_track','ivy','landscape','rdecal','bd','bush','flower','grass','car1','car2','car3','car4']
+        },
+        {
             name: "Parma REMASTER",
             themes:[
-                { name: "Summer Day", path: "570/174542/371/104/31526471323603" },
-                { name: "Autumn", path: "570/174542/371/107/31526471745474" },
-                { name: "Winter Day", path: "570/174542/371/112/31526472317644" }
+                { name: "Summer Day", id: "1619091716420", version: "1775742428928" },
+                { name: "Autumn", id: "1619091716423", version: "1775742428919" },
+                { name: "Winter Day", id: "1619091716426", version: "1775742428935" }
             ],
             defaultBlacklist:['mount_','landscape','flat','ivy','bd','bush','flower','grass', 'crane', 'grab', 'car', 'track', 'crawler', 'tree', 'moss','pipe','saw','soil','garage','road','block','wall_frame','claw','const','chest','tetrapod','gouge']
         }
     ];
 
-    // ==========================================
-    // State and Storage Manager
-    // ==========================================
+    function generateResourcePath(idStr, versionStr) {
+        if (!idStr || !versionStr) return null;
+        try {
+            const id = Number(idStr);
+            const version = Number(versionStr);
+
+            const highId = Math.floor(id / 4294967296);
+            const lowId = id % 4294967296;
+
+            return [
+                highId.toString(8),
+                ((lowId >>> 16) & 0xFFFF).toString(8),
+                ((lowId >>> 8) & 0xFF).toString(8),
+                (lowId & 0xFF).toString(8),
+                version.toString(8)
+            ].join("/");
+        } catch (e) {
+            console.error("[Tampermonkey] ID/Version parsing error:", e);
+            return null;
+        }
+    }
+
+    MAP_CONFIGS.forEach(map => {
+        map.themes.forEach(theme => {
+            theme.path = generateResourcePath(theme.id, theme.version);
+        });
+    });
+
     const STORAGE_KEY = 'Tanki_Remaster_Col_Settings';
     const SUB_SUFFIX_REGEX = /(?:-|_)?sub(?:-|_)?\d+$/i;
 
@@ -196,21 +210,6 @@
             try {
                 const stored = localStorage.getItem(STORAGE_KEY);
                 if (stored) data = { ...data, ...JSON.parse(stored) };
-                let changed = false;
-                for (const map in data.maps) {
-                    for (const theme in data.maps[map]) {
-                        const t = data.maps[map][theme];
-                        if (t.knownModels && t.knownModels.length > 0) {
-                            const cleaned = new Set();
-                            t.knownModels.forEach(m => cleaned.add(m.replace(SUB_SUFFIX_REGEX, '')));
-                            const newModels = Array.from(cleaned);
-                            if (newModels.length !== t.knownModels.length || !newModels.every((m, i) => m === t.knownModels[i])) {
-                                t.knownModels = newModels; changed = true;
-                            }
-                        }
-                    }
-                }
-                if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             } catch(e) {}
             return data;
         }
@@ -281,9 +280,6 @@
     }
     const Settings = new SettingsManager();
 
-    // ==========================================
-    // UI Layer (Shadow DOM)
-    // ==========================================
     class SettingsUI {
         constructor() {
             this.isOpen = false;
@@ -331,158 +327,71 @@
                 }
                 * { box-sizing: border-box; font-family: inherit; }
 
-                .m3-interactive {
-                    position: relative; overflow: hidden; cursor: pointer;
-                    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s, border-color 0.2s;
-                }
-                .m3-interactive::after {
-                    content: ""; position: absolute; inset: 0; background: currentColor; opacity: 0;
-                    transition: opacity 0.2s; pointer-events: none;
-                }
+                .m3-interactive { position: relative; overflow: hidden; cursor: pointer; transition: transform 0.2s, background-color 0.2s, border-color 0.2s; }
+                .m3-interactive::after { content: ""; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
                 .m3-interactive:hover::after { opacity: 0.08; }
                 .m3-interactive:active { transform: scale(0.96); }
 
-                .svg-icon {
-                    display: inline-flex; align-items: center; justify-content: center;
-                    width: 24px; height: 24px; flex-shrink: 0;
-                }
+                .svg-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0; }
                 .svg-icon svg { width: 100%; height: 100%; fill: currentColor; }
 
-                .overlay {
-                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                    background: rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none;
-                    transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1);
-                    backdrop-filter: blur(4px);
-                }
+                .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(4px); }
 
-                .drawer {
-                    position: fixed; top: 0; right: 0;
-                    width: 420px; max-width: 85vw; height: 100%;
-                    background: var(--bg); color: var(--on-surface);
-                    pointer-events: auto; transform: translateX(100%);
-                    transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1);
-                    display: flex; flex-direction: column;
-                    box-shadow: -8px 0 32px rgba(0,0,0,0.6);
-                    border-top-left-radius: 24px; border-bottom-left-radius: 24px;
-                }
+                .drawer { position: fixed; top: 0; right: 0; width: 420px; max-width: 85vw; height: 100%; background: var(--bg); color: var(--on-surface); pointer-events: auto; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1); display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,0.6); border-top-left-radius: 24px; border-bottom-left-radius: 24px; }
 
-                .header {
-                    padding: 24px 24px 16px 24px;
-                    display: flex; justify-content: space-between; align-items: center;
-                }
+                .header { padding: 24px; display: flex; justify-content: space-between; align-items: center; }
                 .title { font-size: 22px; font-weight: 600; color: var(--primary); margin: 0; }
 
-                .icon-btn {
-                    background: transparent; border: none; color: var(--on-surface-variant);
-                    padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-                }
+                .icon-btn { background: transparent; border: none; color: var(--on-surface-variant); padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 
-                .content { flex: 1; overflow-y: auto; padding: 16px 24px 24px 24px; }
+                .content { flex: 1; overflow-y: auto; padding: 0 24px 24px 24px; }
                 .content::-webkit-scrollbar { width: 6px; }
                 .content::-webkit-scrollbar-thumb { background: var(--surface-container-highest); border-radius: 3px; }
 
-                .link-card {
-                    background: var(--surface-container-high); border-radius: 16px;
-                    padding: 16px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 12px;
-                }
+                .link-card { background: var(--surface-container-high); border-radius: 16px; padding: 16px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 12px; }
 
-                .btn {
-                    background: var(--surface-container-highest); color: var(--on-surface);
-                    border: 1px solid transparent; padding: 10px 16px; border-radius: 20px;
-                    font-weight: 500; display: inline-flex; align-items: center; gap: 8px;
-                }
+                .btn { background: var(--surface-container-highest); color: var(--on-surface); border: 1px solid transparent; padding: 10px 16px; border-radius: 20px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
                 .btn.primary { background: rgba(118, 255, 51, 0.15); color: var(--primary); border-color: var(--primary); }
 
-                .map-card {
-                    background: var(--surface-container); border-radius: 24px;
-                    padding: 16px; margin-bottom: 16px; border: 1px solid var(--surface-container-high);
-                }
-                .map-title {
-                    font-size: 16px; font-weight: 600; color: var(--on-surface);
-                    margin-bottom: 12px; padding-left: 4px;
-                }
+                .map-card { background: var(--surface-container); border-radius: 24px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--surface-container-high); }
+                .map-title { font-size: 16px; font-weight: 600; color: var(--on-surface); margin-bottom: 12px; padding-left: 4px; }
                 .theme-tab-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
                 .theme-tab-row::-webkit-scrollbar { height: 0; }
 
-                .theme-tab {
-                    width: 48px; height: 48px; border-radius: 24px; flex-shrink: 0;
-                    background: var(--surface-container-highest); border: 2px solid transparent;
-                    display: flex; align-items: center; justify-content: center;
-                    color: var(--on-surface-variant);
-                }
+                .theme-tab { width: 48px; height: 48px; border-radius: 24px; flex-shrink: 0; background: var(--surface-container-highest); border: 2px solid transparent; display: flex; align-items: center; justify-content: center; color: var(--on-surface-variant); }
                 .theme-tab.active { background: rgba(118, 255, 51, 0.15); border-color: var(--primary); }
 
-                .theme-icon-mask {
-                    width: 26px; height: 26px; background-color: var(--on-surface-variant);
-                    -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center;
-                    mask-size: contain; mask-repeat: no-repeat; mask-position: center;
-                }
+                .theme-icon-mask { width: 26px; height: 26px; background-color: var(--on-surface-variant); -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; mask-size: contain; mask-repeat: no-repeat; mask-position: center; }
                 .theme-tab.active .theme-icon-mask { background-color: var(--primary); }
 
-                .theme-content-wrapper {
-                    display: grid; grid-template-rows: 0fr;
-                    transition: grid-template-rows 0.4s cubic-bezier(0.2, 0, 0, 1), margin-top 0.4s cubic-bezier(0.2, 0, 0, 1);
-                    margin-top: 0;
-                }
+                .theme-content-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.4s cubic-bezier(0.2, 0, 0, 1), margin-top 0.4s; margin-top: 0; }
                 .theme-content-wrapper.open { grid-template-rows: 1fr; margin-top: 16px; }
                 .theme-content-inner { overflow: hidden; display: flex; flex-direction: column; gap: 16px; }
 
-                .theme-details-header {
-                    display: flex; justify-content: space-between; align-items: center;
-                    padding-bottom: 8px; border-bottom: 1px solid var(--surface-container-highest);
-                }
+                .theme-details-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--surface-container-highest); }
                 .theme-details-title { font-size: 15px; font-weight: 500; color: var(--primary); }
 
-                .tags-container {
-                    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-                    background: var(--surface-container-high); border-radius: 12px; padding: 10px;
-                    border: 1px solid var(--outline); transition: border-color 0.2s; cursor: text;
-                }
+                .tags-container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--surface-container-high); border-radius: 12px; padding: 10px; border: 1px solid var(--outline); transition: border-color 0.2s; cursor: text; }
                 .tags-container:focus-within { border-color: var(--primary); }
 
-                .tag-chip {
-                    background: var(--surface-container-highest); color: var(--on-surface);
-                    height: 32px; padding: 0 4px 0 12px; border-radius: 8px;
-                    display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;
-                    border: 1px solid var(--outline);
-                }
-                .tag-chip-remove {
-                    display: flex; align-items: center; justify-content: center;
-                    width: 24px; height: 24px; border-radius: 50%; color: var(--on-surface-variant);
-                }
+                .tag-chip { background: var(--surface-container-highest); color: var(--on-surface); height: 32px; padding: 0 4px 0 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; border: 1px solid var(--outline); }
+                .tag-chip-remove { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: var(--on-surface-variant); }
                 .tag-chip-remove:hover { color: var(--error); background: rgba(255,102,102,0.1); }
 
-                .tag-input {
-                    background: transparent; border: none; outline: none; color: var(--on-surface);
-                    flex: 1; min-width: 130px; font-size: 14px; height: 32px;
-                }
+                .tag-input { background: transparent; border: none; outline: none; color: var(--on-surface); flex: 1; min-width: 130px; font-size: 14px; height: 32px; }
 
-                .model-list {
-                    display: flex; flex-direction: column; gap: 4px;
-                    background: var(--surface-container-high); border-radius: 12px; padding: 8px;
-                    max-height: 250px; overflow-y: auto; border: 1px solid var(--outline);
-                }
+                .model-list { display: flex; flex-direction: column; gap: 4px; background: var(--surface-container-high); border-radius: 12px; padding: 8px; max-height: 250px; overflow-y: auto; border: 1px solid var(--outline); }
                 .model-list::-webkit-scrollbar { width: 4px; }
                 .model-list::-webkit-scrollbar-thumb { background: var(--surface-container-highest); border-radius: 2px; }
 
-                .model-item {
-                    display: flex; justify-content: space-between; align-items: center;
-                    padding: 8px 12px; border-radius: 8px; transition: background 0.2s;
-                }
+                .model-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 8px; transition: background 0.2s; }
                 .model-item:hover { background: var(--surface-container-highest); }
                 .model-name { font-size: 13px; word-break: break-all; }
 
                 .model-item.filtered .model-name { color: var(--error); text-decoration: line-through; opacity: 0.8; }
                 .model-item.included .model-name { color: var(--primary); }
 
-                .toast {
-                    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
-                    background: var(--on-surface-variant); color: var(--bg);
-                    padding: 12px 24px; border-radius: 24px;
-                    font-weight: 600; opacity: 0; pointer-events: none;
-                    transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1), transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-                    box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 1000000;
-                }
+                .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--on-surface-variant); color: var(--bg); padding: 12px 24px; border-radius: 24px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 1000000; }
             `;
             this.shadow.appendChild(style);
         }
@@ -509,7 +418,6 @@
                 </div>
             `;
 
-            // Offline mode panel
             const offlineCardHTML = `
                 <div class="link-card" id="offline-card">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -553,19 +461,13 @@
                 offlineBtn.addEventListener('click', () => {
                     if (!window._offlineMode) {
                         window._offlineMode = true;
-                        if (window._activeWs) {
-                            window._activeWs.close(); // Disconnect connection
-                        }
-
-                        // Update UI
+                        if (window._activeWs) window._activeWs.close();
                         offlineText.innerText = I18N.offlineModeActiveBtn;
                         offlineBtn.style.background = 'rgba(255, 51, 102, 0.15)';
                         offlineBtn.style.borderColor = 'var(--error)';
                         offlineBtn.style.color = 'var(--error)';
-
-                        // Show toast
                         this.showToast(I18N.toastOfflineActivated, 5000);
-                        this.toggle(false); // Auto close drawer
+                        this.toggle(false);
                     } else {
                         this.showToast(I18N.toastOfflineAlreadyActive, 4000);
                     }
@@ -578,14 +480,10 @@
                     this.shortcutText.innerText = I18N.pressKeys;
                     this.shortcutBtn.style.color = "var(--error)";
                 });
-
                 window.addEventListener('keydown', (e) => {
                     if (this.isRecordingShortcut) {
                         e.preventDefault();
-                        // Ignore pure modifier key presses
                         if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key) ||['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) return;
-                        
-                        // Fix: Store e.code instead of e.key for better reliability (ignores IME and CapsLock)
                         const sc = { ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, code: e.code };
                         Settings.data.shortcut = sc;
                         Settings.save();
@@ -595,10 +493,8 @@
                     } else {
                         const sc = Settings.data.shortcut;
                         if (sc) {
-                            // Fix: Support matching both the new 'code' format and the legacy 'key' format
                             const matchCode = sc.code && sc.code === e.code;
                             const matchKey = sc.key && e.key.toLowerCase() === (sc.key ? sc.key.toLowerCase() : "");
-                            
                             if (e.ctrlKey === sc.ctrl && e.shiftKey === sc.shift && e.altKey === sc.alt && (matchCode || matchKey)) {
                                 e.preventDefault();
                                 this.toggle();
@@ -631,16 +527,10 @@
                 } else {
                     const parts =[];
                     if (sc.ctrl) parts.push('Ctrl'); if (sc.alt) parts.push('Alt'); if (sc.shift) parts.push('Shift');
-                    
-                    // Fix: Support both legacy 'key' and new 'code' formats to prevent undefined errors
                     let keyStr = "";
-                    if (sc.code) { 
-                        keyStr = sc.code.replace('Key', '').replace('Digit', '');
-                    } else if (sc.key) { 
-                        keyStr = sc.key.toUpperCase();
-                    }
+                    if (sc.code) keyStr = sc.code.replace('Key', '').replace('Digit', '');
+                    else if (sc.key) keyStr = sc.key.toUpperCase();
                     parts.push(keyStr);
-                    
                     this.shortcutText.innerText = parts.join(' + '); this.shortcutBtn.classList.add('primary');
                 }
             }
@@ -756,6 +646,7 @@
                     };
 
                     tagInput.onkeydown = (e) => {
+                        e.stopPropagation();
                         if (e.key === 'Enter' || e.key === ',') {
                             e.preventDefault();
                             const val = tagInput.value.trim().replace(/,/g, '');
@@ -776,14 +667,21 @@
                             }
                         }
                     };
+
+                    tagInput.onkeyup = (e) => e.stopPropagation();
+                    tagInput.onkeypress = (e) => e.stopPropagation();
+
                     tagsContainer.appendChild(tagInput);
                     tagsContainer.onclick = () => tagInput.focus();
                     contentInner.appendChild(tagsContainer);
 
-                    let rawFolderId = theme.path.split('/').pop();
-                    let decimalFolderId = rawFolderId;
-                    if (/^[0-7]+$/.test(rawFolderId)) {
-                        try { decimalFolderId = window.BigInt("0o" + rawFolderId).toString(10); } catch (e) {}
+                    let decimalFolderId = "0";
+                    if (theme.path) {
+                        let rawFolderId = theme.path.split('/').pop();
+                        decimalFolderId = rawFolderId;
+                        if (/^[0-7]+$/.test(rawFolderId)) {
+                            try { decimalFolderId = parseInt(rawFolderId, 8).toString(10); } catch (e) {}
+                        }
                     }
                     const viewerUrl = `https://testanki1.github.io/maps/special/collision-regenerate?map=${decimalFolderId}`;
 
@@ -869,9 +767,6 @@
         }
     }
 
-    // ==========================================
-    // Core Collision Parsing and Generation Logic
-    // ==========================================
     class BinaryStream {
         constructor(buffer) {
             this.buffer = new Uint8Array(buffer);
@@ -1268,13 +1163,11 @@
         }
     }
 
-    // ==========================================
-    // Auto Pre-load Models (Pre-load map.bin to discover models without joining)
-    // ==========================================
     async function preloadModels() {
         const base = getResourceBase();
         for (const map of MAP_CONFIGS) {
             for (const theme of map.themes) {
+                if (!theme.path) continue;
                 const tData = Settings.getThemeData(map.name, theme.name);
                 if (tData.knownModels.length > 0) continue;
                 let path = theme.path.startsWith('/') ? theme.path : '/' + theme.path;
@@ -1291,32 +1184,35 @@
                             if (uiInstance) uiInstance.notifyModelsDiscovered(map.name, theme.name);
                         }
                     }
-                } catch(e) { console.warn(`[Tampermonkey] Preload failed for ${theme.name}, waiting for actual join...`, e); }
+                } catch(e) {}
             }
         }
     }
 
-    // ==========================================
-    // Interceptors and Initialization
-    // ==========================================
     let uiInstance = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
+    // 安全地初始化 UI
+    function initApp() {
+        if (uiInstance) return;
         uiInstance = new SettingsUI();
         preloadModels();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
+    }
 
     const originalFetch = window.fetch;
     window.originalFetch = originalFetch;
 
     window.fetch = async function(input, init) {
         let url = (input instanceof Request) ? input.url : String(input);
-
         if (url.endsWith("map.bin")) {
             for (const mapConfig of MAP_CONFIGS) {
                 for (const themeConfig of mapConfig.themes) {
-                    if (url.includes(themeConfig.path)) {
-                        console.log(`[Tampermonkey] Fetch Intercepted & Mocked: ${mapConfig.name}`);
+                    if (themeConfig.path && url.includes(themeConfig.path)) {
                         const res = await originalFetch.call(this, input, init);
                         const buffer = await res.arrayBuffer();
                         const newBuffer = await generateMapBinLocal(url, buffer, mapConfig, themeConfig);
@@ -1340,7 +1236,7 @@
         if (this._url.endsWith("map.bin")) {
             for (const mapConfig of MAP_CONFIGS) {
                 for (const themeConfig of mapConfig.themes) {
-                    if (this._url.includes(themeConfig.path)) {
+                    if (themeConfig.path && this._url.includes(themeConfig.path)) {
                         this._matchedMapConfig = mapConfig; this._matchedThemeConfig = themeConfig; break;
                     }
                 }
