@@ -381,7 +381,8 @@
         
         let CONFIG = {
             baseUrl: '', 
-            assetBaseUrl: '', // 新增：分离资源地址以便国际服引用专属静态服务器
+            assetBaseUrl: '', // 分离资源地址以便国际服引用专属静态服务器
+            proxyBase: 'https://findorp.pages.dev/proxy?', // 修改：使用你部署的自建 Cloudflare Pages 代理
             labels: {
                 title: isBrowserChinese ? '3D坦克网页图标浏览' : 'Tanki Online Icon Viewer',
                 step1: isBrowserChinese ? '加载中... (1/4)' : 'Loading... (1/4)',
@@ -454,8 +455,8 @@
         }
 
         async function downloadWithProgress(url, onProgress) {
-            const proxyBase = 'https://corsproxy.io/?';
-            const target = proxyBase + encodeURIComponent(url);
+            // 修改：拼接自建代理前缀
+            const target = CONFIG.proxyBase + encodeURIComponent(url);
             
             const response = await fetch(target);
             if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
@@ -490,8 +491,8 @@
         }
 
         async function fetchSimple(url) {
-            const proxyBase = 'https://corsproxy.io/?';
-            const target = proxyBase + encodeURIComponent(url);
+            // 修改：拼接自建代理前缀
+            const target = CONFIG.proxyBase + encodeURIComponent(url);
             const response = await fetch(target);
             if (!response.ok) throw new Error(`Status ${response.status}`);
             return await response.text();
@@ -512,7 +513,7 @@
                     CONFIG.assetBaseUrl = 'https://3dtank.com/play/';
                 } else {
                     CONFIG.baseUrl = 'https://tankionline.com/play/';
-                    CONFIG.assetBaseUrl = 'https://s.eu.tankionline.com/'; // 改动：国际服资源拉取地址
+                    CONFIG.assetBaseUrl = 'https://s.eu.tankionline.com/'; // 国际服资源拉取地址
                 }
                 
                 // 将页面底部的数据源变更为实际抓取静态资源的域名，更能真实反映文件来源
@@ -522,7 +523,6 @@
                 const html = await fetchSimple(CONFIG.baseUrl);
                 updateProgress(25, CONFIG.labels.step2);
 
-                // --- 修复开始：兼容绝对路径和相对路径 ---
                 const scriptRegex = /src="([^"]*\/static\/js\/main\.[a-z0-9]+\.js)"/;
                 const match = html.match(scriptRegex);
 
@@ -535,7 +535,6 @@
                     const origin = new URL(CONFIG.baseUrl).origin;
                     fullScriptUrl = origin + fullScriptUrl;
                 }
-                // --- 修复结束 ---
 
                 const jsContent = await downloadWithProgress(fullScriptUrl, (loaded, total) => {
                     const loadedStr = formatBytes(loaded);
@@ -565,7 +564,7 @@
                     let path = assetMatch[1].replace('SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED', '');
                     if (!path) continue;
                     
-                    // 改动：拼接逻辑使用 CONFIG.assetBaseUrl，并自动处理去重 /，以防产生双斜杠
+                    // 拼接逻辑使用 CONFIG.assetBaseUrl，并自动处理去重 /，以防产生双斜杠
                     const cleanPath = path.startsWith('/') ? path.substring(1) : path;
                     const fullUrl = CONFIG.assetBaseUrl + cleanPath;
                     const ext = path.split('.').pop().toLowerCase();
@@ -654,14 +653,13 @@
             const container = document.getElementById('resources');
             container.innerHTML = '';
 
-            // --- 修复开始：按文件名 A-Z 排序 ---
+            // 按文件名 A-Z 排序
             resources[type].sort((a, b) => {
                 const nameA = formatName(a);
                 const nameB = formatName(b);
                 // 使用数字敏感排序
                 return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
             });
-            // --- 修复结束 ---
 
             resources[type].forEach(url => {
                 const item = document.createElement('div');
@@ -684,7 +682,7 @@
                         fullScreenImg.style.visibility = 'visible';
                         fullScreenImg.style.opacity = '1';
                         fullScreenImg.src = url;
-                        // 关键修改：设置 alt 和 title 为真实文件名
+                        // 设置 alt 和 title 为真实文件名
                         fullScreenImg.alt = fName;
                         fullScreenImg.title = fName;
                         document.getElementById('imageViewer').classList.add('active');
@@ -706,7 +704,6 @@
                     item.style.cursor = "default";
                 } 
                 else if (['mp4', 'webm'].includes(type)) {
-                    // 关键修改：传递 fName
                     createCustomVideo(preview, url, fName);
                 } 
                 else {
@@ -727,11 +724,11 @@
             });
         }
 
-        // 关键修改：接收 filename
+        // 接收 filename
         function createCustomVideo(container, url, filename) {
             const wrapper = document.createElement('div');
             wrapper.className = 'custom-player';
-            // 关键修改：设置 title 属性
+            // 设置 title 属性
             wrapper.innerHTML = `
                 <video src="${url}" title="${filename}" playsinline preload="metadata"></video>
                 <div class="player-controls">
