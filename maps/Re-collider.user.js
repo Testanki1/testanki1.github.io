@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Remastered Maps Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.4.2
 // @description  Regenerate collisions for Remastered maps + Offline Mode for Out-of-bounds Exploration
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -82,6 +82,7 @@
         setupShortcut: isZh ? "设置快捷键" : "Setup Shortcut",
         pressKeys: isZh ? "请按键..." : "Press keys...",
         panelTitle: isZh ? "碰撞配置" : "Collision Config",
+        panelSubtitle: isZh ? "在进入地图前设置" : "Set up before entering the map",
         btnReset: isZh ? "重置" : "Reset",
         broadFilterLabel: isZh ? "过滤含有以下关键词的模型碰撞：" : "Filter model collisions containing these keywords:",
         addKeyword: isZh ? "添加关键词..." : "Add keyword...",
@@ -144,40 +145,37 @@
         {
             name: "Highland REMASTER",
             themes:[
-                { name: "Summer Day", id: "1619091716430", version: "1775742428832" },
-                { name: "Summer Evening", id: "1619091716464", version: "1775742429697" },
-                { name: "Autumn", id: "1619091716433", version: "1775742428825" },
-                { name: "Winter Day", id: "1619091716436", version: "1775742428840" }
+                { name: "Summer Day", id: 1619091716430, version: 1775742428832 },
+                { name: "Summer Evening", id: 1619091716464, version: 1775742429697 },
+                { name: "Autumn", id: 1619091716433, version: 1775742428825 },
+                { name: "Winter Day", id: 1619091716436, version: 1775742428840 }
             ],
-            defaultBlacklist:['tank','birch','beech','brick_pile','bd','forest','landscape','mount','chest','road','conc_pile','tree_flat','bush_flat','plane','tetrapod','tree','grass','flower','bush','river','pipe','ivy','rdecal','block']
+            defaultBlacklist:['tank','birch','beech','brick_pile','bd','forest','landscape','mount','chest','road','conc_pile','tree_flat','bush_flat','plane','tetrapod','tree','grass','flower','bush','river','pipe','ivy','rdecal']
         },
         {
             name: "Cross REMASTER",
             themes:[
-                { name: "Summer Day", id: "1619091716440", version: "1775742428778" },
-                { name: "Summer Evening", id: "1619091716454", version: "1775742428771" },
-                { name: "Autumn", id: "1619091716443", version: "1775742428768" },
-                { name: "Winter Day", id: "1619091716446", version: "1775742428785" }
+                { name: "Summer Day", id: 1619091716440, version: 1775742428778 },
+                { name: "Summer Evening", id: 1619091716454, version: 1775742428771 },
+                { name: "Autumn", id: 1619091716443, version: 1775742428768 },
+                { name: "Winter Day", id: 1619091716446, version: 1775742428785 }
             ],
             defaultBlacklist:['tank','crowler','beech','mount','road_','soil','tree','_track','ivy','landscape','rdecal','bd','bush','flower','grass','car1','car2','car3','car4']
         },
         {
             name: "Parma REMASTER",
             themes:[
-                { name: "Summer Day", id: "1619091716420", version: "1775742428928" },
-                { name: "Autumn", id: "1619091716423", version: "1775742428919" },
-                { name: "Winter Day", id: "1619091716426", version: "1775742428935" }
+                { name: "Summer Day", id: 1619091716420, version: 1775742428928 },
+                { name: "Autumn", id: 1619091716423, version: 1775742428919 },
+                { name: "Winter Day", id: 1619091716426, version: 1775742428935 }
             ],
             defaultBlacklist:['mount_','landscape','flat','ivy','bd','bush','flower','grass', 'crane', 'grab', 'car', 'track', 'crawler', 'tree', 'moss','pipe','saw','soil','garage','road','block','wall_frame','claw','const','chest','tetrapod','gouge']
         }
     ];
 
-    function generateResourcePath(idStr, versionStr) {
-        if (!idStr || !versionStr) return null;
+    function generateResourcePath(id, version) {
+        if (!id || !version) return null;
         try {
-            const id = Number(idStr);
-            const version = Number(versionStr);
-
             const highId = Math.floor(id / 4294967296);
             const lowId = id % 4294967296;
 
@@ -339,8 +337,10 @@
 
                 .drawer { position: fixed; top: 0; right: 0; width: 420px; max-width: 85vw; height: 100%; background: var(--bg); color: var(--on-surface); pointer-events: auto; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1); display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,0.6); border-top-left-radius: 24px; border-bottom-left-radius: 24px; }
 
-                .header { padding: 24px; display: flex; justify-content: space-between; align-items: center; }
-                .title { font-size: 22px; font-weight: 600; color: var(--primary); margin: 0; }
+                .header { padding: 20px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+                .title-container { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+                .title { font-size: 18px; font-weight: 600; color: var(--primary); margin: 0; white-space: nowrap; flex-shrink: 0; }
+                .subtitle { font-size: 12px; color: #BFD5FF; font-weight: 500; opacity: 0.9; line-height: 1.3; }
 
                 .icon-btn { background: transparent; border: none; color: var(--on-surface-variant); padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 
@@ -433,7 +433,10 @@
 
             this.drawer.innerHTML = `
                 <div class="header">
-                    <h2 class="title">${I18N.panelTitle}</h2>
+                    <div class="title-container">
+                        <h2 class="title">${I18N.panelTitle}</h2>
+                        <div class="subtitle">${I18N.panelSubtitle}</div>
+                    </div>
                     <button class="icon-btn m3-interactive" id="close-btn"><span class="svg-icon">${ICONS.close}</span></button>
                 </div>
                 <div class="content">
@@ -1191,7 +1194,6 @@
 
     let uiInstance = null;
 
-    // 安全地初始化 UI
     function initApp() {
         if (uiInstance) return;
         uiInstance = new SettingsUI();
