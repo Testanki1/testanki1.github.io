@@ -753,5 +753,15 @@ const replacementDict = {
 "Festive Season" :"节日季节",
 "Tanki and The Snow Trap" :"3D坦克和雪陷阱",
 "Ice Age" :"冰河时代",
-"Winter Festival" :"冬季节日"
+"Winter Festival" :"冬季节日",
+"Miner": "扫雷",
+"Armor Blocks": "装甲方块",
+"Rally Tankcar": "拉力坦克车",
+"Assemble a tank": "组装坦克",
+"Memo": "备忘录",
+"compensation": "补偿",
+"Build & Fight": "建造 & 战斗",
+"Challenge Accepted": "接受星级挑战",
+"TankiFund": "3D坦克基金",
+"Wild West": "狂野西部"
 };
