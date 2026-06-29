@@ -727,7 +727,7 @@
         try {
             msg(T.loading);
             const resp = await fetch(ASSETS_INDEX_URL);
-            if(!resp.ok) throw "Fetch failed";
+            if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
             assetsData = await resp.json();
             
             await populateUI();
@@ -739,7 +739,7 @@
             msg("Ready");
         } catch(e) {
             console.error(e);
-            msg("Failed to load index");
+            msg("Failed to load index: " + (e.message || e));
         }
     })();
 
@@ -783,15 +783,6 @@
 
         msg(T.screenshot);
     };
-
-    // Mobile Auto Fullscreen on canvas click/touch
-    renderer.domElement.addEventListener('touchend', () => {
-        const doc = document.documentElement;
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-            if (doc.requestFullscreen) doc.requestFullscreen().catch(()=>{});
-            else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen();
-        }
-    }, { passive: true });
 
     // Beta Toggle Logic
     window.toggleScene = function() {
@@ -973,6 +964,7 @@
     async function fetchMeta(path) {
         const url = `${RES_BASE}/${path}/meta.info`;
         const res = await fetch(url);
+        if(!res.ok) throw new Error(`Fetch meta.info failed: HTTP ${res.status}`);
         return await res.json();
     }
 
@@ -1027,14 +1019,16 @@
             let modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d'));
             if(!modelEntry) modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
             
-            if(!modelEntry) throw "Model file not found";
+            if(!modelEntry) throw new Error("A3D/3DS model file not found in directory");
 
             const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx'));
             const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
             
             let group;
             if(modelEntry.name.endsWith('.a3d')) {
-                const buf = await (await fetch(modelUrl)).arrayBuffer();
+                const resp = await fetch(modelUrl);
+                if(!resp.ok) throw new Error(`Model request failed: HTTP ${resp.status}`);
+                const buf = await resp.arrayBuffer();
                 group = parseA3D(buf, modelEntry.name);
             } else {
                 const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`);
@@ -1064,7 +1058,7 @@
 
         } catch(e) {
             console.error(e);
-            msg(`Error loading ${type}`);
+            msg(`Error loading ${type}: ` + (e.message || e));
         }
     }
 
@@ -1115,7 +1109,9 @@
                 const mUrl = `${RES_BASE}/${path}/${f.name}`;
                 let grp;
                 if(f.name.endsWith('.a3d')) {
-                    const buf = await (await fetch(mUrl)).arrayBuffer();
+                    const resp = await fetch(mUrl);
+                    if(!resp.ok) throw new Error(`Model request failed: HTTP ${resp.status}`);
+                    const buf = await resp.arrayBuffer();
                     grp = parseA3D(buf, f.name);
                 } else {
                     const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${path}/`);
@@ -1140,7 +1136,7 @@
 
         } catch(e) {
             console.error(e);
-            msg("Scene Load Failed");
+            msg("Scene load failed: " + (e.message || e));
         }
     }
 
@@ -1189,7 +1185,7 @@
                 mountHelper.visible = wasVisible;
             }, (err) => { 
                 console.error(err); 
-                msg("Export Failed"); 
+                msg("Export Failed: " + (err.message || err)); 
                 mountHelper.visible = wasVisible;
             }, { binary: true, onlyVisible: true }
         );
@@ -1205,7 +1201,10 @@
                 groupNormal.add(grp);
                 grp.traverse(o=>{ if(o.isMesh) normalMeshes.push(o); });
                 addUI('list-normal', f.name);
-            } catch(e){}
+            } catch(err){
+                console.error(err);
+                msg(`Failed to load model "${f.name}": ` + (err.message || err));
+            }
         }
         for(let f of images) {
             const url = URL.createObjectURL(f);
@@ -1214,6 +1213,9 @@
                 normalTextures.push(t);
                 applyNormalTexture(t);
                 addUI('list-normal', f.name);
+            }, undefined, err => {
+                console.error(err);
+                msg(`Failed to load image "${f.name}"`);
             });
         }
         fitCamera(); e.target.value='';
@@ -1258,12 +1260,15 @@
 
     async function loadModelFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
-        if (ext === 'a3d') return parseA3D(await file.arrayBuffer(), file.name);
-        else if (ext === '3ds') {
+        if (ext === 'a3d') {
+            return parseA3D(await file.arrayBuffer(), file.name);
+        } else if (ext === '3ds') {
             const loader = new TDSLoader(); loader.setResourcePath('');
             const g = await loader.loadAsync(URL.createObjectURL(file));
             g.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }});
             return g;
+        } else {
+            throw new Error(`Unsupported file extension: .${ext}`);
         }
     }
 
@@ -1351,7 +1356,7 @@
     function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.y+s);camera.lookAt(c);controls.update()}
 
     class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
-    function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw "Err"; r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); }
+    function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw new Error("Invalid A3D header"); r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); else throw new Error(`Unsupported A3D version: ${v}`); }
     function readC(r){r.u32();r.u32();return r.u32()}
     function pV3(r,n){ r.u32();r.u32(); const mc=readC(r); for(let i=0;i<mc;i++){r.str();r.sk(12);r.str()} const mdc=readC(r); let md=[]; for(let i=0;i<mdc;i++){let m={n:r.str()};r.sk(28);m.vc=r.u32();const c=r.u32();m.vb=[];for(let j=0;j<c;j++){const k=r.u32(),s=(k===5?4:(k<7&&k!==2?3:2)),d=new Float32Array(m.vc*s);for(let l=0;l<m.vc*s;l++)d[l]=r.f32();m.vb.push({t:k,d})}const sc=r.u32();m.sm=[];for(let j=0;j<sc;j++){const ic=r.u32(),x=new Uint16Array(ic);for(let k=0;k<ic;k++)x[k]=r.u16();r.sk((((ic*2+3)>>2)*4)-(ic*2));m.sm.push({x})}md.push(m)} const tc=readC(r); let td=[],tp=[]; for(let i=0;i<tc;i++){td.push({n:r.str(),p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]})} for(let i=0;i<tc;i++)tp.push(r.i32()); const oc=readC(r); let od=[]; for(let i=0;i<oc;i++){const o={mi:r.u32(),ti:r.u32()},cc=r.u32();for(let k=0;k<cc;k++)r.sk(4);od.push(o)} return build(md,{t:td,p:tp},od,n); }
     function pV2(r,n){ r.u32();r.u32(); const mc=readC(r); for(let i=0;i<mc;i++){r.str0();r.sk(12);r.str0()} const mdc=readC(r); let md=[]; for(let i=0;i<mdc;i++){let m={n:"M"+i};m.vc=r.u32();const c=r.u32();m.vb=[];for(let j=0;j<c;j++){const k=r.u32(),s=(k===5?4:(k<7&&k!==2?3:2)),d=new Float32Array(m.vc*s);for(let l=0;l<m.vc*s;l++)d[l]=r.f32();m.vb.push({t:k,d})}const sc=r.u32();m.sm=[];for(let j=0;j<sc;j++){const fc=r.u32(),x=new Uint16Array(fc*3);for(let k=0;k<fc*3;k++)x[k]=r.u16();for(let k=0;k<fc;k++)r.sk(4);r.sk(2);m.sm.push({x})}md.push(m)} const tc=readC(r); let td=[],tp=[]; for(let i=0;i<tc;i++){td.push({n:"",p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]})} for(let i=0;i<tc;i++)tp.push(r.i32()-1); const oc=readC(r); let od=[]; for(let i=0;i<oc;i++){const s=r.str0(),mi=r.u32(),ti=r.u32(); if(td[ti])td[ti].n=s; od.push({mi,ti})} return build(md,{t:td,p:tp},od,n); }
