@@ -275,7 +275,7 @@
             --md-icon-font: 'Material Symbols Rounded' !important;
         }
 
-        md-filled-text-field {
+        md-filled-text-field, md-outlined-text-field {
             width: 100%;
         }
     </style>
@@ -317,6 +317,10 @@
                 <md-filled-text-field id="apiKey" label="API Key" type="password">
                     <md-icon slot="leading-icon">key</md-icon>
                 </md-filled-text-field>
+
+                <!-- 新增：额外系统提示词输入框 -->
+                <md-outlined-text-field id="extraPrompt" label="额外系统提示词 (可选)" type="textarea" rows="3" placeholder="例如：请用非常幽默的语气进行翻译，或者规定某些特定词汇的翻译方式...">
+                </md-outlined-text-field>
             </div>
 
             <div class="file-picker-container">
@@ -384,6 +388,7 @@
         import { GoogleGenAI, Modality } from '@google/genai';
 
         const apiKeyInput = document.getElementById('apiKey');
+        const extraPromptInput = document.getElementById('extraPrompt'); // 新增引用
         const audioFileInput = document.getElementById('audioFileInput');
         const fileBtn = document.getElementById('fileBtn');
         const fileNameDisplay = document.getElementById('fileName');
@@ -775,14 +780,27 @@
             };
 
             const currentMode = document.getElementById('modeTank').checked ? 'tank' : 'general';
+            const extraPromptText = extraPromptInput.value.trim();
+            
+            // 拼接系统指令
+            let systemInstructionText = "";
 
-            // 仅在坦克模式且词典拉取成功时，才加入专用参考词典的设定指令
             if (currentMode === 'tank' && customDictionary) {
+                systemInstructionText += `翻译时请参考以下专有名词词典：\n\n${customDictionary}\n\n`;
+            }
+
+            if (extraPromptText) {
+                systemInstructionText += `额外要求：\n${extraPromptText}\n\n`;
+            }
+
+            // 如果存在系统指令，则添加到配置中
+            if (systemInstructionText) {
                 config.systemInstruction = {
                     parts: [{
-                        text: `翻译时请参考以下专有名词词典：\n\n${customDictionary}`
+                        text: systemInstructionText.trim()
                     }]
                 };
+                logDebug(`已注入系统提示词配置 (长度: ${systemInstructionText.trim().length} 字符)`, "#17a2b8");
             }
 
             try {
