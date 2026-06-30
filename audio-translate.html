@@ -318,7 +318,6 @@
                     <md-icon slot="leading-icon">key</md-icon>
                 </md-filled-text-field>
 
-                <!-- 新增：额外系统提示词输入框 -->
                 <md-outlined-text-field id="extraPrompt" label="额外系统提示词 (可选)" type="textarea" rows="3" placeholder="例如：请用非常幽默的语气进行翻译，或者规定某些特定词汇的翻译方式...">
                 </md-outlined-text-field>
             </div>
@@ -388,7 +387,7 @@
         import { GoogleGenAI, Modality } from '@google/genai';
 
         const apiKeyInput = document.getElementById('apiKey');
-        const extraPromptInput = document.getElementById('extraPrompt'); // 新增引用
+        const extraPromptInput = document.getElementById('extraPrompt'); 
         const audioFileInput = document.getElementById('audioFileInput');
         const fileBtn = document.getElementById('fileBtn');
         const fileNameDisplay = document.getElementById('fileName');
@@ -421,10 +420,8 @@
         let tasks = [];            
         let currentTaskIndex = 0;  
         
-        let segmentTimeoutId = null; 
         let aiSilenceTimer = null;   
 
-        // 缓存词典数据的全局变量
         let customDictionary = ""; 
 
         const workerCode = `
@@ -651,7 +648,6 @@
 
             const currentMode = document.getElementById('modeTank').checked ? 'tank' : 'general';
 
-            // 1. 如果选择了3D坦克专用模式，尝试拉取并加载专有名词词典
             if (currentMode === 'tank') {
                 if (!customDictionary) {
                     setStatus("正在拉取专有名词词典...");
@@ -723,13 +719,14 @@
             }
         });
 
+        // 极限兜底定时器：为了防止网络或大模型抽风死机，15秒没有回传再强行切断。
         function resetAiSilenceTimer(thisTaskIndex) {
             if (aiSilenceTimer) clearTimeout(aiSilenceTimer);
             if (isLocalStreamDone) {
                 aiSilenceTimer = setTimeout(() => {
-                    logDebug(`[智能等话] 第 ${thisTaskIndex + 1} 段持续 4 秒无回传，判定本段接收完毕！`);
+                    logDebug(`[智能等话] 第 ${thisTaskIndex + 1} 段持续 15 秒无回传，触发极限兜底强制结算！`, "#ffc107");
                     finalizeCurrentSegmentAndNext(thisTaskIndex);
-                }, 4000); 
+                }, 15000); 
             }
         }
 
@@ -753,12 +750,10 @@
             const endIndex = Math.floor(task.end * 16000);
             const rawTargetData = fullInt16Data.subarray(startIndex, endIndex);
 
-            // 【核心修复：防开头吞字】自动在真实音频前补充 3 秒的绝对静音（全 0 数据）作为大模型预热缓冲
             const WARMUP_SECONDS = 3;
             const WARMUP_SAMPLES = WARMUP_SECONDS * 16000;
-            // new Int16Array 默认所有元素初始值都是 0，也就是纯粹的静音
             const targetInt16Data = new Int16Array(WARMUP_SAMPLES + rawTargetData.length);
-            targetInt16Data.set(rawTargetData, WARMUP_SAMPLES); // 将真实音频拼在静音后面
+            targetInt16Data.set(rawTargetData, WARMUP_SAMPLES); 
 
             logDebug(`[切片诊断] 第 ${thisTaskIndex + 1} 段：切割起止时间 = ${actualStartSec.toFixed(2)}s ~ ${task.end.toFixed(2)}s`);
             logDebug(`[切片诊断] 截取的 PCM 采样点数组下标 = ${startIndex} 到 ${endIndex}`);
@@ -782,7 +777,6 @@
             const currentMode = document.getElementById('modeTank').checked ? 'tank' : 'general';
             const extraPromptText = extraPromptInput.value.trim();
             
-            // 拼接系统指令
             let systemInstructionText = "";
 
             if (currentMode === 'tank' && customDictionary) {
@@ -793,7 +787,6 @@
                 systemInstructionText += `额外要求：\n${extraPromptText}\n\n`;
             }
 
-            // 如果存在系统指令，则添加到配置中
             if (systemInstructionText) {
                 config.systemInstruction = {
                     parts: [{
@@ -817,6 +810,13 @@
                         onmessage: (message) => {
                             resetAiSilenceTimer(thisTaskIndex);
                             const content = message.serverContent;
+                            
+                            // 👇 新增：监听大模型官方发出的“我完整说完了”的结束信号，以此为依据进行结算
+                            if (content?.turnComplete) {
+                                logDebug(`[大模型信号] 收到 turnComplete，大模型已完整说完当前段落，准备结算。`, "#28a745");
+                                finalizeCurrentSegmentAndNext(thisTaskIndex);
+                                return;
+                            }
                             
                             if (content?.outputTranscription?.text) {
                                 appendTranslation(content.outputTranscription.text);
@@ -866,21 +866,26 @@
                     
                     resetAiSilenceTimer(thisTaskIndex);
                     
-                    segmentTimeoutId = setTimeout(() => {
-                        logDebug(`[智能等话] 第 ${thisTaskIndex + 1} 段触及 10 秒强行截止底线。`);
-                        finalizeCurrentSegmentAndNext(thisTaskIndex);
-                    }, 10000); 
+                    // 尝试发送客户端闭麦（推流结束）的信号，告诉模型不要再等我们说话了
+                    try {
+                        if (session && typeof session.send === 'function') {
+                            session.send({ clientContent: { turnComplete: true } });
+                        } else if (session && typeof session.sendClientContent === 'function') {
+                            session.sendClientContent({ turnComplete: true });
+                        }
+                    } catch (e) {
+                        // 如果当前 SDK 不支持主动发信，则忽略，等待模型自己讲完即可
+                    }
                     
                     return;
                 }
 
-                // 扣除预热静音的 3 秒，让前端 UI 进度条准确显示真实音频的进度
                 const WARMUP_SAMPLES = 3 * 16000;
                 let currentProcessedSec = (offset - WARMUP_SAMPLES) / 16000;
-                if (currentProcessedSec < 0) currentProcessedSec = 0; // 预热静音期间，真实进度算作 0 秒
+                if (currentProcessedSec < 0) currentProcessedSec = 0; 
                 
                 let absoluteCurrentSec = startSec + currentProcessedSec;
-                if (absoluteCurrentSec > totalDurationSec) absoluteCurrentSec = totalDurationSec; // 防止溢出
+                if (absoluteCurrentSec > totalDurationSec) absoluteCurrentSec = totalDurationSec; 
 
                 const progressRatio = absoluteCurrentSec / totalDurationSec;
                 
@@ -914,7 +919,6 @@
 
         function finalizeCurrentSegmentAndNext(thisTaskIndex) {
             if (aiSilenceTimer) clearTimeout(aiSilenceTimer);
-            if (segmentTimeoutId) clearTimeout(segmentTimeoutId);
 
             const totalBytes = currentSegmentChunks.reduce((acc, val) => acc + val.length, 0);
             const generatedDuration = (totalBytes / 2) / 24000;
@@ -943,7 +947,7 @@
 
             if (session) {
                 try {
-                    logDebug(`正在主动强制关闭第 ${thisTaskIndex + 1} 段管道，等待连接彻底回收释放...`);
+                    logDebug(`正在主动关闭第 ${thisTaskIndex + 1} 段管道，等待连接彻底回收释放...`);
                     session.close(); 
                 } catch (e) {
                     console.error("Error closing session:", e);
@@ -968,7 +972,6 @@
             isTranslating = false; 
             timerWorker.postMessage('stop');
             if (aiSilenceTimer) clearTimeout(aiSilenceTimer);
-            if (segmentTimeoutId) clearTimeout(segmentTimeoutId);
             
             progressBar.indeterminate = false;
             progressBar.value = 1;
