@@ -420,8 +420,10 @@
         let tasks = [];            
         let currentTaskIndex = 0;  
         
+        let segmentTimeoutId = null; 
         let aiSilenceTimer = null;   
 
+        // 缓存词典数据的全局变量
         let customDictionary = ""; 
 
         const workerCode = `
@@ -682,8 +684,6 @@
                     const secVal = parseInt(rows[i].querySelector('.sec-input').value) || 0;
                     const totalSec = minVal * 60 + secVal;
                     
-                    logDebug(`分析输入的切割点 ${i + 1}: 分=${minVal}, 秒=${secVal} -> 换算为: ${totalSec} 秒`);
-                    
                     if (totalSec > 0 && totalSec < totalDurationSec) {
                         rawPoints.push(totalSec);
                     } else {
@@ -719,14 +719,13 @@
             }
         });
 
-        // 极限兜底定时器：为了防止网络或大模型抽风死机，15秒没有回传再强行切断。
         function resetAiSilenceTimer(thisTaskIndex) {
             if (aiSilenceTimer) clearTimeout(aiSilenceTimer);
             if (isLocalStreamDone) {
                 aiSilenceTimer = setTimeout(() => {
-                    logDebug(`[智能等话] 第 ${thisTaskIndex + 1} 段持续 15 秒无回传，触发极限兜底强制结算！`, "#ffc107");
+                    logDebug(`[智能等话] 第 ${thisTaskIndex + 1} 段持续 4 秒无回传，判定本段接收完毕！`);
                     finalizeCurrentSegmentAndNext(thisTaskIndex);
-                }, 15000); 
+                }, 4000); 
             }
         }
 
@@ -750,14 +749,19 @@
             const endIndex = Math.floor(task.end * 16000);
             const rawTargetData = fullInt16Data.subarray(startIndex, endIndex);
 
+            // 【核心修复：防吞字】开头保留 3 秒静音预热，结尾补充 10 秒静音收尾
             const WARMUP_SECONDS = 3;
+            const COOLDOWN_SECONDS = 10;
             const WARMUP_SAMPLES = WARMUP_SECONDS * 16000;
-            const targetInt16Data = new Int16Array(WARMUP_SAMPLES + rawTargetData.length);
+            const COOLDOWN_SAMPLES = COOLDOWN_SECONDS * 16000;
+            
+            // 数组总长度 = 3秒开头 + 实际音频 + 10秒结尾
+            const targetInt16Data = new Int16Array(WARMUP_SAMPLES + rawTargetData.length + COOLDOWN_SAMPLES);
+            // 将实际音频放置在 3 秒静音之后
             targetInt16Data.set(rawTargetData, WARMUP_SAMPLES); 
 
             logDebug(`[切片诊断] 第 ${thisTaskIndex + 1} 段：切割起止时间 = ${actualStartSec.toFixed(2)}s ~ ${task.end.toFixed(2)}s`);
-            logDebug(`[切片诊断] 截取的 PCM 采样点数组下标 = ${startIndex} 到 ${endIndex}`);
-            logDebug(`[切片诊断] 已在前端自动补充 ${WARMUP_SECONDS} 秒静音预热，推流总长度 = ${(targetInt16Data.length / 16000).toFixed(2)} 秒`, "#17a2b8");
+            logDebug(`[切片诊断] 已自动补充 ${WARMUP_SECONDS}秒开头静音 及 ${COOLDOWN_SECONDS}秒结尾静音，推流总长度 = ${(targetInt16Data.length / 16000).toFixed(2)} 秒`, "#17a2b8");
 
             currentSegmentChunks = [];
             isLocalStreamDone = false; 
@@ -803,20 +807,12 @@
                     callbacks: {
                         onopen: () => {
                             progressBar.indeterminate = false; 
-                            
                             logDebug(`[网络连接] 第 ${thisTaskIndex + 1} 段 WebSocket 管道建立成功。开始推流...`);
-                            startSendingAudio(targetInt16Data, actualStartSec, thisTaskIndex);
+                            startSendingAudio(targetInt16Data, actualStartSec, thisTaskIndex, rawTargetData.length);
                         },
                         onmessage: (message) => {
                             resetAiSilenceTimer(thisTaskIndex);
                             const content = message.serverContent;
-                            
-                            // 👇 新增：监听大模型官方发出的“我完整说完了”的结束信号，以此为依据进行结算
-                            if (content?.turnComplete) {
-                                logDebug(`[大模型信号] 收到 turnComplete，大模型已完整说完当前段落，准备结算。`, "#28a745");
-                                finalizeCurrentSegmentAndNext(thisTaskIndex);
-                                return;
-                            }
                             
                             if (content?.outputTranscription?.text) {
                                 appendTranslation(content.outputTranscription.text);
@@ -849,7 +845,8 @@
             }
         }
 
-        function startSendingAudio(int16Data, startSec, thisTaskIndex) {
+        // 新增了 rawDataLength 参数以便于计算真实的推流进度
+        function startSendingAudio(int16Data, startSec, thisTaskIndex, rawDataLength) {
             const chunkSize = 1600; 
             let offset = 0;
 
@@ -860,32 +857,29 @@
                     timerWorker.postMessage('stop');
                     isLocalStreamDone = true;
                     
-                    logDebug(`[推流完毕] 第 ${thisTaskIndex + 1}/${tasks.length} 段本地数据推流完成，开始等待大模型最后说话...`);
+                    logDebug(`[推流完毕] 第 ${thisTaskIndex + 1}/${tasks.length} 段全部数据(含收尾静音)推流完成，等待大模型最后说话...`);
                     setStatus(`第 ${thisTaskIndex + 1}/${tasks.length} 段推流完毕，等待大模型说完最后一句话...`);
                     progressBar.indeterminate = true;
                     
                     resetAiSilenceTimer(thisTaskIndex);
                     
-                    // 尝试发送客户端闭麦（推流结束）的信号，告诉模型不要再等我们说话了
-                    try {
-                        if (session && typeof session.send === 'function') {
-                            session.send({ clientContent: { turnComplete: true } });
-                        } else if (session && typeof session.sendClientContent === 'function') {
-                            session.sendClientContent({ turnComplete: true });
-                        }
-                    } catch (e) {
-                        // 如果当前 SDK 不支持主动发信，则忽略，等待模型自己讲完即可
-                    }
+                    segmentTimeoutId = setTimeout(() => {
+                        logDebug(`[智能等话] 第 ${thisTaskIndex + 1} 段触及 10 秒强行截止底线。`);
+                        finalizeCurrentSegmentAndNext(thisTaskIndex);
+                    }, 10000); 
                     
                     return;
                 }
 
+                // 计算进度条：扣除预热静音(3秒) 并 忽略收尾静音(10秒) 的影响，只让真实音频走动
                 const WARMUP_SAMPLES = 3 * 16000;
                 let currentProcessedSec = (offset - WARMUP_SAMPLES) / 16000;
-                if (currentProcessedSec < 0) currentProcessedSec = 0; 
+                
+                if (currentProcessedSec < 0) currentProcessedSec = 0; // 预热静音期间
+                if (currentProcessedSec > (rawDataLength / 16000)) currentProcessedSec = (rawDataLength / 16000); // 结尾静音期间
                 
                 let absoluteCurrentSec = startSec + currentProcessedSec;
-                if (absoluteCurrentSec > totalDurationSec) absoluteCurrentSec = totalDurationSec; 
+                if (absoluteCurrentSec > totalDurationSec) absoluteCurrentSec = totalDurationSec; // 防止溢出
 
                 const progressRatio = absoluteCurrentSec / totalDurationSec;
                 
@@ -919,6 +913,7 @@
 
         function finalizeCurrentSegmentAndNext(thisTaskIndex) {
             if (aiSilenceTimer) clearTimeout(aiSilenceTimer);
+            if (segmentTimeoutId) clearTimeout(segmentTimeoutId);
 
             const totalBytes = currentSegmentChunks.reduce((acc, val) => acc + val.length, 0);
             const generatedDuration = (totalBytes / 2) / 24000;
@@ -947,7 +942,7 @@
 
             if (session) {
                 try {
-                    logDebug(`正在主动关闭第 ${thisTaskIndex + 1} 段管道，等待连接彻底回收释放...`);
+                    logDebug(`正在主动强制关闭第 ${thisTaskIndex + 1} 段管道，等待连接彻底回收释放...`);
                     session.close(); 
                 } catch (e) {
                     console.error("Error closing session:", e);
@@ -972,6 +967,7 @@
             isTranslating = false; 
             timerWorker.postMessage('stop');
             if (aiSilenceTimer) clearTimeout(aiSilenceTimer);
+            if (segmentTimeoutId) clearTimeout(segmentTimeoutId);
             
             progressBar.indeterminate = false;
             progressBar.value = 1;
