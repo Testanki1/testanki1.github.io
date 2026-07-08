@@ -70,6 +70,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         header {
@@ -103,6 +104,29 @@
         }
 
         .back-btn:hover {
+            background-color: var(--md-sys-color-surface-variant);
+        }
+
+        /* Help Button */
+        .help-btn {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--md-sys-color-on-background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+            z-index: 10;
+        }
+
+        .help-btn:hover {
             background-color: var(--md-sys-color-surface-variant);
         }
 
@@ -252,7 +276,6 @@
             fill: currentColor;
         }
 
-        /* 专门绘制的 CSS 分割线 */
         .badge-separator {
             width: 1px;
             height: 12px;
@@ -344,6 +367,111 @@
             border-radius: 4px;
         }
 
+        /* Help Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 25, 38, 0.8);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            padding: 24px;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: var(--md-sys-color-background);
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--border-radius-lg);
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-close-icon-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--md-sys-color-on-background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            transition: background-color 0.2s, opacity 0.2s;
+            opacity: 0.7;
+        }
+
+        .modal-close-icon-btn:hover {
+            background-color: var(--md-sys-color-surface-variant);
+            opacity: 1;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--md-sys-color-primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-right: 32px; /* Prevent text from overlapping with close button */
+        }
+
+        .modal-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .modal-row svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--md-sys-color-primary);
+            flex-shrink: 0;
+        }
+
+        .modal-note {
+            font-size: 13px;
+            line-height: 1.6;
+            opacity: 0.8;
+            margin-top: 8px;
+            padding: 16px;
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--border-radius-md);
+            border-left: 3px solid var(--md-sys-color-primary);
+        }
+
         @media (min-width: 768px) {
             .container {
                 max-width: 960px;
@@ -381,7 +509,7 @@
 </head>
 <body>
     
-    <!-- 全局 SVG 资源定义 (不会显示出来，只用于引用) -->
+    <!-- 全局 SVG 资源定义 -->
     <svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
         <defs>
             <symbol id="icon-online" viewBox="0 0 16 16">
@@ -394,6 +522,12 @@
     </svg>
 
     <div class="container">
+        
+        <!-- Help Button -->
+        <button class="help-btn" onclick="openHelpModal()" aria-label="Help">
+            <span class="material-symbols-rounded">info</span>
+        </button>
+
         <!-- Header -->
         <header id="main-header" class="hidden">
             <button class="back-btn" onclick="goHome()" aria-label="Back">
@@ -436,7 +570,7 @@
                 </div></div>
             </a>
 
-            <!-- 经典版卡片，增加人数显示 -->
+            <!-- 经典版卡片 -->
             <div class="menu-card" onclick="goTo('classic')">
                 <img src="https://testanki1.github.io/logos/tankiclassic.svg" alt="Classic">
                 <span class="menu-card-title" data-i18n="server_classic">Classic</span>
@@ -456,7 +590,6 @@
         <!-- Classic Server View -->
         <div id="view-classic" class="view">
             
-            <!-- 经典版内页顶端的大盘统计数据同步 -->
             <div style="display: flex; justify-content: center; margin-top: -16px; margin-bottom: 16px;">
                 <div class="online-badge">
                     <svg><use href="#icon-online"></use></svg>
@@ -491,7 +624,7 @@
             </div>
         </div>
 
-        <!-- Global Server View (外服) -->
+        <!-- Global Server View -->
         <div id="view-global" class="view">
             <div class="list-group">
                 <a href="https://tankionline.com/play/" class="list-item">
@@ -634,7 +767,7 @@
             </div>
         </div>
 
-        <!-- CN Server View (国服内页) -->
+        <!-- CN Server View -->
         <div id="view-cn" class="view">
             
             <div style="display: flex; justify-content: center; margin-top: -16px; margin-bottom: 16px;">
@@ -692,7 +825,6 @@
                     </div>
                 </div>
                 
-                <!-- 4399 单独只展示总在线，因为接口里没有其战斗中细分 -->
                 <a href="https://my.4399.com/yxtk/play?sid=1" class="list-item">
                     <img src="https://testanki1.github.io/logos/4399.png" alt="4399">
                     <div class="list-item-content">
@@ -839,6 +971,35 @@
 
     </div>
 
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay" onclick="closeHelpModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <!-- 新增的右上角关闭按钮 -->
+            <button class="modal-close-icon-btn" onclick="closeHelpModal(event)" aria-label="Close">
+                <span class="material-symbols-rounded">close</span>
+            </button>
+            
+            <div class="modal-header">
+                <span class="material-symbols-rounded">info</span>
+                <span data-i18n="help_title">Data Legend</span>
+            </div>
+            
+            <div class="modal-row">
+                <svg><use href="#icon-online"></use></svg>
+                <span data-i18n="help_online">Current Online Players</span>
+            </div>
+            
+            <div class="modal-row">
+                <svg><use href="#icon-battles"></use></svg>
+                <span data-i18n="help_battles">Players in Battles</span>
+            </div>
+            
+            <div class="modal-note" data-i18n="help_dau_note">
+                Note: Current online players (CCU) is not the same as Daily Active Users (DAU). DAU is the total number of unique players who logged in throughout the day, which is typically much higher.
+            </div>
+        </div>
+    </div>
+
     <script>
         const translations = {
             zh: {
@@ -869,7 +1030,13 @@
                 p_mi: "小米应用商店",
                 p_oppo: "OPPO 软件商店",
                 p_honor: "荣耀应用市场",
-                p_ld: "雷电模拟器"
+                p_ld: "雷电模拟器",
+                
+                // 弹窗翻译
+                help_title: "数据说明",
+                help_online: "当前在线人数",
+                help_battles: "当前战斗中人数",
+                help_dau_note: "注意：当前在线人数（指此时此刻同时在线的玩家数）不等于日活跃用户数（DAU）。日活是指一整天内累计登录过的独立玩家总数，通常远大于当前在线人数。"
             },
             en: {
                 page_title: "Tanki Online Server List",
@@ -899,7 +1066,13 @@
                 p_mi: "Xiaomi App Store",
                 p_oppo: "OPPO App Store",
                 p_honor: "Honor App Market",
-                p_ld: "LDPlayer"
+                p_ld: "LDPlayer",
+
+                // Modal translations
+                help_title: "Data Legend",
+                help_online: "Current Online Players",
+                help_battles: "Players in Battles",
+                help_dau_note: "Note: Current online players (CCU) is not the same as Daily Active Users (DAU). DAU is the total number of unique players who logged in throughout the day, which is typically much higher."
             }
         };
 
@@ -926,17 +1099,14 @@
                 updateHeaderTitle(pageId);
             }
             
-            // 新增：如果系统语言是中文，则将国服卡片放到外服卡片前面
             const viewHome = document.getElementById('view-home');
             const cardGlobal = document.getElementById('card-global');
             const cardCn = document.getElementById('card-cn');
             
             if (viewHome && cardGlobal && cardCn) {
                 if (currentLang === 'zh') {
-                    // 把国服放到外服之前
                     viewHome.insertBefore(cardCn, cardGlobal);
                 } else {
-                    // 把外服放到国服之前（恢复默认顺序）
                     viewHome.insertBefore(cardGlobal, cardCn);
                 }
             }
@@ -998,6 +1168,17 @@
             });
         }
 
+        // 打开说明弹窗
+        function openHelpModal() {
+            document.getElementById('help-modal').classList.add('active');
+        }
+
+        // 关闭说明弹窗
+        function closeHelpModal(event) {
+            if (event) event.stopPropagation();
+            document.getElementById('help-modal').classList.remove('active');
+        }
+
         let fetchTimeoutId = null;
         function fetchCNServerStats() {
             clearTimeout(fetchTimeoutId);
@@ -1047,7 +1228,6 @@
                     let totalOnline = 0;
                     let totalInBattles = 0;
                     
-                    // 兼容常规的结构或者只返回大盘数字的情况
                     if (data.nodes) {
                         Object.values(data.nodes).forEach(node => {
                             totalOnline += node.online || 0;
@@ -1072,7 +1252,7 @@
         setLanguage();
         setupMarquees();
         fetchCNServerStats(); 
-        fetchClassicServerStats(); // 初始化获取经典版数据
+        fetchClassicServerStats(); 
 
         document.fonts.ready.then(() => {
             document.body.classList.add('loaded');
