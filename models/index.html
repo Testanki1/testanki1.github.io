@@ -194,7 +194,7 @@
             position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
             width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
         }
-        /* 支持 IMG 标签保持原色，支持 SVG 保持样式 */
+        /* Keep original colors for IMG tags, keep styles for SVG */
         .select-icon-box svg, .select-icon-box img { width: 100%; height: 100%; object-fit: contain; } 
         
         .select-text {
@@ -237,7 +237,7 @@
             background: var(--md-sys-color-surface-container-highest); 
             color: var(--md-sys-color-primary); 
         }
-        /* 仅对内联 SVG (装备) 强制变色，对 IMG (皮肤) 不生效，保护皮肤颜色 */
+        /* Force color change only for inline SVG (equipment), not for IMG (skin) to protect skin colors */
         .m3-option-row.selected .opt-icon svg { fill: var(--md-sys-color-primary); }
 
         .opt-icon { width: 28px; height: 28px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; }
@@ -334,10 +334,6 @@
         ::-webkit-scrollbar { width: 4px; } 
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #546E7A; border-radius: 2px; }
-
-        #mount-status { font-size: 12px; color: var(--md-sys-color-on-surface-variant); text-align: center; display: none; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
-        #mount-status.active { color: var(--md-sys-color-primary); }
-        .status-badge { padding: 2px 6px; background: var(--md-sys-color-surface-container-high); border-radius: 4px; font-weight: 500; font-size: 10px; letter-spacing: 0.5px; }
     </style>
     <script type="importmap">
         { 
@@ -450,7 +446,6 @@
         </div>
 
         <div class="footer">
-            <div id="mount-status"><span class="status-badge t-mount-status">MOUNT POINT</span> <span id="mount-txt" class="t-mount-none">Not Detected</span></div>
             <button class="btn-filled" id="btn-export">
                 <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                 <span id="t-export">Export GLB</span>
@@ -504,9 +499,6 @@
             sceneTitle: "地图 / 车库",
             sceneDisplay: "无环境",
             removeEnv: "移除环境",
-            mountStatus: "挂载点",
-            mountActive: "已锁定",
-            mountNone: "未检测",
             export: "导出 GLB",
             clear: "清空场景",
             loading: "加载中...",
@@ -529,9 +521,6 @@
             sceneTitle: "Map / Garage",
             sceneDisplay: "No Environment",
             removeEnv: "Remove Environment",
-            mountStatus: "MOUNT POINT",
-            mountActive: "Active",
-            mountNone: "Not Detected",
             export: "Export GLB",
             clear: "Clear All Objects",
             loading: "Loading...",
@@ -560,8 +549,6 @@
         document.querySelectorAll('.t-turret-sub').forEach(el => el.innerText = T.turretSub);
         document.querySelectorAll('.t-scene-display').forEach(el => el.innerText = T.sceneDisplay);
         document.querySelectorAll('.t-remove-env').forEach(el => el.innerText = T.removeEnv);
-        document.querySelectorAll('.t-mount-status').forEach(el => el.innerText = T.mountStatus);
-        document.querySelectorAll('.t-mount-none').forEach(el => el.innerText = T.mountNone);
         document.querySelectorAll('.t-clear').forEach(el => el.innerText = T.clear);
     }
 
@@ -669,8 +656,6 @@
     let normalMeshes = [], normalTextures =[];
 
     // Helpers
-    const mountHelper = new THREE.Mesh(new THREE.SphereGeometry(3,8,8), new THREE.MeshBasicMaterial({color:0x76FF33}));
-    mountHelper.visible = false;
     let mountPos = null;
 
     // Scene
@@ -690,8 +675,6 @@
     groupAssembly.visible = true; 
     root.add(groupNormal);
     root.add(groupAssembly);
-    
-    root.add(mountHelper);
 
     const lg = new THREE.Group(); scene.add(lg);
     lg.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -699,8 +682,56 @@
     lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
     window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
-    function animate(){requestAnimationFrame(animate);lg.quaternion.copy(camera.quaternion);controls.update();renderer.render(scene,camera)}
+
+    // ====== ANIMATION STATE ======
+    let animClock = 0;
+    let activeAnim = null;
+    const DEG = Math.PI/180;
+    const clock = new THREE.Clock();
+
+    function animate(){
+        requestAnimationFrame(animate);
+        const dt = clock.getDelta();
+        if(activeAnim){ animClock += dt; applyAnim(activeAnim, animClock); }
+        lg.quaternion.copy(camera.quaternion);
+        controls.update();
+        renderer.render(scene,camera);
+    }
     animate();
+
+    function interpTrack(keys, t){
+        if(t <= keys[0][0]) return keys[0][1];
+        for(let i=1;i<keys.length;i++){ if(t <= keys[i][0]){ const [t0,v0]=keys[i-1],[t1,v1]=keys[i]; const a=(t-t0)/((t1-t0)||1); return v0+(v1-v0)*a; } }
+        return keys[keys.length-1][1];
+    }
+
+    function applyAnim(state, time){
+        const t = state.duration>0 ? (time % state.duration) : 0;
+        const {tracks, groups, nameToNode} = state;
+        for(const g of groups){
+            const node = nameToNode[g.name];
+            if(!node) continue;
+            const tcs = [g.t0,g.t1,g.t2];
+            const vx = interpTrack(tracks[tcs[0]], t);
+            const vy = interpTrack(tracks[tcs[1]], t);
+            const vz = interpTrack(tracks[tcs[2]], t);
+            if(g.N===1) node.position.set(vx,vy,vz);
+            else if(g.N===2) node.rotation.set(vx*DEG, vy*DEG, vz*DEG, 'ZYX');
+            else if(g.N===4) node.scale.set(vx||1,vy||1,vz||1);
+        }
+        state.rootGroup.updateMatrixWorld(true);
+        if(state.skeleton) state.skeleton.update();
+    }
+
+    function registerAnim(grp){
+        const a = grp.userData.anim;
+        if(a && a.groups.length && a.duration>0){
+            activeAnim = { tracks:a.tracks, groups:a.groups, nameToNode:a.nameToNode, duration:a.duration, rootGroup:grp, skeleton: grp.userData.skinnedMesh?.skeleton || null };
+            msg('▶ ' + a.groups.length + ' anim tracks · ' + a.duration.toFixed(2)+'s loop');
+        } else { 
+            activeAnim=null; 
+        }
+    }
 
     // UI Helpers
     const drawer=document.getElementById('drawer'), fab=document.getElementById('fab');
@@ -722,7 +753,6 @@
     (async function init() {
         document.getElementById('t-tab-assembly').classList.add('active');
         document.getElementById('panel-assembly').classList.add('active');
-        document.getElementById('mount-status').style.display = 'flex';
         
         try {
             msg(T.loading);
@@ -753,10 +783,6 @@
         const origPixelRatio = renderer.getPixelRatio();
         const origAspect = camera.aspect;
         
-        // Hide UI helper sphere to make screenshot perfectly clean
-        const wasMountVisible = mountHelper.visible;
-        mountHelper.visible = false;
-
         // Apply Settings
         renderer.setPixelRatio(1);
         renderer.setSize(targetWidth, targetHeight, false);
@@ -772,7 +798,6 @@
         renderer.setSize(origWidth, origHeight);
         camera.aspect = origAspect;
         camera.updateProjectionMatrix();
-        mountHelper.visible = wasMountVisible;
         renderer.render(scene, camera);
 
         // Download
@@ -1072,7 +1097,7 @@
         group.traverse(m => {
             if (!m.isMesh) return;
             const apply = (mat) => {
-                // 拼接所有可能包含特征关键词的命名维度，消除冲突
+                // Concatenate all possible naming dimensions containing feature keywords to eliminate conflicts
                 const name = ((m.userData.originalName || "") + " " + (m.name || "") + " " + (mat.name || "")).toLowerCase();
                 let target = texLightmap;
                 if (name.includes('track') || name.includes('chain')) target = texTracks || target;
@@ -1161,14 +1186,8 @@
         groupAssembly.visible = (mode === 'assembly');
         
         if (mode === 'assembly') {
-             document.getElementById('mount-status').style.display = 'flex';
-             if(mountPos) mountHelper.visible = true;
-
              if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
              if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
-        } else {
-             document.getElementById('mount-status').style.display = 'none';
-             mountHelper.visible = false;
         }
     }
 
@@ -1179,7 +1198,6 @@
         if(toExport.children.length === 0) { msg("Empty Scene"); return; }
         
         const exporter = new GLTFExporter();
-        const wasVisible = mountHelper.visible; mountHelper.visible = false;
         
         exporter.parse(root, (result) => {
                 const blob = new Blob([result], { type: 'application/octet-stream' });
@@ -1188,11 +1206,9 @@
                 link.download = 'tanki_model.glb'; 
                 link.click();
                 msg(T.export + " OK"); 
-                mountHelper.visible = wasVisible;
             }, (err) => { 
                 console.error(err); 
                 msg(String(err.message || err)); 
-                mountHelper.visible = wasVisible;
             }, { binary: true, onlyVisible: true }
         );
     };
@@ -1283,6 +1299,9 @@
         slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
         fitCamera();
+
+        // ===== register skeletal animation if present =====
+        if(type==='hull') registerAnim(grp); else if(!slots.hull || !slots.hull.group.userData.anim) activeAnim=null;
     }
 
     function scanMount(grp) {
@@ -1292,12 +1311,12 @@
             if(o.name && o.name.toLowerCase().includes("mount")) {
                 const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos);
                 mountPos = root.worldToLocal(worldPos.clone()); 
-                updateMount(mountPos); 
                 found = true;
             }
         });
-        if(!found) updateMount(null);
+        if(!found) mountPos = null;
     }
+    
     function snapTurret() {
         if(slots.turret) {
             if(slots.hull && mountPos) slots.turret.group.position.copy(mountPos);
@@ -1323,18 +1342,7 @@
         div.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;fill:#90A4AE"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><span style="margin-left:8px">${text}</span>`;
         document.getElementById(id).appendChild(div);
     }
-    function updateMount(pos) {
-        const el=document.getElementById('mount-status'), txt=document.getElementById('mount-txt');
-        if(pos){
-            mountHelper.position.copy(pos); 
-            if(currentMode==='assembly') mountHelper.visible=true; 
-            el.classList.add('active'); txt.innerText=T.mountActive;
-        }
-        else{
-            mountHelper.visible=false; 
-            el.classList.remove('active'); txt.innerText=T.mountNone;
-        }
-    }
+    
     function clearScene() {
         if(currentMode === 'normal') {
             while(groupNormal.children.length > 0){
@@ -1350,10 +1358,11 @@
             slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
             
             logBox.style.display='none';
-            updateMount(null);
+            mountPos = null;
         }
         
         sceneLib.tex.clear(); sceneLib.meshes=[];
+        activeAnim = null;
         msg(T.clear);
     }
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
@@ -1372,9 +1381,238 @@
     class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
     function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw new Error("Invalid A3D header"); r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); else throw new Error(`Unsupported A3D version: ${v}`); }
     function readC(r){r.u32();r.u32();return r.u32()}
-    function pV3(r,n){ let md=[], td=[], tp=[], od=[], mats=[]; r.o=8; let fT=r.v.getUint32(8,1), fS=r.v.getUint32(12,1); if(fT===1 && fS>=r.v.byteLength-24) r.o=16; while(r.o<r.v.byteLength){ const cT=r.u32(), cS=r.u32(), nxt=r.o+cS, count=r.u32(); if(cT===2){ for(let i=0;i<count;i++){ let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[]; for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); } const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); } md.push(m); } } else if(cT===3){ for(let i=0;i<count;i++) td.push({n:r.str(),p:[r.f32(),r.f32(),r.f32()],q:[r.f32(),r.f32(),r.f32(),r.f32()],s:[r.f32(),r.f32(),r.f32()]}); for(let i=0;i<count;i++) tp.push(r.i32()); } else if(cT!==1){ let tOff=r.o, isObj=true; for(let i=0;i<count;i++){ if(tOff+12>nxt){isObj=false;break;} tOff+=8; let cc=r.v.getUint32(tOff,1); tOff+=4+cc*4; } if(isObj && tOff===nxt && count>0){ for(let i=0;i<count;i++){ const o={mi:r.u32(),ti:r.u32()},cc=r.u32(); o.matIdx=[]; for(let k=0;k<cc;k++)o.matIdx.push(r.u32()); od.push(o); } } else { let mOff=r.o, isMat=true; for(let i=0; i<count; i++){ if(mOff+4>nxt){isMat=false;break;} let len1=r.v.getUint32(mOff,1); mOff+=4+len1+(((len1+3)>>2)*4-len1); if(mOff+16>nxt){isMat=false;break;} mOff+=12; let len2=r.v.getUint32(mOff,1); mOff+=4+len2+(((len2+3)>>2)*4-len2); } if(isMat && mOff===nxt && count>0){ for(let i=0;i<count;i++){ let mName=r.str(); r.sk(12); let tName=r.str(); mats.push({n:mName, t:tName}); } } } } r.o = nxt; } return build(md,{t:td,p:tp},od,n,mats); }
     
-    function build(gd,td,od,fname,mats){const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});const geos=gd.map(d=>{const g=new THREE.BufferGeometry();g.userData={n:d.n};d.vb.forEach(v=>{if(v.t===1)g.setAttribute('position',new THREE.BufferAttribute(v.d,3));if(v.t===3)g.setAttribute('normal',new THREE.BufferAttribute(v.d,3));if(v.t===2){for(let i=1;i<v.d.length;i+=2)v.d[i]=1.0-v.d[i];g.setAttribute('uv',new THREE.BufferAttribute(v.d,2))}});let i=[],o=0;d.sm.forEach((s,subIdx)=>{for(let k=0;k<s.x.length;k++)i.push(s.x[k]);g.addGroup(o,s.x.length,subIdx);o+=s.x.length});g.setIndex(i);return g});const grp=new THREE.Group();if(td.t && td.t.length>0){const nds=td.t.map(t=>{const o=new THREE.Object3D();o.position.set(...t.p);o.quaternion.set(...t.q);o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1);o.name=t.n;return o});td.p.forEach((pid,i)=>{if(pid>=0 && nds[pid])nds[pid].add(nds[i]);else grp.add(nds[i])});if(od.length>0){od.forEach(o=>{if(!geos[o.mi]||!nds[o.ti])return;const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||"");let matsArr=[];if(mats&&o.matIdx&&o.matIdx.length>0){matsArr=o.matIdx.map(idx=>{let subMat=mat.clone();subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase();return subMat;});}else{matsArr=[mat.clone()]}const finalMat=matsArr.length===1?matsArr[0]:matsArr;const m=new THREE.Mesh(geos[o.mi],finalMat);if(nm.toLowerCase().match(/box|bound|col|shape/))m.visible=false;m.userData.originalName=nm;nds[o.ti].add(m)});}else{geos.forEach((g,i)=>{const m=new THREE.Mesh(g,mat.clone());m.userData.originalName=g.userData.n||"m"+i;grp.add(m);});}}else{geos.forEach((g,i)=>{const m=new THREE.Mesh(g,mat.clone());m.userData.originalName=g.userData.n||"m"+i;grp.add(m);});}return grp;}
+    function pV2(r,n){
+        let md=[],td=[],tp=[],od=[]; let fT=r.v.getUint32(r.o,1),fS=r.v.getUint32(r.o+4,1);
+        if(fT===1 && fS>=r.v.byteLength-24) r.o=16;
+        while(r.o<r.v.byteLength){ const cT=r.u32(),cS=r.u32(),nxt=r.o+cS,count=r.u32();
+            if(cT===2){ for(let i=0;i<count;i++){ let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[]; for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); } const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); } md.push(m); } }
+            r.o=nxt;
+        }
+        return build(md,{t:[],p:[]},[],n,[],null,null,null);
+    }
+    
+    function pV3(r,n){
+        let md=[], td=[], tp=[], od=[], mats=[];
+        let anim=null, skin=null, bindMats=null;
+        r.o=8; let fT=r.v.getUint32(8,1), fS=r.v.getUint32(12,1);
+        if(fT===1 && fS>=r.v.byteLength-24) r.o=16;
+        while(r.o<r.v.byteLength){
+            const cT=r.u32(), cS=r.u32(), nxt=r.o+cS, count=r.u32();
+            if(cT===2){
+                for(let i=0;i<count;i++){
+                    let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[];
+                    for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); }
+                    const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); }
+                    md.push(m);
+                }
+            } else if(cT===3){
+                for(let i=0;i<count;i++) td.push({n:r.str(), p:[r.f32(),r.f32(),r.f32()], q:[r.f32(),r.f32(),r.f32(),r.f32()], s:[r.f32(),r.f32(),r.f32()]});
+                for(let i=0;i<count;i++) tp.push(r.i32());
+            } else if(cT===6){
+                anim = parseAnimChunk(r, count, nxt);
+            } else if(cT===7){
+                skin = parseSkinChunk(r, count);
+            } else if(cT===8){
+                bindMats = parseBindChunk(r);
+            } else if(cT!==1){
+                let tOff=r.o, isObj=true;
+                for(let i=0;i<count;i++){ if(tOff+12>nxt){isObj=false;break;} tOff+=8; let cc=r.v.getUint32(tOff,1); tOff+=4+cc*4; }
+                if(isObj && tOff===nxt && count>0){
+                    for(let i=0;i<count;i++){ const o={mi:r.u32(),ti:r.u32()},cc=r.u32(); o.matIdx=[]; for(let k=0;k<cc;k++)o.matIdx.push(r.u32()); od.push(o); }
+                } else {
+                    let mOff=r.o, isMat=true;
+                    for(let i=0;i<count;i++){ if(mOff+4>nxt){isMat=false;break;} let len1=r.v.getUint32(mOff,1); mOff+=4+len1+(((len1+3)>>2)*4-len1); if(mOff+16>nxt){isMat=false;break;} mOff+=12; let len2=r.v.getUint32(mOff,1); mOff+=4+len2+(((len2+3)>>2)*4-len2); }
+                    if(isMat && mOff===nxt && count>0){ for(let i=0;i<count;i++){ let mName=r.str(); r.sk(12); let tName=r.str(); mats.push({n:mName, t:tName}); } }
+                }
+            }
+            r.o=nxt;
+        }
+        return build(md,{t:td,p:tp},od,n,mats,anim,skin,bindMats);
+    }
+    
+    function parseAnimChunk(r, count, nxt){
+        const tracks=[];
+        for(let i=0;i<count;i++){
+            const nk=r.u32(); const keys=[];
+            for(let k=0;k<nk;k++){ const t=r.f32(), v=r.f32(); keys.push([t,v]); }
+            tracks.push(keys);
+        }
+        const groups=[]; let maxTime=0;
+        try {
+            const numClips = r.u32();
+            const isAnimated = (g) => {
+                for(const ti of [g.t0,g.t1,g.t2]){
+                    const ks = tracks[ti]; if(!ks||ks.length<2) continue;
+                    const v0 = ks[0][1];
+                    for(let i=1;i<ks.length;i++){ if(Math.abs(ks[i][1]-v0)>0.001) return true; }
+                }
+                return false;
+            };
+            const merged = new Map();
+            for(let ci=0; ci<numClips; ci++){
+                const clipName = r.str();
+                const numGroups = r.u32();
+                for(let gi=0; gi<numGroups; gi++){
+                    const bname = r.str();
+                    const N = r.u32(); const three = r.u32();
+                    const c1=r.u32(), t0=r.u32(), c2=r.u32(), t1=r.u32(), c3=r.u32(), t2=r.u32();
+                    const g = {name:bname, N, t0, t1, t2};
+                    const key = bname+':'+N;
+                    const existing = merged.get(key);
+                    if(!existing) merged.set(key, g);
+                    else if(!isAnimated(existing) && isAnimated(g)) merged.set(key, g);
+                }
+            }
+            for(const g of merged.values()) groups.push(g);
+        } catch(e) {
+            console.warn('Anim clip parse fell back to byte-scan:', e);
+            let p=r.o;
+            while(p < nxt-4){
+                const len=r.v.getUint32(p,1);
+                if(len>=1 && len<=32 && p+4+len<=nxt){
+                    let ok=true; for(let i=0;i<len;i++){const c=r.v.getUint8(p+4+i); if(c<32||c>=127){ok=false;break;}}
+                    if(ok){
+                        const name = r.d.decode(new Uint8Array(r.v.buffer, r.v.byteOffset+p+4, len));
+                        const pad=((len+3)>>2)*4-len; const after=p+4+len+pad;
+                        if(after+32<=nxt){
+                            const N=r.v.getUint32(after,1), m3=r.v.getUint32(after+4,1);
+                            const c1=r.v.getUint32(after+8,1), t0=r.v.getUint32(after+12,1);
+                            const c2=r.v.getUint32(after+16,1), t1=r.v.getUint32(after+20,1);
+                            const c3=r.v.getUint32(after+24,1), t2=r.v.getUint32(after+28,1);
+                            if(m3===3 && c1===1 && c2===2 && c3===3 && t0<count && t1===t0+1 && t2===t0+2){
+                                groups.push({name, N, t0, t1, t2}); p=after+32; continue;
+                            }
+                        }
+                    }
+                }
+                p++;
+            }
+        }
+        for(const tr of tracks) if(tr.length) maxTime=Math.max(maxTime, tr[tr.length-1][0]);
+        return {tracks, groups, duration:maxTime};
+    }
+    
+    function parseSkinChunk(r, count){
+        r.u16();
+        const numBones=r.u16();
+        const boneIds=[]; for(let i=0;i<numBones;i++) boneIds.push(r.u16());
+        r.u32();
+        const numVerts=r.u32();
+        const bone0=new Uint32Array(numVerts);
+        for(let i=0;i<numVerts;i++) bone0[i]=r.u32();
+        return {numVerts, bone0, numBones, boneIds};
+    }
+    
+    function parseBindChunk(r){
+        const numRec=r.u32();
+        const mats={};
+        for(let i=0;i<numRec;i++){
+            const nodeId=r.u32();
+            const f=[]; for(let j=0;j<12;j++) f.push(r.f32());
+            const M=new THREE.Matrix4();
+            M.set(f[0],f[3],f[6],f[9], f[1],f[4],f[7],f[10], f[2],f[5],f[8],f[11], 0,0,0,1);
+            mats[nodeId]=M;
+        }
+        return mats;
+    }
+    
+    function build(gd, td, od, fname, mats, anim, skin, bindMats){
+        const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});
+        const geos=gd.map(d=>{
+            const g=new THREE.BufferGeometry(); g.userData={n:d.n};
+            d.vb.forEach(v=>{
+                if(v.t===1) g.setAttribute('position', new THREE.BufferAttribute(v.d,3));
+                if(v.t===3) g.setAttribute('normal', new THREE.BufferAttribute(v.d,3));
+                if(v.t===2){ for(let i=1;i<v.d.length;i+=2) v.d[i]=1.0-v.d[i]; g.setAttribute('uv', new THREE.BufferAttribute(v.d,2)); }
+            });
+            let i=[], o=0;
+            d.sm.forEach((s,subIdx)=>{ for(let k=0;k<s.x.length;k++) i.push(s.x[k]); g.addGroup(o,s.x.length,subIdx); o+=s.x.length; });
+            g.setIndex(i); return g;
+        });
+        const grp=new THREE.Group();
+        let nds=[];
+        if(td.t && td.t.length>0){
+            nds=td.t.map(t=>{ const o=new THREE.Object3D(); o.position.set(...t.p); o.quaternion.set(...t.q); o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); o.name=t.n; return o; });
+            td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); });
+        }
+        let skinnedMeshMi=-1;
+        if(skin && nds.length>0){
+            geos.forEach((g,i)=>{ if(g.attributes.position && g.attributes.position.count===skin.numVerts){ applySkin(g, skin); skinnedMeshMi=i; } });
+        }
+        if(od.length>0){
+            od.forEach(o=>{
+                if(o.mi===skinnedMeshMi) return;
+                if(!geos[o.mi] || !nds[o.ti]) return;
+                const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||"");
+                let matsArr=[];
+                if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase(); return subMat; }); }
+                else matsArr=[mat.clone()];
+                const m=new THREE.Mesh(geos[o.mi], matsArr.length===1?matsArr[0]:matsArr);
+                if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false;
+                m.userData.originalName=nm; nds[o.ti].add(m);
+            });
+        } else {
+            geos.forEach((g,i)=>{ if(i===skinnedMeshMi) return; const m=new THREE.Mesh(g,mat.clone()); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); });
+        }
+        if(skinnedMeshMi>=0 && nds.length>0 && skin){
+            let skmParentNode=0;
+            let skmMatsArr = [mat.clone()]; // Default single material array
+            
+            // 1. Find and restore multi-material mapping info of SkinnedMesh
+            if(od.length>0){ 
+                const skmObj=od.find(o=>o.mi===skinnedMeshMi); 
+                if(skmObj) {
+                    skmParentNode=skmObj.ti; 
+                    if(mats && skmObj.matIdx && skmObj.matIdx.length>0){ 
+                        skmMatsArr = skmObj.matIdx.map(idx => { 
+                            let subMat = mat.clone(); 
+                            // Inherit material name, this is crucial for automatic texture matching
+                            subMat.name = (mats[idx] ? mats[idx].n : "default").toLowerCase(); 
+                            return subMat; 
+                        }); 
+                    }
+                } 
+            }
+            
+            grp.updateMatrixWorld(true);
+            const bones=[]; const boneInverses=[];
+            for(let k=0;k<skin.numBones;k++){
+                const nodeIdx=skin.boneIds[k];
+                bones.push(nds[nodeIdx]);
+                if(bindMats && bindMats[nodeIdx]){ boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); }
+                else { boneInverses.push(new THREE.Matrix4().copy(nds[nodeIdx].matrixWorld).invert()); }
+            }
+            const skeleton=new THREE.Skeleton(bones, boneInverses);
+            
+            // 2. Assign the correct material array to SkinnedMesh
+            const finalSkmMat = skmMatsArr.length === 1 ? skmMatsArr[0] : skmMatsArr;
+            const skm=new THREE.SkinnedMesh(geos[skinnedMeshMi], finalSkmMat);
+            
+            // 3. Preserve original name instead of hardcoding 'skinned_body'
+            skm.userData.originalName = geos[skinnedMeshMi].userData.n || 'skinned_body';
+            
+            nds[skmParentNode].add(skm);
+            let bindMatrix=null;
+            if(bindMats && bindMats[skmParentNode]) bindMatrix=bindMats[skmParentNode];
+            grp.updateMatrixWorld(true);
+            if(bindMatrix){ skm.bind(skeleton, bindMatrix); } else { skm.bind(skeleton); }
+            grp.userData.skinnedMesh=skm;
+        }
+        if(anim){
+            const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; });
+            grp.userData.anim={ tracks:anim.tracks, groups:anim.groups, duration:anim.duration, nameToNode };
+        }
+        return grp;
+    }
+    
+    function applySkin(geo, skin){
+        const n=skin.numVerts;
+        const si=new Float32Array(n*4), sw=new Float32Array(n*4);
+        for(let i=0;i<n;i++){ si[i*4]=skin.bone0[i]; sw[i*4]=1; }
+        geo.setAttribute('skinIndex', new THREE.BufferAttribute(si,4));
+        geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw,4));
+    }
 </script>
 </body>
 </html>
