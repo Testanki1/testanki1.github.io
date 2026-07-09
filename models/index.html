@@ -684,52 +684,94 @@
     window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 
     // ====== ANIMATION STATE ======
-    let animClock = 0;
-    let activeAnim = null;
+    let mixer = null;
     const DEG = Math.PI/180;
     const clock = new THREE.Clock();
 
     function animate(){
         requestAnimationFrame(animate);
         const dt = clock.getDelta();
-        if(activeAnim){ animClock += dt; applyAnim(activeAnim, animClock); }
+        if(mixer) mixer.update(dt);
         lg.quaternion.copy(camera.quaternion);
         controls.update();
         renderer.render(scene,camera);
     }
     animate();
 
-    function interpTrack(keys, t){
-        if(t <= keys[0][0]) return keys[0][1];
-        for(let i=1;i<keys.length;i++){ if(t <= keys[i][0]){ const [t0,v0]=keys[i-1],[t1,v1]=keys[i]; const a=(t-t0)/((t1-t0)||1); return v0+(v1-v0)*a; } }
-        return keys[keys.length-1][1];
-    }
-
-    function applyAnim(state, time){
-        const t = state.duration>0 ? (time % state.duration) : 0;
-        const {tracks, groups, nameToNode} = state;
-        for(const g of groups){
-            const node = nameToNode[g.name];
-            if(!node) continue;
-            const tcs = [g.t0,g.t1,g.t2];
-            const vx = interpTrack(tracks[tcs[0]], t);
-            const vy = interpTrack(tracks[tcs[1]], t);
-            const vz = interpTrack(tracks[tcs[2]], t);
-            if(g.N===1) node.position.set(vx,vy,vz);
-            else if(g.N===2) node.rotation.set(vx*DEG, vy*DEG, vz*DEG, 'ZYX');
-            else if(g.N===4) node.scale.set(vx||1,vy||1,vz||1);
-        }
-        state.rootGroup.updateMatrixWorld(true);
-        if(state.skeleton) state.skeleton.update();
-    }
-
     function registerAnim(grp){
+        if (mixer) {
+            mixer.stopAllAction();
+            mixer = null;
+        }
+
         const a = grp.userData.anim;
-        if(a && a.groups.length && a.duration>0){
-            activeAnim = { tracks:a.tracks, groups:a.groups, nameToNode:a.nameToNode, duration:a.duration, rootGroup:grp, skeleton: grp.userData.skinnedMesh?.skeleton || null };
-            msg('▶ ' + a.groups.length + ' anim tracks · ' + a.duration.toFixed(2)+'s loop');
-        } else { 
-            activeAnim=null; 
+        if(a && a.groups.length && a.duration > 0){
+            
+            // Extract all involved track frame time nodes
+            function getUnifiedTimes(t0, t1, t2) {
+                const times = new Set();
+                [t0, t1, t2].forEach(idx => {
+                    if(a.tracks[idx]) a.tracks[idx].forEach(k => times.add(k[0]));
+                });
+                return Array.from(times).sort((x, y) => x - y);
+            }
+            
+            // Linear interpolation helper function
+            function interpTrack(keys, t) {
+                if(!keys || keys.length === 0) return 0;
+                if(t <= keys[0][0]) return keys[0][1];
+                for(let i=1; i<keys.length; i++) {
+                    if(t <= keys[i][0]) {
+                        const [t0, v0] = keys[i-1], [t1, v1] = keys[i];
+                        const alpha = (t - t0) / ((t1 - t0) || 1);
+                        return v0 + (v1 - v0) * alpha;
+                    }
+                }
+                return keys[keys.length-1][1];
+            }
+
+            const threeTracks = [];
+            
+            for (const g of a.groups) {
+                const node = a.nameToNode[g.name];
+                if (!node) continue;
+                
+                const times = getUnifiedTimes(g.t0, g.t1, g.t2);
+                if (times.length === 0) continue;
+                
+                const timeArr = new Float32Array(times);
+                const values = [];
+                
+                for (const t of times) {
+                    const vx = interpTrack(a.tracks[g.t0], t);
+                    const vy = interpTrack(a.tracks[g.t1], t);
+                    const vz = interpTrack(a.tracks[g.t2], t);
+                    
+                    if (g.N === 1 || g.N === 4) { // Translation(1) or Scale(4)
+                        values.push(vx, vy, vz);
+                    } else if (g.N === 2) {       // Rotation(2)
+                        // A3D uses Euler ZYX angles in degrees, convert to Quaternion
+                        const euler = new THREE.Euler(vx * DEG, vy * DEG, vz * DEG, 'ZYX');
+                        const quat = new THREE.Quaternion().setFromEuler(euler);
+                        values.push(quat.x, quat.y, quat.z, quat.w);
+                    }
+                }
+                
+                const valArr = new Float32Array(values);
+                // Three.js PropertyBinding supports precise targeting via object UUID
+                const path = node.uuid;
+                
+                if (g.N === 1) threeTracks.push(new THREE.VectorKeyframeTrack(`${path}.position`, timeArr, valArr));
+                else if (g.N === 2) threeTracks.push(new THREE.QuaternionKeyframeTrack(`${path}.quaternion`, timeArr, valArr));
+                else if (g.N === 4) threeTracks.push(new THREE.VectorKeyframeTrack(`${path}.scale`, timeArr, valArr));
+            }
+            
+            if (threeTracks.length > 0) {
+                const clip = new THREE.AnimationClip('A3D_Anim', a.duration, threeTracks);
+                mixer = new THREE.AnimationMixer(grp);
+                mixer.clipAction(clip).play();
+                msg('▶ ' + threeTracks.length + ' tracks (Native) · ' + a.duration.toFixed(2) + 's loop');
+            }
         }
     }
 
@@ -1301,7 +1343,10 @@
         fitCamera();
 
         // ===== register skeletal animation if present =====
-        if(type==='hull') registerAnim(grp); else if(!slots.hull || !slots.hull.group.userData.anim) activeAnim=null;
+        if(type==='hull') registerAnim(grp); 
+        else if(!slots.hull || !slots.hull.group.userData.anim) {
+            if (mixer) { mixer.stopAllAction(); mixer = null; }
+        }
     }
 
     function scanMount(grp) {
@@ -1362,7 +1407,7 @@
         }
         
         sceneLib.tex.clear(); sceneLib.meshes=[];
-        activeAnim = null;
+        if (mixer) { mixer.stopAllAction(); mixer = null; }
         msg(T.clear);
     }
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
@@ -1493,27 +1538,74 @@
         return {tracks, groups, duration:maxTime};
     }
     
-    function parseSkinChunk(r, count){
-    r.u16(); // version / reserved
-    const numBones = r.u16();
-    const boneIds = [];
-    for (let i = 0; i < numBones; i++) boneIds.push(r.u16());
-    
-    if (r.o & 3) r.sk(4 - (r.o & 3));
+    function parseSkinChunk(r, count) {
+        const skins = {};
+        for (let i = 0; i < count; i++) {
+            const geoIdx = r.u16(); 
+            const numBones = r.u16();
+            const boneIds = [];
+            for (let j = 0; j < numBones; j++) boneIds.push(r.u16());
+            if (numBones % 2 === 1) r.sk(2);
 
-    r.u32();
-    const numVerts = r.u32();
+            const inf = r.u32(); // <--- This is u32, crucial! Reading as u16 causes all subsequent parsing to misalign
+            const numVerts = r.u32();
+            const countElements = inf * numVerts;
 
-    const bytesLeft = r.v.byteLength - r.o;
-    if (!Number.isFinite(numVerts) || numVerts <= 0 || numVerts * 4 > bytesLeft) {
-        throw new Error(`Invalid skin numVerts=${numVerts}, bytesLeft=${bytesLeft}`);
+            const boneIndices = new Int16Array(countElements);
+            for (let j = 0; j < countElements; j++) boneIndices[j] = r.u16();
+            if (countElements % 2 === 1) r.sk(2);
+
+            const boneWeights = new Uint16Array(countElements);
+            for (let j = 0; j < countElements; j++) boneWeights[j] = r.u16();
+            if (countElements % 2 === 1) r.sk(2);
+
+            skins[geoIdx] = { numBones, boneIds, inf, numVerts, boneIndices, boneWeights };
+        }
+        return skins;
     }
 
-    const bone0 = new Uint32Array(numVerts);
-    for (let i = 0; i < numVerts; i++) bone0[i] = r.u32();
+    // Official function to unpack 16-bit half-precision float (Float16) to regular float
+    function decodeFloat16(binary) {
+        const sign = (binary & 0x8000) ? -1 : 1;
+        const exp = (binary >> 10) & 0x1F;
+        const frac = binary & 0x3FF;
+        if (exp === 0) return sign * Math.pow(2, -14) * (frac / 1024);
+        if (exp === 0x1F) return frac ? NaN : sign * Infinity;
+        return sign * Math.pow(2, exp - 15) * (1 + frac / 1024);
+    }
 
-    return { numVerts, bone0, numBones, boneIds };
-}
+    function applySkin(geo, skin) {
+        const numVerts = geo.attributes.position.count;
+        if (numVerts !== skin.numVerts) return;
+        
+        // Three.js specifies skinIndex and skinWeight use vec4 format
+        const si = new Uint16Array(numVerts * 4);
+        const sw = new Float32Array(numVerts * 4);
+        const influences = Math.min(4, skin.inf); 
+
+        for (let i = 0; i < numVerts; i++) {
+            let wSum = 0;
+            for (let j = 0; j < influences; j++) {
+                const idx = i * skin.inf + j;
+                const internalBone = skin.boneIndices[idx]; 
+                const weight = decodeFloat16(skin.boneWeights[idx]); // Decode half-precision float
+                
+                const outIdx = i * 4 + j;
+                si[outIdx] = internalBone; 
+                sw[outIdx] = (Number.isFinite(weight) && weight > 0) ? weight : 0;
+                wSum += sw[outIdx];
+            }
+            
+            // Normalize to ensure weights sum to 1
+            if (wSum > 0) {
+                for (let j = 0; j < influences; j++) sw[i * 4 + j] /= wSum;
+            } else {
+                sw[i * 4] = 1; 
+            }
+        }
+        geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+        geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+    }
     
     function parseBindChunk(r){
         const numRec=r.u32();
@@ -1530,99 +1622,113 @@
     
     function build(gd, td, od, fname, mats, anim, skin, bindMats){
         const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});
-        const geos=gd.map(d=>{
+        
+        const geos=gd.map((d, i)=>{
             const g=new THREE.BufferGeometry(); g.userData={n:d.n};
             d.vb.forEach(v=>{
                 if(v.t===1) g.setAttribute('position', new THREE.BufferAttribute(v.d,3));
                 if(v.t===3) g.setAttribute('normal', new THREE.BufferAttribute(v.d,3));
-                if(v.t===2){ for(let i=1;i<v.d.length;i+=2) v.d[i]=1.0-v.d[i]; g.setAttribute('uv', new THREE.BufferAttribute(v.d,2)); }
+                if(v.t===2){ for(let k=1;k<v.d.length;k+=2) v.d[k]=1.0-v.d[k]; g.setAttribute('uv', new THREE.BufferAttribute(v.d,2)); }
             });
-            let i=[], o=0;
-            d.sm.forEach((s,subIdx)=>{ for(let k=0;k<s.x.length;k++) i.push(s.x[k]); g.addGroup(o,s.x.length,subIdx); o+=s.x.length; });
-            g.setIndex(i); return g;
+            let idxs=[], o=0;
+            d.sm.forEach((s,subIdx)=>{ for(let k=0;k<s.x.length;k++) idxs.push(s.x[k]); g.addGroup(o,s.x.length,subIdx); o+=s.x.length; });
+            g.setIndex(idxs);
+            
+            // Match each Geometry with its unique skinning data
+            if (skin && skin[i]) {
+                applySkin(g, skin[i]);
+                g.userData.skinData = skin[i];
+            }
+            return g;
         });
+        
         const grp=new THREE.Group();
         let nds=[];
         if(td.t && td.t.length>0){
-            nds=td.t.map(t=>{ const o=new THREE.Object3D(); o.position.set(...t.p); o.quaternion.set(...t.q); o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); o.name=t.n; return o; });
+            nds=td.t.map(t=>{ 
+                const o=new THREE.Bone(); // All control nodes use Bone to ensure compatibility
+                o.position.set(...t.p); 
+                o.quaternion.set(...t.q); 
+                o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); 
+                o.name=t.n; 
+                return o; 
+            });
             td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); });
         }
-        let skinnedMeshMi=-1;
-        if(skin && nds.length>0){
-            geos.forEach((g,i)=>{ if(g.attributes.position && g.attributes.position.count===skin.numVerts){ applySkin(g, skin); skinnedMeshMi=i; } });
+        
+        grp.updateMatrixWorld(true);
+
+        // Core: Independent Mesh / SkinnedMesh generator
+        function createMesh(geo, matsArr, parentNodeIdx) {
+            // If the mesh has skinWeight injected and the scene has bones, it is a SkinnedMesh
+            if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) {
+                const skData = geo.userData.skinData;
+                const bones = [];
+                const boneInverses = [];
+                
+                // Dynamically extract the local bones associated with this mesh
+                for (let k = 0; k < skData.numBones; k++) {
+                    const nodeIdx = skData.boneIds[k];
+                    const boneNode = nds[nodeIdx];
+                    bones.push(boneNode);
+                    if (bindMats && bindMats[nodeIdx]) {
+                        boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert());
+                    } else {
+                        boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert());
+                    }
+                }
+                const skel = new THREE.Skeleton(bones, boneInverses);
+                
+                const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr;
+                const skm = new THREE.SkinnedMesh(geo, finalMat);
+                
+                let bindMatrix = null;
+                if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) {
+                    bindMatrix = bindMats[parentNodeIdx];
+                }
+                if (bindMatrix) {
+                    skm.bind(skel, bindMatrix);
+                } else {
+                    skm.bind(skel);
+                }
+                return skm;
+            } else {
+                const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr;
+                return new THREE.Mesh(geo, finalMat);
+            }
         }
+
         if(od.length>0){
             od.forEach(o=>{
-                if(o.mi===skinnedMeshMi) return;
                 if(!geos[o.mi] || !nds[o.ti]) return;
                 const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||"");
                 let matsArr=[];
-                if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase(); return subMat; }); }
-                else matsArr=[mat.clone()];
-                const m=new THREE.Mesh(geos[o.mi], matsArr.length===1?matsArr[0]:matsArr);
+                if(mats && o.matIdx && o.matIdx.length>0){ 
+                    matsArr=o.matIdx.map(idx=>{ 
+                        let subMat=mat.clone(); 
+                        subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase(); 
+                        return subMat; 
+                    }); 
+                } else matsArr=[mat.clone()];
+                
+                const m = createMesh(geos[o.mi], matsArr, o.ti);
                 if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false;
-                m.userData.originalName=nm; nds[o.ti].add(m);
+                m.userData.originalName=nm; 
+                nds[o.ti].add(m);
             });
         } else {
-            geos.forEach((g,i)=>{ if(i===skinnedMeshMi) return; const m=new THREE.Mesh(g,mat.clone()); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); });
+            geos.forEach((g,i)=>{ 
+                const m = createMesh(g, [mat.clone()]);
+                m.userData.originalName=g.userData.n||"m"+i; 
+                grp.add(m); 
+            });
         }
-        if(skinnedMeshMi>=0 && nds.length>0 && skin){
-            let skmParentNode=0;
-            let skmMatsArr = [mat.clone()]; // Default single material array
-            
-            // 1. Find and restore multi-material mapping info of SkinnedMesh
-            if(od.length>0){ 
-                const skmObj=od.find(o=>o.mi===skinnedMeshMi); 
-                if(skmObj) {
-                    skmParentNode=skmObj.ti; 
-                    if(mats && skmObj.matIdx && skmObj.matIdx.length>0){ 
-                        skmMatsArr = skmObj.matIdx.map(idx => { 
-                            let subMat = mat.clone(); 
-                            // Inherit material name, this is crucial for automatic texture matching
-                            subMat.name = (mats[idx] ? mats[idx].n : "default").toLowerCase(); 
-                            return subMat; 
-                        }); 
-                    }
-                } 
-            }
-            
-            grp.updateMatrixWorld(true);
-            const bones=[]; const boneInverses=[];
-            for(let k=0;k<skin.numBones;k++){
-                const nodeIdx=skin.boneIds[k];
-                bones.push(nds[nodeIdx]);
-                if(bindMats && bindMats[nodeIdx]){ boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); }
-                else { boneInverses.push(new THREE.Matrix4().copy(nds[nodeIdx].matrixWorld).invert()); }
-            }
-            const skeleton=new THREE.Skeleton(bones, boneInverses);
-            
-            // 2. Assign the correct material array to SkinnedMesh
-            const finalSkmMat = skmMatsArr.length === 1 ? skmMatsArr[0] : skmMatsArr;
-            const skm=new THREE.SkinnedMesh(geos[skinnedMeshMi], finalSkmMat);
-            
-            // 3. Preserve original name instead of hardcoding 'skinned_body'
-            skm.userData.originalName = geos[skinnedMeshMi].userData.n || 'skinned_body';
-            
-            nds[skmParentNode].add(skm);
-            let bindMatrix=null;
-            if(bindMats && bindMats[skmParentNode]) bindMatrix=bindMats[skmParentNode];
-            grp.updateMatrixWorld(true);
-            if(bindMatrix){ skm.bind(skeleton, bindMatrix); } else { skm.bind(skeleton); }
-            grp.userData.skinnedMesh=skm;
-        }
+
         if(anim){
             const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; });
             grp.userData.anim={ tracks:anim.tracks, groups:anim.groups, duration:anim.duration, nameToNode };
         }
         return grp;
-    }
-    
-    function applySkin(geo, skin){
-        const n=skin.numVerts;
-        const si=new Float32Array(n*4), sw=new Float32Array(n*4);
-        for(let i=0;i<n;i++){ si[i*4]=skin.bone0[i]; sw[i*4]=1; }
-        geo.setAttribute('skinIndex', new THREE.BufferAttribute(si,4));
-        geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw,4));
     }
 </script>
 </body>
