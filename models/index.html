@@ -1641,12 +1641,21 @@
             }
             return g;
         });
+
+        const boneIndicesSet = new Set();
+        if (skin) {
+            Object.values(skin).forEach(sk => {
+                if (sk.boneIds) {
+                    sk.boneIds.forEach(id => boneIndicesSet.add(id));
+                }
+            });
+        }
         
         const grp=new THREE.Group();
         let nds=[];
         if(td.t && td.t.length>0){
-            nds=td.t.map(t=>{ 
-                const o=new THREE.Bone(); // All control nodes use Bone to ensure compatibility
+            nds=td.t.map((t, idx)=>{ 
+                const o = boneIndicesSet.has(idx) ? new THREE.Bone() : new THREE.Object3D();
                 o.position.set(...t.p); 
                 o.quaternion.set(...t.q); 
                 o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); 
@@ -1655,6 +1664,7 @@
             });
             td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); });
         }
+        // =============================================================
         
         grp.updateMatrixWorld(true);
 
