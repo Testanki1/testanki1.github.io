@@ -1494,15 +1494,26 @@
     }
     
     function parseSkinChunk(r, count){
-        r.u16();
-        const numBones=r.u16();
-        const boneIds=[]; for(let i=0;i<numBones;i++) boneIds.push(r.u16());
-        r.u32();
-        const numVerts=r.u32();
-        const bone0=new Uint32Array(numVerts);
-        for(let i=0;i<numVerts;i++) bone0[i]=r.u32();
-        return {numVerts, bone0, numBones, boneIds};
+    r.u16(); // version / reserved
+    const numBones = r.u16();
+    const boneIds = [];
+    for (let i = 0; i < numBones; i++) boneIds.push(r.u16());
+    
+    if (r.o & 3) r.sk(4 - (r.o & 3));
+
+    r.u32();
+    const numVerts = r.u32();
+
+    const bytesLeft = r.v.byteLength - r.o;
+    if (!Number.isFinite(numVerts) || numVerts <= 0 || numVerts * 4 > bytesLeft) {
+        throw new Error(`Invalid skin numVerts=${numVerts}, bytesLeft=${bytesLeft}`);
     }
+
+    const bone0 = new Uint32Array(numVerts);
+    for (let i = 0; i < numVerts; i++) bone0[i] = r.u32();
+
+    return { numVerts, bone0, numBones, boneIds };
+}
     
     function parseBindChunk(r){
         const numRec=r.u32();
