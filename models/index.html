@@ -716,19 +716,48 @@
                 return Array.from(times).sort((x, y) => x - y);
             }
             
-            // Linear interpolation helper function
+            // --- Upgraded: Cubic Hermite Spline smooth interpolation ---
             function interpTrack(keys, t) {
                 if(!keys || keys.length === 0) return 0;
                 if(t <= keys[0][0]) return keys[0][1];
-                for(let i=1; i<keys.length; i++) {
+                if(t >= keys[keys.length-1][0]) return keys[keys.length-1][1];
+
+                for(let i = 1; i < keys.length; i++) {
                     if(t <= keys[i][0]) {
-                        const [t0, v0] = keys[i-1], [t1, v1] = keys[i];
-                        const alpha = (t - t0) / ((t1 - t0) || 1);
-                        return v0 + (v1 - v0) * alpha;
+                        const t1 = keys[i-1][0], v1 = keys[i-1][1];
+                        const t2 = keys[i][0],   v2 = keys[i][1];
+                        const alpha = (t - t1) / ((t2 - t1) || 1);
+
+                        // If there are enough adjacent frames, calculate derivatives and use 
+                        // spline interpolation to restore smooth curves before baking
+                        if (i > 1 && i < keys.length - 1) {
+                            const t0 = keys[i-2][0], v0 = keys[i-2][1];
+                            const t3 = keys[i+1][0], v3 = keys[i+1][1];
+
+                            // Calculate derivatives (slopes)
+                            const m1 = (v2 - v0) / ((t2 - t0) || 1);
+                            const m2 = (v3 - v1) / ((t3 - t1) || 1);
+
+                            const dt = t2 - t1;
+                            const alpha2 = alpha * alpha;
+                            const alpha3 = alpha2 * alpha;
+
+                            // Spline basis function weight calculation
+                            const h00 = 2 * alpha3 - 3 * alpha2 + 1;
+                            const h10 = alpha3 - 2 * alpha2 + alpha;
+                            const h01 = -2 * alpha3 + 3 * alpha2;
+                            const h11 = alpha3 - alpha2;
+
+                            return h00 * v1 + h10 * dt * m1 + h01 * v2 + h11 * dt * m2;
+                        }
+
+                        // Fallback to basic linear interpolation if only two frames exist (or at edges)
+                        return v1 + (v2 - v1) * alpha;
                     }
                 }
                 return keys[keys.length-1][1];
             }
+            // -------------------------------------------------------------
 
             const threeTracks = [];
             
@@ -750,7 +779,6 @@
                     if (g.N === 1 || g.N === 4) { // Translation(1) or Scale(4)
                         values.push(vx, vy, vz);
                     } else if (g.N === 2) {       // Rotation(2)
-                        // A3D uses Euler ZYX angles in degrees, convert to Quaternion
                         const euler = new THREE.Euler(vx * DEG, vy * DEG, vz * DEG, 'ZYX');
                         const quat = new THREE.Quaternion().setFromEuler(euler);
                         values.push(quat.x, quat.y, quat.z, quat.w);
@@ -758,19 +786,31 @@
                 }
                 
                 const valArr = new Float32Array(values);
-                // Three.js PropertyBinding supports precise targeting via object UUID
                 const path = node.uuid;
                 
-                if (g.N === 1) threeTracks.push(new THREE.VectorKeyframeTrack(`${path}.position`, timeArr, valArr));
-                else if (g.N === 2) threeTracks.push(new THREE.QuaternionKeyframeTrack(`${path}.quaternion`, timeArr, valArr));
-                else if (g.N === 4) threeTracks.push(new THREE.VectorKeyframeTrack(`${path}.scale`, timeArr, valArr));
+                // --- Upgraded: Inject smooth interpolation instruction to Three.js ---
+                if (g.N === 1) {
+                    const track = new THREE.VectorKeyframeTrack(`${path}.position`, timeArr, valArr);
+                    track.setInterpolation(THREE.InterpolateSmooth); // Enable native smooth interpolation
+                    threeTracks.push(track);
+                }
+                else if (g.N === 2) {
+                    // Rotation tracks default to SLERP (Spherical Linear Interpolation), 
+                    // mathematically optimal for quaternions, no changes needed.
+                    threeTracks.push(new THREE.QuaternionKeyframeTrack(`${path}.quaternion`, timeArr, valArr));
+                }
+                else if (g.N === 4) {
+                    const track = new THREE.VectorKeyframeTrack(`${path}.scale`, timeArr, valArr);
+                    track.setInterpolation(THREE.InterpolateSmooth); // Enable native smooth interpolation
+                    threeTracks.push(track);
+                }
             }
             
             if (threeTracks.length > 0) {
                 const clip = new THREE.AnimationClip('A3D_Anim', a.duration, threeTracks);
                 mixer = new THREE.AnimationMixer(grp);
                 mixer.clipAction(clip).play();
-                msg('▶ ' + threeTracks.length + ' tracks (Native) · ' + a.duration.toFixed(2) + 's loop');
+                msg(threeTracks.length + ' tracks (Smooth) · ' + a.duration.toFixed(2) + 's loop');
             }
         }
     }
