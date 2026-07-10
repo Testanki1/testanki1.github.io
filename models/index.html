@@ -4,405 +4,303 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tanki Online Model Showcase</title>
+    
+    <!-- Import official Material Symbols icon library and fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0" />
+    
     <style>
         /* Prevent FOUT */
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap');
         body.fouc-loading { opacity: 0; pointer-events: none; }
         body { transition: opacity 0.3s ease-in; opacity: 1; }
-        * {
-        -webkit-tap-highlight-color: transparent;
-        }
-        /* Design Tokens - Dark Theme */
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        /* Design Tokens - Official Brand Theme */
         :root {
-            /* Palette */
-            --md-sys-color-background: #00141e;
-            --md-sys-color-surface: #00141e;
-            --md-sys-color-surface-container-low: #001d26;
-            --md-sys-color-surface-container: #00222b;
-            --md-sys-color-surface-container-high: #002b37;
-            --md-sys-color-surface-container-highest: #003644;
-            
-            --md-sys-color-primary: #76FF33;
-            --md-sys-color-on-primary: #00390a;
-            --md-sys-color-primary-container: #005313;
-            --md-sys-color-on-primary-container: #8aff66;
-            
-            --md-sys-color-outline: #8d9da5;
-            --md-sys-color-outline-variant: #40484c;
-            
-            --md-sys-color-on-surface: #e1e2e5;
-            --md-sys-color-on-surface-variant: #bfc8cc;
+            --tanki-green: #76FF33;
+            --tanki-cyan: #00D4FF;
+            --tanki-light-blue: #BFD5FF;
+            --tanki-yellow: #FFCC00;
+            --tanki-bright-yellow: #FFEE00;
+            --tanki-dark: #001926;
+            --tanki-purple: #D580FF;
+            --tanki-salmon: #FF6666;
+            --tanki-red: #FF3333;
+            --tanki-orange: #FF8000;
 
-            /* State Layers */
-            --md-state-hover: rgba(255,255,255,0.08);
-            --md-state-focus: rgba(255,255,255,0.12);
-            --md-state-primary-hover: rgba(118, 255, 51, 0.08);
+            --md-sys-color-background: var(--tanki-dark);
+            --md-sys-color-surface: var(--tanki-dark);
+            --md-sys-color-surface-container-low: #002233;
+            --md-sys-color-surface-container: #002b40;
+            --md-sys-color-surface-container-high: #003650;
+            --md-sys-color-surface-container-highest: #004466;
             
-            /* Shape */
+            --md-sys-color-primary: var(--tanki-green);
+            --md-sys-color-on-primary: var(--tanki-dark);
+            --md-sys-color-primary-container: rgba(118, 255, 51, 0.15);
+            --md-sys-color-on-primary-container: var(--tanki-green);
+            
+            --md-sys-color-outline: var(--tanki-light-blue);
+            --md-sys-color-outline-variant: #004466;
+            
+            --md-sys-color-on-surface: #ffffff;
+            --md-sys-color-on-surface-variant: var(--tanki-light-blue);
+
+            --md-state-hover: rgba(191, 213, 255, 0.1);
+            --md-state-focus: rgba(191, 213, 255, 0.15);
+            --md-state-primary-hover: rgba(118, 255, 51, 0.1);
+            
             --shape-l: 24px;
-            --shape-m: 12px;
-            --shape-s: 4px;
+            --shape-m: 16px;
+            --shape-s: 16px; 
             
-            /* Assets */
-            --hull: #80cbc4; 
-            --turret: #ffcc80; 
-            --scene: #ffab91; 
+            --hull: var(--tanki-green); 
+            --turret: var(--tanki-green); 
+            --scene: var(--tanki-orange); 
+        }
+
+        .material-symbols-rounded {
+            font-family: 'Material Symbols Rounded', sans-serif;
+            font-size: 24px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        /* HARD LOCKED DOM ROOT - FIXES VIEWPORT BUGS */
+        html, body {
+            width: 100%; height: 100%;
+            margin: 0; padding: 0;
+            overflow: hidden; 
         }
 
         body { 
-            margin: 0; overflow: hidden; font-family: 'Rubik', 'M PLUS 1p'; 
+            font-family: 'Rubik', 'M PLUS 1p'; 
             background: var(--md-sys-color-background); color: var(--md-sys-color-on-surface); 
             touch-action: none; 
+            position: relative;
         }
         
-        /* Typography */
         h3 { letter-spacing: 0; line-height: 24px; }
         p, span, div { letter-spacing: 0.25px; }
         
-        #top-bar { position: absolute; top: 0; left: 0; right: 0; padding: 24px; background: linear-gradient(to bottom, #00141ee6, transparent); pointer-events: none; z-index: 10; display:flex; flex-direction:column; gap:4px; }
-        .app-title { font-weight: 400; font-size: 22px; color: var(--md-sys-color-on-surface); }
+        #top-bar { 
+            position: absolute; top: 0; left: 0; right: 0; padding: 16px 24px; 
+            background: linear-gradient(to bottom, rgba(0,25,38,0.9), transparent); 
+            z-index: 10; display:flex; justify-content: space-between; align-items: center; 
+            pointer-events: none;
+        }
+        .app-title { font-weight: 500; font-size: 20px; color: var(--md-sys-color-on-surface); text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        .top-bar-actions { display: flex; gap: 12px; pointer-events: auto; }
+        .action-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface);
+            border: 1px solid var(--md-sys-color-outline-variant); box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s;
+        }
+        .action-btn:hover { background: color-mix(in srgb, var(--md-sys-color-surface-container-high), white 10%); transform: scale(1.05); color: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary);}
+        .action-btn .material-symbols-rounded { font-size: 22px; }
 
         #toast { 
             position: absolute; top: 24px; left: 50%; transform: translateX(-50%) translateY(-20px); 
-            background: #2b3135; color: #f1f0f4;
-            padding: 14px 24px; border-radius: 100px; opacity: 0; transition: 0.4s cubic-bezier(0.2,0,0,1); 
-            pointer-events: none; z-index: 200; box-shadow: 0 4px 8px rgba(0,0,0,0.3); font-size: 14px; 
+            background: #2b3135; color: #f1f0f4; padding: 14px 24px; border-radius: 100px; opacity: 0; transition: 0.4s cubic-bezier(0.2,0,0,1); 
+            pointer-events: none; z-index: 300; box-shadow: 0 4px 8px rgba(0,0,0,0.3); font-size: 14px; 
             display:flex; align-items:center; gap:8px; 
+            max-width: 90vw; width: max-content; box-sizing: border-box; text-align: center; word-break: break-word; line-height: 1.4;
         }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        /* M3 FAB (Standard) */
-        #fab { 
-            position: absolute; bottom: 24px; right: 24px; 
-            width: 56px; height: 56px; border-radius: 16px; 
-            background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); 
-            border: none; box-shadow: 0 4px 8px 3px rgba(0,0,0,0.15); 
-            display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; 
-            transition: 0.2s cubic-bezier(0.2,0,0,1); 
+        #drawer-scrim {
+            position: fixed; inset: 0; background: rgba(0, 25, 38, 0.6); 
+            opacity: 0; pointer-events: none; z-index: 80; transition: 0.3s cubic-bezier(0.2,0,0,1);
         }
-        #fab:hover { background: color-mix(in srgb, var(--md-sys-color-primary-container), white 10%); box-shadow: 0 6px 10px 4px rgba(0,0,0,0.2); transform:scale(1.02); }
-        #fab svg { width: 24px; fill: currentColor; }
+        #drawer-scrim.show { opacity: 1; pointer-events: auto; }
 
-        /* M3 FAB (Screenshot) */
-        #fab-cam { 
-            position: absolute; bottom: 96px; right: 24px; 
-            width: 56px; height: 56px; border-radius: 16px; 
-            background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); 
-            border: 1px solid var(--md-sys-color-outline-variant); box-shadow: 0 4px 8px 3px rgba(0,0,0,0.15); 
-            display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; 
-            transition: 0.2s cubic-bezier(0.2,0,0,1); 
-        }
-        #fab-cam:hover { background: color-mix(in srgb, var(--md-sys-color-surface-container-high), white 10%); box-shadow: 0 6px 10px 4px rgba(0,0,0,0.2); transform:scale(1.02); }
-        #fab-cam svg { width: 24px; fill: currentColor; }
-
-        /* M3 Navigation Drawer */
         #drawer { 
             position: absolute; top: 0; right: 0; bottom: 0; width: 360px; max-width: 95vw; 
             background: var(--md-sys-color-surface-container-low); 
             border-top-left-radius: var(--shape-l); border-bottom-left-radius: var(--shape-l);
-            display: none; z-index: 90; 
+            display: flex; z-index: 90; 
             flex-direction: column; box-shadow: -4px 0 12px rgba(0,0,0,0.3);
-            border-left: 1px solid rgba(255,255,255,0.05);
+            border-left: 1px solid rgba(191, 213, 255, 0.05);
+            transform: translateX(100%); opacity: 0; visibility: hidden;
+            transition: transform 0.3s cubic-bezier(0.2,0,0,1), opacity 0.3s, visibility 0.3s;
         }
-        #drawer.open { display: flex; }
+        #drawer.open { transform: translateX(0); opacity: 1; visibility: visible; }
+
+        #drawer-handle { display: none; }
+
+        @media (max-width: 768px) {
+            #top-bar { padding: 12px 16px; }
+            #btn-menu { display: none; } 
+
+            #drawer-handle {
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                height: 48px; flex-shrink: 0; cursor: grab;
+                background: var(--md-sys-color-surface-container-low);
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+                border-top-left-radius: var(--shape-l);
+                border-top-right-radius: var(--shape-l);
+            }
+            #drawer-handle:active { cursor: grabbing; }
+            .handle-pill { width: 40px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.3); margin-bottom: 6px; }
+            .handle-lbl { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); letter-spacing: 0.5px; text-transform: uppercase;}
+            
+            #drawer {
+                top: auto; bottom: 0; left: 0; right: 0;
+                width: 100%; max-width: none; height: 65vh;
+                border-radius: var(--shape-l) var(--shape-l) 0 0;
+                border-left: none; border-top: 1px solid rgba(191, 213, 255, 0.05);
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+                transform: translateY(calc(100% - 48px)); 
+                opacity: 1; visibility: visible; 
+            }
+            #drawer.open { transform: translateY(0); }
+        }
         
-        /* M3 Segmented Button (Tabs) */
-        .tab-group { 
-            display: flex; margin: 16px; 
-            border: 1px solid var(--md-sys-color-outline); 
-            border-radius: 100px; overflow: hidden; height: 40px;
-            flex-shrink: 0;
+        .unified-toolbar { 
+            display: flex; align-items: center; padding: 12px 16px; gap: 8px; 
+            background: var(--md-sys-color-surface-container); 
+            border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;
         }
-        .tab-btn { 
-            flex: 1; display: flex; align-items: center; justify-content: center;
-            font-size: 14px; font-weight: 500; cursor: pointer; color: var(--md-sys-color-on-surface-variant); 
-            transition: 0.2s; letter-spacing: 0.1px;
-            border-right: 1px solid var(--md-sys-color-outline);
-            position: relative;
+        .toolbar-btn {
+            flex: 1; height: 44px; display: flex; align-items: center; justify-content: center;
+            border-radius: var(--shape-s); border: 1px solid var(--md-sys-color-outline-variant); 
+            background: transparent; color: var(--md-sys-color-on-surface-variant); 
+            cursor: pointer; transition: 0.2s; box-sizing: border-box; position: relative;
         }
-        .tab-btn:last-child { border-right: none; }
-        .tab-btn.active { 
-            background: var(--md-sys-color-primary-container); 
-            color: var(--md-sys-color-on-primary-container); 
-        }
-        .tab-btn:hover:not(.active) { background: var(--md-state-hover); color: var(--md-sys-color-on-surface); }
+        .toolbar-btn .material-symbols-rounded { font-size: 22px; }
+        .toolbar-btn:hover { background: var(--md-state-hover); color: var(--md-sys-color-on-surface); }
+        .toolbar-btn.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--md-sys-color-primary); }
         
-        .drawer-content { flex: 1; overflow-y: auto; padding: 0 16px 20px; display: none; }
+        .toolbar-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px; }
+        
+        .toolbar-btn.action-btn.export { color: var(--md-sys-color-primary); }
+        .toolbar-btn.action-btn.export:hover { background: rgba(118,255,51,0.08); }
+        .toolbar-btn.action-btn.clear { color: var(--tanki-salmon); }
+        .toolbar-btn.action-btn.clear:hover { background: rgba(255,102,102,0.08); }
+
+        .drawer-content { flex: 1; overflow-y: auto; padding: 16px 16px 20px; display: none; }
         .drawer-content.active { display: block; }
 
-        /* M3 Outlined Card */
         .m3-card { 
-            background: transparent; 
-            border: 1px solid var(--md-sys-color-outline-variant);
-            border-radius: var(--shape-m); 
-            padding: 16px; margin-bottom: 16px; 
-            transition: 0.2s;
-            position: relative;
+            background: transparent; border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--shape-m); padding: 16px; margin-bottom: 16px; transition: 0.2s;
         }
         .m3-card:hover { border-color: var(--md-sys-color-outline); }
 
-        .card-title { 
-            font-size: 11px; font-weight: 500; letter-spacing: 0.5px; 
-            text-transform: uppercase; margin-bottom: 16px; 
-            display:flex; align-items:center; gap:8px; opacity: 0.9;
-        }
+        .card-title { font-size: 11px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; display:flex; align-items:center; gap:8px; opacity: 0.9;}
+
+        .control-col { display: flex; flex-direction: column; gap: 8px; }
+        .icon-grid-wrapper { display: flex; flex-direction: column; gap: 6px; position: relative; margin-bottom: 8px; }
+        .icon-grid-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+        .icon-grid-label { font-size: 11px; font-weight: 500; color: var(--md-sys-color-on-surface-variant); letter-spacing: 0.5px; text-transform: uppercase; }
+        .selection-text { font-size: 13px; font-weight: 600; text-transform: capitalize; }
+        .icon-grid { display: flex; flex-wrap: wrap; gap: 8px; }
         
-        .slot-display { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
-        .slot-icon { 
-            width: 56px; height: 56px; border-radius: 16px; 
-            background: var(--md-sys-color-surface-container-highest); 
-            display: flex; align-items: center; justify-content: center; 
-            color: var(--md-sys-color-on-surface-variant); 
+        .icon-grid-btn {
+            width: 48px; height: 48px; background: var(--md-sys-color-surface-container-highest);
+            border: 2px solid transparent; border-radius: var(--shape-s);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.2s cubic-bezier(0.2,0,0,1); color: var(--md-sys-color-on-surface-variant); 
+            padding: 8px; box-sizing: border-box; user-select: none;
         }
-        .slot-icon svg { width: 28px; fill: currentColor; }
-        .slot-text h3 { margin: 0; font-size: 16px; font-weight: 400; color: var(--md-sys-color-on-surface); }
-        .slot-text p { margin: 4px 0 0; font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+        .icon-grid-btn:hover { background: var(--md-state-hover); transform: translateY(-2px); }
+        .icon-grid-btn.selected { border-color: var(--md-sys-color-primary); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+        .icon-grid-btn svg, .icon-grid-btn img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .icon-grid-btn svg { fill: currentColor; }
+        .icon-grid-btn.text-btn { width: auto; min-width: 48px; padding: 0 16px; font-size: 13px; font-weight: 500; }
 
-        /* --- M3 Custom Select --- */
-        .control-col { display: flex; flex-direction: column; gap: 16px; }
+        #box-hull .icon-grid-label, #box-hull-skin .icon-grid-label, #box-hull .selection-text, #box-hull-skin .selection-text { color: var(--hull); }
+        #box-hull .icon-grid-btn.selected, #box-hull-skin .icon-grid-btn.selected { border-color: var(--hull); background: rgba(118, 255, 51, 0.15); color: var(--hull); }
+        #box-turret .icon-grid-label, #box-turret-skin .icon-grid-label, #box-turret .selection-text, #box-turret-skin .selection-text { color: var(--turret); }
+        #box-turret .icon-grid-btn.selected, #box-turret-skin .icon-grid-btn.selected { border-color: var(--turret); background: rgba(118, 255, 51, 0.15); color: var(--turret); }
+        #box-scene .icon-grid-label, #box-scene .selection-text { color: var(--scene); }
+        #box-scene .icon-grid-btn.selected { border-color: var(--scene); background: rgba(255, 128, 0, 0.15); color: var(--scene); }
 
-        .m3-custom-select {
-            position: relative;
-            background: var(--md-sys-color-surface-container-highest);
-            border-radius: 4px 4px 0 0;
-            height: 56px;
-            border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .m3-custom-select:hover { background: color-mix(in srgb, var(--md-sys-color-surface-container-highest), white 5%); }
-        .m3-custom-select::after {
-            content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px;
-            background: var(--md-sys-color-primary); transform: scaleX(0); transition: 0.2s;
-            z-index: 2;
-        }
-        .m3-custom-select.active::after { transform: scaleX(1); }
-
-        .select-label {
-            position: absolute; top: 8px; left: 52px;
-            font-size: 12px; color: var(--md-sys-color-primary);
-            pointer-events: none; letter-spacing: 0.4px;
-        }
-        
-        .select-trigger {
-            display: flex; align-items: center; width: 100%; height: 100%;
-            padding: 20px 16px 4px; box-sizing: border-box;
-        }
-        
-        .select-icon-box {
-            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-        }
-        /* Keep original colors for IMG tags, keep styles for SVG */
-        .select-icon-box svg, .select-icon-box img { width: 100%; height: 100%; object-fit: contain; } 
-        
-        .select-text {
-            margin-left: 36px; font-size: 16px; color: var(--md-sys-color-on-surface);
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
-        }
-        .select-arrow {
-            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-            color: var(--md-sys-color-on-surface-variant);
-            transition: transform 0.2s;
-            display: flex; align-items: center; justify-content: center;
-            width: 24px; height: 24px; pointer-events: none;
-        }
-        .select-arrow svg { fill: currentColor; width: 24px; height: 24px; }
-        .m3-custom-select.active .select-arrow { transform: translateY(-50%) rotate(180deg); }
-
-        /* Dropdown Menu */
-        .m3-options-panel {
-            display: none; position: absolute; top: 100%; left: 0; right: 0;
-            background: var(--md-sys-color-surface-container-high);
-            border-radius: 0 0 8px 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            max-height: 280px; overflow-y: auto;
-            z-index: 200; margin-top: 1px;
-            padding: 4px 0;
-        }
-        .m3-options-panel.show { display: block; animation: slideDown 0.15s ease-out; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-
-        .m3-option-row {
-            display: flex; align-items: center; gap: 12px;
-            padding: 10px 16px;
-            cursor: pointer; transition: 0.1s;
-            color: var(--md-sys-color-on-surface);
-        }
-        .m3-option-row:hover, .m3-option-row.selected {
-            background: var(--md-state-hover);
-        }
-        .m3-option-row.selected { 
-            background: var(--md-sys-color-surface-container-highest); 
-            color: var(--md-sys-color-primary); 
-        }
-        /* Force color change only for inline SVG (equipment), not for IMG (skin) to protect skin colors */
-        .m3-option-row.selected .opt-icon svg { fill: var(--md-sys-color-primary); }
-
-        .opt-icon { width: 28px; height: 28px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; }
-        .opt-icon svg, .opt-icon img { width: 100%; height: 100%; object-fit: contain; }
-
-        /* Hidden Native Select */
+        .icon-grid-wrapper.loading::after { content: ''; position: absolute; inset: -4px; background: rgba(0, 25, 38, 0.7); border-radius: var(--shape-s); z-index: 10; }
+        .icon-grid-wrapper.loading::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--md-sys-color-primary); border-radius: 50%; animation: spin 1s linear infinite; z-index: 11; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .native-select-hidden { display: none; }
 
-        .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--md-sys-color-primary); border-radius: 50%; animation: spin 1s linear infinite; position: absolute; right: 16px; top: 20px; display: none; background:var(--md-sys-color-surface-container-highest); z-index:2;}
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .m3-custom-select.loading .spinner { display: block; }
-
-        /* Animation chip selector */
-        .anim-chip-row {
-            display: flex; flex-wrap: wrap; gap: 8px;
-            padding-top: 4px;
-        }
-        .anim-chip-label {
-            width:100%; font-size: 11px; font-weight:500; letter-spacing:0.5px;
-            text-transform:uppercase; color: var(--md-sys-color-outline);
-            margin-bottom: 2px;
-        }
-        .anim-chip {
-            position: relative; overflow: hidden;
-            font-family: inherit;
-            font-size: 12px; font-weight:500; letter-spacing:0.2px;
-            padding: 6px 12px; border-radius: 8px;
-            border: 1px solid var(--md-sys-color-outline-variant);
-            background: transparent; color: var(--md-sys-color-on-surface-variant);
-            cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-            display:inline-flex; align-items:center; gap:6px;
-            text-transform: capitalize;
-            -webkit-user-select: none; user-select: none;
-            touch-action: manipulation;
-        }
-        /* Border Progress Bar */
-        .anim-chip .chip-bar {
-            position: absolute;
-            inset: -1.5px;
-            border-radius: inherit;
-            padding: 1.5px;
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
-            opacity: 0;
-        }
-        .anim-chip.active {
-            background: var(--md-sys-color-primary-container);
-            color: var(--md-sys-color-on-primary-container);
-            border-color: var(--md-sys-color-primary-container);
-        }
-        .anim-chip.active .chip-bar {
-            opacity: 1;
-            background: conic-gradient(var(--md-sys-color-primary) var(--p, 0%), transparent 0);
-        }
-        /* Loop Mode Progress */
-        .anim-chip.looping .chip-bar {
-            background: conic-gradient(from var(--ang, 0deg), transparent 0deg, var(--md-sys-color-primary) 45deg, transparent 55deg);
-        }
-        /* Loop indicator infinity symbol */
-        .anim-chip.looping::after {
-            content: "∞";
-            position: absolute; top:2px; right:6px;
-            font-size: 9px; line-height:1;
-            opacity: 0.7;
-            z-index: 1;
-        }
-        .anim-chip .chip-dot {
-            width:6px; height:6px; border-radius:50%;
-            background: currentColor; opacity:0.6;
-            position: relative; z-index:1;
-        }
-        .anim-chip .chip-text {
-            position: relative; z-index:1;
-        }
+        .anim-chip-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+        .anim-chip-label { width:100%; font-size: 11px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; color: var(--md-sys-color-outline-variant); margin-bottom: 2px; }
+        .anim-chip { position: relative; font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); cursor: pointer; transition: 0.15s; display:inline-flex; align-items:center; gap:6px; text-transform: capitalize; user-select: none; touch-action: manipulation; }
+        .anim-chip .chip-bar { position: absolute; inset: -3px; border-radius: 11px; padding: 3px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0; z-index: 2; }
+        .anim-chip.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--md-sys-color-primary-container); }
+        .anim-chip.active .chip-bar { opacity: 1; background: conic-gradient(var(--md-sys-color-primary) var(--p, 0%), transparent 0); }
+        .anim-chip.looping .chip-bar { background: conic-gradient(from var(--ang, 0deg), transparent 0deg, var(--md-sys-color-primary) 45deg, transparent 55deg); }
+        .anim-chip.looping::after { content: "∞"; position: absolute; top:2px; right:6px; font-size: 9px; opacity: 0.7; z-index: 1; }
+        .anim-chip .chip-dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:0.6; position: relative; z-index:1; }
+        .anim-chip .chip-text { position: relative; z-index:1; }
         .anim-chip:not(.active) .chip-dot { opacity:0; }
-        .anim-chip.pressing {
-            transform: scale(0.96);
-        }
+        .anim-chip.pressing { transform: scale(0.96); }
 
-        /* M3 Switch */
-        .beta-toggle { 
-            display: flex; align-items: center; justify-content: space-between; 
-            padding: 8px 0; cursor: pointer; user-select: none; margin-bottom:8px;
-        }
+        .beta-toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; cursor: pointer; user-select: none; margin-bottom:8px; }
         .beta-label { font-size: 14px; font-weight: 500; color: var(--md-sys-color-on-surface); }
-        .beta-switch { 
-            width: 52px; height: 32px; 
-            background: var(--md-sys-color-surface-container-highest); 
-            border: 2px solid var(--md-sys-color-outline);
-            border-radius: 100px; position: relative; transition: 0.2s; box-sizing: border-box;
-        }
-        .beta-switch::after { 
-            content: ''; position: absolute; top: 50%; left: 6px; transform: translateY(-50%);
-            width: 16px; height: 16px; 
-            background: var(--md-sys-color-outline); border-radius: 50%; transition: 0.2s cubic-bezier(0.2, 0, 0, 1.3); 
-        }
-        /* Switch Active State */
-        .beta-toggle.active .beta-switch { 
-            background: var(--md-sys-color-primary); 
-            border-color: var(--md-sys-color-primary); 
-        }
-        .beta-toggle.active .beta-switch::after { 
-            background: var(--md-sys-color-on-primary); 
-            width: 24px; height: 24px; left: calc(100% - 28px); 
-        }
+        .beta-switch { width: 52px; height: 32px; background: var(--md-sys-color-surface-container-highest); border: 2px solid var(--md-sys-color-outline-variant); border-radius: 100px; position: relative; transition: 0.2s; box-sizing: border-box; }
+        .beta-switch::after { content: ''; position: absolute; top: 50%; left: 6px; transform: translateY(-50%); width: 16px; height: 16px; background: var(--md-sys-color-outline); border-radius: 50%; transition: 0.2s cubic-bezier(0.2, 0, 0, 1.3); }
+        .beta-toggle.active .beta-switch { background: var(--scene); border-color: var(--scene); }
+        .beta-toggle.active .beta-switch::after { background: var(--md-sys-color-on-primary); width: 24px; height: 24px; left: calc(100% - 28px); }
         
         #group-scene { display: none; margin-top: 10px; border-style:dashed; }
         #group-scene.visible { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
 
-        /* Footer */
-        .footer { padding: 24px 16px; background: var(--md-sys-color-surface-container); display: flex; flex-direction: column; gap: 12px; margin-top: auto; flex-shrink: 0;}
-        
-        /* M3 Filled Button */
-        .btn-filled { 
-            width: 100%; height: 40px; border: none; border-radius: 20px; 
-            background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); 
-            font-weight: 500; font-size: 14px; letter-spacing: 0.1px;
-            cursor: pointer; display: flex; justify-content: center; align-items: center; 
-            transition: 0.2s; 
-        }
-        .btn-filled:hover { background: color-mix(in srgb, var(--md-sys-color-primary), black 8%); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-        .btn-filled svg { width: 18px; margin-right: 8px; fill: currentColor; }
-        
-        /* M3 Text Button */
-        .btn-text { 
-            background: transparent; color: var(--md-sys-color-primary); 
-            border: none; height: 40px; border-radius: 20px; 
-            cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s; 
-        }
-        .btn-text:hover { background: var(--md-state-primary-hover); }
-        
-        /* Error State */
-        .btn-text.error { color: #ffb4ab; margin-top: 12px; width: 100%; }
-        .btn-text.error:hover { background: rgba(255, 180, 171, 0.08); }
+        .btn-text { background: transparent; border: none; height: 36px; padding: 0 16px; border-radius: 18px; cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s; }
+        .btn-text.error { color: var(--tanki-salmon); margin-top: 4px; width: 100%; border: 1px solid var(--md-sys-color-outline-variant); }
+        .btn-text.error:hover { background: rgba(255, 102, 102, 0.08); border-color: var(--tanki-salmon); }
 
-        /* Normal Mode List */
         .file-list { border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--shape-s); overflow: hidden; margin-top:10px; }
-        .file-item { padding: 12px; border-bottom: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); font-size: 13px; display:flex; gap:8px; align-items:center; }
+        .file-item { padding: 12px; border-bottom: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); font-size: 13px; display:flex; gap:12px; align-items:center; }
+        .file-item .material-symbols-rounded { font-size: 20px; color: var(--md-sys-color-outline-variant); }
         
-        /* Outlined Button (Add File) */
-        .btn-add-file { 
-            position: relative; width: 100%; padding: 10px; 
-            border: 1px solid var(--md-sys-color-outline); border-radius: 20px;
-            color: var(--md-sys-color-primary); text-align: center; font-size: 14px; font-weight: 500;
-            cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
-            transition: 0.2s; box-sizing: border-box;
-        }
-        .btn-add-file:hover { background: var(--md-state-primary-hover); border-color: var(--md-sys-color-primary); }
+        .btn-add-file { position: relative; width: 100%; padding: 12px; border: 1px solid var(--md-sys-color-outline); border-radius: var(--shape-s); color: var(--md-sys-color-outline); text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; transition: 0.2s; box-sizing: border-box; }
+        .btn-add-file:hover { background: var(--md-state-hover); border-color: var(--md-sys-color-on-surface); color: var(--md-sys-color-on-surface); }
+        .btn-add-file .material-symbols-rounded { margin-right: 8px; font-size: 20px; }
         .btn-add-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
-        /* Log Box */
-        .log-box { 
-            font-family: 'Consolas', monospace; font-size: 11px; color: #90A4AE; 
-            background: #111; padding: 10px; border-radius: 4px;
-            height: 100px; overflow-y: auto; margin-bottom: 10px; display:none;
-        }
+        .log-box { font-family: 'Consolas', monospace; font-size: 11px; color: var(--md-sys-color-outline); background: #000; padding: 10px; border-radius: var(--shape-s); height: 100px; overflow-y: auto; margin-bottom: 10px; display:none; }
         .log-line { margin-bottom: 2px; border-bottom: 1px solid #222; padding-bottom: 2px; }
-        .log-ok { color: #76FF33; }
+        .log-ok { color: var(--md-sys-color-primary); }
 
-        ::-webkit-scrollbar { width: 4px; } 
+        ::-webkit-scrollbar { width: 6px; } 
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #546E7A; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: var(--md-sys-color-surface-container-highest); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--md-sys-color-outline-variant); }
+
+        #dialog-scrim {
+            position: fixed; inset: 0; background: rgba(0, 25, 38, 0.8);
+            opacity: 0; pointer-events: none; z-index: 400; transition: 0.3s ease;
+        }
+        #dialog-scrim.show { opacity: 1; pointer-events: auto; }
+        
+        .m3-dialog {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95);
+            width: 320px; max-width: 90vw; background: var(--md-sys-color-surface-container-highest);
+            border-radius: var(--shape-l); padding: 24px; z-index: 410;
+            opacity: 0; pointer-events: none; transition: 0.3s cubic-bezier(0.2,0,0,1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 16px; box-sizing: border-box;
+        }
+        .m3-dialog.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+        .m3-dialog-title { font-size: 20px; font-weight: 500; color: var(--md-sys-color-on-surface); margin: 0; }
+        .m3-dialog-desc { font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin: 0; line-height: 1.5; }
+        .m3-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+        
+        .dialog-btn {
+            background: transparent; border: none; padding: 10px 16px; border-radius: 100px;
+            font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s;
+        }
+        .dialog-btn.cancel { color: var(--md-sys-color-outline); }
+        .dialog-btn.cancel:hover { background: var(--md-state-hover); color: var(--md-sys-color-on-surface); }
+        .dialog-btn.confirm { color: var(--tanki-dark); background: var(--tanki-green); }
+        .dialog-btn.confirm:hover { background: color-mix(in srgb, var(--tanki-green), white 15%); }
+        .dialog-btn.danger { color: #fff; background: var(--tanki-salmon); }
+        .dialog-btn.danger:hover { background: color-mix(in srgb, var(--tanki-salmon), white 15%); }
     </style>
     <script type="importmap">
         { 
@@ -413,47 +311,76 @@
         }
     </script>
 </head>
-<body class="fouc-loading">
+<body class="fouc-loading drawer-open">
 
+    <!-- Top Action Bar -->
     <div id="top-bar">
         <div class="app-title" id="t-app-title">Model showcase</div>
+        <div class="top-bar-actions">
+            <button id="btn-cam" class="action-btn" title="4K Screenshot">
+                <span class="material-symbols-rounded">photo_camera</span>
+            </button>
+            <button id="btn-menu" class="action-btn" title="Menu" onclick="window.toggleDrawer()">
+                <span class="material-symbols-rounded">menu</span>
+            </button>
+        </div>
     </div>
-    <div id="toast"><span>Ready</span></div>
-    
-    <button id="fab-cam" title="4K Screenshot"><svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg></button>
-    <button id="fab"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
 
+    <div id="toast"><span>Ready</span></div>
+
+    <!-- Modals & Scrims -->
+    <div id="drawer-scrim" onclick="window.toggleDrawer()"></div>
+    <div id="dialog-scrim"></div>
+    
+    <div id="m3-dialog" class="m3-dialog">
+        <h3 class="m3-dialog-title" id="dialog-title">Title</h3>
+        <p class="m3-dialog-desc" id="dialog-desc">Desc</p>
+        <div class="m3-dialog-actions">
+            <button class="dialog-btn cancel" id="dialog-cancel">Cancel</button>
+            <button class="dialog-btn confirm" id="dialog-confirm">Confirm</button>
+        </div>
+    </div>
+
+    <!-- Right Drawer / Bottom Sheet -->
     <div id="drawer" class="open">
-        <div class="tab-group">
-            <div class="tab-btn" onclick="switchMode('assembly')" id="t-tab-assembly">Tank Assembly</div>
-            <div class="tab-btn" onclick="switchMode('normal')" id="t-tab-normal">Local File</div>
+        <!-- Mobile drag handle -->
+        <div id="drawer-handle" onclick="window.toggleDrawer()">
+            <div class="handle-pill"></div>
+            <span class="handle-lbl" id="t-handle-lbl">Menu & Equip</span>
+        </div>
+
+        <!-- 4 Buttons in one unified toolbar row using Material Symbols -->
+        <div class="unified-toolbar">
+            <button class="toolbar-btn tab-btn active" onclick="switchMode('assembly')" id="tab-btn-assembly" title="Tank Assembly">
+                <span class="material-symbols-rounded">widgets</span>
+            </button>
+            <button class="toolbar-btn tab-btn" onclick="switchMode('normal')" id="tab-btn-normal" title="Local File">
+                <span class="material-symbols-rounded">folder_open</span>
+            </button>
+            
+            <div class="toolbar-divider"></div>
+            
+            <button class="toolbar-btn action-btn export" id="btn-export" title="Export GLB">
+                <span class="material-symbols-rounded">download</span>
+            </button>
+            <button class="toolbar-btn action-btn clear" id="btn-clear" title="Clear All Objects">
+                <span class="material-symbols-rounded">delete</span>
+            </button>
         </div>
 
         <!-- Assembly Mode -->
-        <div id="panel-assembly" class="drawer-content">
-            <div style="height:20px"></div>
-
+        <div id="panel-assembly" class="drawer-content active">
             <!-- Hull Card -->
             <div class="m3-card">
                 <div class="card-title" style="color:var(--hull)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M2 3L3 2H7L8 3H16V5H6V6H10L12 8H15L16 9V11L14 13H2L0 11V8L2 6V3Z" fill="currentColor"/>
                     </svg>
                     <span id="t-hull-title">Hull</span>
                 </div>
-                <!-- Controls -->
                 <div class="control-col">
-                    <!-- Hull Model Select -->
-                    <div id="box-hull" class="m3-custom-select-container">
-                        <select id="sel-hull-name" class="native-select-hidden"><option>Loading...</option></select>
-                    </div>
-
-                    <!-- Hull Skin Select -->
-                    <div id="box-hull-skin" class="m3-custom-select-container">
-                        <select id="sel-hull-skin" class="native-select-hidden"><option>-</option></select>
-                    </div>
-
-                    <!-- Hull Animations (dynamically populated) -->
+                    <div id="box-hull"><select id="sel-hull-name" class="native-select-hidden"></select></div>
+                    <div id="box-hull-skin"><select id="sel-hull-skin" class="native-select-hidden"></select></div>
                     <div id="box-hull-anim" class="anim-chip-row" style="display:none;"></div>
                 </div>
             </div>
@@ -461,23 +388,14 @@
             <!-- Turret Card -->
             <div class="m3-card">
                 <div class="card-title" style="color:var(--turret)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0H7V12H9V0H11V6L14 9V13L11 16V16H9H7H5V16L2 13V9L5 6V0Z" fill="currentColor"/>
                     </svg>
                     <span id="t-turret-title">Turret</span>
                 </div>
-                <!-- Controls -->
                 <div class="control-col">
-                    <!-- Turret Model Select -->
-                    <div id="box-turret" class="m3-custom-select-container">
-                        <select id="sel-turret-name" class="native-select-hidden"><option>Loading...</option></select>
-                    </div>
-                    <!-- Turret Skin Select -->
-                    <div id="box-turret-skin" class="m3-custom-select-container">
-                        <select id="sel-turret-skin" class="native-select-hidden"><option>-</option></select>
-                    </div>
-
-                    <!-- Turret Animations (dynamically populated) -->
+                    <div id="box-turret"><select id="sel-turret-name" class="native-select-hidden"></select></div>
+                    <div id="box-turret-skin"><select id="sel-turret-skin" class="native-select-hidden"></select></div>
                     <div id="box-turret-anim" class="anim-chip-row" style="display:none;"></div>
                 </div>
             </div>
@@ -491,41 +409,23 @@
             <!-- Hidden Scene Card -->
             <div class="m3-card" id="group-scene">
                 <div class="card-title" style="color:var(--scene)" id="t-scene-title">Map / Garage</div>
-                <div class="slot-display">
-                    <div class="slot-text">
-                        <h3 id="display-scene" class="t-scene-display">No Environment</h3>
-                    </div>
-                </div>
                 <div id="scene-log" class="log-box"></div>
                 <div class="control-col">
-                    <div id="box-scene" class="m3-custom-select-container">
-                         <select id="sel-scene-var" class="native-select-hidden"><option>Loading...</option></select>
-                    </div>
+                    <div id="box-scene"><select id="sel-scene-var" class="native-select-hidden"></select></div>
                 </div>
-                <button class="btn-text error t-remove-env" id="btn-clear-scene">Remove Environment</button>
+                <button class="btn-text error t-remove-env" id="btn-clear-scene" style="margin-top: 4px;">Remove Environment</button>
             </div>
-
         </div>
 
         <!-- Normal Mode -->
         <div id="panel-normal" class="drawer-content">
-            <div style="margin: 24px 0 16px;">
-                <label class="btn-add-file">
-                    <svg viewBox="0 0 24 24" style="width:18px;margin-right:8px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    <span id="t-import-btn">Import .a3d / .3ds files</span>
-                    <input type="file" id="in-normal" multiple>
-                </label>
-            </div>
-            <div class="card-title" id="t-res-title">IMPORTED RESOURCES</div>
+            <label class="btn-add-file">
+                <span class="material-symbols-rounded">note_add</span>
+                <span id="t-import-btn">Import .a3d / .3ds files</span>
+                <input type="file" id="in-normal" multiple>
+            </label>
+            <div class="card-title" id="t-res-title" style="color:var(--md-sys-color-outline); margin-top: 16px;">IMPORTED RESOURCES</div>
             <div id="list-normal" class="file-list"></div>
-        </div>
-
-        <div class="footer">
-            <button class="btn-filled" id="btn-export">
-                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                <span id="t-export">Export GLB</span>
-            </button>
-            <button class="btn-text t-clear" id="btn-clear">Clear All Objects</button>
         </div>
     </div>
 
@@ -559,1240 +459,574 @@
     const Dict = {
         zh: {
             appTitle: "3D坦克模型展示",
+            handleLbl: "菜单与装备",
             tabNormal: "本地文件",
             tabAssembly: "坦克组装",
             importBtn: "导入 .a3d / .3ds 文件",
             resTitle: "已导入资源",
             hullTitle: "底盘",
-            hullSub: "选择底盘以装备",
             turretTitle: "炮塔",
-            turretSub: "选择炮塔以装备",
             lblModel: "装备",
             lblSkin: "皮肤",
             lblEnv: "环境",
             betaLabel: "显示环境 (Beta)",
             sceneTitle: "地图 / 车库",
-            sceneDisplay: "无环境",
             removeEnv: "移除环境",
+            exportTitle: "导出 GLB 模型",
+            exportDesc: "确定要将当前场景导出为包含纹理的 GLB 3D 模型吗？",
+            clearTitle: "清空场景",
+            clearDesc: "确定要彻底清空场景中的所有加载对象吗？",
+            btnCancel: "取消",
+            btnConfirm: "确定",
             export: "导出 GLB",
             clear: "清空场景",
             loading: "加载中...",
-            screenshot: "已保存截图"
+            screenshot: "已保存高清截图"
         },
         en: {
-            appTitle: "Tanki Online Model Showcase",
+            appTitle: "Model Showcase",
+            handleLbl: "Menu & Equip",
             tabNormal: "Local File",
             tabAssembly: "Tank Assembly",
             importBtn: "Import .a3d / .3ds files",
             resTitle: "IMPORTED RESOURCES",
             hullTitle: "Hull",
-            hullSub: "Select a hull to equip",
             turretTitle: "Turret",
-            turretSub: "Select a turret to equip",
             lblModel: "Equipment",
             lblSkin: "Skin",
             lblEnv: "Environment",
             betaLabel: "Show Environment (Beta)",
             sceneTitle: "Map / Garage",
-            sceneDisplay: "No Environment",
             removeEnv: "Remove Environment",
+            exportTitle: "Export GLB",
+            exportDesc: "Are you sure you want to export the current scene as a GLB model with textures?",
+            clearTitle: "Clear Scene",
+            clearDesc: "Are you sure you want to completely clear all loaded objects from the scene?",
+            btnCancel: "Cancel",
+            btnConfirm: "Confirm",
             export: "Export GLB",
             clear: "Clear All Objects",
             loading: "Loading...",
-            screenshot: "Screenshot Saved"
+            screenshot: "4K Screenshot Saved"
         }
     };
     const T = Dict[userLang];
 
-    // Apply Static Translations
     function applyI18n() {
         document.getElementById('t-app-title').innerText = T.appTitle;
-        document.getElementById('t-tab-normal').innerText = T.tabNormal;
-        document.getElementById('t-tab-assembly').innerText = T.tabAssembly;
+        document.getElementById('t-handle-lbl').innerText = T.handleLbl;
         document.getElementById('t-import-btn').innerText = T.importBtn;
         document.getElementById('t-res-title').innerText = T.resTitle;
         document.getElementById('t-hull-title').innerText = T.hullTitle;
         document.getElementById('t-turret-title').innerText = T.turretTitle;
         document.getElementById('t-beta-label').innerText = T.betaLabel;
         document.getElementById('t-scene-title').innerText = T.sceneTitle;
-        document.getElementById('t-export').innerText = T.export;
-        
-        document.querySelectorAll('.t-lbl-model').forEach(el => el.innerText = T.lblModel);
-        document.querySelectorAll('.t-lbl-skin').forEach(el => el.innerText = T.lblSkin);
-        document.querySelectorAll('.t-lbl-env').forEach(el => el.innerText = T.lblEnv);
-        document.querySelectorAll('.t-hull-sub').forEach(el => el.innerText = T.hullSub);
-        document.querySelectorAll('.t-turret-sub').forEach(el => el.innerText = T.turretSub);
-        document.querySelectorAll('.t-scene-display').forEach(el => el.innerText = T.sceneDisplay);
         document.querySelectorAll('.t-remove-env').forEach(el => el.innerText = T.removeEnv);
-        document.querySelectorAll('.t-clear').forEach(el => el.innerText = T.clear);
+
+        document.getElementById('tab-btn-assembly').title = T.tabAssembly;
+        document.getElementById('tab-btn-normal').title = T.tabNormal;
+        document.getElementById('btn-export').title = T.export;
+        document.getElementById('btn-clear').title = T.clear;
     }
 
-    // Dynamic Data Translation
     const EN_ACRO = new Set(['XT', 'LC', 'DC', 'GT', 'HD', 'RF', 'SE', 'VT', 'DK', 'SP', 'IC', 'UT', 'PR', 'UFO']);
-    const EN_TERMS = {
-        '万圣节': 'Halloween', '新年': 'New Year', '生日': 'Birthday', 'UFO 日': 'UFO Day',
-        '雪人': 'Snowman', '番茄炮': 'Tomato', '螯': 'Claw', '蜘蛛': 'Spider'
-    };
-
+    const EN_TERMS = { '万圣节': 'Halloween', '新年': 'New Year', '生日': 'Birthday', 'UFO 日': 'UFO Day', '雪人': 'Snowman', '番茄炮': 'Tomato', '螯': 'Claw', '蜘蛛': 'Spider' };
     function formatName(name) {
         let text = name.replace(/_/g, ' ');
-        if(userLang === 'zh') {
-            return text.split(' ').map(part => {
-                const lc = part.toLowerCase();
-                return CNDict[lc] || part;
-            }).join(' ');
-        } else {
-            Object.entries(EN_TERMS).forEach(([zh, en]) => {
-                text = text.replace(new RegExp(zh, 'g'), en);
-            });
-            return text.split(' ').map(s => {
-                const upper = s.toUpperCase();
-                if(EN_ACRO.has(upper)) return upper;
-                return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-            }).join(' ');
-        }
+        if(userLang === 'zh') return text.split(' ').map(part => CNDict[part.toLowerCase()] || part).join(' ');
+        Object.entries(EN_TERMS).forEach(([zh, en]) => { text = text.replace(new RegExp(zh, 'g'), en); });
+        return text.split(' ').map(s => EN_ACRO.has(s.toUpperCase()) ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()).join(' ');
     }
+    function translateDataKey(key) { return formatName(key); }
 
-    function translateDataKey(key) {
-        return formatName(key);
-    }
-
-    // --- Icon Loader Class ---
     const IconLoader = {
         cache: new Map(),
-        
         async getEquipmentIcon(internalName) {
-            let filename = internalName;
-            const lower = internalName.toLowerCase();
+            let filename = internalName; const lower = internalName.toLowerCase();
             if (lower === 'b0-nk') filename = 'bonk';
-            
             const url = `${ICON_BASE_EQUIP}/${filename}.svg`;
-            
             try {
                 if (this.cache.has(url)) return this.cache.get(url);
-                
-                const resp = await fetch(url);
-                if (!resp.ok) throw "Icon 404";
-                let text = await resp.text();
-                
-                text = text.replace(/<\?xml.*?\?>/g, '').replace(/<!DOCTYPE.*?>/g, '');
+                const resp = await fetch(url); if (!resp.ok) throw "Icon 404";
+                let text = await resp.text(); text = text.replace(/<\?xml.*?\?>/g, '').replace(/<!DOCTYPE.*?>/g, '');
                 text = text.replace(/fill="(?!(none|currentColor))[^"]*"/gi, 'fill="currentColor"');
-                
-                if (!text.includes('fill="currentColor"') && !text.includes('fill="none"')) {
-                     text = text.replace('<svg', '<svg fill="currentColor"');
-                }
-                
-                this.cache.set(url, text);
-                return text;
-            } catch (e) {
-                return null;
-            }
+                if (!text.includes('fill="currentColor"') && !text.includes('fill="none"')) { text = text.replace('<svg', '<svg fill="currentColor"'); }
+                this.cache.set(url, text); return text;
+            } catch (e) { return null; }
         },
-
         getSkinIconUrl(skinId) {
-            if(!skinId) return null;
-            const lower = skinId.toLowerCase();
-            
-            if (lower === 'claw' || lower === '螯' || lower === 'spider' || lower === '蜘蛛') 
-                return `${ICON_BASE_EQUIP}/bonk.svg`;
-            
-            if (lower.includes('tomato') || lower.includes('番茄')) 
-                return `${ICON_BASE_EQUIP}/magnum.svg`;
-                
-            if (lower === 'snowman' || lower === '雪人') 
-                return `${ICON_BASE_EQUIP}/freeze.svg`;
-            
-            if (lower === 'default' || lower === '默认') 
-                return `${ICON_BASE_SKIN}/standard.svg`;
-            
-            const isDc = lower.includes('dc') || lower.includes('恶魔');
-            const isOld = lower.includes('old') || lower.includes('旧');
+            if(!skinId) return null; const lower = skinId.toLowerCase();
+            if (lower === 'claw' || lower === '螯' || lower === 'spider' || lower === '蜘蛛') return `${ICON_BASE_EQUIP}/bonk.svg`;
+            if (lower.includes('tomato') || lower.includes('番茄')) return `${ICON_BASE_EQUIP}/magnum.svg`;
+            if (lower === 'snowman' || lower === '雪人') return `${ICON_BASE_EQUIP}/freeze.svg`;
+            if (lower === 'default' || lower === '默认') return `${ICON_BASE_SKIN}/standard.svg`;
+            const isDc = lower.includes('dc') || lower.includes('恶魔'); const isOld = lower.includes('old') || lower.includes('旧');
             if (isDc && isOld) return `${ICON_BASE_SKIN}/DC.svg`;
-
-            let filename = "";
-            if (lower === 'ic') filename = "ICE.svg";
-            else if (lower === 'xt_hd') filename = "XT_HD.svg";
-            else filename = `${skinId.toUpperCase()}.svg`; 
-            
+            let filename = lower === 'ic' ? "ICE.svg" : (lower === 'xt_hd' ? "XT_HD.svg" : `${skinId.toUpperCase()}.svg`); 
             return `${ICON_BASE_SKIN}/${filename}`;
         }
     };
 
-    // State
     let currentMode = 'assembly'; 
     const slots = { hull: null, turret: null, scene: null };
-    const pools = { hull:[], turret:[] };
-    // Record active clip names for each slot
-    const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
-    let assetsData = null; 
-    
-    // Scene Lib
-    const sceneLib = { tex: new Map(), meshes:[] };
-    const logBox = document.getElementById('scene-log');
+    const pools = { hull:[], turret:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
+    let assetsData = null; const sceneLib = { tex: new Map(), meshes:[] }; const logBox = document.getElementById('scene-log');
+    let normalMeshes = [], normalTextures =[]; let mountPos = null;
 
-    let normalMeshes = [], normalTextures =[];
+    let swipeStartY = 0, currentSwipeY = 0;
 
-    // Helpers
-    let mountPos = null;
-
-    // Scene
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x001926);
-    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 1, 1e6); camera.position.set(150,150,150);
-    // preserveDrawingBuffer is key for taking screenshot via toDataURL
+    const camera = new THREE.PerspectiveCamera(45, 1, 1, 1e6); camera.position.set(150,150,150);
     const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer: true}); 
-    renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio); 
-    renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(devicePixelRatio); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping=true;
     
     const root = new THREE.Group(); root.rotation.set(-Math.PI/2, 0, 0); scene.add(root);
-    const groupNormal = new THREE.Group();
-    const groupAssembly = new THREE.Group();
-    groupNormal.visible = false;
-    groupAssembly.visible = true; 
-    root.add(groupNormal);
-    root.add(groupAssembly);
+    const groupNormal = new THREE.Group(); const groupAssembly = new THREE.Group();
+    groupNormal.visible = false; groupAssembly.visible = true; root.add(groupNormal); root.add(groupAssembly);
+    const lg = new THREE.Group(); scene.add(lg); lg.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun); lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
-    const lg = new THREE.Group(); scene.add(lg);
-    lg.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun);
-    lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
+    // Improved Resize Handler to fix mobile orientation change UI bugs
+    window.addEventListener('resize', () => {
+        const updateLayout = () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            if (w === 0 || h === 0) return;
+            
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            
+            // Clear mobile swipe inline styles to prevent layout breaks on orientation change
+            const drawerEl = document.getElementById('drawer');
+            if (drawerEl) {
+                drawerEl.style.transform = '';
+                drawerEl.style.transition = '';
+            }
+            swipeStartY = 0;
+            currentSwipeY = 0;
+        };
+        updateLayout();
+        setTimeout(updateLayout, 150); 
+        setTimeout(updateLayout, 500); 
+    });
+    // Trigger layout init immediately
+    window.dispatchEvent(new Event('resize'));
 
-    window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
-
-    // ====== ANIMATION STATE ======
-    // Each loaded Group holds its own AnimationMixer, allowing multiple objects to animate simultaneously
-    const activeMixers = new Set();
-    const DEG = Math.PI/180;
-    const clock = new THREE.Clock();
+    const activeMixers = new Set(); const DEG = Math.PI/180; const clock = new THREE.Clock();
 
     function animate(){
         requestAnimationFrame(animate);
-        const dt = clock.getDelta();
-        for(const m of activeMixers) m.update(dt);
-        updateChipProgress();
-        lg.quaternion.copy(camera.quaternion);
-        controls.update();
-        renderer.render(scene,camera);
+        const dt = clock.getDelta(); for(const m of activeMixers) m.update(dt); updateChipProgress();
+        lg.quaternion.copy(camera.quaternion); controls.update(); renderer.render(scene,camera);
     }
     animate();
 
     function disposeMixer(grp){
-        if(!grp || !grp.userData.mixer) return;
-        const mx = grp.userData.mixer;
-        // Clear action states belonging to this grp
-        if(grp.userData.animActions){
-            for(const name in grp.userData.animActions){
-                actionState.delete(grp.userData.animActions[name]);
-            }
-        }
-        mx.stopAllAction();
-        mx.uncacheRoot(grp);
-        activeMixers.delete(mx);
-        grp.userData.mixer = null;
-        grp.userData.animActions = null;
+        if(!grp || !grp.userData.mixer) return; const mx = grp.userData.mixer;
+        if(grp.userData.animActions){ for(const name in grp.userData.animActions) actionState.delete(grp.userData.animActions[name]); }
+        mx.stopAllAction(); mx.uncacheRoot(grp); activeMixers.delete(mx); grp.userData.mixer = null; grp.userData.animActions = null;
     }
 
-    // Unwrap rotation angle tracks: if adjacent frames differ by more than 180 degrees, 
-    // add/subtract 360 degrees to subsequent frames to avoid quaternion SLERP taking the shortest path in reverse.
     function unwrapAngleTrack(keys){
-        if(!keys || keys.length<2) return keys;
-        const out = keys.map(k => [k[0], k[1]]);
-        let offset = 0;
-        for(let i=1;i<out.length;i++){
-            const prev = out[i-1][1]; 
-            let cur = out[i][1] + offset;
-            let diff = cur - prev;
-            while(diff > 180)  { cur -= 360; offset -= 360; diff -= 360; }
-            while(diff < -180) { cur += 360; offset += 360; diff += 360; }
-            out[i][1] = cur;
-        }
-        return out;
+        if(!keys || keys.length<2) return keys; const out = keys.map(k => [k[0], k[1]]); let offset = 0;
+        for(let i=1;i<out.length;i++){ const prev = out[i-1][1]; let cur = out[i][1] + offset; let diff = cur - prev; while(diff > 180)  { cur -= 360; offset -= 360; diff -= 360; } while(diff < -180) { cur += 360; offset += 360; diff += 360; } out[i][1] = cur; } return out;
     }
-
     function linearSample(keys, t){
-        if(!keys || keys.length===0) return 0;
-        if(t <= keys[0][0]) return keys[0][1];
-        if(t >= keys[keys.length-1][0]) return keys[keys.length-1][1];
-        for(let i=1;i<keys.length;i++){
-            if(t <= keys[i][0]){
-                const t1=keys[i-1][0], v1=keys[i-1][1];
-                const t2=keys[i][0],   v2=keys[i][1];
-                const a=(t-t1)/((t2-t1)||1);
-                return v1 + (v2-v1)*a;
-            }
-        }
-        return keys[keys.length-1][1];
+        if(!keys || keys.length===0) return 0; if(t <= keys[0][0]) return keys[0][1]; if(t >= keys[keys.length-1][0]) return keys[keys.length-1][1];
+        for(let i=1;i<keys.length;i++){ if(t <= keys[i][0]){ const t1=keys[i-1][0], v1=keys[i-1][1]; const t2=keys[i][0], v2=keys[i][1]; const a=(t-t1)/((t2-t1)||1); return v1 + (v2-v1)*a; } } return keys[keys.length-1][1];
     }
-
-    // Check if at least one of the three scalar channels in a group actually changes over time.
-    function groupHasMotion(a, g){
-        return [g.t0, g.t1, g.t2].some(ti => {
-            const ks = a.tracks[ti];
-            if(!ks || ks.length < 2) return false;
-            const v0 = ks[0][1];
-            for(let i=1;i<ks.length;i++){
-                if(Math.abs(ks[i][1] - v0) > 0.001) return true;
-            }
-            return false;
-        });
-    }
-
-    // Check if a flat group merely rewrites the node's rest pose repeatedly.
-    // Such tracks are common placeholder data from exporters; if left in a dynamic clip, 
-    // AnimationMixer will still use it to dilute the result of another action (e.g. crank-l/r locking the opposite crank).
+    function groupHasMotion(a, g){ return [g.t0, g.t1, g.t2].some(ti => { const ks = a.tracks[ti]; if(!ks || ks.length < 2) return false; const v0 = ks[0][1]; for(let i=1;i<ks.length;i++){ if(Math.abs(ks[i][1] - v0) > 0.001) return true; } return false; }); }
     function flatGroupMatchesRestPose(a, g, node){
-        const k0=a.tracks[g.t0], k1=a.tracks[g.t1], k2=a.tracks[g.t2];
-        if(!k0?.length || !k1?.length || !k2?.length) return false;
+        const k0=a.tracks[g.t0], k1=a.tracks[g.t1], k2=a.tracks[g.t2]; if(!k0?.length || !k1?.length || !k2?.length) return false;
         const x=k0[0][1], y=k1[0][1], z=k2[0][1];
-        if(g.N === 1){
-            return Math.abs(node.position.x-x)<=0.02 &&
-                   Math.abs(node.position.y-y)<=0.02 &&
-                   Math.abs(node.position.z-z)<=0.02;
-        }
-        if(g.N === 2){
-            const q = new THREE.Quaternion().setFromEuler(
-                new THREE.Euler(x*DEG, y*DEG, z*DEG, 'ZYX')
-            );
-            // q and -q represent the same rotation; angleTo handles absolute dot product.
-            return q.angleTo(node.quaternion) <= 0.002;
-        }
-        if(g.N === 4){
-            return Math.abs(node.scale.x-x)<=0.002 &&
-                   Math.abs(node.scale.y-y)<=0.002 &&
-                   Math.abs(node.scale.z-z)<=0.002;
-        }
+        if(g.N === 1){ return Math.abs(node.position.x-x)<=0.02 && Math.abs(node.position.y-y)<=0.02 && Math.abs(node.position.z-z)<=0.02; }
+        if(g.N === 2){ const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(x*DEG, y*DEG, z*DEG, 'ZYX')); return q.angleTo(node.quaternion) <= 0.002; }
+        if(g.N === 4){ return Math.abs(node.scale.x-x)<=0.002 && Math.abs(node.scale.y-y)<=0.002 && Math.abs(node.scale.z-z)<=0.002; }
         return false;
     }
-
-    // Generate a three.js KeyframeTrack for a group.
-    // Construct Euler angles using unwrapped angle values for the rotation channel, convert to quaternion, and apply SLERP.
     function buildTracksForGroups(a, groups, nameToNode){
-        const tracks = [];
-        // Deduplicate by (node,N): if multiple groups in the same clip target the same node and channel (rare),
-        // take the animated one; if all are animated, take the first.
-        const seen = new Map();
-        const unWrappedCache = new Map(); // Cache unwrapped data for the rotation channel
-        const getUTrack = (idx, isRot) => {
-            if(!a.tracks[idx]) return null;
-            if(isRot){
-                if(!unWrappedCache.has(idx)) unWrappedCache.set(idx, unwrapAngleTrack(a.tracks[idx]));
-                return unWrappedCache.get(idx);
-            }
-            return a.tracks[idx];
-        };
+        const tracks = []; const seen = new Map(); const unWrappedCache = new Map();
+        const getUTrack = (idx, isRot) => { if(!a.tracks[idx]) return null; if(isRot){ if(!unWrappedCache.has(idx)) unWrappedCache.set(idx, unwrapAngleTrack(a.tracks[idx])); return unWrappedCache.get(idx); } return a.tracks[idx]; };
         for(const g of groups){
-            const node = nameToNode[g.name];
-            if(!node) continue;
-            const key = node.uuid+':'+g.N;
-            if(seen.has(key)) continue;
-            seen.set(key, g);
-
-            const isRot = (g.N === 2);
-            const tr0 = getUTrack(g.t0, isRot && true), tr1 = getUTrack(g.t1, isRot), tr2 = getUTrack(g.t2, isRot);
-            // Aggregate key times
-            const timeSet = new Set();
-            [tr0,tr1,tr2].forEach(tr => { if(tr) tr.forEach(k => timeSet.add(k[0])); });
-            const times = Array.from(timeSet).sort((a,b)=>a-b);
-            if(times.length === 0) continue;
-
-            const values = [];
+            const node = nameToNode[g.name]; if(!node) continue; const key = node.uuid+':'+g.N; if(seen.has(key)) continue; seen.set(key, g);
+            const isRot = (g.N === 2); const tr0 = getUTrack(g.t0, isRot && true), tr1 = getUTrack(g.t1, isRot), tr2 = getUTrack(g.t2, isRot);
+            const timeSet = new Set(); [tr0,tr1,tr2].forEach(tr => { if(tr) tr.forEach(k => timeSet.add(k[0])); });
+            const times = Array.from(timeSet).sort((a,b)=>a-b); if(times.length === 0) continue; const values = [];
             for(const t of times){
-                const vx = tr0 ? linearSample(tr0,t) : 0;
-                const vy = tr1 ? linearSample(tr1,t) : 0;
-                const vz = tr2 ? linearSample(tr2,t) : 0;
-                if(g.N === 1 || g.N === 4){ // Translation / Scale
-                    values.push(vx, vy, vz);
-                } else if(g.N === 2){        // Rotation: Euler angles (degrees) -> Quaternion, keeping the original ZYX order
-                    const euler = new THREE.Euler(vx*DEG, vy*DEG, vz*DEG, 'ZYX');
-                    const q = new THREE.Quaternion().setFromEuler(euler);
-                    values.push(q.x, q.y, q.z, q.w);
-                }
+                const vx = tr0 ? linearSample(tr0,t) : 0; const vy = tr1 ? linearSample(tr1,t) : 0; const vz = tr2 ? linearSample(tr2,t) : 0;
+                if(g.N === 1 || g.N === 4) { values.push(vx, vy, vz); }
+                else if(g.N === 2) { const euler = new THREE.Euler(vx*DEG, vy*DEG, vz*DEG, 'ZYX'); const q = new THREE.Quaternion().setFromEuler(euler); values.push(q.x, q.y, q.z, q.w); }
             }
-            const timeArr = new Float32Array(times);
-            const valArr = new Float32Array(values);
-            const path = node.uuid;
-            if(g.N === 1){
-                const tk = new THREE.VectorKeyframeTrack(path+'.position', timeArr, valArr);
-                tk.setInterpolation(THREE.InterpolateSmooth);
-                tracks.push(tk);
-            } else if(g.N === 2){
-                const tk = new THREE.QuaternionKeyframeTrack(path+'.quaternion', timeArr, valArr);
-                // SLERP is default for QuaternionKeyframeTrack, set explicitly
-                tk.setInterpolation(THREE.InterpolateLinear);
-                tracks.push(tk);
-            } else if(g.N === 4){
-                const tk = new THREE.VectorKeyframeTrack(path+'.scale', timeArr, valArr);
-                tk.setInterpolation(THREE.InterpolateSmooth);
-                tracks.push(tk);
-            }
-        }
-        return tracks;
+            const timeArr = new Float32Array(times); const valArr = new Float32Array(values); const path = node.uuid;
+            if(g.N === 1){ const tk = new THREE.VectorKeyframeTrack(path+'.position', timeArr, valArr); tk.setInterpolation(THREE.InterpolateSmooth); tracks.push(tk); } 
+            else if(g.N === 2){ const tk = new THREE.QuaternionKeyframeTrack(path+'.quaternion', timeArr, valArr); tk.setInterpolation(THREE.InterpolateLinear); tracks.push(tk); } 
+            else if(g.N === 4){ const tk = new THREE.VectorKeyframeTrack(path+'.scale', timeArr, valArr); tk.setInterpolation(THREE.InterpolateSmooth); tracks.push(tk); }
+        } return tracks;
     }
 
     function registerAnim(grp){
-        // Clear previous mixer for this grp (remove old mixer when swapping equipment)
-        disposeMixer(grp);
-
-        const a = grp.userData.anim;
-        if(!a || !a.clips || a.clips.length === 0) return;
-        if(a.duration <= 0) return;
-
-        const nameToNode = a.nameToNode || {};
-
-        // Compatibility with old structure (fallback byte scan may still yield groups instead of clips)
-        let clips = a.clips;
-        if(!clips && a.groups){
-            clips = [{name:'A3D_Anim', groups:a.groups}];
-        }
-
-        // Calculate duration of each clip (based on the last keyframe time of tracks involved in the clip)
-        const clipDuration = (groups) => {
-            let d = 0;
-            for(const g of groups){
-                for(const ti of [g.t0,g.t1,g.t2]){
-                    const tr = a.tracks[ti];
-                    if(tr && tr.length) d = Math.max(d, tr[tr.length-1][0]);
-                }
-            }
-            return d || a.duration;
-        };
-
-        const mixer = new THREE.AnimationMixer(grp);
-        grp.userData.mixer = mixer;
-        grp.userData.animActions = {}; 
-        activeMixers.add(mixer);
-
+        disposeMixer(grp); const a = grp.userData.anim; if(!a || !a.clips || a.clips.length === 0 || a.duration <= 0) return;
+        const nameToNode = a.nameToNode || {}; let clips = a.clips; if(!clips && a.groups) clips = [{name:'A3D_Anim', groups:a.groups}];
+        const clipDuration = (groups) => { let d = 0; for(const g of groups){ for(const ti of [g.t0,g.t1,g.t2]){ const tr = a.tracks[ti]; if(tr && tr.length) d = Math.max(d, tr[tr.length-1][0]); } } return d || a.duration; };
+        const mixer = new THREE.AnimationMixer(grp); grp.userData.mixer = mixer; grp.userData.animActions = {}; activeMixers.add(mixer);
         const builtClips = [];
         for(const c of clips){
-            // Cannot simply exclude all flat groups: idle / radar-up-idle are inherently
-            // clips that "hold a static pose"; although values don't change, they are truly written to bones.
-            // Rules:
-            //  1) Entire clip is flat -> treated as a pose clip, retain all and participate in conflicts;
-            //  2) Flat in a dynamic clip and equals rest pose -> exporter placeholder, no effect, filter out;
-            //  3) Flat in a dynamic clip but deviates from rest pose -> intended static pose for the action, retain.
-            const hasMotion = c.groups.some(g => groupHasMotion(a, g));
-            const effectiveGroups = c.groups.filter(g => {
-                const node = nameToNode[g.name];
-                if(!node) return false;
-                if(!hasMotion || groupHasMotion(a, g)) return true;
-                return !flatGroupMatchesRestPose(a, g, node);
-            });
-
-            const tracks = buildTracksForGroups(a, effectiveGroups, nameToNode);
-            if(tracks.length === 0) continue;
-            const dur = clipDuration(c.groups);
-            const clip = new THREE.AnimationClip(c.name, dur, tracks);
-
-            // Conflict nodes must match the effective groups actually handed to the mixer. 
-            // Otherwise, hidden flat tracks will mix parallel animations by weight, halving the amplitude.
-            const nodeSet = new Set();
-            for(const g of effectiveGroups){
-                const node = nameToNode[g.name];
-                if(node) nodeSet.add(node.uuid);
-            }
-            clipAffected.set(clip, nodeSet);
-            builtClips.push({name:c.name, clip, groups:effectiveGroups});
+            const hasMotion = c.groups.some(g => groupHasMotion(a, g)); const effectiveGroups = c.groups.filter(g => { const node = nameToNode[g.name]; if(!node) return false; if(!hasMotion || groupHasMotion(a, g)) return true; return !flatGroupMatchesRestPose(a, g, node); });
+            const tracks = buildTracksForGroups(a, effectiveGroups, nameToNode); if(tracks.length === 0) continue;
+            const dur = clipDuration(c.groups); const clip = new THREE.AnimationClip(c.name, dur, tracks);
+            const nodeSet = new Set(); for(const g of effectiveGroups){ const node = nameToNode[g.name]; if(node) nodeSet.add(node.uuid); }
+            clipAffected.set(clip, nodeSet); builtClips.push({name:c.name, clip, groups:effectiveGroups});
         }
-
-        // Do not play any clip by default. Each action is enabled but weight=0 / paused.
-        // Enabled by user clicking UI chip or calling toggleClip; one-shot playback (LoopOnce),
-        // clamps when finished.
         for(const bc of builtClips){
-            const action = mixer.clipAction(bc.clip);
-            action.setLoop(THREE.LoopOnce, 1);
-            action.clampWhenFinished = true;
-            action.enabled = true;
-            action.weight = 0;
-            action.repetitions = 1;
-            action.timeScale = 1;
-            action.time = 0;
-            action.paused = true;
-            action.play();     // Let three.js attach it to the mixer first, but with weight=0/paused it has no effect
-            action._clipRef = bc.clip; // Save clip reference for easy duration retrieval
-            actionState.set(action, 'idle');
-            grp.userData.animActions[bc.name] = action;
+            const action = mixer.clipAction(bc.clip); action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.enabled = true; action.weight = 0; action.repetitions = 1; action.timeScale = 1; action.time = 0; action.paused = true; action.play();
+            action._clipRef = bc.clip; actionState.set(action, 'idle'); grp.userData.animActions[bc.name] = action;
         }
-
-        // Expose clip names for console debugging: window.playClip(grp, 'shot')
         grp.userData.animClipNames = builtClips.map(c=>c.name);
-
-        const totalTracks = builtClips.reduce((s,c)=>s+c.clip.tracks.length,0);
-        const clipSummary = builtClips.map(c=>c.name).join(', ');
-        msg(`${totalTracks} tracks · ${clips.length} clips [${clipSummary}] · ${a.duration.toFixed(2)}s`);
     }
 
-    // chip element -> { grp, clipName, barEl } used for progress bar updates in main loop
-    const chipRefs = new WeakMap();
-    // Action states: 'idle' | 'once' | 'loop'
-    //  - 'idle': not playing / reset
-    //  - 'once': playing one-shot or stopped at last frame (both count as occupying nodes and participate in conflict detection)
-    //  - 'loop': currently looping
-    const actionState = new WeakMap();
-    // clip -> Set<nodeUuid> all bone nodes affected by this clip, used for conflict detection
-    const clipAffected = new WeakMap();
-    // Long press threshold (ms)
-    const LONG_PRESS_MS = 400;
-
-    // Get all currently active (once/loop) action entries {name, action} on a grp
-    function collectActiveActions(grp){
-        const out = [];
-        if(!grp || !grp.userData.animActions) return out;
-        for(const name in grp.userData.animActions){
-            const a = grp.userData.animActions[name];
-            const st = actionState.get(a);
-            // once (including stopped at last frame) and loop are considered active and participate in conflicts
-            if(st === 'once' || st === 'loop') out.push({name, action:a});
-        }
-        return out;
-    }
-
-    // Stop/reset an action back to idle
-    function resetAction(grp, name){
-        if(!grp || !grp.userData.animActions) return;
-        const action = grp.userData.animActions[name];
-        if(!action) return;
-        action.weight = 0;
-        action.paused = true;
-        action.time = 0;
-        action.stop();
-        actionState.set(action, 'idle');
-        if(grp.userData.mixer) grp.userData.mixer.update(0);
-    }
-
-    // Start an action (mode: 'once' | 'loop'), without conflict check
-    function startAction(grp, name, mode){
-        if(!grp || !grp.userData.animActions) return;
-        const action = grp.userData.animActions[name];
-        if(!action) return;
-        action.enabled = true;
-        action.weight = 1;
-        action.reset();
-        action.time = 0;
-        action.paused = false;
-        if(mode === 'loop'){
-            action.setLoop(THREE.LoopRepeat, Infinity);
-            action.clampWhenFinished = false;
-            action.repetitions = Infinity;
-        } else {
-            action.setLoop(THREE.LoopOnce, 1);
-            action.clampWhenFinished = true;
-            action.repetitions = 1;
-        }
-        action.play();
-        actionState.set(action, mode);
-    }
-
-    // Toggle a single clip:
-    //   Short tap (mode='once'): single click toggles behavior. If active, cancel. If idle, play once.
-    //   Long press / right click (mode='loop'): ensures looping playback without cancelling.
+    const chipRefs = new WeakMap(); const actionState = new WeakMap(); const clipAffected = new WeakMap(); const LONG_PRESS_MS = 400;
+    function collectActiveActions(grp){ const out = []; if(!grp || !grp.userData.animActions) return out; for(const name in grp.userData.animActions){ const a = grp.userData.animActions[name]; const st = actionState.get(a); if(st === 'once' || st === 'loop') out.push({name, action:a}); } return out; }
+    function resetAction(grp, name){ if(!grp || !grp.userData.animActions) return; const action = grp.userData.animActions[name]; if(!action) return; action.weight = 0; action.paused = true; action.time = 0; action.stop(); actionState.set(action, 'idle'); if(grp.userData.mixer) grp.userData.mixer.update(0); }
+    function startAction(grp, name, mode){ if(!grp || !grp.userData.animActions) return; const action = grp.userData.animActions[name]; if(!action) return; action.enabled = true; action.weight = 1; action.reset(); action.time = 0; action.paused = false; if(mode === 'loop'){ action.setLoop(THREE.LoopRepeat, Infinity); action.clampWhenFinished = false; action.repetitions = Infinity; } else { action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.repetitions = 1; } action.play(); actionState.set(action, mode); }
     function toggleClip(grp, clipName, mode){
-        if(!grp || !grp.userData.animActions) return 'idle';
-        const action = grp.userData.animActions[clipName];
-        if(!action) return 'idle';
-        const st = actionState.get(action) || 'idle';
-
-        const resolveConflicts = () => {
-            const clip = action._clipRef;
-            const myNodes = clipAffected.get(clip) || new Set();
-            for(const {name: otherName, action: otherAct} of collectActiveActions(grp)){
-                if(otherName === clipName) continue;
-                const otherClip = otherAct._clipRef;
-                const otherNodes = clipAffected.get(otherClip) || new Set();
-                let conflict = false;
-                for(const n of myNodes){ if(otherNodes.has(n)){ conflict = true; break; } }
-                if(conflict) resetAction(grp, otherName);
-            }
-        };
-
-        if (mode === 'loop') {
-            if (st === 'loop') return 'loop';
-            resolveConflicts();
-            startAction(grp, clipName, 'loop');
-            return 'loop';
-        } else {
-            if (st !== 'idle') {
-                resetAction(grp, clipName);
-                return 'idle';
-            }
-            resolveConflicts();
-            startAction(grp, clipName, 'once');
-            return 'once';
-        }
+        if(!grp || !grp.userData.animActions) return 'idle'; const action = grp.userData.animActions[clipName]; if(!action) return 'idle'; const st = actionState.get(action) || 'idle';
+        const resolveConflicts = () => { const clip = action._clipRef; const myNodes = clipAffected.get(clip) || new Set(); for(const {name: otherName, action: otherAct} of collectActiveActions(grp)){ if(otherName === clipName) continue; const otherClip = otherAct._clipRef; const otherNodes = clipAffected.get(otherClip) || new Set(); let conflict = false; for(const n of myNodes){ if(otherNodes.has(n)){ conflict = true; break; } } if(conflict) resetAction(grp, otherName); } };
+        if (mode === 'loop') { if (st === 'loop') return 'loop'; resolveConflicts(); startAction(grp, clipName, 'loop'); return 'loop'; } else { if (st !== 'idle') { resetAction(grp, clipName); return 'idle'; } resolveConflicts(); startAction(grp, clipName, 'once'); return 'once'; }
     }
-
-    window.playClip = (grp, n) => { if(grp) toggleClip(grp, n, 'once'); };
-    window.stopClip = (grp, n) => { if(grp) resetAction(grp, n); };
-    window.loopClip = (grp, n) => { if(grp) toggleClip(grp, n, 'loop'); };
-
-    // Render animation chip row for a slot
+    
     function renderAnimChips(type){
-        const box = document.getElementById(`box-${type}-anim`);
-        if(!box) return;
-        const slot = slots[type];
-        const names = slot?.group?.userData?.animClipNames;
-
-        // Clear existing chips
-        box.innerHTML = '';
-        // Old chip refs don't need manual cleanup, WeakMap handles it
-        if(!names || names.length === 0){
-            box.style.display = 'none';
-            activeClips[type].clear();
-            return;
-        }
-
-        const label = document.createElement('div');
-        label.className = 'anim-chip-label';
+        const box = document.getElementById(`box-${type}-anim`); if(!box) return; const slot = slots[type]; const names = slot?.group?.userData?.animClipNames; box.innerHTML = '';
+        if(!names || names.length === 0){ box.style.display = 'none'; activeClips[type].clear(); return; }
+        const label = document.createElement('div'); label.className = 'anim-chip-label';
         label.innerText = userLang === 'zh' ? '动作（左键/点击: 播放/复位，右键/长按: 循环）' : 'Animations (Left-click/Tap: Play/Reset, Right-click/Hold: Loop)';
         box.appendChild(label);
-
         for(const name of names){
-            const btn = document.createElement('button');
-            btn.className = 'anim-chip';
-            btn.type = 'button';
-            const displayName = formatName(name);
+            const btn = document.createElement('button'); btn.className = 'anim-chip'; btn.type = 'button'; const displayName = formatName(name);
             btn.innerHTML = `<span class="chip-bar" style="--p:0%; --ang:0deg;"></span><span class="chip-dot"></span><span class="chip-text">${displayName}</span>`;
-            const bar = btn.querySelector('.chip-bar');
-            chipRefs.set(btn, { grp: slot.group, clipName: name, bar, type });
-
-            let longPressTimer = null;
-            let longPressed = false;
-
-            const triggerAction = (mode) => {
-                const result = toggleClip(slot.group, name, mode);
-                if(result === 'idle'){
-                    activeClips[type].delete(name);
-                    bar.style.setProperty('--p', '0%');
-                    btn.classList.remove('active', 'looping');
-                } else {
-                    activeClips[type].add(name);
-                }
-                // Sync all chip UI states (conflicts might have reset other buttons)
-                syncChipUI(type);
-            };
-
-            // Long press detection: pointerdown starts a LONG_PRESS_MS timer for touch
-            btn.addEventListener('pointerdown', (ev) => {
-                if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-                btn.classList.add('pressing');
-                if (ev.pointerType === 'touch') {
-                    longPressed = false;
-                    longPressTimer = setTimeout(() => {
-                        longPressed = true;
-                        triggerAction('loop');
-                        if(navigator.vibrate) navigator.vibrate(15);
-                    }, LONG_PRESS_MS);
-                }
-            });
-
-            // pointerup/leave before timer -> short tap (once)
-            btn.addEventListener('pointerup', (ev) => {
-                btn.classList.remove('pressing');
-                if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-                
-                if (ev.pointerType === 'touch') {
-                    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-                    if (!longPressed) triggerAction('once');
-                } else {
-                    triggerAction('once');
-                }
-            });
-
-            btn.addEventListener('pointerleave', () => {
-                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-                btn.classList.remove('pressing');
-            });
-            
-            btn.addEventListener('pointercancel', () => {
-                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-                btn.classList.remove('pressing');
-            });
-
-            btn.addEventListener('contextmenu', (ev) => {
-                ev.preventDefault();
-                if (ev.pointerType !== 'touch') {
-                    triggerAction('loop');
-                }
-            });
+            const bar = btn.querySelector('.chip-bar'); chipRefs.set(btn, { grp: slot.group, clipName: name, bar, type });
+            let longPressTimer = null; let longPressed = false;
+            const triggerAction = (mode) => { const result = toggleClip(slot.group, name, mode); if(result === 'idle'){ activeClips[type].delete(name); bar.style.setProperty('--p', '0%'); btn.classList.remove('active', 'looping'); } else { activeClips[type].add(name); } syncChipUI(type); };
+            btn.addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'mouse' && ev.button !== 0) return; btn.classList.add('pressing'); if (ev.pointerType === 'touch') { longPressed = false; longPressTimer = setTimeout(() => { longPressed = true; triggerAction('loop'); if(navigator.vibrate) navigator.vibrate(15); }, LONG_PRESS_MS); } });
+            btn.addEventListener('pointerup', (ev) => { btn.classList.remove('pressing'); if (ev.pointerType === 'mouse' && ev.button !== 0) return; if (ev.pointerType === 'touch') { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } if (!longPressed) triggerAction('once'); } else { triggerAction('once'); } });
+            btn.addEventListener('pointerleave', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } btn.classList.remove('pressing'); });
+            btn.addEventListener('pointercancel', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } btn.classList.remove('pressing'); });
+            btn.addEventListener('contextmenu', (ev) => { ev.preventDefault(); if (ev.pointerType !== 'touch') { triggerAction('loop'); } });
             box.appendChild(btn);
-        }
-        box.style.display = 'flex';
+        } box.style.display = 'flex';
     }
 
-    // Sync visual states of all chip buttons in a slot (without rebuilding DOM)
     function syncChipUI(type){
-        const box = document.getElementById(`box-${type}-anim`);
-        if(!box) return;
-        const slot = slots[type];
-        box.querySelectorAll('.anim-chip').forEach(btn => {
-            const ref = chipRefs.get(btn);
-            if(!ref) return;
-            const action = ref.grp?.userData?.animActions?.[ref.clipName];
-            if(!action){ btn.classList.remove('active','looping'); return; }
-            const st = actionState.get(action) || 'idle';
-            btn.classList.toggle('active', st !== 'idle');
-            btn.classList.toggle('looping', st === 'loop');
-            if(st === 'idle' && ref.bar){
-                ref.bar.style.setProperty('--p', '0%');
-            }
-        });
+        const box = document.getElementById(`box-${type}-anim`); if(!box) return;
+        box.querySelectorAll('.anim-chip').forEach(btn => { const ref = chipRefs.get(btn); if(!ref) return; const action = ref.grp?.userData?.animActions?.[ref.clipName]; if(!action){ btn.classList.remove('active','looping'); return; } const st = actionState.get(action) || 'idle'; btn.classList.toggle('active', st !== 'idle'); btn.classList.toggle('looping', st === 'loop'); if(st === 'idle' && ref.bar){ ref.bar.style.setProperty('--p', '0%'); } });
     }
 
-    // Update progress bar and state styles of all chips every frame
     function updateChipProgress(){
-        const chips = document.querySelectorAll('.anim-chip');
-        chips.forEach(btn => {
-            const ref = chipRefs.get(btn);
-            if(!ref) return;
-            const action = ref.grp?.userData?.animActions?.[ref.clipName];
-            if(!action || !ref.bar) return;
-            const clip = action._clipRef;
-            const dur = clip ? clip.duration : 0;
-            const st = actionState.get(action) || 'idle';
-
-            if(st === 'idle'){
-                ref.bar.style.setProperty('--p', '0%');
-                btn.classList.remove('active', 'looping');
-                return;
-            }
-            btn.classList.add('active');
-            if(st === 'loop'){
-                btn.classList.add('looping');
-                // Loop mode progress is driven by angle animation
-                if(!dur) return;
-                const time = action.time;
-                const pct = (time / dur) % 1;
-                const ang = pct * 360;
-                ref.bar.style.setProperty('--ang', `${ang}deg`);
-                return;
-            }
-            btn.classList.remove('looping');
-            if(!dur) return;
-            // once mode: set progress by time/dur
-            let pct;
-            if(action.time >= dur - 0.001){
-                pct = 100;
-                action.time = dur;
-                action.paused = true; // freeze at last frame
-                // Keep state as 'once' to participate in conflict detection
-            } else {
-                pct = Math.max(0, Math.min(1, action.time / dur)) * 100;
-            }
-            ref.bar.style.setProperty('--p', pct + '%');
+        document.querySelectorAll('.anim-chip').forEach(btn => {
+            const ref = chipRefs.get(btn); if(!ref) return; const action = ref.grp?.userData?.animActions?.[ref.clipName]; if(!action || !ref.bar) return;
+            const clip = action._clipRef; const dur = clip ? clip.duration : 0; const st = actionState.get(action) || 'idle';
+            if(st === 'idle'){ ref.bar.style.setProperty('--p', '0%'); btn.classList.remove('active', 'looping'); return; } btn.classList.add('active');
+            if(st === 'loop'){ btn.classList.add('looping'); if(!dur) return; const pct = (action.time / dur) % 1; const ang = pct * 360; ref.bar.style.setProperty('--ang', `${ang}deg`); return; }
+            btn.classList.remove('looping'); if(!dur) return; let pct; if(action.time >= dur - 0.001){ pct = 100; action.time = dur; action.paused = true; } else { pct = Math.max(0, Math.min(1, action.time / dur)) * 100; } ref.bar.style.setProperty('--p', pct + '%');
         });
     }
 
-    // UI Helpers
-    const drawer=document.getElementById('drawer'), fab=document.getElementById('fab');
-    let open=true; fab.onclick=()=>{open=!open;if(open)drawer.style.display='flex';else drawer.style.display='none'};
-    function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
-    
-    function log(msgText) {
-        const div = document.createElement('div');
-        div.className = `log-line log-ok`;
-        div.innerText = msgText;
-        logBox.appendChild(div);
-        logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    // Initialize
-    applyI18n();
-    document.body.classList.remove('fouc-loading');
-
-    (async function init() {
-        document.getElementById('t-tab-assembly').classList.add('active');
-        document.getElementById('panel-assembly').classList.add('active');
+    // --- Drawer Swipe & Interactivity ---
+    let drawerOpen = true;
+    window.toggleDrawer = function() {
+        drawerOpen = !drawerOpen;
+        const drawer = document.getElementById('drawer'); const scrim = document.getElementById('drawer-scrim');
         
-        try {
-            msg(T.loading);
-            const resp = await fetch(ASSETS_INDEX_URL);
-            if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-            assetsData = await resp.json();
-            
-            await populateUI();
-            
-            if(currentMode==='assembly') {
-                if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
-                if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
-            }
-            msg("Ready");
-        } catch(e) {
-            console.error(e);
-            msg(String(e.message || e));
+        // Force reset inline transform left over from releasing a swipe halfway
+        drawer.style.transform = ''; 
+        drawer.style.transition = '';
+        
+        if(drawerOpen) { 
+            drawer.classList.add('open'); document.body.classList.add('drawer-open');
+            scrim.classList.add('show'); 
+        } else { 
+            drawer.classList.remove('open'); document.body.classList.remove('drawer-open');
+            scrim.classList.remove('show');
         }
-    })();
-
-    // Screenshot Logic (No UI elements captured naturally via toDataURL)
-    document.getElementById('fab-cam').onclick = () => {
-        const targetWidth = 3840;
-        const targetHeight = 2160;
-
-        const origWidth = innerWidth;
-        const origHeight = innerHeight;
-        const origPixelRatio = renderer.getPixelRatio();
-        const origAspect = camera.aspect;
-        
-        // Apply Settings
-        renderer.setPixelRatio(1);
-        renderer.setSize(targetWidth, targetHeight, false);
-        camera.aspect = targetWidth / targetHeight;
-        camera.updateProjectionMatrix();
-
-        // Render & Capture pure WebGL canvas
-        renderer.render(scene, camera);
-        const dataURL = renderer.domElement.toDataURL('image/png');
-
-        // Restore everything back to normal
-        renderer.setPixelRatio(origPixelRatio);
-        renderer.setSize(origWidth, origHeight);
-        camera.aspect = origAspect;
-        camera.updateProjectionMatrix();
-        renderer.render(scene, camera);
-
-        // Download
-        const link = document.createElement('a');
-        link.href = dataURL;
-        link.download = `Screenshot_${new Date()}.png`;
-        link.click();
-
-        msg(T.screenshot);
     };
 
-    // Beta Toggle Logic
-    window.toggleScene = function() {
-        const toggle = document.querySelector('.beta-toggle');
-        const box = document.getElementById('group-scene');
-        const active = toggle.classList.toggle('active');
-        if(active) {
-            box.classList.add('visible');
-            if(!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad();
-        } else {
-            box.classList.remove('visible');
+    const drawerEl = document.getElementById('drawer');
+    drawerEl.addEventListener('touchstart', (e) => {
+        if(window.innerWidth > 768) return; 
+        const activeContent = drawerEl.querySelector('.drawer-content.active');
+        if (drawerOpen && activeContent && activeContent.scrollTop > 0 && !e.target.closest('#drawer-handle')) return;
+        swipeStartY = e.touches[0].clientY;
+        currentSwipeY = swipeStartY; 
+        drawerEl.style.transition = 'none';
+    }, {passive: true});
+
+    drawerEl.addEventListener('touchmove', (e) => {
+        if (!swipeStartY || window.innerWidth > 768) return;
+        currentSwipeY = e.touches[0].clientY;
+        let dy = currentSwipeY - swipeStartY;
+        if (drawerOpen && dy > 0) { 
+            drawerEl.style.transform = `translateY(${dy}px)`; 
+        } else if (!drawerOpen && dy < 0) {
+            drawerEl.style.transform = `translateY(calc(100% - 48px + ${dy}px))`;
         }
+    }, {passive: true});
+
+    drawerEl.addEventListener('touchend', (e) => {
+        if (!swipeStartY || window.innerWidth > 768) return;
+        drawerEl.style.transition = '';
+        let dy = currentSwipeY - swipeStartY;
+        
+        if (Math.abs(dy) > 50) {
+            if (drawerOpen && dy > 0) window.toggleDrawer();
+            else if (!drawerOpen && dy < 0) window.toggleDrawer();
+            else drawerEl.style.transform = '';
+        } else {
+            drawerEl.style.transform = '';
+        }
+        swipeStartY = 0; currentSwipeY = 0;
+    });
+
+    drawerEl.addEventListener('touchcancel', () => {
+        if (!swipeStartY || window.innerWidth > 768) return;
+        drawerEl.style.transition = '';
+        drawerEl.style.transform = '';
+        swipeStartY = 0; currentSwipeY = 0;
+    });
+
+    // --- Custom M3 Dialog System ---
+    let dialogCallback = null;
+    function showDialog(title, desc, isDanger, confirmTxt, callback) {
+        document.getElementById('dialog-title').innerText = title;
+        document.getElementById('dialog-desc').innerText = desc;
+        document.getElementById('dialog-cancel').innerText = T.btnCancel;
+        
+        const btnConf = document.getElementById('dialog-confirm');
+        btnConf.innerText = confirmTxt;
+        btnConf.className = isDanger ? 'dialog-btn danger' : 'dialog-btn confirm';
+        
+        dialogCallback = callback;
+        document.getElementById('dialog-scrim').classList.add('show');
+        document.getElementById('m3-dialog').classList.add('show');
+    }
+    
+    function closeDialog() {
+        document.getElementById('dialog-scrim').classList.remove('show');
+        document.getElementById('m3-dialog').classList.remove('show');
+        dialogCallback = null;
     }
 
-    // --- M3 Custom Select Logic ---
-    async function renderCustomSelect(nativeSelectId, type, items) {
-        const nativeSel = document.getElementById(nativeSelectId);
-        const container = nativeSel.parentElement;
-        const oldCustom = container.querySelector('.m3-custom-select');
-        if(oldCustom) oldCustom.remove();
-        
-        nativeSel.innerHTML = "";
-        items.forEach(item => nativeSel.add(new Option(item.label, item.value)));
+    document.getElementById('dialog-cancel').onclick = closeDialog;
+    document.getElementById('dialog-scrim').onclick = closeDialog;
+    document.getElementById('dialog-confirm').onclick = () => { if(dialogCallback) dialogCallback(); closeDialog(); };
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'm3-custom-select';
-        
-        let labelTxt = "";
-        if(type === 'model') labelTxt = T.lblModel;
-        else if(type === 'skin') labelTxt = T.lblSkin;
-        else if(type === 'env') labelTxt = T.lblEnv;
 
-        const initialVal = items[0]?.value;
-        const initialLabel = items[0]?.label || "Select...";
-        
-        wrapper.innerHTML = `
-            <span class="select-label">${labelTxt}</span>
-            <div class="spinner"></div>
-            <div class="select-trigger">
-                <div class="select-icon-box"></div>
-                <span class="select-text">${initialLabel}</span>
-                <div class="select-arrow">
-                    <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" fill="currentColor"/></svg>
-                </div>
-            </div>
-            <div class="m3-options-panel"></div>
-        `;
-        
-        const trigger = wrapper.querySelector('.select-trigger');
-        const iconBox = wrapper.querySelector('.select-icon-box');
-        const textBox = wrapper.querySelector('.select-text');
-        const panel = wrapper.querySelector('.m3-options-panel');
-        
-        const updateDisplay = async (val, txt) => {
-            textBox.innerText = txt;
-            iconBox.innerHTML = ""; 
-            
-            if (type === 'model') {
-                const svg = await IconLoader.getEquipmentIcon(val);
-                if(svg) iconBox.innerHTML = svg;
-            } else if (type === 'skin') {
-                const url = IconLoader.getSkinIconUrl(val);
-                if(url) iconBox.innerHTML = `<img src="${url}" draggable="false" alt="">`;
-            }
-        };
+    function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
+    function log(msgText) { const div = document.createElement('div'); div.className = `log-line log-ok`; div.innerText = msgText; logBox.appendChild(div); logBox.scrollTop = logBox.scrollHeight; }
+
+    applyI18n(); document.body.classList.remove('fouc-loading');
+
+    // Screenshot
+    document.getElementById('btn-cam').onclick = () => {
+        const tw = 3840; const th = 2160; const ow = innerWidth; const oh = innerHeight; const opr = renderer.getPixelRatio(); const oa = camera.aspect;
+        renderer.setPixelRatio(1); renderer.setSize(tw, th, false); camera.aspect = tw / th; camera.updateProjectionMatrix();
+        renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL('image/png');
+        renderer.setPixelRatio(opr); renderer.setSize(ow, oh); camera.aspect = oa; camera.updateProjectionMatrix(); renderer.render(scene, camera);
+        const link = document.createElement('a'); link.href = dataURL; link.download = `Screenshot_${new Date()}.png`; link.click(); msg(T.screenshot);
+    };
+
+    window.toggleScene = function() {
+        const toggle = document.querySelector('.beta-toggle'); const box = document.getElementById('group-scene'); const active = toggle.classList.toggle('active');
+        if(active) { box.classList.add('visible'); if(!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad(); } else { box.classList.remove('visible'); }
+    }
+
+    // --- Icon Grid Select UI Builder ---
+    async function renderIconGrid(nativeSelectId, type, items) {
+        const nativeSel = document.getElementById(nativeSelectId); const container = nativeSel.parentElement;
+        const oldGrid = container.querySelector('.icon-grid-wrapper'); if (oldGrid) oldGrid.remove();
+        nativeSel.innerHTML = ""; items.forEach(item => nativeSel.add(new Option(item.label, item.value)));
+        let currentVal = nativeSel.value || (items[0] && items[0].value); if (!currentVal) return;
+
+        const wrapper = document.createElement('div'); wrapper.className = 'icon-grid-wrapper';
+        let labelTxt = ""; if(type === 'model') labelTxt = T.lblModel; else if(type === 'skin') labelTxt = T.lblSkin; else if(type === 'env') labelTxt = T.lblEnv;
+
+        wrapper.innerHTML = `<div class="icon-grid-header"><div class="icon-grid-label">${labelTxt}</div><div class="selection-text" id="sel-txt-${nativeSelectId}"></div></div><div class="icon-grid"></div>`;
+        const grid = wrapper.querySelector('.icon-grid'); const selText = wrapper.querySelector(`#sel-txt-${nativeSelectId}`);
 
         for (const item of items) {
-            const row = document.createElement('div');
-            row.className = 'm3-option-row';
-            if(item.value === initialVal) row.classList.add('selected');
-            
-            const iHolder = document.createElement('div'); iHolder.className = 'opt-icon';
-            const txt = document.createElement('div'); txt.className = 'opt-text'; txt.innerText = item.label;
-            
-            row.appendChild(iHolder); row.appendChild(txt);
-            
-            row.onclick = (e) => {
-                e.stopPropagation();
-                nativeSel.value = item.value;
-                panel.querySelectorAll('.m3-option-row').forEach(r => r.classList.remove('selected'));
-                row.classList.add('selected');
-                updateDisplay(item.value, item.label);
-                
-                panel.classList.remove('show');
-                wrapper.classList.remove('active');
-                
-                nativeSel.dispatchEvent(new Event('change'));
+            const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; if (type === 'env') btn.classList.add('text-btn'); btn.title = item.label;
+            if (item.value === currentVal) { btn.classList.add('selected'); selText.innerText = item.label; }
+            if (type === 'model') { IconLoader.getEquipmentIcon(item.value).then(svg => { if (svg) btn.innerHTML = svg; else btn.innerText = item.label.substring(0, 2); });
+            } else if (type === 'skin') { const url = IconLoader.getSkinIconUrl(item.value); if (url) { const img = document.createElement('img'); img.src = url; img.loading = "lazy"; img.alt = item.label; btn.appendChild(img); } else { btn.innerText = item.label.substring(0, 2); }
+            } else if (type === 'env') { btn.innerText = item.label; }
+
+            btn.onclick = () => {
+                grid.querySelectorAll('.icon-grid-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected'); selText.innerText = item.label;
+                nativeSel.value = item.value; nativeSel.dispatchEvent(new Event('change'));
             };
-            
-            panel.appendChild(row);
-            
-            (async () => {
-                if(type === 'model') {
-                    const svg = await IconLoader.getEquipmentIcon(item.value);
-                    if(svg) iHolder.innerHTML = svg;
-                } else if(type === 'skin') {
-                    const url = IconLoader.getSkinIconUrl(item.value);
-                    if(url) iHolder.innerHTML = `<img src="${url}" loading="lazy" alt="">`;
-                }
-            })();
+            grid.appendChild(btn);
         }
-
-        wrapper.onclick = (e) => {
-            document.querySelectorAll('.m3-options-panel.show').forEach(p => {
-                if(p !== panel) { p.classList.remove('show'); p.parentElement.classList.remove('active'); }
-            });
-            
-            const isOpen = panel.classList.contains('show');
-            if(isOpen) {
-                panel.classList.remove('show');
-                wrapper.classList.remove('active');
-            } else {
-                panel.classList.add('show');
-                wrapper.classList.add('active');
-            }
-        };
-
-        if(items.length > 0) updateDisplay(initialVal, initialLabel);
-
         container.insertBefore(wrapper, nativeSel);
     }
 
-    document.addEventListener('click', (e) => {
-        if(!e.target.closest('.m3-custom-select')) {
-            document.querySelectorAll('.m3-options-panel.show').forEach(p => {
-                p.classList.remove('show');
-                p.parentElement.classList.remove('active');
-            });
-        }
-    });
-
     async function populateUI() {
         if(!assetsData) return;
-        
-        const hullKeys = Object.keys(assetsData.hulls || {});
-        const hullItems = hullKeys.map(k => ({ value: k, label: formatName(k) }));
-        await renderCustomSelect('sel-hull-name', 'model', hullItems);
-        
+        const hullKeys = Object.keys(assetsData.hulls || {}); const hullItems = hullKeys.map(k => ({ value: k, label: formatName(k) }));
+        await renderIconGrid('sel-hull-name', 'model', hullItems);
         const selHull = document.getElementById('sel-hull-name');
-        selHull.onchange = () => {
-            updateSkinSelect('hull', selHull.value);
-            if(currentMode==='assembly') triggerLoad('hull');
-        };
+        selHull.onchange = async () => { await updateSkinSelect('hull', selHull.value); if(currentMode==='assembly') triggerLoad('hull'); };
 
-        const turretKeys = Object.keys(assetsData.turrets || {});
-        const turretItems = turretKeys.map(k => ({ value: k, label: formatName(k) }));
-        await renderCustomSelect('sel-turret-name', 'model', turretItems);
-
+        const turretKeys = Object.keys(assetsData.turrets || {}); const turretItems = turretKeys.map(k => ({ value: k, label: formatName(k) }));
+        await renderIconGrid('sel-turret-name', 'model', turretItems);
         const selTurret = document.getElementById('sel-turret-name');
-        selTurret.onchange = () => {
-            updateSkinSelect('turret', selTurret.value);
-            if(currentMode==='assembly') triggerLoad('turret');
-        };
+        selTurret.onchange = async () => { await updateSkinSelect('turret', selTurret.value); if(currentMode==='assembly') triggerLoad('turret'); };
 
-        const selScene = document.getElementById('sel-scene-var');
-        const garageData = assetsData.festivals?.garage || {};
+        const selScene = document.getElementById('sel-scene-var'); const garageData = assetsData.festivals?.garage || {};
         const sceneItems = Object.keys(garageData).map(k => ({ value: k, label: translateDataKey(k) }));
-        
-        await renderCustomSelect('sel-scene-var', 'env', sceneItems);
+        await renderIconGrid('sel-scene-var', 'env', sceneItems);
         selScene.onchange = () => triggerSceneLoad();
-
-        if(hullItems.length) updateSkinSelect('hull', hullItems[0].value);
-        if(turretItems.length) updateSkinSelect('turret', turretItems[0].value);
+        if(hullItems.length) await updateSkinSelect('hull', hullItems[0].value);
+        if(turretItems.length) await updateSkinSelect('turret', turretItems[0].value);
     }
 
     async function updateSkinSelect(type, name) {
-        const skins = assetsData[`${type}s`][name] || {};
-        const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) }));
-        
-        skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
-        
-        await renderCustomSelect(`sel-${type}-skin`, 'skin', skinItems);
-        
-        const selSkin = document.getElementById(`sel-${type}-skin`);
-        selSkin.onchange = () => { if(currentMode==='assembly') triggerLoad(type); };
+        const skins = assetsData[`${type}s`][name] || {}; const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) })); skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
+        await renderIconGrid(`sel-${type}-skin`, 'skin', skinItems);
+        document.getElementById(`sel-${type}-skin`).onchange = () => { if(currentMode==='assembly') triggerLoad(type); };
     }
 
-    // --- Loading Logic ---
-    async function fetchMeta(path) {
-        const url = `${RES_BASE}/${path}/meta.info`;
-        const res = await fetch(url);
-        if(!res.ok) throw new Error(`Fetch meta.info failed: HTTP ${res.status}`);
-        return await res.json();
-    }
+    // Initialization
+    (async function init() {
+        if (window.innerWidth <= 768) { drawerOpen = false; document.getElementById('drawer').classList.remove('open'); }
+        else { document.getElementById('drawer-scrim').classList.add('show'); }
+        
+        try {
+            msg(T.loading); const resp = await fetch(ASSETS_INDEX_URL); if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+            assetsData = await resp.json(); await populateUI();
+            if(currentMode==='assembly') { if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull'); if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret'); }
+            msg("Ready");
+        } catch(e) { console.error(e); msg(String(e.message || e)); }
+    })();
 
+    // --- Core Loading Handlers ---
     let loadingState = { hull: false, turret: false, scene: false };
+    
+    async function fetchMeta(path) {
+        const url = `${RES_BASE}/${path}/meta.info`; const res = await fetch(url);
+        if(!res.ok) throw new Error(`Fetch meta.info failed: HTTP ${res.status}`); return await res.json();
+    }
 
     async function triggerLoad(type) {
         if(loadingState[type]) return; 
-        
-        const name = document.getElementById(`sel-${type}-name`).value;
-        const skin = document.getElementById(`sel-${type}-skin`).value;
+        const name = document.getElementById(`sel-${type}-name`).value; const skin = document.getElementById(`sel-${type}-skin`).value;
         if(!name || !skin || name==='Loading...' || skin==='-') return;
-
-        const path = assetsData[`${type}s`][name][skin];
-        if(!path) return;
-        
-        const box = document.getElementById(`box-${type}`);
-        const wrapper = box.querySelector('.m3-custom-select');
-        if(wrapper) wrapper.classList.add('loading');
-        
-        loadingState[type] = true;
-        
-        await loadRemoteAsset(path, type);
-        
-        if(wrapper) wrapper.classList.remove('loading');
-        loadingState[type] = false;
+        const path = assetsData[`${type}s`][name][skin]; if(!path) return;
+        const wrapper = document.getElementById(`box-${type}`).querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
+        loadingState[type] = true; await loadRemoteAsset(path, type);
+        if(wrapper) wrapper.classList.remove('loading'); loadingState[type] = false;
     }
 
     async function triggerSceneLoad() {
-        if(loadingState.scene) return;
-        const variant = document.getElementById('sel-scene-var').value;
-        const path = assetsData.festivals.garage[variant];
-        if(!path) return;
-        
-        const box = document.getElementById('box-scene');
-        const wrapper = box.querySelector('.m3-custom-select');
-        if(wrapper) wrapper.classList.add('loading');
-        loadingState.scene = true;
-        
-        await loadRemoteScene(path, variant);
-        
-        if(wrapper) wrapper.classList.remove('loading');
-        loadingState.scene = false;
-        
-        document.getElementById(`display-scene`).innerText = `Garage: ${translateDataKey(variant)}`;
+        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value; const path = assetsData.festivals.garage[variant]; if(!path) return;
+        const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
+        loadingState.scene = true; await loadRemoteScene(path, variant);
+        if(wrapper) wrapper.classList.remove('loading'); loadingState.scene = false;
     }
 
     async function loadRemoteAsset(pathStr, type) {
         try {
-            msg(`${T.loading} ${type}...`);
-            const meta = await fetchMeta(pathStr);
-            
-            let modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d'));
-            if(!modelEntry) modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
-            
-            if(!modelEntry) throw new Error("A3D/3DS model file not found in directory");
-
-            const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx'));
-            const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
-            
+            msg(`${T.loading} ${type}...`); const meta = await fetchMeta(pathStr);
+            let modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds')); if(!modelEntry) throw new Error("A3D/3DS model file not found");
+            const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx')); const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
             let group;
-            if(modelEntry.name.endsWith('.a3d')) {
-                const resp = await fetch(modelUrl);
-                if(!resp.ok) throw new Error(`Model request failed: HTTP ${resp.status}`);
-                const buf = await resp.arrayBuffer();
-                group = parseA3D(buf, modelEntry.name);
-            } else {
-                const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`);
-                group = await loader.loadAsync(modelUrl);
-                group.traverse(o => { 
-                    if(o.isMesh) { 
-                        o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:2}); 
-                        o.userData.originalName = o.name; 
-                    }
-                });
-            }
-
+            if(modelEntry.name.endsWith('.a3d')) { const resp = await fetch(modelUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`); group = parseA3D(await resp.arrayBuffer(), modelEntry.name);
+            } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`); group = await loader.loadAsync(modelUrl); group.traverse(o => { if(o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:2}); o.userData.originalName = o.name; } }); }
             pools[type] =[];
-            if(imgEntries.length > 0) {
-                const texPromises = imgEntries.map(async entry => {
-                    const texUrl = `${RES_BASE}/${pathStr}/${entry.name}`;
-                    const tex = await new THREE.TextureLoader().loadAsync(texUrl);
-                    setupTex(tex); tex.name = entry.name;
-                    return { name: entry.name, tex: tex };
-                });
-                pools[type] = await Promise.all(texPromises);
-                applyTexturesFromPool(group, pools[type]);
-            }
-
-            equipAssembly(group, modelEntry.name, type);
-            msg(`${type.toUpperCase()} Ready`);
-
-        } catch(e) {
-            console.error(e);
-            msg(String(e.message || e));
-        }
+            if(imgEntries.length > 0) { const texPromises = imgEntries.map(async entry => { const texUrl = `${RES_BASE}/${pathStr}/${entry.name}`; const tex = await new THREE.TextureLoader().loadAsync(texUrl); setupTex(tex); tex.name = entry.name; return { name: entry.name, tex: tex }; }); pools[type] = await Promise.all(texPromises); applyTexturesFromPool(group, pools[type]); }
+            equipAssembly(group, modelEntry.name, type); msg(`${type.toUpperCase()} Ready`);
+        } catch(e) { console.error(e); msg(String(e.message || e)); }
     }
 
     function applyTexturesFromPool(group, pool) {
-        if (!pool || pool.length === 0) return;
-        const findTex = (k) => pool.find(p => p.name.toLowerCase().includes(k))?.tex;
-        const texTracks = findTex('track') || findTex('chain');
-        const texWheels = findTex('wheel');
-        const texLightmap = findTex('lightmap') || findTex('map') || pool[0].tex;
-
+        if (!pool || pool.length === 0) return; const findTex = (k) => pool.find(p => p.name.toLowerCase().includes(k))?.tex;
+        const texTracks = findTex('track') || findTex('chain'); const texWheels = findTex('wheel'); const texLightmap = findTex('lightmap') || findTex('map') || pool[0].tex;
         group.traverse(m => {
-            if (!m.isMesh) return;
-            const apply = (mat) => {
-                // Concatenate all possible naming dimensions containing feature keywords to eliminate conflicts
+            if (!m.isMesh) return; const apply = (mat) => {
                 const name = ((m.userData.originalName || "") + " " + (m.name || "") + " " + (mat.name || "")).toLowerCase();
-                let target = texLightmap;
-                if (name.includes('track') || name.includes('chain')) target = texTracks || target;
-                else if (name.includes('wheel')) target = texWheels || target;
-                if (target) {
-                    mat.map = target; mat.emissiveMap = target;
-                    mat.emissive = new THREE.Color(0xffffff);
-                    mat.emissiveIntensity = 0.5; mat.needsUpdate = true;
-                }
-            };
-            if (Array.isArray(m.material)) m.material.forEach(apply);
-            else apply(m.material);
+                let target = texLightmap; if (name.includes('track') || name.includes('chain')) target = texTracks || target; else if (name.includes('wheel')) target = texWheels || target;
+                if (target) { mat.map = target; mat.emissiveMap = target; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }
+            }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material);
         });
     }
 
     async function loadRemoteScene(path, variant) {
-        if(slots.scene) {
-            disposeMixer(slots.scene);
-            groupAssembly.remove(slots.scene);
-            dispose(slots.scene);
-            slots.scene=null;
-        }
-        sceneLib.meshes =[]; sceneLib.tex.clear();
-        logBox.style.display = 'block'; logBox.innerHTML='';
-        
+        if(slots.scene) { disposeMixer(slots.scene); groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
+        sceneLib.meshes =[]; sceneLib.tex.clear(); logBox.style.display = 'block'; logBox.innerHTML='';
         try {
-            msg(T.loading);
-            const meta = await fetchMeta(path);
-            
-            const models = meta.filter(f => f.name.match(/\.(a3d|3ds)$/i));
-            const images = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i));
-
-            const texProm = images.map(async f => {
-                const texUrl = `${RES_BASE}/${path}/${f.name}`;
-                const tex = await new THREE.TextureLoader().loadAsync(texUrl);
-                tex.name = f.name; setupTex(tex);
-                return { n: f.name, t: tex };
-            });
-            const loadedTex = await Promise.all(texProm);
-            loadedTex.forEach(o => sceneLib.tex.set(o.n, o.t));
-
+            msg(T.loading); const meta = await fetchMeta(path);
+            const models = meta.filter(f => f.name.match(/\.(a3d|3ds)$/i)); const images = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i));
+            const texProm = images.map(async f => { const texUrl = `${RES_BASE}/${path}/${f.name}`; const tex = await new THREE.TextureLoader().loadAsync(texUrl); tex.name = f.name; setupTex(tex); return { n: f.name, t: tex }; });
+            const loadedTex = await Promise.all(texProm); loadedTex.forEach(o => sceneLib.tex.set(o.n, o.t));
             const combinedGroup = new THREE.Group();
-            
             for(let f of models) {
-                const mUrl = `${RES_BASE}/${path}/${f.name}`;
-                let grp;
-                if(f.name.endsWith('.a3d')) {
-                    const resp = await fetch(mUrl);
-                    if(!resp.ok) throw new Error(`Model request failed: HTTP ${resp.status}`);
-                    const buf = await resp.arrayBuffer();
-                    grp = parseA3D(buf, f.name);
-                } else {
-                    const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${path}/`);
-                    grp = await loader.loadAsync(mUrl);
-                }
-                
-                grp.traverse(o => { 
-                    if (o.isMesh) { 
-                        if (o.parent) o.userData.parentName = o.parent.name; 
-                        sceneLib.meshes.push(o); 
-                    } 
-                });
-                combinedGroup.add(grp);
+                const mUrl = `${RES_BASE}/${path}/${f.name}`; let grp;
+                if(f.name.endsWith('.a3d')) { const resp = await fetch(mUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`); grp = parseA3D(await resp.arrayBuffer(), f.name);
+                } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${path}/`); grp = await loader.loadAsync(mUrl); }
+                grp.traverse(o => { if (o.isMesh) { if (o.parent) o.userData.parentName = o.parent.name; sceneLib.meshes.push(o); } }); combinedGroup.add(grp);
             }
-
-            slots.scene = combinedGroup; 
-            groupAssembly.add(combinedGroup);
-            
-            runSceneInjector();
-            fitCamera();
-            msg("Environment Loaded");
-
-        } catch(e) {
-            console.error(e);
-            msg(String(e.message || e));
-        }
+            slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); fitCamera(); msg("Environment Loaded");
+        } catch(e) { console.error(e); msg(String(e.message || e)); }
     }
 
-    // --- Standard Functions ---
     window.switchMode = function(mode) {
-        if(currentMode === mode) return;
-        currentMode = mode;
-        
-        document.querySelectorAll('.tab-btn').forEach((el,i) => {
-            const modes = ['assembly','normal'];
-            el.classList.toggle('active', modes[i] === mode);
-        });
+        if(currentMode === mode) return; currentMode = mode;
+        document.querySelectorAll('.tab-btn').forEach((el,i) => { const modes = ['assembly','normal']; el.classList.toggle('active', modes[i] === mode); });
         ['normal','assembly'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
-        
-        groupNormal.visible = (mode === 'normal');
-        groupAssembly.visible = (mode === 'assembly');
-        
-        if (mode === 'assembly') {
-             if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
-             if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
-        }
+        groupNormal.visible = (mode === 'normal'); groupAssembly.visible = (mode === 'assembly');
+        if (mode === 'assembly') { if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull'); if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret'); }
     }
 
-    document.getElementById('btn-clear').onclick = clearScene;
+    document.getElementById('btn-clear').onclick = () => {
+        showDialog(T.clearTitle, T.clearDesc, true, T.btnConfirm, () => {
+            if(currentMode === 'normal') {
+                while(groupNormal.children.length > 0){ const c = groupNormal.children[0]; disposeMixer(c); dispose(c); groupNormal.remove(c); }
+                normalMeshes =[]; normalTextures.forEach(t=>t.dispose()); normalTextures =[]; document.getElementById('list-normal').innerHTML="";
+            } else {
+                if(slots.hull)  { disposeMixer(slots.hull.group);  groupAssembly.remove(slots.hull.group);  dispose(slots.hull.group); }
+                if(slots.turret){ disposeMixer(slots.turret.group);groupAssembly.remove(slots.turret.group);dispose(slots.turret.group);}
+                if(slots.scene) { disposeMixer(slots.scene);       groupAssembly.remove(slots.scene);      dispose(slots.scene); }
+                slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
+                ['hull','turret','scene'].forEach(t => { activeClips[t].clear(); renderAnimChips(t); });
+                logBox.style.display='none'; mountPos = null;
+            }
+            sceneLib.tex.clear(); sceneLib.meshes=[]; msg(T.clear);
+        });
+    };
 
     document.getElementById('btn-export').onclick = () => {
         const toExport = currentMode === 'normal' ? groupNormal : groupAssembly;
         if(toExport.children.length === 0) { msg("Empty Scene"); return; }
         
-        const exporter = new GLTFExporter();
-        
-        exporter.parse(root, (result) => {
-                const blob = new Blob([result], { type: 'application/octet-stream' });
-                const link = document.createElement('a'); 
-                link.href = URL.createObjectURL(blob); 
-                link.download = 'tanki_model.glb'; 
-                link.click();
-                msg(T.export + " OK"); 
-            }, (err) => { 
-                console.error(err); 
-                msg(String(err.message || err)); 
-            }, { binary: true, onlyVisible: true }
-        );
+        showDialog(T.exportTitle, T.exportDesc, false, T.btnConfirm, () => {
+            const exporter = new GLTFExporter();
+            exporter.parse(root, (result) => {
+                const blob = new Blob([result], { type: 'application/octet-stream' }); const link = document.createElement('a'); 
+                link.href = URL.createObjectURL(blob); link.download = 'tanki_model.glb'; link.click(); msg(T.export + " OK"); 
+            }, (err) => { console.error(err); msg(String(err.message || err)); }, { binary: true, onlyVisible: true });
+        });
     };
 
     document.getElementById('in-normal').onchange = async e => {
-        const arr = Array.from(e.target.files);
-        const models = arr.filter(f=>f.name.match(/\.(a3d|3ds)$/i));
-        const images = arr.filter(f=>f.type.startsWith('image/'));
+        const arr = Array.from(e.target.files); const models = arr.filter(f=>f.name.match(/\.(a3d|3ds)$/i)); const images = arr.filter(f=>f.type.startsWith('image/'));
         for(let f of models) {
-            try {
-                const grp = await loadModelFile(f); 
-                groupNormal.add(grp);
-                grp.traverse(o=>{ if(o.isMesh) normalMeshes.push(o); });
-                addUI('list-normal', f.name);
-            } catch(err){
-                console.error(err);
-                msg(String(err.message || err));
-            }
+            try { const grp = await loadModelFile(f); groupNormal.add(grp); grp.traverse(o=>{ if(o.isMesh) normalMeshes.push(o); }); addUI('list-normal', f.name);
+            } catch(err){ console.error(err); msg(String(err.message || err)); }
         }
         for(let f of images) {
             const url = URL.createObjectURL(f);
-            new THREE.TextureLoader().load(url, t => {
-                setupTex(t); t.name = f.name;
-                normalTextures.push(t);
-                applyNormalTexture(t);
-                addUI('list-normal', f.name);
-            }, undefined, err => {
-                console.error(err);
-                msg(String(err.message || err));
-            });
+            new THREE.TextureLoader().load(url, t => { setupTex(t); t.name = f.name; normalTextures.push(t); applyNormalTexture(t); addUI('list-normal', f.name); }, undefined, err => { console.error(err); msg(String(err.message || err)); });
         }
         fitCamera(); e.target.value='';
     };
@@ -1800,98 +1034,50 @@
     function runSceneInjector() {
         let count = 0; log(">>> Injecting Textures...");
         sceneLib.meshes.forEach(mesh => {
-            const candidates =[];
-            if (mesh.material && mesh.material.name) candidates.push(mesh.material.name);
-            if (mesh.name) candidates.push(mesh.name);
-            if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
+            const candidates =[]; if (mesh.material && mesh.material.name) candidates.push(mesh.material.name); if (mesh.name) candidates.push(mesh.name); if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
             let bestTex = null;
             for (const[texName, texObj] of sceneLib.tex) {
                 const cleanTexName = texName.toLowerCase().split('.')[0];
-                for (const cand of candidates) {
-                    const cleanCand = cand.toLowerCase();
-                    if (cleanCand.includes(cleanTexName)) { bestTex = texObj; break; }
-                    if (cleanTexName.includes(cleanCand) && cleanCand.length > 3) { bestTex = texObj; break; }
-                }
+                for (const cand of candidates) { const cleanCand = cand.toLowerCase(); if (cleanCand.includes(cleanTexName)) { bestTex = texObj; break; } if (cleanTexName.includes(cleanCand) && cleanCand.length > 3) { bestTex = texObj; break; } }
                 if (bestTex) break;
             }
-            if (bestTex) {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    map: bestTex, emissiveMap: bestTex, emissive: new THREE.Color(0x888888), 
-                    color: 0xffffff, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 
-                });
-                mesh.material.needsUpdate = true; log(`✔[${mesh.name}] -> ${bestTex.name}`); count++;
-            }
+            if (bestTex) { mesh.material = new THREE.MeshStandardMaterial({ map: bestTex, emissiveMap: bestTex, emissive: new THREE.Color(0x888888), color: 0xffffff, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 }); mesh.material.needsUpdate = true; log(`✔[${mesh.name}] -> ${bestTex.name}`); count++; }
         });
         if(count > 0) msg(`Matched ${count} materials`); else log("⚠ No matches found");
     }
 
     document.getElementById('btn-clear-scene').onclick = () => {
          if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
-         sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear();
-         sceneLib.meshes =[];
-         logBox.innerHTML = ''; logBox.style.display = 'none';
-         document.getElementById('display-scene').innerText = T.sceneDisplay;
+         sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear(); sceneLib.meshes =[]; logBox.innerHTML = ''; logBox.style.display = 'none';
          msg(T.removeEnv);
     };
 
     async function loadModelFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
-        if (ext === 'a3d') {
-            return parseA3D(await file.arrayBuffer(), file.name);
-        } else if (ext === '3ds') {
-            const loader = new TDSLoader(); loader.setResourcePath('');
-            const g = await loader.loadAsync(URL.createObjectURL(file));
-            g.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }});
-            return g;
-        } else {
-            throw new Error(`Unsupported file extension: .${ext}`);
-        }
+        if (ext === 'a3d') { return parseA3D(await file.arrayBuffer(), file.name); } 
+        else if (ext === '3ds') { const loader = new TDSLoader(); loader.setResourcePath(''); const g = await loader.loadAsync(URL.createObjectURL(file)); g.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }}); return g; } 
+        else { throw new Error(`Unsupported file extension: .${ext}`); }
     }
 
     function equipAssembly(grp, fname, type) {
-        if(slots[type]) {
-            const old = slots[type].group;
-            // Dispose old object's mixer to avoid continuing to tick
-            disposeMixer(old);
-            groupAssembly.remove(old);
-            dispose(old);
-        }
+        if(slots[type]) { const old = slots[type].group; disposeMixer(old); groupAssembly.remove(old); dispose(old); }
         slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
-        fitCamera();
-
-        // hull and turret register their own animations, independent mixers, can run simultaneously
-        registerAnim(grp);
-        // Render animation chips (models without animations will auto-hide)
-        activeClips[type].clear();
-        renderAnimChips(type);
+        fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type);
     }
 
     function scanMount(grp) {
         let found = false; grp.updateMatrixWorld(true);
-        grp.traverse(o => {
-            if(found) return;
-            if(o.name && o.name.toLowerCase().includes("mount")) {
-                const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos);
-                mountPos = root.worldToLocal(worldPos.clone()); 
-                found = true;
-            }
-        });
+        grp.traverse(o => { if(found) return; if(o.name && o.name.toLowerCase().includes("mount")) { const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos); mountPos = root.worldToLocal(worldPos.clone()); found = true; } });
         if(!found) mountPos = null;
     }
     
-    function snapTurret() {
-        if(slots.turret) {
-            if(slots.hull && mountPos) slots.turret.group.position.copy(mountPos);
-            else slots.turret.group.position.set(0,0,0);
-        }
-    }
+    function snapTurret() { if(slots.turret) { if(slots.hull && mountPos) slots.turret.group.position.copy(mountPos); else slots.turret.group.position.set(0,0,0); } }
     
     function applyNormalTexture(tex) {
         const base = tex.name.toLowerCase().split('.')[0];
         normalMeshes.forEach(m => {
-            const part = (m.userData.originalName||m.name).toLowerCase();
-            let match = false;
+            const part = (m.userData.originalName||m.name).toLowerCase(); let match = false;
             if(part.includes(base)) match=true;
             else if(base.includes('track') && (part.includes('track')||part.includes('chain'))) match=true;
             else if(base.includes('wheel') && part.includes('wheel')) match=true;
@@ -1900,399 +1086,35 @@
         });
     }
 
-    function addUI(id, text) {
-        const div = document.createElement('div'); div.className = 'file-item';
-        div.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;fill:#90A4AE"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><span style="margin-left:8px">${text}</span>`;
-        document.getElementById(id).appendChild(div);
-    }
+    function addUI(id, text) { const div = document.createElement('div'); div.className = 'file-item'; div.innerHTML = `<span class="material-symbols-rounded">insert_drive_file</span><span>${text}</span>`; document.getElementById(id).appendChild(div); }
     
-    function clearScene() {
-        if(currentMode === 'normal') {
-            while(groupNormal.children.length > 0){
-                const c = groupNormal.children[0];
-                disposeMixer(c);
-                dispose(c); groupNormal.remove(c);
-            }
-            normalMeshes =[]; normalTextures.forEach(t=>t.dispose()); normalTextures =[];
-            document.getElementById('list-normal').innerHTML="";
-        } else {
-            if(slots.hull)  { disposeMixer(slots.hull.group);  groupAssembly.remove(slots.hull.group);  dispose(slots.hull.group); }
-            if(slots.turret){ disposeMixer(slots.turret.group);groupAssembly.remove(slots.turret.group);dispose(slots.turret.group);}
-            if(slots.scene) { disposeMixer(slots.scene);       groupAssembly.remove(slots.scene);      dispose(slots.scene); }
-            slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
-            ['hull','turret','scene'].forEach(t => { activeClips[t].clear(); renderAnimChips(t); });
-            
-            logBox.style.display='none';
-            mountPos = null;
-        }
-        
-        sceneLib.tex.clear(); sceneLib.meshes=[];
-        msg(T.clear);
-    }
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
-    function setMat(m, t) {
-        const apply = (mat) => {
-            mat.map = t; mat.emissiveMap = t;
-            mat.emissive = new THREE.Color(0xffffff);
-            mat.emissiveIntensity = 0.5; mat.needsUpdate = true;
-        };
-        if (Array.isArray(m.material)) m.material.forEach(apply);
-        else apply(m.material);
-    }
+    function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = t; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}})}
     function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.y+s);camera.lookAt(c);controls.update()}
 
+    /* Binary File Logic - Standard Logic Restrained */
     class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
     function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw new Error("Invalid A3D header"); r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); else throw new Error(`Unsupported A3D version: ${v}`); }
-    function readC(r){r.u32();r.u32();return r.u32()}
-    
-    function pV2(r,n){
-        let md=[],td=[],tp=[],od=[]; let fT=r.v.getUint32(r.o,1),fS=r.v.getUint32(r.o+4,1);
-        if(fT===1 && fS>=r.v.byteLength-24) r.o=16;
-        while(r.o<r.v.byteLength){ const cT=r.u32(),cS=r.u32(),nxt=r.o+cS,count=r.u32();
-            if(cT===2){ for(let i=0;i<count;i++){ let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[]; for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); } const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); } md.push(m); } }
-            r.o=nxt;
-        }
-        return build(md,{t:[],p:[]},[],n,[],null,null,null);
-    }
-    
-    function pV3(r,n){
-        let md=[], td=[], tp=[], od=[], mats=[];
-        let anim=null, skin=null, bindMats=null;
-        r.o=8; let fT=r.v.getUint32(8,1), fS=r.v.getUint32(12,1);
-        if(fT===1 && fS>=r.v.byteLength-24) r.o=16;
-        while(r.o<r.v.byteLength){
-            const cT=r.u32(), cS=r.u32(), nxt=r.o+cS, count=r.u32();
-            if(cT===2){
-                for(let i=0;i<count;i++){
-                    let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[];
-                    for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); }
-                    const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); }
-                    md.push(m);
-                }
-            } else if(cT===3){
-                for(let i=0;i<count;i++) td.push({n:r.str(), p:[r.f32(),r.f32(),r.f32()], q:[r.f32(),r.f32(),r.f32(),r.f32()], s:[r.f32(),r.f32(),r.f32()]});
-                for(let i=0;i<count;i++) tp.push(r.i32());
-            } else if(cT===6){
-                anim = parseAnimChunk(r, count, nxt);
-            } else if(cT===7){
-                skin = parseSkinChunk(r, count);
-            } else if(cT===8){
-                bindMats = parseBindChunk(r);
-            } else if(cT!==1){
-                // Maintain original author's heuristic order
-                // Try old format material, skip if both fail
-                // Note: in new format cT=4 seems to be name+16 bytes material params, but semantics are unclear
-                // not RGBA, 4th field is often 0 making it fully transparent,
-                // to avoid invisible models, only recognize the two old format structures here.
-                let tOff=r.o, isObj=true;
-                for(let i=0;i<count;i++){ if(tOff+12>nxt){isObj=false;break;} tOff+=8; let cc=r.v.getUint32(tOff,1); tOff+=4+cc*4; }
-                if(isObj && tOff===nxt && count>0){
-                    for(let i=0;i<count;i++){
-                        const mi=r.u32(), ti=r.u32(), cc=r.u32();
-                        const o={mi,ti}; o.matIdx=[];
-                        for(let k=0;k<cc;k++) o.matIdx.push(r.u32());
-                        od.push(o);
-                    }
-                } else {
-                    let mOff=r.o, isMat=true;
-                    for(let i=0;i<count;i++){
-                        if(mOff+4>nxt){isMat=false;break;}
-                        let len1=r.v.getUint32(mOff,1); mOff+=4;
-                        if(mOff+len1+(((len1+3)>>2)*4-len1)>nxt){isMat=false;break;}
-                        mOff+=len1+(((len1+3)>>2)*4-len1);
-                        if(mOff+16>nxt){isMat=false;break;}
-                        mOff+=12;
-                        let len2=r.v.getUint32(mOff,1); mOff+=4;
-                        if(mOff+len2+(((len2+3)>>2)*4-len2)>nxt){isMat=false;break;}
-                        mOff+=len2+(((len2+3)>>2)*4-len2);
-                    }
-                    if(isMat && mOff===nxt && count>0){
-                        for(let i=0;i<count;i++){
-                            let mName=r.str(); r.sk(12); let tName=r.str();
-                            mats.push({n:mName, t:tName});
-                        }
-                    }
-                    // else: no match, skip block
-                }
-            }
-            r.o=nxt;
-        }
-        return build(md,{t:td,p:tp},od,n,mats,anim,skin,bindMats);
-    }
-    
-    function parseAnimChunk(r, count, nxt){
-        const tracks=[];
-        for(let i=0;i<count;i++){
-            const nk=r.u32(); const keys=[];
-            for(let k=0;k<nk;k++){ const t=r.f32(), v=r.f32(); keys.push([t,v]); }
-            tracks.push(keys);
-        }
-        // Unwrap rotation angle tracks: add/subtract 360 degrees if jump > 180
-        // so SLERP doesn't take the wrong direction
-        // (Mark only, actual unwrap before building KeyframeTrack)
-        const clips=[]; let maxTime=0;
-        // Keep group list per clip (no longer merge across clips)
-        function isAnimatedTrack(tidx){
-            const ks = tracks[tidx]; if(!ks || ks.length<2) return false;
-            const v0 = ks[0][1];
-            for(let i=1;i<ks.length;i++){ if(Math.abs(ks[i][1]-v0)>0.001) return true; }
-            return false;
-        }
-        try {
-            const numClips = r.u32();
-            for(let ci=0; ci<numClips; ci++){
-                const clipName = r.str();
-                const numGroups = r.u32();
-                const groups = [];
-                for(let gi=0; gi<numGroups; gi++){
-                    const bname = r.str();
-                    const N = r.u32(); const three = r.u32();
-                    const c1=r.u32(), t0=r.u32(), c2=r.u32(), t1=r.u32(), c3=r.u32(), t2=r.u32();
-                    groups.push({name:bname, N, t0, t1, t2});
-                }
-                clips.push({name:clipName, groups});
-            }
-        } catch(e) {
-            // Fallback: byte scan, merge into a virtual clip, preserve old behavior
-            console.warn('Anim clip parse fell back to byte-scan:', e);
-            const groups=[];
-            let p=r.o;
-            while(p < nxt-4){
-                const len=r.v.getUint32(p,1);
-                if(len>=1 && len<=32 && p+4+len<=nxt){
-                    let ok=true;
-                    for(let i=0;i<len;i++){const c=r.v.getUint8(p+4+i); if(c<32||c>=127){ok=false;break;}}
-                    if(ok){
-                        const name = r.d.decode(new Uint8Array(r.v.buffer, r.v.byteOffset+p+4, len));
-                        const pad=((len+3)>>2)*4-len; const after=p+4+len+pad;
-                        if(after+32<=nxt){
-                            const N=r.v.getUint32(after,1), m3=r.v.getUint32(after+4,1);
-                            const c1=r.v.getUint32(after+8,1), t0=r.v.getUint32(after+12,1);
-                            const c2=r.v.getUint32(after+16,1), t1=r.v.getUint32(after+20,1);
-                            const c3=r.v.getUint32(after+24,1), t2=r.v.getUint32(after+28,1);
-                            if(m3===3 && c1===1 && c2===2 && c3===3 && t0<count && t1===t0+1 && t2===t0+2){
-                                groups.push({name, N, t0, t1, t2}); p=after+32; continue;
-                            }
-                        }
-                    }
-                }
-                p++;
-            }
-            clips.push({name:'A3D_Anim', groups});
-        }
-        for(const tr of tracks) if(tr.length) maxTime=Math.max(maxTime, tr[tr.length-1][0]);
-        return {tracks, clips, duration:maxTime};
-    }
-    
-    function parseSkinChunk(r, count) {
-        const skins = {};
-        for (let i = 0; i < count; i++) {
-            const geoIdx = r.u16(); 
-            const numBones = r.u16();
-            const boneIds = [];
-            for (let j = 0; j < numBones; j++) boneIds.push(r.u16());
-            if (numBones % 2 === 1) r.sk(2);
-
-            const inf = r.u32(); // <--- This is u32, crucial! Reading as u16 causes all subsequent parsing to misalign
-            const numVerts = r.u32();
-            const countElements = inf * numVerts;
-
-            const boneIndices = new Int16Array(countElements);
-            for (let j = 0; j < countElements; j++) boneIndices[j] = r.u16();
-            if (countElements % 2 === 1) r.sk(2);
-
-            const boneWeights = new Uint16Array(countElements);
-            for (let j = 0; j < countElements; j++) boneWeights[j] = r.u16();
-            if (countElements % 2 === 1) r.sk(2);
-
-            skins[geoIdx] = { numBones, boneIds, inf, numVerts, boneIndices, boneWeights };
-        }
-        return skins;
-    }
-
-    // Official function to unpack 16-bit half-precision float (Float16) to regular float
-    function decodeFloat16(binary) {
-        const sign = (binary & 0x8000) ? -1 : 1;
-        const exp = (binary >> 10) & 0x1F;
-        const frac = binary & 0x3FF;
-        if (exp === 0) return sign * Math.pow(2, -14) * (frac / 1024);
-        if (exp === 0x1F) return frac ? NaN : sign * Infinity;
-        return sign * Math.pow(2, exp - 15) * (1 + frac / 1024);
-    }
-
-    function applySkin(geo, skin) {
-        const numVerts = geo.attributes.position.count;
-        if (numVerts !== skin.numVerts) return;
-        
-        // Three.js specifies skinIndex and skinWeight use vec4 format
-        const si = new Uint16Array(numVerts * 4);
-        const sw = new Float32Array(numVerts * 4);
-        const influences = Math.min(4, skin.inf); 
-
-        for (let i = 0; i < numVerts; i++) {
-            let wSum = 0;
-            for (let j = 0; j < influences; j++) {
-                const idx = i * skin.inf + j;
-                const internalBone = skin.boneIndices[idx]; 
-                const weight = decodeFloat16(skin.boneWeights[idx]); // Decode half-precision float
-                
-                const outIdx = i * 4 + j;
-                si[outIdx] = internalBone; 
-                sw[outIdx] = (Number.isFinite(weight) && weight > 0) ? weight : 0;
-                wSum += sw[outIdx];
-            }
-            
-            // Normalize to ensure weights sum to 1
-            if (wSum > 0) {
-                for (let j = 0; j < influences; j++) sw[i * 4 + j] /= wSum;
-            } else {
-                sw[i * 4] = 1; 
-            }
-        }
-        geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
-        geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
-    }
-    
-    function parseBindChunk(r){
-        const numRec=r.u32();
-        const mats={};
-        for(let i=0;i<numRec;i++){
-            const nodeId=r.u32();
-            const f=[]; for(let j=0;j<12;j++) f.push(r.f32());
-            const M=new THREE.Matrix4();
-            M.set(f[0],f[3],f[6],f[9], f[1],f[4],f[7],f[10], f[2],f[5],f[8],f[11], 0,0,0,1);
-            mats[nodeId]=M;
-        }
-        return mats;
-    }
-    
+    function pV2(r,n){ let md=[],td=[],tp=[],od=[]; let fT=r.v.getUint32(r.o,1),fS=r.v.getUint32(r.o+4,1); if(fT===1 && fS>=r.v.byteLength-24) r.o=16; while(r.o<r.v.byteLength){ const cT=r.u32(),cS=r.u32(),nxt=r.o+cS,count=r.u32(); if(cT===2){ for(let i=0;i<count;i++){ let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[]; for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); } const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); } md.push(m); } } r.o=nxt; } return build(md,{t:[],p:[]},[],n,[],null,null,null); }
+    function pV3(r,n){ let md=[], td=[], tp=[], od=[], mats=[]; let anim=null, skin=null, bindMats=null; r.o=8; let fT=r.v.getUint32(8,1), fS=r.v.getUint32(12,1); if(fT===1 && fS>=r.v.byteLength-24) r.o=16; while(r.o<r.v.byteLength){ const cT=r.u32(), cS=r.u32(), nxt=r.o+cS, count=r.u32(); if(cT===2){ for(let i=0;i<count;i++){ let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[]; for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); } const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); } md.push(m); } } else if(cT===3){ for(let i=0;i<count;i++) td.push({n:r.str(), p:[r.f32(),r.f32(),r.f32()], q:[r.f32(),r.f32(),r.f32(),r.f32()], s:[r.f32(),r.f32(),r.f32()]}); for(let i=0;i<count;i++) tp.push(r.i32()); } else if(cT===6){ anim = parseAnimChunk(r, count, nxt); } else if(cT===7){ skin = parseSkinChunk(r, count); } else if(cT===8){ bindMats = parseBindChunk(r); } else if(cT!==1){ let tOff=r.o, isObj=true; for(let i=0;i<count;i++){ if(tOff+12>nxt){isObj=false;break;} tOff+=8; let cc=r.v.getUint32(tOff,1); tOff+=4+cc*4; } if(isObj && tOff===nxt && count>0){ for(let i=0;i<count;i++){ const mi=r.u32(), ti=r.u32(), cc=r.u32(); const o={mi,ti}; o.matIdx=[]; for(let k=0;k<cc;k++) o.matIdx.push(r.u32()); od.push(o); } } else { let mOff=r.o, isMat=true; for(let i=0;i<count;i++){ if(mOff+4>nxt){isMat=false;break;} let len1=r.v.getUint32(mOff,1); mOff+=4; if(mOff+len1+(((len1+3)>>2)*4-len1)>nxt){isMat=false;break;} mOff+=len1+(((len1+3)>>2)*4-len1); if(mOff+16>nxt){isMat=false;break;} mOff+=12; let len2=r.v.getUint32(mOff,1); mOff+=4; if(mOff+len2+(((len2+3)>>2)*4-len2)>nxt){isMat=false;break;} mOff+=len2+(((len2+3)>>2)*4-len2); } if(isMat && mOff===nxt && count>0){ for(let i=0;i<count;i++){ let mName=r.str(); r.sk(12); let tName=r.str(); mats.push({n:mName, t:tName}); } } } } r.o=nxt; } return build(md,{t:td,p:tp},od,n,mats,anim,skin,bindMats); }
+    function parseAnimChunk(r, count, nxt){ const tracks=[]; for(let i=0;i<count;i++){ const nk=r.u32(); const keys=[]; for(let k=0;k<nk;k++){ const t=r.f32(), v=r.f32(); keys.push([t,v]); } tracks.push(keys); } const clips=[]; let maxTime=0; try { const numClips = r.u32(); for(let ci=0; ci<numClips; ci++){ const clipName = r.str(); const numGroups = r.u32(); const groups = []; for(let gi=0; gi<numGroups; gi++){ const bname = r.str(); const N = r.u32(); const three = r.u32(); const c1=r.u32(), t0=r.u32(), c2=r.u32(), t1=r.u32(), c3=r.u32(), t2=r.u32(); groups.push({name:bname, N, t0, t1, t2}); } clips.push({name:clipName, groups}); } } catch(e) { const groups=[]; let p=r.o; while(p < nxt-4){ const len=r.v.getUint32(p,1); if(len>=1 && len<=32 && p+4+len<=nxt){ let ok=true; for(let i=0;i<len;i++){const c=r.v.getUint8(p+4+i); if(c<32||c>=127){ok=false;break;}} if(ok){ const name = r.d.decode(new Uint8Array(r.v.buffer, r.v.byteOffset+p+4, len)); const pad=((len+3)>>2)*4-len; const after=p+4+len+pad; if(after+32<=nxt){ const N=r.v.getUint32(after,1), m3=r.v.getUint32(after+4,1); const c1=r.v.getUint32(after+8,1), t0=r.v.getUint32(after+12,1); const c2=r.v.getUint32(after+16,1), t1=r.v.getUint32(after+20,1); const c3=r.v.getUint32(after+24,1), t2=r.v.getUint32(after+28,1); if(m3===3 && c1===1 && c2===2 && c3===3 && t0<count && t1===t0+1 && t2===t0+2){ groups.push({name, N, t0, t1, t2}); p=after+32; continue; } } } } p++; } clips.push({name:'A3D_Anim', groups}); } for(const tr of tracks) if(tr.length) maxTime=Math.max(maxTime, tr[tr.length-1][0]); return {tracks, clips, duration:maxTime}; }
+    function parseSkinChunk(r, count) { const skins = {}; for (let i = 0; i < count; i++) { const geoIdx = r.u16(); const numBones = r.u16(); const boneIds = []; for (let j = 0; j < numBones; j++) boneIds.push(r.u16()); if (numBones % 2 === 1) r.sk(2); const inf = r.u32(); const numVerts = r.u32(); const countElements = inf * numVerts; const boneIndices = new Int16Array(countElements); for (let j = 0; j < countElements; j++) boneIndices[j] = r.u16(); if (countElements % 2 === 1) r.sk(2); const boneWeights = new Uint16Array(countElements); for (let j = 0; j < countElements; j++) boneWeights[j] = r.u16(); if (countElements % 2 === 1) r.sk(2); skins[geoIdx] = { numBones, boneIds, inf, numVerts, boneIndices, boneWeights }; } return skins; }
+    function decodeFloat16(binary) { const sign = (binary & 0x8000) ? -1 : 1; const exp = (binary >> 10) & 0x1F; const frac = binary & 0x3FF; if (exp === 0) return sign * Math.pow(2, -14) * (frac / 1024); if (exp === 0x1F) return frac ? NaN : sign * Infinity; return sign * Math.pow(2, exp - 15) * (1 + frac / 1024); }
+    function applySkin(geo, skin) { const numVerts = geo.attributes.position.count; if (numVerts !== skin.numVerts) return; const si = new Uint16Array(numVerts * 4); const sw = new Float32Array(numVerts * 4); const influences = Math.min(4, skin.inf); for (let i = 0; i < numVerts; i++) { let wSum = 0; for (let j = 0; j < influences; j++) { const idx = i * skin.inf + j; const internalBone = skin.boneIndices[idx]; const weight = decodeFloat16(skin.boneWeights[idx]); const outIdx = i * 4 + j; si[outIdx] = internalBone; sw[outIdx] = (Number.isFinite(weight) && weight > 0) ? weight : 0; wSum += sw[outIdx]; } if (wSum > 0) { for (let j = 0; j < influences; j++) sw[i * 4 + j] /= wSum; } else { sw[i * 4] = 1; } } geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4)); }
+    function parseBindChunk(r){ const numRec=r.u32(); const mats={}; for(let i=0;i<numRec;i++){ const nodeId=r.u32(); const f=[]; for(let j=0;j<12;j++) f.push(r.f32()); const M=new THREE.Matrix4(); M.set(f[0],f[3],f[6],f[9], f[1],f[4],f[7],f[10], f[2],f[5],f[8],f[11], 0,0,0,1); mats[nodeId]=M; } return mats; }
     function build(gd, td, od, fname, mats, anim, skin, bindMats){
         const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});
-        
-        const geos=gd.map((d, i)=>{
-            const g=new THREE.BufferGeometry(); g.userData={n:d.n};
-            d.vb.forEach(v=>{
-                if(v.t===1) g.setAttribute('position', new THREE.BufferAttribute(v.d,3));
-                if(v.t===3) g.setAttribute('normal', new THREE.BufferAttribute(v.d,3));
-                if(v.t===2){ for(let k=1;k<v.d.length;k+=2) v.d[k]=1.0-v.d[k]; g.setAttribute('uv', new THREE.BufferAttribute(v.d,2)); }
-            });
-            let idxs=[], o=0;
-            d.sm.forEach((s,subIdx)=>{ for(let k=0;k<s.x.length;k++) idxs.push(s.x[k]); g.addGroup(o,s.x.length,subIdx); o+=s.x.length; });
-            g.setIndex(idxs);
-            
-            // Match each Geometry with its unique skinning data
-            if (skin && skin[i]) {
-                applySkin(g, skin[i]);
-                g.userData.skinData = skin[i];
-            }
-            return g;
-        });
-
-        const boneIndicesSet = new Set();
-        if (skin) {
-            Object.values(skin).forEach(sk => {
-                if (sk.boneIds) {
-                    sk.boneIds.forEach(id => boneIndicesSet.add(id));
-                }
-            });
-        }
-        
-        const grp=new THREE.Group();
-        let nds=[];
-        if(td.t && td.t.length>0){
-            nds=td.t.map((t, idx)=>{ 
-                const o = boneIndicesSet.has(idx) ? new THREE.Bone() : new THREE.Object3D();
-                o.position.set(...t.p); 
-                o.quaternion.set(...t.q); 
-                o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); 
-                o.name=t.n; 
-                return o; 
-            });
-            td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); });
-        }
-        // =============================================================
-        
+        const geos=gd.map((d, i)=>{ const g=new THREE.BufferGeometry(); g.userData={n:d.n}; d.vb.forEach(v=>{ if(v.t===1) g.setAttribute('position', new THREE.BufferAttribute(v.d,3)); if(v.t===3) g.setAttribute('normal', new THREE.BufferAttribute(v.d,3)); if(v.t===2){ for(let k=1;k<v.d.length;k+=2) v.d[k]=1.0-v.d[k]; g.setAttribute('uv', new THREE.BufferAttribute(v.d,2)); } }); let idxs=[], o=0; d.sm.forEach((s,subIdx)=>{ for(let k=0;k<s.x.length;k++) idxs.push(s.x[k]); g.addGroup(o,s.x.length,subIdx); o+=s.x.length; }); g.setIndex(idxs); if (skin && skin[i]) { applySkin(g, skin[i]); g.userData.skinData = skin[i]; } return g; });
+        const boneIndicesSet = new Set(); if (skin) { Object.values(skin).forEach(sk => { if (sk.boneIds) { sk.boneIds.forEach(id => boneIndicesSet.add(id)); } }); }
+        const grp=new THREE.Group(); let nds=[];
+        if(td.t && td.t.length>0){ nds=td.t.map((t, idx)=>{ const o = boneIndicesSet.has(idx) ? new THREE.Bone() : new THREE.Object3D(); o.position.set(...t.p); o.quaternion.set(...t.q); o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); o.name=t.n; return o; }); td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); }); }
         grp.updateMatrixWorld(true);
-
-        // Core: Independent Mesh / SkinnedMesh generator
-        function createMesh(geo, matsArr, parentNodeIdx) {
-            // If the mesh has skinWeight injected and the scene has bones, it is a SkinnedMesh
-            if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) {
-                const skData = geo.userData.skinData;
-                const bones = [];
-                const boneInverses = [];
-                
-                // Dynamically extract the local bones associated with this mesh
-                for (let k = 0; k < skData.numBones; k++) {
-                    const nodeIdx = skData.boneIds[k];
-                    const boneNode = nds[nodeIdx];
-                    bones.push(boneNode);
-                    if (bindMats && bindMats[nodeIdx]) {
-                        boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert());
-                    } else {
-                        boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert());
-                    }
-                }
-                const skel = new THREE.Skeleton(bones, boneInverses);
-                
-                const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr;
-                const skm = new THREE.SkinnedMesh(geo, finalMat);
-                
-                let bindMatrix = null;
-                if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) {
-                    bindMatrix = bindMats[parentNodeIdx];
-                }
-                if (bindMatrix) {
-                    skm.bind(skel, bindMatrix);
-                } else {
-                    skm.bind(skel);
-                }
-                return skm;
-            } else {
-                const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr;
-                return new THREE.Mesh(geo, finalMat);
-            }
-        }
-
-        if(od.length>0){
-            od.forEach(o=>{
-                if(!geos[o.mi] || !nds[o.ti]) return;
-                const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||"");
-                let matsArr=[];
-                if(mats && o.matIdx && o.matIdx.length>0){ 
-                    matsArr=o.matIdx.map(idx=>{ 
-                        let subMat=mat.clone(); 
-                        subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase(); 
-                        return subMat; 
-                    }); 
-                } else matsArr=[mat.clone()];
-                
-                const m = createMesh(geos[o.mi], matsArr, o.ti);
-                if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false;
-                m.userData.originalName=nm; 
-                nds[o.ti].add(m);
-            });
-        } else {
-            geos.forEach((g,i)=>{ 
-                const m = createMesh(g, [mat.clone()]);
-                m.userData.originalName=g.userData.n||"m"+i; 
-                grp.add(m); 
-            });
-        }
-
-        if(anim){
-            const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; });
-            grp.userData.anim={
-                tracks: anim.tracks,
-                clips: anim.clips,
-                // Retain groups/duration for compatibility with old structure
-                groups: (anim.clips && anim.clips.length) ? anim.clips[0].groups : (anim.groups||[]),
-                duration: anim.duration,
-                nameToNode
-            };
-        }
+        function createMesh(geo, matsArr, parentNodeIdx) { if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) { const skData = geo.userData.skinData; const bones = []; const boneInverses = []; for (let k = 0; k < skData.numBones; k++) { const nodeIdx = skData.boneIds[k]; const boneNode = nds[nodeIdx]; bones.push(boneNode); if (bindMats && bindMats[nodeIdx]) { boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); } else { boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert()); } } const skel = new THREE.Skeleton(bones, boneInverses); const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; const skm = new THREE.SkinnedMesh(geo, finalMat); let bindMatrix = null; if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) { bindMatrix = bindMats[parentNodeIdx]; } if (bindMatrix) { skm.bind(skel, bindMatrix); } else { skm.bind(skel); } return skm; } else { const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; return new THREE.Mesh(geo, finalMat); } }
+        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase(); return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false; m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
+        if(anim){ const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; }); grp.userData.anim={ tracks: anim.tracks, clips: anim.clips, groups: (anim.clips && anim.clips.length) ? anim.clips[0].groups : (anim.groups||[]), duration: anim.duration, nameToNode }; }
         return grp;
     }
 </script>
+</body>
 </html>
