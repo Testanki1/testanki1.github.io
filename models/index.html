@@ -736,8 +736,22 @@
         }
     };
 
+    let globalPointerDownX = 0;
+    let globalPointerDownY = 0;
+
+    document.addEventListener('pointerdown', (e) => {
+        globalPointerDownX = e.clientX;
+        globalPointerDownY = e.clientY;
+    });
+
     document.addEventListener('click', (e) => {
         if (drawerOpen) {
+            const dx = e.clientX - globalPointerDownX;
+            const dy = e.clientY - globalPointerDownY;
+            if (Math.sqrt(dx * dx + dy * dy) > 5) {
+                return;
+            }
+
             if (!e.target.closest('#drawer') && 
                 !e.target.closest('#top-bar') && 
                 !e.target.closest('#dialog-scrim') && 
