@@ -250,7 +250,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .m3-custom-select.loading .spinner { display: block; }
 
-        /* Animation chip selector (multi-select, one-shot with progress bar) */
+        /* Animation chip selector */
         .anim-chip-row {
             display: flex; flex-wrap: wrap; gap: 8px;
             padding-top: 4px;
@@ -273,11 +273,17 @@
             -webkit-user-select: none; user-select: none;
             touch-action: manipulation;
         }
-        /* 进度条底色条：贴在按钮底部 2px 高 */
+        /* Border Progress Bar */
         .anim-chip .chip-bar {
-            position: absolute; left:0; bottom:0; height:2px; width: var(--p, 0%);
-            background: var(--md-sys-color-outline);
-            transition: background-color 0.15s ease;
+            position: absolute;
+            inset: -1.5px;
+            border-radius: inherit;
+            padding: 1.5px;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            opacity: 0;
         }
         .anim-chip.active {
             background: var(--md-sys-color-primary-container);
@@ -285,29 +291,20 @@
             border-color: var(--md-sys-color-primary-container);
         }
         .anim-chip.active .chip-bar {
-            background: var(--md-sys-color-primary);
+            opacity: 1;
+            background: conic-gradient(var(--md-sys-color-primary) var(--p, 0%), transparent 0);
         }
-        /* 循环模式：按钮右上带一个小 ∞ 标记，进度条做 stripe 往返动画 */
+        /* Loop Mode Progress */
+        .anim-chip.looping .chip-bar {
+            background: conic-gradient(from var(--ang, 0deg), transparent 0deg, var(--md-sys-color-primary) 45deg, transparent 55deg);
+        }
+        /* Loop indicator infinity symbol */
         .anim-chip.looping::after {
             content: "∞";
             position: absolute; top:2px; right:6px;
             font-size: 9px; line-height:1;
             opacity: 0.7;
             z-index: 1;
-        }
-        .anim-chip.looping .chip-bar {
-            background-image: repeating-linear-gradient(
-                90deg,
-                var(--md-sys-color-primary) 0 6px,
-                color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent) 6px 12px
-            );
-            background-size: 200% 100%;
-            animation: chip-loop-bar 0.8s linear infinite;
-            width: 100% !important;
-        }
-        @keyframes chip-loop-bar {
-            from { background-position: 0% 0; }
-            to   { background-position: 100% 0; }
         }
         .anim-chip .chip-dot {
             width:6px; height:6px; border-radius:50%;
@@ -456,7 +453,7 @@
                         <select id="sel-hull-skin" class="native-select-hidden"><option>-</option></select>
                     </div>
 
-                    <!-- Hull Animations (动态填充；没有动画则隐藏) -->
+                    <!-- Hull Animations (dynamically populated) -->
                     <div id="box-hull-anim" class="anim-chip-row" style="display:none;"></div>
                 </div>
             </div>
@@ -480,7 +477,7 @@
                         <select id="sel-turret-skin" class="native-select-hidden"><option>-</option></select>
                     </div>
 
-                    <!-- Turret Animations (动态填充) -->
+                    <!-- Turret Animations (dynamically populated) -->
                     <div id="box-turret-anim" class="anim-chip-row" style="display:none;"></div>
                 </div>
             </div>
@@ -725,7 +722,7 @@
     let currentMode = 'assembly'; 
     const slots = { hull: null, turret: null, scene: null };
     const pools = { hull:[], turret:[] };
-    // 记录每个 slot 当前激活的 clip 名集合
+    // Record active clip names for each slot
     const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
     let assetsData = null; 
     
@@ -764,7 +761,7 @@
     window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 
     // ====== ANIMATION STATE ======
-    // 每个加载的 Group 持有自己的 AnimationMixer，允许多个对象同时动画
+    // Each loaded Group holds its own AnimationMixer, allowing multiple objects to animate simultaneously
     const activeMixers = new Set();
     const DEG = Math.PI/180;
     const clock = new THREE.Clock();
@@ -783,7 +780,7 @@
     function disposeMixer(grp){
         if(!grp || !grp.userData.mixer) return;
         const mx = grp.userData.mixer;
-        // 把属于该 grp 的 action 状态清理掉
+        // Clear action states belonging to this grp
         if(grp.userData.animActions){
             for(const name in grp.userData.animActions){
                 actionState.delete(grp.userData.animActions[name]);
@@ -796,14 +793,14 @@
         grp.userData.animActions = null;
     }
 
-    // 旋转角度轨道 unwrap：相邻帧差值超过 180° 就给后面的帧累加 ±360，
-    // 避免四元数 SLERP 走反向（例如 0→360 齿轮旋转跳变）。
+    // Unwrap rotation angle tracks: if adjacent frames differ by more than 180 degrees, 
+    // add/subtract 360 degrees to subsequent frames to avoid quaternion SLERP taking the shortest path in reverse.
     function unwrapAngleTrack(keys){
         if(!keys || keys.length<2) return keys;
         const out = keys.map(k => [k[0], k[1]]);
         let offset = 0;
         for(let i=1;i<out.length;i++){
-            const prev = out[i-1][1]; // 已经是 unwrap 后的值
+            const prev = out[i-1][1]; 
             let cur = out[i][1] + offset;
             let diff = cur - prev;
             while(diff > 180)  { cur -= 360; offset -= 360; diff -= 360; }
@@ -828,7 +825,7 @@
         return keys[keys.length-1][1];
     }
 
-    // group 的三个标量通道中是否至少有一个真的随时间变化。
+    // Check if at least one of the three scalar channels in a group actually changes over time.
     function groupHasMotion(a, g){
         return [g.t0, g.t1, g.t2].some(ti => {
             const ks = a.tracks[ti];
@@ -841,9 +838,9 @@
         });
     }
 
-    // 判断 flat group 是否只是重复写入节点的绑定/初始姿态。
-    // 这类轨道是导出器常见的占位数据；若留在动态 clip 中，AnimationMixer 仍会
-    // 用它稀释另一个 action 的结果（例如 crank-l/r 各自锁住对侧曲柄）。
+    // Check if a flat group merely rewrites the node's rest pose repeatedly.
+    // Such tracks are common placeholder data from exporters; if left in a dynamic clip, 
+    // AnimationMixer will still use it to dilute the result of another action (e.g. crank-l/r locking the opposite crank).
     function flatGroupMatchesRestPose(a, g, node){
         const k0=a.tracks[g.t0], k1=a.tracks[g.t1], k2=a.tracks[g.t2];
         if(!k0?.length || !k1?.length || !k2?.length) return false;
@@ -857,7 +854,7 @@
             const q = new THREE.Quaternion().setFromEuler(
                 new THREE.Euler(x*DEG, y*DEG, z*DEG, 'ZYX')
             );
-            // q 与 -q 表示同一个旋转；angleTo 已按绝对点积处理。
+            // q and -q represent the same rotation; angleTo handles absolute dot product.
             return q.angleTo(node.quaternion) <= 0.002;
         }
         if(g.N === 4){
@@ -868,14 +865,14 @@
         return false;
     }
 
-    // 为一个 group 生成 three.js KeyframeTrack。
-    // 对旋转通道使用 unwrap 后的角度值构造欧拉，再转四元数；并做 SLERP 插值。
+    // Generate a three.js KeyframeTrack for a group.
+    // Construct Euler angles using unwrapped angle values for the rotation channel, convert to quaternion, and apply SLERP.
     function buildTracksForGroups(a, groups, nameToNode){
         const tracks = [];
-        // 按 (node,N) 去重：同一 clip 内如果多条 group 指向同一节点同一通道（极少见），
-        // 取 animated 的那条；都 animated 取第一条。
+        // Deduplicate by (node,N): if multiple groups in the same clip target the same node and channel (rare),
+        // take the animated one; if all are animated, take the first.
         const seen = new Map();
-        const unWrappedCache = new Map(); // 对 rotation 通道缓存 unwrap 后的数据
+        const unWrappedCache = new Map(); // Cache unwrapped data for the rotation channel
         const getUTrack = (idx, isRot) => {
             if(!a.tracks[idx]) return null;
             if(isRot){
@@ -893,7 +890,7 @@
 
             const isRot = (g.N === 2);
             const tr0 = getUTrack(g.t0, isRot && true), tr1 = getUTrack(g.t1, isRot), tr2 = getUTrack(g.t2, isRot);
-            // 汇总关键时间
+            // Aggregate key times
             const timeSet = new Set();
             [tr0,tr1,tr2].forEach(tr => { if(tr) tr.forEach(k => timeSet.add(k[0])); });
             const times = Array.from(timeSet).sort((a,b)=>a-b);
@@ -906,7 +903,7 @@
                 const vz = tr2 ? linearSample(tr2,t) : 0;
                 if(g.N === 1 || g.N === 4){ // Translation / Scale
                     values.push(vx, vy, vz);
-                } else if(g.N === 2){        // Rotation：欧拉角（度）→ 四元数，顺规保留原作者的 ZYX
+                } else if(g.N === 2){        // Rotation: Euler angles (degrees) -> Quaternion, keeping the original ZYX order
                     const euler = new THREE.Euler(vx*DEG, vy*DEG, vz*DEG, 'ZYX');
                     const q = new THREE.Quaternion().setFromEuler(euler);
                     values.push(q.x, q.y, q.z, q.w);
@@ -921,7 +918,7 @@
                 tracks.push(tk);
             } else if(g.N === 2){
                 const tk = new THREE.QuaternionKeyframeTrack(path+'.quaternion', timeArr, valArr);
-                // SLERP 是 QuaternionKeyframeTrack 默认插值，显式设一下
+                // SLERP is default for QuaternionKeyframeTrack, set explicitly
                 tk.setInterpolation(THREE.InterpolateLinear);
                 tracks.push(tk);
             } else if(g.N === 4){
@@ -934,7 +931,7 @@
     }
 
     function registerAnim(grp){
-        // 先清掉这个 grp 之前的 mixer（换装时旧的 mixer 要摘除）
+        // Clear previous mixer for this grp (remove old mixer when swapping equipment)
         disposeMixer(grp);
 
         const a = grp.userData.anim;
@@ -943,13 +940,13 @@
 
         const nameToNode = a.nameToNode || {};
 
-        // 兼容旧结构（fallback 字节扫描可能仍然产出 groups 而非 clips）
+        // Compatibility with old structure (fallback byte scan may still yield groups instead of clips)
         let clips = a.clips;
         if(!clips && a.groups){
             clips = [{name:'A3D_Anim', groups:a.groups}];
         }
 
-        // 计算每个 clip 的持续时间（以该 clip 涉及轨道的最后一个关键帧时间为准）
+        // Calculate duration of each clip (based on the last keyframe time of tracks involved in the clip)
         const clipDuration = (groups) => {
             let d = 0;
             for(const g of groups){
@@ -963,17 +960,17 @@
 
         const mixer = new THREE.AnimationMixer(grp);
         grp.userData.mixer = mixer;
-        grp.userData.animActions = {}; // clipName -> AnimationAction
+        grp.userData.animActions = {}; 
         activeMixers.add(mixer);
 
         const builtClips = [];
         for(const c of clips){
-            // 不能简单地把所有 flat group 都排除：idle / radar-up-idle 本身就是
-            // “保持在一个静态姿态”的 clip，虽然数值不变化，仍会真实写入骨骼。
-            // 规则：
-            //  1) 整条 clip 都是 flat → 作为姿态 clip，全部保留并参与冲突；
-            //  2) 动态 clip 中 flat 且等于绑定姿态 → 导出占位，无效果，过滤掉；
-            //  3) 动态 clip 中 flat 但偏离绑定姿态 → 是动作要求的保持姿态，保留。
+            // Cannot simply exclude all flat groups: idle / radar-up-idle are inherently
+            // clips that "hold a static pose"; although values don't change, they are truly written to bones.
+            // Rules:
+            //  1) Entire clip is flat -> treated as a pose clip, retain all and participate in conflicts;
+            //  2) Flat in a dynamic clip and equals rest pose -> exporter placeholder, no effect, filter out;
+            //  3) Flat in a dynamic clip but deviates from rest pose -> intended static pose for the action, retain.
             const hasMotion = c.groups.some(g => groupHasMotion(a, g));
             const effectiveGroups = c.groups.filter(g => {
                 const node = nameToNode[g.name];
@@ -987,8 +984,8 @@
             const dur = clipDuration(c.groups);
             const clip = new THREE.AnimationClip(c.name, dur, tracks);
 
-            // 冲突节点必须和真正交给 mixer 的有效 group 一致。否则即使冲突检测
-            // 放行，隐藏的 flat 轨道仍会把并行动画按权重混合、造成幅度减半。
+            // Conflict nodes must match the effective groups actually handed to the mixer. 
+            // Otherwise, hidden flat tracks will mix parallel animations by weight, halving the amplitude.
             const nodeSet = new Set();
             for(const g of effectiveGroups){
                 const node = nameToNode[g.name];
@@ -998,9 +995,9 @@
             builtClips.push({name:c.name, clip, groups:effectiveGroups});
         }
 
-        // 不默认播放任何 clip。每个 action 都 enabled 但 weight=0 / paused，
-        // 由用户点 UI chip 或调 toggleClip 再开启；一次性播放（LoopOnce），
-        // 播完停在末帧 (clampWhenFinished)。
+        // Do not play any clip by default. Each action is enabled but weight=0 / paused.
+        // Enabled by user clicking UI chip or calling toggleClip; one-shot playback (LoopOnce),
+        // clamps when finished.
         for(const bc of builtClips){
             const action = mixer.clipAction(bc.clip);
             action.setLoop(THREE.LoopOnce, 1);
@@ -1011,13 +1008,13 @@
             action.timeScale = 1;
             action.time = 0;
             action.paused = true;
-            action.play();     // 先让 three.js 把它挂进 mixer 里，但 weight=0/paused 时无效果
-            action._clipRef = bc.clip; // 保存 clip 引用，方便取 duration
+            action.play();     // Let three.js attach it to the mixer first, but with weight=0/paused it has no effect
+            action._clipRef = bc.clip; // Save clip reference for easy duration retrieval
             actionState.set(action, 'idle');
             grp.userData.animActions[bc.name] = action;
         }
 
-        // 把 clip 名列表挂出来，方便控制台调试：window.playClip(grp, 'shot')
+        // Expose clip names for console debugging: window.playClip(grp, 'shot')
         grp.userData.animClipNames = builtClips.map(c=>c.name);
 
         const totalTracks = builtClips.reduce((s,c)=>s+c.clip.tracks.length,0);
@@ -1025,32 +1022,32 @@
         msg(`${totalTracks} tracks · ${clips.length} clips [${clipSummary}] · ${a.duration.toFixed(2)}s`);
     }
 
-    // chip 元素 -> { grp, clipName, barEl }  用于主循环更新进度条
+    // chip element -> { grp, clipName, barEl } used for progress bar updates in main loop
     const chipRefs = new WeakMap();
-    // 每个 action 的状态：'idle' | 'once' | 'loop'
-    //  - 'idle'：未播放/已复位
-    //  - 'once'：一次性在播或已播完停在末帧（都算"占据节点"，会参与冲突检测）
-    //  - 'loop'：循环播放中
+    // Action states: 'idle' | 'once' | 'loop'
+    //  - 'idle': not playing / reset
+    //  - 'once': playing one-shot or stopped at last frame (both count as occupying nodes and participate in conflict detection)
+    //  - 'loop': currently looping
     const actionState = new WeakMap();
-    // clip -> Set<nodeUuid> 该 clip 影响的所有骨骼节点，用于冲突检测
+    // clip -> Set<nodeUuid> all bone nodes affected by this clip, used for conflict detection
     const clipAffected = new WeakMap();
-    // 长按判定阈值（ms）
+    // Long press threshold (ms)
     const LONG_PRESS_MS = 400;
 
-    // 取某个 grp 上当前激活（once/loop）的所有 action 条目 {name, action}
+    // Get all currently active (once/loop) action entries {name, action} on a grp
     function collectActiveActions(grp){
         const out = [];
         if(!grp || !grp.userData.animActions) return out;
         for(const name in grp.userData.animActions){
             const a = grp.userData.animActions[name];
             const st = actionState.get(a);
-            // once（含播完停在末帧）和 loop 都算激活，都要参与冲突检测
+            // once (including stopped at last frame) and loop are considered active and participate in conflicts
             if(st === 'once' || st === 'loop') out.push({name, action:a});
         }
         return out;
     }
 
-    // 停止/复位某个 action 回 idle
+    // Stop/reset an action back to idle
     function resetAction(grp, name){
         if(!grp || !grp.userData.animActions) return;
         const action = grp.userData.animActions[name];
@@ -1063,7 +1060,7 @@
         if(grp.userData.mixer) grp.userData.mixer.update(0);
     }
 
-    // 启动某个 action（mode: 'once' | 'loop'），不做冲突检查
+    // Start an action (mode: 'once' | 'loop'), without conflict check
     function startAction(grp, name, mode){
         if(!grp || !grp.userData.animActions) return;
         const action = grp.userData.animActions[name];
@@ -1086,67 +1083,58 @@
         actionState.set(action, mode);
     }
 
-    // 开关单个 clip：
-    //   短按（mode='once'）：一次性播 → 播完停末帧
-    //   长按（mode='loop'）：循环播放
-    //   若当前已在播/循环/末帧，不管长短按都复位回 idle
-    //   冲突检测：新 clip 影响到的节点会把别的正在影响它们的 clip 复位
+    // Toggle a single clip:
+    //   Short tap (mode='once'): single click toggles behavior. If active, cancel. If idle, play once.
+    //   Long press / right click (mode='loop'): ensures looping playback without cancelling.
     function toggleClip(grp, clipName, mode){
         if(!grp || !grp.userData.animActions) return 'idle';
         const action = grp.userData.animActions[clipName];
         if(!action) return 'idle';
         const st = actionState.get(action) || 'idle';
 
-        // 已经在任何激活状态 → 复位
-        if(st !== 'idle'){
-            resetAction(grp, clipName);
-            return 'idle';
+        const resolveConflicts = () => {
+            const clip = action._clipRef;
+            const myNodes = clipAffected.get(clip) || new Set();
+            for(const {name: otherName, action: otherAct} of collectActiveActions(grp)){
+                if(otherName === clipName) continue;
+                const otherClip = otherAct._clipRef;
+                const otherNodes = clipAffected.get(otherClip) || new Set();
+                let conflict = false;
+                for(const n of myNodes){ if(otherNodes.has(n)){ conflict = true; break; } }
+                if(conflict) resetAction(grp, otherName);
+            }
+        };
+
+        if (mode === 'loop') {
+            if (st === 'loop') return 'loop';
+            resolveConflicts();
+            startAction(grp, clipName, 'loop');
+            return 'loop';
+        } else {
+            if (st !== 'idle') {
+                resetAction(grp, clipName);
+                return 'idle';
+            }
+            resolveConflicts();
+            startAction(grp, clipName, 'once');
+            return 'once';
         }
-
-        // 冲突：找出这个 clip 影响哪些节点，把同样影响这些节点的其他激活 clip 复位
-        const clip = action._clipRef;
-        const myNodes = clipAffected.get(clip) || new Set();
-        for(const {name: otherName, action: otherAct} of collectActiveActions(grp)){
-            if(otherName === clipName) continue;
-            const otherClip = otherAct._clipRef;
-            const otherNodes = clipAffected.get(otherClip) || new Set();
-            let conflict = false;
-            for(const n of myNodes){ if(otherNodes.has(n)){ conflict = true; break; } }
-            if(conflict) resetAction(grp, otherName);
-        }
-
-        startAction(grp, clipName, mode);
-        return mode;
-    }
-
-    function isClipActive(grp, clipName){
-        if(!grp || !grp.userData.animActions) return false;
-        const a = grp.userData.animActions[clipName];
-        if(!a) return false;
-        const st = actionState.get(a);
-        return st === 'once' || st === 'loop';
-    }
-    function isClipLooping(grp, clipName){
-        if(!grp || !grp.userData.animActions) return false;
-        const a = grp.userData.animActions[clipName];
-        if(!a) return false;
-        return actionState.get(a) === 'loop';
     }
 
     window.playClip = (grp, n) => { if(grp) toggleClip(grp, n, 'once'); };
     window.stopClip = (grp, n) => { if(grp) resetAction(grp, n); };
     window.loopClip = (grp, n) => { if(grp) toggleClip(grp, n, 'loop'); };
 
-    // 渲染某个 slot 的动作 chip 行
+    // Render animation chip row for a slot
     function renderAnimChips(type){
         const box = document.getElementById(`box-${type}-anim`);
         if(!box) return;
         const slot = slots[type];
         const names = slot?.group?.userData?.animClipNames;
 
-        // 清掉已有 chip
+        // Clear existing chips
         box.innerHTML = '';
-        // 旧 chip 的 ref 不用手动清，WeakMap 会自动回收
+        // Old chip refs don't need manual cleanup, WeakMap handles it
         if(!names || names.length === 0){
             box.style.display = 'none';
             activeClips[type].clear();
@@ -1155,7 +1143,7 @@
 
         const label = document.createElement('div');
         label.className = 'anim-chip-label';
-        label.innerText = userLang === 'zh' ? '动作（可多选，点击播放/再次点击复位）' : 'Animations (one-shot · tap to play/reset)';
+        label.innerText = userLang === 'zh' ? '动作（左键/点击: 播放/复位，右键/长按: 循环）' : 'Animations (Left-click/Tap: Play/Reset, Right-click/Hold: Loop)';
         box.appendChild(label);
 
         for(const name of names){
@@ -1163,42 +1151,14 @@
             btn.className = 'anim-chip';
             btn.type = 'button';
             const displayName = formatName(name);
-            btn.innerHTML = `<span class="chip-bar" style="--p:0%"></span><span class="chip-dot"></span><span class="chip-text">${displayName}</span>`;
+            btn.innerHTML = `<span class="chip-bar" style="--p:0%; --ang:0deg;"></span><span class="chip-dot"></span><span class="chip-text">${displayName}</span>`;
             const bar = btn.querySelector('.chip-bar');
             chipRefs.set(btn, { grp: slot.group, clipName: name, bar, type });
 
-            // 长按检测：pointerdown 起一个 LONG_PRESS_MS 的定时器；
-            // 期间 pointerup/pointerleave/cancel 早于定时器 → 短按（once），
-            // 定时器触发 → 长按（loop），并阻止后续 click。
             let longPressTimer = null;
             let longPressed = false;
-            const startPress = (ev) => {
-                // 仅主键触发（鼠标左键/触摸）
-                if(ev.button !== undefined && ev.button !== 0) return;
-                longPressed = false;
-                btn.classList.add('pressing');
-                longPressTimer = setTimeout(() => {
-                    longPressed = true;
-                    triggerAction('loop');
-                    if(navigator.vibrate) navigator.vibrate(15);
-                }, LONG_PRESS_MS);
-            };
-            const endPress = (ev) => {
-                btn.classList.remove('pressing');
-                if(longPressTimer){
-                    clearTimeout(longPressTimer); longPressTimer = null;
-                }
-                if(!longPressed){
-                    // 短按：如果当前正在循环，再次点按仍然是"复位"的语义
-                    triggerAction('once');
-                }
-            };
-            const cancelPress = () => {
-                btn.classList.remove('pressing');
-                if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; }
-                longPressed = false;
-            };
-            function triggerAction(mode){
+
+            const triggerAction = (mode) => {
                 const result = toggleClip(slot.group, name, mode);
                 if(result === 'idle'){
                     activeClips[type].delete(name);
@@ -1207,25 +1167,59 @@
                 } else {
                     activeClips[type].add(name);
                 }
-                // 同步所有 chip 的显示（因为冲突可能复位了别的按钮）
+                // Sync all chip UI states (conflicts might have reset other buttons)
                 syncChipUI(type);
-            }
+            };
 
-            btn.addEventListener('pointerdown', startPress);
-            btn.addEventListener('pointerup', endPress);
+            // Long press detection: pointerdown starts a LONG_PRESS_MS timer for touch
+            btn.addEventListener('pointerdown', (ev) => {
+                if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+                btn.classList.add('pressing');
+                if (ev.pointerType === 'touch') {
+                    longPressed = false;
+                    longPressTimer = setTimeout(() => {
+                        longPressed = true;
+                        triggerAction('loop');
+                        if(navigator.vibrate) navigator.vibrate(15);
+                    }, LONG_PRESS_MS);
+                }
+            });
+
+            // pointerup/leave before timer -> short tap (once)
+            btn.addEventListener('pointerup', (ev) => {
+                btn.classList.remove('pressing');
+                if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+                
+                if (ev.pointerType === 'touch') {
+                    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                    if (!longPressed) triggerAction('once');
+                } else {
+                    triggerAction('once');
+                }
+            });
+
             btn.addEventListener('pointerleave', () => {
-                // 移出按钮时取消长按计时，但已经长按触发 loop 了就保留
-                if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; }
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
                 btn.classList.remove('pressing');
             });
-            btn.addEventListener('pointercancel', cancelPress);
-            btn.addEventListener('contextmenu', (e) => e.preventDefault());
+            
+            btn.addEventListener('pointercancel', () => {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                btn.classList.remove('pressing');
+            });
+
+            btn.addEventListener('contextmenu', (ev) => {
+                ev.preventDefault();
+                if (ev.pointerType !== 'touch') {
+                    triggerAction('loop');
+                }
+            });
             box.appendChild(btn);
         }
         box.style.display = 'flex';
     }
 
-    // 同步某个 slot 下所有 chip 按钮的视觉状态（不重建 DOM）
+    // Sync visual states of all chip buttons in a slot (without rebuilding DOM)
     function syncChipUI(type){
         const box = document.getElementById(`box-${type}-anim`);
         if(!box) return;
@@ -1244,7 +1238,7 @@
         });
     }
 
-    // 每帧更新所有 chip 的进度条与状态样式
+    // Update progress bar and state styles of all chips every frame
     function updateChipProgress(){
         const chips = document.querySelectorAll('.anim-chip');
         chips.forEach(btn => {
@@ -1264,18 +1258,23 @@
             btn.classList.add('active');
             if(st === 'loop'){
                 btn.classList.add('looping');
-                // 循环模式下进度条由 CSS 条纹动画驱动，不按 time 设宽度
+                // Loop mode progress is driven by angle animation
+                if(!dur) return;
+                const time = action.time;
+                const pct = (time / dur) % 1;
+                const ang = pct * 360;
+                ref.bar.style.setProperty('--ang', `${ang}deg`);
                 return;
             }
             btn.classList.remove('looping');
             if(!dur) return;
-            // once 模式：按 time/dur 设进度；播完停在 100%，状态保持 'once'（仍是激活的）
+            // once mode: set progress by time/dur
             let pct;
             if(action.time >= dur - 0.001){
                 pct = 100;
                 action.time = dur;
-                action.paused = true; // 冻结在末帧
-                // 状态保持 'once'，不要改成别的，否则冲突检测会漏掉
+                action.paused = true; // freeze at last frame
+                // Keep state as 'once' to participate in conflict detection
             } else {
                 pct = Math.max(0, Math.min(1, action.time / dur)) * 100;
             }
@@ -1852,7 +1851,7 @@
     function equipAssembly(grp, fname, type) {
         if(slots[type]) {
             const old = slots[type].group;
-            // 先把旧对象的 mixer 释放，避免继续 tick
+            // Dispose old object's mixer to avoid continuing to tick
             disposeMixer(old);
             groupAssembly.remove(old);
             dispose(old);
@@ -1861,9 +1860,9 @@
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
         fitCamera();
 
-        // hull 和 turret 都注册自己的动画，mixer 各自独立，可以同时跑
+        // hull and turret register their own animations, independent mixers, can run simultaneously
         registerAnim(grp);
-        // 渲染动作 chip（没动画的模型会自动隐藏）
+        // Render animation chips (models without animations will auto-hide)
         activeClips[type].clear();
         renderAnimChips(type);
     }
@@ -1981,11 +1980,11 @@
             } else if(cT===8){
                 bindMats = parseBindChunk(r);
             } else if(cT!==1){
-                // 保持原作者的启发式顺序：先试"物体描述"（meshIdx, nodeIdx, matIdxs...），
-                // 再试"旧格式材质"（name + skip12 + texName）。都失败则整块跳过。
-                // 注意：新格式（SP/RF）里 cT=4 看起来是 name+16 字节的材质参数块，但那 16 字节
-                // 的语义我们没完全搞清楚（它不是 RGBA，第四个字段常常是 0，会把材质设成全透明），
-                // 为避免把模型弄成不可见，这里只识别"旧格式"的两种结构。
+                // Maintain original author's heuristic order
+                // Try old format material, skip if both fail
+                // Note: in new format cT=4 seems to be name+16 bytes material params, but semantics are unclear
+                // not RGBA, 4th field is often 0 making it fully transparent,
+                // to avoid invisible models, only recognize the two old format structures here.
                 let tOff=r.o, isObj=true;
                 for(let i=0;i<count;i++){ if(tOff+12>nxt){isObj=false;break;} tOff+=8; let cc=r.v.getUint32(tOff,1); tOff+=4+cc*4; }
                 if(isObj && tOff===nxt && count>0){
@@ -2014,7 +2013,7 @@
                             mats.push({n:mName, t:tName});
                         }
                     }
-                    // else：都不匹配，整块跳过（r.o 不动，下面 r.o=nxt 会跳过）
+                    // else: no match, skip block
                 }
             }
             r.o=nxt;
@@ -2029,11 +2028,11 @@
             for(let k=0;k<nk;k++){ const t=r.f32(), v=r.f32(); keys.push([t,v]); }
             tracks.push(keys);
         }
-        // 对旋转通道的角度轨道做 unwrap：如果相邻帧跳变超过 180°，在后面累计加/减 360，
-        // 这样 three.js 的 SLERP 不会走错方向；播放时我们在取四元数前再 normalize 到 [-180,180]
-        // （这里只标记，实际 unwrap 在构建 KeyframeTrack 前按 group.N 决定）
+        // Unwrap rotation angle tracks: add/subtract 360 degrees if jump > 180
+        // so SLERP doesn't take the wrong direction
+        // (Mark only, actual unwrap before building KeyframeTrack)
         const clips=[]; let maxTime=0;
-        // 为每个 clip 单独保留 group 列表（不再跨 clip merge）
+        // Keep group list per clip (no longer merge across clips)
         function isAnimatedTrack(tidx){
             const ks = tracks[tidx]; if(!ks || ks.length<2) return false;
             const v0 = ks[0][1];
@@ -2055,7 +2054,7 @@
                 clips.push({name:clipName, groups});
             }
         } catch(e) {
-            // Fallback：字节扫描，合并为一个虚拟 clip，保持旧行为
+            // Fallback: byte scan, merge into a virtual clip, preserve old behavior
             console.warn('Anim clip parse fell back to byte-scan:', e);
             const groups=[];
             let p=r.o;
@@ -2287,7 +2286,7 @@
             grp.userData.anim={
                 tracks: anim.tracks,
                 clips: anim.clips,
-                // 保留 groups/duration 字段以兼容 fallback/旧引用
+                // Retain groups/duration for compatibility with old structure
                 groups: (anim.clips && anim.clips.length) ? anim.clips[0].groups : (anim.groups||[]),
                 duration: anim.duration,
                 nameToNode
@@ -2296,6 +2295,4 @@
         return grp;
     }
 </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a1903a25ef402c82',t:'MTc4MzY5MzQxNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
