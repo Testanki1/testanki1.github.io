@@ -70,7 +70,7 @@
             user-select: none;
         }
 
-        /* HARD LOCKED DOM ROOT - FIXES VIEWPORT BUGS */
+        /* Hard locked DOM root - fixes viewport bugs */
         html, body {
             width: 100%; height: 100%;
             margin: 0; padding: 0;
@@ -113,12 +113,6 @@
             max-width: 90vw; width: max-content; box-sizing: border-box; text-align: center; word-break: break-word; line-height: 1.4;
         }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-        #drawer-scrim {
-            position: fixed; inset: 0; background: rgba(0, 25, 38, 0.6); 
-            opacity: 0; pointer-events: none; z-index: 80; transition: 0.3s cubic-bezier(0.2,0,0,1);
-        }
-        #drawer-scrim.show { opacity: 1; pointer-events: auto; }
 
         #drawer { 
             position: absolute; top: 0; right: 0; bottom: 0; width: 360px; max-width: 95vw; 
@@ -328,8 +322,7 @@
 
     <div id="toast"><span>Ready</span></div>
 
-    <!-- Modals & Scrims -->
-    <div id="drawer-scrim" onclick="window.toggleDrawer()"></div>
+    <!-- Modals -->
     <div id="dialog-scrim"></div>
     
     <div id="m3-dialog" class="m3-dialog">
@@ -435,12 +428,10 @@
     import { TDSLoader } from 'three/addons/loaders/TDSLoader.js'; 
     import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'; 
 
-    // Constants
     const ASSETS_INDEX_URL = "https://testanki1.github.io/models/assets.json";
     const ICON_BASE_EQUIP = "https://testanki1.github.io/equipment_icons";
     const ICON_BASE_SKIN = "https://testanki1.github.io/skin_icons";
 
-    // --- I18n System ---
     const userLang = navigator.language.startsWith('zh') ? 'zh' : 'en';
     const RES_BASE = userLang === 'zh' ? "https://res.3dtank.com" : "https://s.eu.tankionline.com";
     
@@ -588,7 +579,6 @@
     const lg = new THREE.Group(); scene.add(lg); lg.add(new THREE.AmbientLight(0xffffff, 1.2));
     const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun); lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
-    // Improved Resize Handler to fix mobile orientation change UI bugs
     window.addEventListener('resize', () => {
         const updateLayout = () => {
             const w = window.innerWidth;
@@ -599,7 +589,6 @@
             camera.updateProjectionMatrix();
             renderer.setSize(w, h);
             
-            // Clear mobile swipe inline styles to prevent layout breaks on orientation change
             const drawerEl = document.getElementById('drawer');
             if (drawerEl) {
                 drawerEl.style.transform = '';
@@ -612,7 +601,6 @@
         setTimeout(updateLayout, 150); 
         setTimeout(updateLayout, 500); 
     });
-    // Trigger layout init immediately
     window.dispatchEvent(new Event('resize'));
 
     const activeMixers = new Set(); const DEG = Math.PI/180; const clock = new THREE.Clock();
@@ -733,24 +721,31 @@
         });
     }
 
-    // --- Drawer Swipe & Interactivity ---
     let drawerOpen = true;
     window.toggleDrawer = function() {
         drawerOpen = !drawerOpen;
-        const drawer = document.getElementById('drawer'); const scrim = document.getElementById('drawer-scrim');
+        const drawer = document.getElementById('drawer');
         
-        // Force reset inline transform left over from releasing a swipe halfway
         drawer.style.transform = ''; 
         drawer.style.transition = '';
         
         if(drawerOpen) { 
             drawer.classList.add('open'); document.body.classList.add('drawer-open');
-            scrim.classList.add('show'); 
         } else { 
             drawer.classList.remove('open'); document.body.classList.remove('drawer-open');
-            scrim.classList.remove('show');
         }
     };
+
+    document.addEventListener('click', (e) => {
+        if (drawerOpen) {
+            if (!e.target.closest('#drawer') && 
+                !e.target.closest('#top-bar') && 
+                !e.target.closest('#dialog-scrim') && 
+                !e.target.closest('.m3-dialog')) {
+                window.toggleDrawer();
+            }
+        }
+    });
 
     const drawerEl = document.getElementById('drawer');
     drawerEl.addEventListener('touchstart', (e) => {
@@ -795,7 +790,6 @@
         swipeStartY = 0; currentSwipeY = 0;
     });
 
-    // --- Custom M3 Dialog System ---
     let dialogCallback = null;
     function showDialog(title, desc, isDanger, confirmTxt, callback) {
         document.getElementById('dialog-title').innerText = title;
@@ -821,13 +815,11 @@
     document.getElementById('dialog-scrim').onclick = closeDialog;
     document.getElementById('dialog-confirm').onclick = () => { if(dialogCallback) dialogCallback(); closeDialog(); };
 
-
     function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
     function log(msgText) { const div = document.createElement('div'); div.className = `log-line log-ok`; div.innerText = msgText; logBox.appendChild(div); logBox.scrollTop = logBox.scrollHeight; }
 
     applyI18n(); document.body.classList.remove('fouc-loading');
 
-    // Screenshot
     document.getElementById('btn-cam').onclick = () => {
         const tw = 3840; const th = 2160; const ow = innerWidth; const oh = innerHeight; const opr = renderer.getPixelRatio(); const oa = camera.aspect;
         renderer.setPixelRatio(1); renderer.setSize(tw, th, false); camera.aspect = tw / th; camera.updateProjectionMatrix();
@@ -841,7 +833,6 @@
         if(active) { box.classList.add('visible'); if(!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad(); } else { box.classList.remove('visible'); }
     }
 
-    // --- Icon Grid Select UI Builder ---
     async function renderIconGrid(nativeSelectId, type, items) {
         const nativeSel = document.getElementById(nativeSelectId); const container = nativeSel.parentElement;
         const oldGrid = container.querySelector('.icon-grid-wrapper'); if (oldGrid) oldGrid.remove();
@@ -871,6 +862,12 @@
         container.insertBefore(wrapper, nativeSel);
     }
 
+    async function updateSkinSelect(type, name) {
+        const skins = assetsData[`${type}s`][name] || {}; const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) })); skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
+        await renderIconGrid(`sel-${type}-skin`, 'skin', skinItems);
+        document.getElementById(`sel-${type}-skin`).onchange = () => { if(currentMode==='assembly') triggerLoad(type); };
+    }
+
     async function populateUI() {
         if(!assetsData) return;
         const hullKeys = Object.keys(assetsData.hulls || {}); const hullItems = hullKeys.map(k => ({ value: k, label: formatName(k) }));
@@ -891,16 +888,8 @@
         if(turretItems.length) await updateSkinSelect('turret', turretItems[0].value);
     }
 
-    async function updateSkinSelect(type, name) {
-        const skins = assetsData[`${type}s`][name] || {}; const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) })); skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
-        await renderIconGrid(`sel-${type}-skin`, 'skin', skinItems);
-        document.getElementById(`sel-${type}-skin`).onchange = () => { if(currentMode==='assembly') triggerLoad(type); };
-    }
-
-    // Initialization
     (async function init() {
         if (window.innerWidth <= 768) { drawerOpen = false; document.getElementById('drawer').classList.remove('open'); }
-        else { document.getElementById('drawer-scrim').classList.add('show'); }
         
         try {
             msg(T.loading); const resp = await fetch(ASSETS_INDEX_URL); if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
@@ -910,7 +899,6 @@
         } catch(e) { console.error(e); msg(String(e.message || e)); }
     })();
 
-    // --- Core Loading Handlers ---
     let loadingState = { hull: false, turret: false, scene: false };
     
     async function fetchMeta(path) {
@@ -1093,7 +1081,6 @@
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}})}
     function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.y+s);camera.lookAt(c);controls.update()}
 
-    /* Binary File Logic - Standard Logic Restrained */
     class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
     function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw new Error("Invalid A3D header"); r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); else throw new Error(`Unsupported A3D version: ${v}`); }
     function pV2(r,n){ let md=[],td=[],tp=[],od=[]; let fT=r.v.getUint32(r.o,1),fS=r.v.getUint32(r.o+4,1); if(fT===1 && fS>=r.v.byteLength-24) r.o=16; while(r.o<r.v.byteLength){ const cT=r.u32(),cS=r.u32(),nxt=r.o+cS,count=r.u32(); if(cT===2){ for(let i=0;i<count;i++){ let m={n:r.str()}; r.sk(28); m.vc=r.u32(); const bc=r.u32(); m.vb=[]; for(let j=0;j<bc;j++){ const k=r.u32(); let s=3; if(k===2)s=2; else if(k===5||k>=7)s=4; const d=new Float32Array(m.vc*s); for(let l=0;l<m.vc*s;l++)d[l]=r.f32(); m.vb.push({t:k,d}); } const sc=r.u32(); m.sm=[]; for(let j=0;j<sc;j++){ const ic=r.u32(),x=new Uint16Array(ic); for(let k=0;k<ic;k++)x[k]=r.u16(); r.sk((((ic*2+3)>>2)*4)-(ic*2)); m.sm.push({x}); } md.push(m); } } r.o=nxt; } return build(md,{t:[],p:[]},[],n,[],null,null,null); }
