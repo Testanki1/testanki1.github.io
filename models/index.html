@@ -1111,6 +1111,11 @@
             let group;
             if(modelEntry.name.endsWith('.a3d')) { const resp = await fetch(modelUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`); group = parseA3D(await resp.arrayBuffer(), modelEntry.name);
             } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`); group = await loader.loadAsync(modelUrl); group.traverse(o => { if(o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:2}); o.userData.originalName = o.name; } }); }
+            // Recenter legacy skins (XT/DC/PR/UT/...) that were authored with the
+            // root pivot at non-origin scene coordinates.  Safe no-op for modern
+            // skins whose pivot is already at (0,0,0).
+            const pivotNames = type === 'hull' ? ['hull', 'Hull', 'body'] : ['turret', 'Turret'];
+            recenterModelAtPivot(group, pivotNames);
             pools[type] =[];
             if(imgEntries.length > 0) { const texPromises = imgEntries.map(async entry => { const texUrl = `${RES_BASE}/${pathStr}/${entry.name}`; const tex = await new THREE.TextureLoader().loadAsync(texUrl); setupTex(tex); tex.name = entry.name; return { name: entry.name, tex: tex }; }); pools[type] = await Promise.all(texPromises); applyTexturesFromPool(group, pools[type]); }
             equipAssembly(group, modelEntry.name, type); msg(`${type.toUpperCase()} Ready`);
@@ -1527,9 +1532,151 @@
 
     async function loadModelFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
-        if (ext === 'a3d') { return parseA3D(await file.arrayBuffer(), file.name); } 
-        else if (ext === '3ds') { const loader = new TDSLoader(); loader.setResourcePath(''); const g = await loader.loadAsync(URL.createObjectURL(file)); g.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }}); return g; } 
+        let grp;
+        if (ext === 'a3d') { grp = parseA3D(await file.arrayBuffer(), file.name); }
+        else if (ext === '3ds') { const loader = new TDSLoader(); loader.setResourcePath(''); grp = await loader.loadAsync(URL.createObjectURL(file)); grp.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }}); }
         else { throw new Error(`Unsupported file extension: .${ext}`); }
+        // Best-effort recenter for user-imported legacy files too.
+        recenterModelAtPivot(grp, ['hull','Hull','turret','Turret','body']);
+        return grp;
+    }
+
+    // ---- Legacy-model pivot correction ----
+    // Old skins (XT / DC / PR / UT / LC, plus SP-style "multi-root" rigs) were
+    // authored either with the root pivot sitting at arbitrary scene coordinates
+    // (e.g. "turret" at (1634,-2511,0) or "hull" at (1124,610,-41)) OR with the
+    // body mesh offset from a separate "root" helper that owns the mount point
+    // (e.g. hornet SP).  Either problem makes the turret appear thousands of
+    // units away from / inside the hull once mount-point snapping runs.
+    //
+    // Strategy: pick ONE pivot node per model and shift all root children so
+    // that pivot lands at local (0,0,0).  Pivot priority (hulls):
+    //   1) A node explicitly named "root"/"pivot" (SP-style rigs).
+    //   2) The top-most root-level ancestor of any node whose name contains
+    //      "mount" (this guarantees the mount stays at its authored offset
+    //      from the pivot — the critical invariant for snapTurret).
+    //   3) A node named exactly "hull" / "Hull" / "turret" / "Turret".
+    //   4) A node whose name contains "hull" / "turret" / "body".
+    // If nothing matches we leave the model untouched.
+    function recenterModelAtPivot(grp, pivotNames) {
+        if (!grp) return null;
+        grp.updateMatrixWorld(true);
+
+        // Build parent map for traversal
+        const parent = new Map();
+        grp.traverse(o => { o.children.forEach(c => parent.set(c, o)); });
+        const isRootChild = o => o.parent === grp;
+        const rootAncestor = o => {
+            let cur = o;
+            while (cur && cur.parent && cur.parent !== grp) cur = parent.get(cur);
+            return cur && cur.parent === grp ? cur : null;
+        };
+
+        let pivot = null;
+        const wanted = (pivotNames || []).map(s => s.toLowerCase());
+
+        // 1) "root" / "pivot" node (SP rig convention)
+        if (!pivot) {
+            grp.traverse(o => {
+                if (pivot || !o.name) return;
+                const ln = o.name.toLowerCase();
+                if (ln === 'root' || ln === 'pivot') pivot = o;
+            });
+        }
+
+        // 2) top-most root ancestor of any "mount*" node (for hulls).  This is
+        //    the most reliable signal because the mount point MUST be in the
+        //    right place relative to the pivot for snapTurret to work.
+        if (!pivot) {
+            let mountNode = null;
+            grp.traverse(o => {
+                if (mountNode || !o.name) return;
+                const ln = o.name.toLowerCase();
+                // Only treat it as a mount helper if the name starts with
+                // "mount" — not "sur_mount" or similar; but "mount03" etc. ok.
+                if (ln === 'mount' || /^mount[\w\d]*$/.test(ln)) mountNode = o;
+            });
+            if (mountNode) pivot = rootAncestor(mountNode);
+        }
+
+        // 3) Exact name match from caller (hull/Hull/turret/Turret/body)
+        if (!pivot) {
+            grp.traverse(o => {
+                if (pivot || !o.name) return;
+                const ln = o.name.toLowerCase();
+                if (wanted.some(w => ln === w)) pivot = o;
+            });
+        }
+
+        // 4) Contains-name match
+        if (!pivot) {
+            grp.traverse(o => {
+                if (pivot || !o.name) return;
+                const ln = o.name.toLowerCase();
+                if (wanted.some(w => ln.includes(w))) pivot = o;
+            });
+        }
+
+        // 5) If there is exactly one root-level Object3D (non-Mesh) child,
+        //    treat it as the pivot.  Handles unexpected rigs gracefully.
+        if (!pivot) {
+            const roots = grp.children.filter(c => c.isObject3D && !c.isMesh && !c.isLight && !c.isCamera);
+            if (roots.length === 1) pivot = roots[0];
+        }
+
+        if (!pivot) return null;
+
+        const pivotLocal = new THREE.Vector3();
+        pivot.getWorldPosition(pivotLocal);
+        pivotLocal.applyMatrix4(grp.matrixWorld.clone().invert());
+
+        const len = pivotLocal.length();
+        if (len < 0.5) return pivot;
+
+        const shift = pivotLocal.clone().negate();
+        grp.children.forEach(child => { child.position.add(shift); });
+        grp.userData.recenterShift = shift.clone();
+        grp.userData.pivotNodeName = pivot.name || null;
+
+        // After shifting, skeletons may still hold stale boneInverses that
+        // were computed from pre-shift world matrices (boneInverses are
+        // calculated in build() BEFORE recenter runs).  Rebuild them so skinned
+        // meshes don't jump to the pre-shift bind pose when animation starts.
+        grp.updateMatrixWorld(true);
+        grp.traverse(o => {
+            if (o.isSkinnedMesh && o.skeleton) {
+                o.skeleton.calculateInverses();
+            }
+        });
+
+        return pivot;
+    }
+
+    // Estimate a reasonable turret mount point on a hull that has no explicit
+    // "mount" helper: project to the top center of the hull's visible bounding
+    // box (ignoring invisible collision Box* / bound* helpers).
+    function estimateMountPoint(grp) {
+        const box = new THREE.Box3();
+        let hasAny = false;
+        grp.traverse(o => {
+            if (!o.isMesh || o.visible === false) return;
+            const n = (o.name || '').toLowerCase();
+            if (n.match(/box\d*|bound|col|shape/) && !n.includes('mount')) return; // skip collision helpers
+            const geo = o.geometry;
+            if (!geo) return;
+            if (!geo.boundingBox) geo.computeBoundingBox();
+            if (!geo.boundingBox) return;
+            const wb = geo.boundingBox.clone().applyMatrix4(o.matrixWorld);
+            if (!hasAny) { box.copy(wb); hasAny = true; } else box.union(wb);
+        });
+        if (!hasAny) return null;
+        // In Tanki's A3D coordinate convention (after root rotation) Y is up and
+        // Z is forward; the turret sits on the top (+Z here before root rotation)
+        // near the middle of the hull.  Use the max-Z, X-center, Y-center point.
+        const pt = new THREE.Vector3((box.min.x + box.max.x) * 0.5,
+                                     (box.min.y + box.max.y) * 0.5,
+                                     box.max.z * 0.7 + box.min.z * 0.3);
+        return pt;
     }
 
     function equipAssembly(grp, fname, type) {
@@ -1540,12 +1687,41 @@
     }
 
     function scanMount(grp) {
-        let found = false; grp.updateMatrixWorld(true);
-        grp.traverse(o => { if(found) return; if(o.name && o.name.toLowerCase().includes("mount")) { const worldPos = new THREE.Vector3(); o.getWorldPosition(worldPos); mountPos = root.worldToLocal(worldPos.clone()); found = true; } });
-        if(!found) mountPos = null;
+        mountPos = null;
+        grp.updateMatrixWorld(true);
+        // Primary: look for a node explicitly named "mount" (case-insensitive).
+        const worldPos = new THREE.Vector3();
+        let found = false;
+        grp.traverse(o => {
+            if (found || !o.name) return;
+            if (o.name.toLowerCase().includes("mount")) {
+                o.getWorldPosition(worldPos);
+                found = true;
+            }
+        });
+        if (found) {
+            mountPos = root.worldToLocal(worldPos.clone());
+            return;
+        }
+        // Fallback: estimate from the visible bounding box of the hull so turrets
+        // still sit in a sensible place on skins that lack a mount helper.
+        const est = estimateMountPoint(grp);
+        if (est) {
+            // est is in grp-local world space (post-recenter); convert to root-local
+            mountPos = root.worldToLocal(grp.localToWorld(est.clone()));
+        }
     }
-    
-    function snapTurret() { if(slots.turret) { if(slots.hull && mountPos) slots.turret.group.position.copy(mountPos); else slots.turret.group.position.set(0,0,0); } }
+
+    function snapTurret() {
+        if(!slots.turret) return;
+        if(slots.hull && mountPos) {
+            slots.turret.group.position.copy(mountPos);
+            // Reset rotation so the turret aligns with the hull forward direction.
+            slots.turret.group.quaternion.identity();
+        } else {
+            slots.turret.group.position.set(0,0,0);
+        }
+    }
     
     function applyNormalTexture(tex) {
         const base = tex.name.toLowerCase().split('.')[0];
@@ -1609,5 +1785,5 @@
         return grp;
     }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a1967208baad70b8',t:'MTc4Mzc1ODYxOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a1967208baad70b8',t:'MTc4Mzc1ODYxOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a196c1da3a92c235',t:'MTc4Mzc2MTg4OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
