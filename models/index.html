@@ -258,10 +258,6 @@
         .btn-add-file .material-symbols-rounded { margin-right: 8px; font-size: 20px; }
         .btn-add-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
-        .log-box { font-family: 'Consolas', monospace; font-size: 11px; color: var(--md-sys-color-outline); background: #000; padding: 10px; border-radius: var(--shape-s); height: 100px; overflow-y: auto; margin-bottom: 10px; display:none; }
-        .log-line { margin-bottom: 2px; border-bottom: 1px solid #222; padding-bottom: 2px; }
-        .log-ok { color: var(--md-sys-color-primary); }
-
         ::-webkit-scrollbar { width: 6px; } 
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--md-sys-color-surface-container-highest); border-radius: 3px; }
@@ -402,11 +398,9 @@
             <!-- Hidden Scene Card -->
             <div class="m3-card" id="group-scene">
                 <div class="card-title" style="color:var(--scene)" id="t-scene-title">Map / Garage</div>
-                <div id="scene-log" class="log-box"></div>
                 <div class="control-col">
                     <div id="box-scene"><select id="sel-scene-var" class="native-select-hidden"></select></div>
                 </div>
-                <button class="btn-text error t-remove-env" id="btn-clear-scene" style="margin-top: 4px;">Remove Environment</button>
             </div>
         </div>
 
@@ -425,6 +419,7 @@
     <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { FlyControls } from 'three/addons/controls/FlyControls.js';
     import { TDSLoader } from 'three/addons/loaders/TDSLoader.js'; 
     import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'; 
 
@@ -462,7 +457,6 @@
             lblEnv: "环境",
             betaLabel: "显示环境 (Beta)",
             sceneTitle: "地图 / 车库",
-            removeEnv: "移除环境",
             exportTitle: "导出 GLB 模型",
             exportDesc: "确定要将当前场景导出为包含纹理的 GLB 3D 模型吗？",
             clearTitle: "清空场景",
@@ -488,7 +482,6 @@
             lblEnv: "Environment",
             betaLabel: "Show Environment (Beta)",
             sceneTitle: "Map / Garage",
-            removeEnv: "Remove Environment",
             exportTitle: "Export GLB",
             exportDesc: "Are you sure you want to export the current scene as a GLB model with textures?",
             clearTitle: "Clear Scene",
@@ -512,7 +505,6 @@
         document.getElementById('t-turret-title').innerText = T.turretTitle;
         document.getElementById('t-beta-label').innerText = T.betaLabel;
         document.getElementById('t-scene-title').innerText = T.sceneTitle;
-        document.querySelectorAll('.t-remove-env').forEach(el => el.innerText = T.removeEnv);
 
         document.getElementById('tab-btn-assembly').title = T.tabAssembly;
         document.getElementById('tab-btn-normal').title = T.tabNormal;
@@ -561,17 +553,156 @@
     let currentMode = 'assembly'; 
     const slots = { hull: null, turret: null, scene: null };
     const pools = { hull:[], turret:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
-    let assetsData = null; const sceneLib = { tex: new Map(), meshes:[] }; const logBox = document.getElementById('scene-log');
+    let assetsData = null; const sceneLib = { tex: new Map(), meshes:[] };
     let normalMeshes = [], normalTextures =[]; let mountPos = null;
 
     let swipeStartY = 0, currentSwipeY = 0;
 
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x001926);
-    const camera = new THREE.PerspectiveCamera(45, 1, 1, 1e6); camera.position.set(150,150,150);
+    const camera = new THREE.PerspectiveCamera(45, 1, 1, 1e6);
+    camera.position.set(150, 150, 150);
+    camera.rotation.order = 'YXZ';
     const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer: true}); 
     renderer.setPixelRatio(devicePixelRatio); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
-    const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping=true;
+
+    // Default: orbit around model. Free-look is only enabled while an environment is loaded.
+    let cameraMode = 'orbit'; // 'orbit' | 'fly'
+    const FLY_SPEED = 2500;
+    const FLY_SPEED_FAST = 8000;
+
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+
+    // Free-look (map-editor style): drag rotates camera itself; WASD/R/F move via FlyControls
+    const cameraTarget = new THREE.Object3D();
+    cameraTarget.position.copy(camera.position);
+    const flyControls = new FlyControls(cameraTarget, renderer.domElement);
+    flyControls.movementSpeed = FLY_SPEED;
+    flyControls.rollSpeed = 0;
+    flyControls.autoForward = false;
+    flyControls.dragToLook = true;
+    flyControls.enabled = false;
+
+    let isHeightLocked = false;
+    const _origFlyUpdate = flyControls.update.bind(flyControls);
+    flyControls.update = function(delta) {
+        if (!flyControls.enabled) return;
+        if (isHeightLocked) {
+            const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+            cameraTarget.quaternion.setFromEuler(new THREE.Euler(0, euler.y, 0, 'YXZ'));
+        } else {
+            cameraTarget.quaternion.copy(camera.quaternion);
+        }
+        // Look is applied directly to camera; keep FlyControls for translation only
+        if (flyControls._moveState) {
+            flyControls._moveState.yawLeft = 0;
+            flyControls._moveState.yawRight = 0;
+            flyControls._moveState.pitchUp = 0;
+            flyControls._moveState.pitchDown = 0;
+            flyControls._moveState.rollLeft = 0;
+            flyControls._moveState.rollRight = 0;
+            if (typeof flyControls._updateRotationVector === 'function') flyControls._updateRotationVector();
+        }
+        _origFlyUpdate(delta);
+    };
+
+    window.addEventListener('keydown', (e) => {
+        if (cameraMode !== 'fly') return;
+        if (e.target.closest('input,textarea,select,[contenteditable]')) return;
+        if (e.key === 'Shift') flyControls.movementSpeed = FLY_SPEED_FAST;
+        if (e.code === 'KeyH' && !e.repeat) {
+            isHeightLocked = !isHeightLocked;
+            msg(isHeightLocked
+                ? (userLang === 'zh' ? '高度锁定: 开' : 'Height lock: ON')
+                : (userLang === 'zh' ? '高度锁定: 关' : 'Height lock: OFF'));
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') flyControls.movementSpeed = FLY_SPEED;
+    });
+
+    // Free-look pointer handlers (only active in fly mode)
+    const camPointers = {};
+    let prevTwoFinger = null;
+    function twoFingerState(ptrs) {
+        if (ptrs.length < 2) return null;
+        const a = ptrs[0], b = ptrs[1];
+        return {
+            distance: Math.hypot(b.x - a.x, b.y - a.y),
+            midpoint: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+        };
+    }
+    const canvasEl = renderer.domElement;
+    canvasEl.style.touchAction = 'none';
+
+    canvasEl.addEventListener('pointerdown', (e) => {
+        if (cameraMode !== 'fly') return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        camPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        if (Object.keys(camPointers).length >= 2) prevTwoFinger = twoFingerState(Object.values(camPointers));
+    });
+    canvasEl.addEventListener('pointermove', (e) => {
+        if (cameraMode !== 'fly') return;
+        const p = camPointers[e.pointerId];
+        if (!p) return;
+        const n = Object.keys(camPointers).length;
+        if (n === 1) {
+            const dx = e.clientX - p.x;
+            const dy = e.clientY - p.y;
+            camera.rotation.y -= dx * 0.004;
+            camera.rotation.x -= dy * 0.004;
+            camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+        } else if (n >= 2) {
+            p.x = e.clientX; p.y = e.clientY;
+            const cur = twoFingerState(Object.values(camPointers));
+            if (prevTwoFinger && cur) {
+                const dpx = cur.midpoint.x - prevTwoFinger.midpoint.x;
+                const dpy = cur.midpoint.y - prevTwoFinger.midpoint.y;
+                const dpz = cur.distance - prevTwoFinger.distance;
+                // Scale pan/zoom for large garage scenes
+                const k = 3;
+                camera.translateX(-dpx * k);
+                camera.translateY(dpy * k);
+                camera.translateZ(-dpz * k);
+                cameraTarget.position.copy(camera.position);
+            }
+            prevTwoFinger = cur;
+        }
+        p.x = e.clientX; p.y = e.clientY;
+    });
+    const clearCamPtr = (e) => {
+        delete camPointers[e.pointerId];
+        if (Object.keys(camPointers).length < 2) prevTwoFinger = null;
+    };
+    canvasEl.addEventListener('pointerup', clearCamPtr);
+    canvasEl.addEventListener('pointercancel', clearCamPtr);
+    canvasEl.addEventListener('pointerleave', clearCamPtr);
+    canvasEl.addEventListener('contextmenu', (e) => { if (cameraMode === 'fly') e.preventDefault(); });
+
+    function setCameraMode(mode) {
+        if (mode === cameraMode) return;
+        cameraMode = mode;
+        // Drop any in-progress free-look pointers when leaving fly mode
+        for (const id of Object.keys(camPointers)) delete camPointers[id];
+        prevTwoFinger = null;
+
+        if (mode === 'fly') {
+            orbitControls.enabled = false;
+            flyControls.enabled = true;
+            flyControls.movementSpeed = FLY_SPEED;
+            cameraTarget.position.copy(camera.position);
+            cameraTarget.quaternion.copy(camera.quaternion);
+        } else {
+            flyControls.enabled = false;
+            orbitControls.enabled = true;
+            // Re-sync orbit target from current view so switching back feels stable
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            orbitControls.target.copy(camera.position).addScaledVector(dir, 200);
+            orbitControls.update();
+        }
+    }
     
     const root = new THREE.Group(); root.rotation.set(-Math.PI/2, 0, 0); scene.add(root);
     const groupNormal = new THREE.Group(); const groupAssembly = new THREE.Group();
@@ -607,8 +738,17 @@
 
     function animate(){
         requestAnimationFrame(animate);
-        const dt = clock.getDelta(); for(const m of activeMixers) m.update(dt); updateChipProgress();
-        lg.quaternion.copy(camera.quaternion); controls.update(); renderer.render(scene,camera);
+        const dt = Math.min(clock.getDelta(), 0.1);
+        for(const m of activeMixers) m.update(dt);
+        updateChipProgress();
+        lg.quaternion.copy(camera.quaternion);
+        if (cameraMode === 'fly') {
+            flyControls.update(dt);
+            camera.position.lerp(cameraTarget.position, Math.min(1, 12 * dt));
+        } else {
+            orbitControls.update();
+        }
+        renderer.render(scene, camera);
     }
     animate();
 
@@ -830,7 +970,6 @@
     document.getElementById('dialog-confirm').onclick = () => { if(dialogCallback) dialogCallback(); closeDialog(); };
 
     function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
-    function log(msgText) { const div = document.createElement('div'); div.className = `log-line log-ok`; div.innerText = msgText; logBox.appendChild(div); logBox.scrollTop = logBox.scrollHeight; }
 
     applyI18n(); document.body.classList.remove('fouc-loading');
 
@@ -842,9 +981,36 @@
         const link = document.createElement('a'); link.href = dataURL; link.download = `Screenshot_${new Date()}.png`; link.click(); msg(T.screenshot);
     };
 
+    function clearSceneEnvironment(refit = true) {
+        if (slots.scene) {
+            disposeMixer(slots.scene);
+            groupAssembly.remove(slots.scene);
+            dispose(slots.scene);
+            slots.scene = null;
+        }
+        sceneLib.tex.forEach(t => t.dispose());
+        sceneLib.tex.clear();
+        sceneLib.meshes = [];
+        // Environment gone → restore orbit camera
+        setCameraMode('orbit');
+        if (refit) fitCamera();
+    }
+
     window.toggleScene = function() {
-        const toggle = document.querySelector('.beta-toggle'); const box = document.getElementById('group-scene'); const active = toggle.classList.toggle('active');
-        if(active) { box.classList.add('visible'); if(!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad(); } else { box.classList.remove('visible'); }
+        const toggle = document.querySelector('.beta-toggle');
+        const box = document.getElementById('group-scene');
+        const active = toggle.classList.toggle('active');
+        if (active) {
+            box.classList.add('visible');
+            // Load environment if none is currently in the scene
+            if (!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad();
+            else if (slots.scene) setCameraMode('fly');
+        } else {
+            // Turning off must fully unload the environment (not just hide the UI),
+            // otherwise the garage still affects the camera framing/center.
+            box.classList.remove('visible');
+            clearSceneEnvironment(true);
+        }
     }
 
     async function renderIconGrid(nativeSelectId, type, items) {
@@ -963,23 +1129,271 @@
         });
     }
 
+    // Normalize texture/material labels for matching:
+    // "BG1 1024.PNG" / "bg1_1024.webp" / "Material #9" -> comparable stems
+    function texStem(s) {
+        if (!s) return '';
+        return String(s).toLowerCase()
+            .replace(/^.*[\\/]/, '')          // strip path
+            .replace(/\.[a-z0-9]+$/i, '')     // strip extension
+            .replace(/[\s_\-]+/g, '');        // collapse separators (bg1 1024 == bg11024)
+    }
+
+    // Parse a 3DS ArrayBuffer for material→texture and mesh→material maps.
+    // Needed because most garage .3ds files name materials "Material #NNNN"
+    // while the actual link to "BL.PNG"/"GAR1.PNG" lives only in the texture-map chunk.
+    // Birthday 16 is the exception where material names already equal texture stems.
+    function parse3dsTextureBindings(buf) {
+        const data = new Uint8Array(buf);
+        const view = new DataView(buf);
+        const matTex = Object.create(null);   // materialName -> textureBasename
+        const meshMats = Object.create(null); // meshName -> [materialName]
+
+        const readCString = (off, end) => {
+            let i = off;
+            while (i < end && data[i] !== 0) i++;
+            return { str: new TextDecoder('latin1').decode(data.subarray(off, i)), next: i + 1 };
+        };
+
+        const walk = (offset, end) => {
+            while (offset + 6 <= end) {
+                const cid = view.getUint16(offset, true);
+                const size = view.getUint32(offset + 2, true);
+                if (size < 6 || offset + size > end) break;
+                const chunkEnd = offset + size;
+                const ds = offset + 6;
+
+                if (cid === 0x4D4D || cid === 0x3D3D) {
+                    walk(ds, chunkEnd);
+                } else if (cid === 0xAFFF) { // material entry
+                    let matName = null, texName = null;
+                    let pos = ds;
+                    while (pos + 6 <= chunkEnd) {
+                        const scid = view.getUint16(pos, true);
+                        const ssize = view.getUint32(pos + 2, true);
+                        if (ssize < 6 || pos + ssize > chunkEnd) break;
+                        if (scid === 0xA000) { // material name
+                            matName = readCString(pos + 6, pos + ssize).str;
+                        } else if (scid === 0xA200 || scid === 0xA210 || scid === 0xA230 || scid === 0xA204) {
+                            // diffuse / opacity / bump / specular map — dig for filename (0xA300)
+                            let tpos = pos + 6;
+                            const tend = pos + ssize;
+                            while (tpos + 6 <= tend) {
+                                const tcid = view.getUint16(tpos, true);
+                                const tsize = view.getUint32(tpos + 2, true);
+                                if (tsize < 6 || tpos + tsize > tend) break;
+                                if (tcid === 0xA300) {
+                                    const tn = readCString(tpos + 6, tpos + tsize).str;
+                                    if (tn) texName = tn;
+                                }
+                                tpos += tsize;
+                            }
+                        }
+                        pos += ssize;
+                    }
+                    if (matName && texName) matTex[matName] = texName;
+                } else if (cid === 0x4000) { // named object
+                    const { str: objName, next } = readCString(ds, chunkEnd);
+                    const matsUsed = [];
+                    const findMats = (o, e) => {
+                        while (o + 6 <= e) {
+                            const c = view.getUint16(o, true);
+                            const s = view.getUint32(o + 2, true);
+                            if (s < 6 || o + s > e) break;
+                            if (c === 0x4100) {
+                                findMats(o + 6, o + s);
+                            } else if (c === 0x4120) {
+                                const nfaces = view.getUint16(o + 6, true);
+                                findMats(o + 6 + 2 + nfaces * 8, o + s);
+                            } else if (c === 0x4130) {
+                                matsUsed.push(readCString(o + 6, o + s).str);
+                            }
+                            o += s;
+                        }
+                    };
+                    findMats(next, chunkEnd);
+                    if (objName) meshMats[objName] = matsUsed;
+                }
+                offset = chunkEnd;
+            }
+        };
+        walk(0, data.byteLength);
+        return { matTex, meshMats };
+    }
+
     async function loadRemoteScene(path, variant) {
         if(slots.scene) { disposeMixer(slots.scene); groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
-        sceneLib.meshes =[]; sceneLib.tex.clear(); logBox.style.display = 'block'; logBox.innerHTML='';
+        sceneLib.meshes =[]; sceneLib.tex.clear();
         try {
             msg(T.loading); const meta = await fetchMeta(path);
-            const models = meta.filter(f => f.name.match(/\.(a3d|3ds)$/i)); const images = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i));
-            const texProm = images.map(async f => { const texUrl = `${RES_BASE}/${path}/${f.name}`; const tex = await new THREE.TextureLoader().loadAsync(texUrl); tex.name = f.name; setupTex(tex); return { n: f.name, t: tex }; });
+            const models = meta.filter(f => f.name.match(/\.(a3d|3ds)$/i));
+            // Only browser-decodable images (skip GPU-compressed .ktx)
+            const images = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !/\.ktx$/i.test(f.name));
+            // Encode path segments so names with spaces (e.g. "bg1 1024.webp") resolve
+            const texUrlOf = (name) => `${RES_BASE}/${path}/${String(name).split('/').map(encodeURIComponent).join('/')}`;
+            const texProm = images.map(async f => {
+                const tex = await new THREE.TextureLoader().loadAsync(texUrlOf(f.name));
+                tex.name = f.name; setupTex(tex); return { n: f.name, t: tex };
+            });
             const loadedTex = await Promise.all(texProm); loadedTex.forEach(o => sceneLib.tex.set(o.n, o.t));
+
             const combinedGroup = new THREE.Group();
             for(let f of models) {
-                const mUrl = `${RES_BASE}/${path}/${f.name}`; let grp;
-                if(f.name.endsWith('.a3d')) { const resp = await fetch(mUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`); grp = parseA3D(await resp.arrayBuffer(), f.name);
-                } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${path}/`); grp = await loader.loadAsync(mUrl); }
-                grp.traverse(o => { if (o.isMesh) { if (o.parent) o.userData.parentName = o.parent.name; sceneLib.meshes.push(o); } }); combinedGroup.add(grp);
+                const mUrl = `${RES_BASE}/${path}/${encodeURIComponent(f.name)}`;
+                const resp = await fetch(mUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const buf = await resp.arrayBuffer();
+                let grp;
+                let bindings = null;
+
+                if(f.name.toLowerCase().endsWith('.a3d')) {
+                    grp = parseA3D(buf, f.name);
+                } else {
+                    // Parse texture bindings from the raw 3DS BEFORE TDSLoader runs.
+                    bindings = parse3dsTextureBindings(buf);
+                    // 3DS files reference missing .PNG names on CDN (.webp only).
+                    // Stub those requests with a 1x1 pixel so the console stays clean;
+                    // real textures are applied later by runSceneInjector.
+                    const stubMgr = new THREE.LoadingManager();
+                    const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+                    stubMgr.setURLModifier((url) => {
+                        // Only rewrite texture-like relative paths; leave the .3ds itself alone
+                        if (/\.(png|jpg|jpeg|bmp|tga|gif|webp)(\?|$)/i.test(url) || !/^https?:|^data:|^blob:/i.test(url)) {
+                            return PIXEL;
+                        }
+                        return url;
+                    });
+                    const loader = new TDSLoader(stubMgr);
+                    loader.setResourcePath('');
+                    grp = loader.parse(buf, '');
+                }
+
+                grp.traverse(o => {
+                    if (!o.isMesh) return;
+                    if (o.parent) o.userData.parentName = o.parent.name;
+
+                    const refs = [];
+                    const pushRef = (v) => { if (v) refs.push(String(v)); };
+
+                    // Material name(s) — works for Birthday 16 (mat name == tex stem)
+                    // and for A3D (build() stores lowercased mat name that matches webp stem)
+                    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+                    for (const mat of mats) {
+                        pushRef(mat && mat.name);
+                        // A3D materials also carry the original texture filename in userData
+                        if (mat && mat.userData && mat.userData.texName) pushRef(mat.userData.texName);
+                    }
+                    pushRef(o.name);
+                    pushRef(o.userData.parentName);
+
+                    // From 3DS binary: map mesh → materials → texture basenames (the real fix)
+                    if (bindings) {
+                        const mlist = bindings.meshMats[o.name] || [];
+                        for (const mn of mlist) {
+                            pushRef(mn);
+                            if (bindings.matTex[mn]) pushRef(bindings.matTex[mn]);
+                        }
+                        // Also accept any material currently on the mesh via matTex lookup
+                        for (const mat of mats) {
+                            if (mat && mat.name && bindings.matTex[mat.name]) pushRef(bindings.matTex[mat.name]);
+                        }
+                    }
+
+                    o.userData.texRefs = Array.from(new Set(refs.filter(Boolean)));
+                    sceneLib.meshes.push(o);
+                });
+                combinedGroup.add(grp);
             }
-            slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); fitCamera(); msg("Environment Loaded");
+            slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector();
+            setCameraMode('fly');
+            placeEnvCamera(combinedGroup);
+            msg("Environment Loaded");
         } catch(e) { console.error(e); msg(String(e.message || e)); }
+    }
+
+    // Hide garage camera helper meshes and put the free-look camera on cam0,
+    // aiming at the tank (hull/turret), not the whole garage bounds.
+    function isCamMarkerName(n) {
+        n = (n || '').toLowerCase();
+        return n === 'cam0' || n === 'cam' || n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n.startsWith('cam');
+    }
+    function placeEnvCamera(envGroup) {
+        if (!envGroup) return;
+        envGroup.updateMatrixWorld(true);
+        if (slots.hull?.group) slots.hull.group.updateMatrixWorld(true);
+        if (slots.turret?.group) slots.turret.group.updateMatrixWorld(true);
+
+        let camNode = null;
+        envGroup.traverse(o => {
+            const n = (o.name || '').toLowerCase();
+            // Camera markers in garage assets: cam0 (eye) / cam_t0 (look-at helper)
+            if (n === 'cam0' || n === 'cam') camNode = o;
+            // Hide the helper geometry itself (mesh may be named differently under A3D parent)
+            if (o.isMesh && (isCamMarkerName(o.name) || isCamMarkerName(o.parent && o.parent.name) || isCamMarkerName(o.userData.originalName))) {
+                o.visible = false;
+            }
+        });
+
+        // Look-at: prefer assembled tank; fall back to garage tank platform markers
+        const look = new THREE.Vector3();
+        let hasLook = false;
+        const tankBox = new THREE.Box3();
+        let hasTankBox = false;
+        const expandTank = (grp) => {
+            if (!grp) return;
+            const b = new THREE.Box3().setFromObject(grp);
+            if (b.isEmpty()) return;
+            if (!hasTankBox) { tankBox.copy(b); hasTankBox = true; }
+            else tankBox.union(b);
+        };
+        expandTank(slots.hull?.group);
+        expandTank(slots.turret?.group);
+        if (hasTankBox) {
+            tankBox.getCenter(look);
+            hasLook = true;
+        } else {
+            // No tank loaded yet — aim at garage tnk_plat / tnk_base / cam_t0
+            const platBox = new THREE.Box3();
+            let hasPlat = false;
+            envGroup.traverse(o => {
+                if (!o.isMesh || !o.visible) return;
+                const n = ((o.name || '') + ' ' + (o.userData.originalName || '') + ' ' + (o.parent?.name || '')).toLowerCase();
+                if (!(n.includes('tnk_plat') || n.includes('tnk_base') || n.includes('tank'))) return;
+                const geo = o.geometry;
+                if (!geo) return;
+                if (!geo.boundingBox) geo.computeBoundingBox();
+                if (!geo.boundingBox) return;
+                const wb = geo.boundingBox.clone().applyMatrix4(o.matrixWorld);
+                if (!hasPlat) { platBox.copy(wb); hasPlat = true; }
+                else platBox.union(wb);
+            });
+            if (hasPlat) {
+                platBox.getCenter(look);
+                hasLook = true;
+            } else {
+                // Last resort: cam_t0 world position or origin
+                let camT = null;
+                envGroup.traverse(o => {
+                    const n = (o.name || '').toLowerCase();
+                    if (n === 'cam_t0' || n === 'cam_t' || n === 'camt0') camT = o;
+                });
+                if (camT) { camT.getWorldPosition(look); hasLook = true; }
+                else look.set(0, 0, 0);
+            }
+        }
+
+        const pos = new THREE.Vector3();
+        if (camNode) {
+            camNode.getWorldPosition(pos);
+        } else {
+            // Fallback elevated view toward the tank
+            const dist = hasTankBox ? Math.max(tankBox.getSize(new THREE.Vector3()).length() * 1.5, 120) : 400;
+            pos.set(look.x + dist * 0.7, look.y + dist * 0.45, look.z + dist * 0.7);
+        }
+
+        camera.position.copy(pos);
+        camera.lookAt(look);
+        cameraTarget.position.copy(camera.position);
+        cameraTarget.quaternion.copy(camera.quaternion);
     }
 
     window.switchMode = function(mode) {
@@ -1001,7 +1415,8 @@
                 if(slots.scene) { disposeMixer(slots.scene);       groupAssembly.remove(slots.scene);      dispose(slots.scene); }
                 slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
                 ['hull','turret','scene'].forEach(t => { activeClips[t].clear(); renderAnimChips(t); });
-                logBox.style.display='none'; mountPos = null;
+                mountPos = null;
+                setCameraMode('orbit');
             }
             sceneLib.tex.clear(); sceneLib.meshes=[]; msg(T.clear);
         });
@@ -1034,25 +1449,81 @@
     };
 
     function runSceneInjector() {
-        let count = 0; log(">>> Injecting Textures...");
-        sceneLib.meshes.forEach(mesh => {
-            const candidates =[]; if (mesh.material && mesh.material.name) candidates.push(mesh.material.name); if (mesh.name) candidates.push(mesh.name); if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
-            let bestTex = null;
-            for (const[texName, texObj] of sceneLib.tex) {
-                const cleanTexName = texName.toLowerCase().split('.')[0];
-                for (const cand of candidates) { const cleanCand = cand.toLowerCase(); if (cleanCand.includes(cleanTexName)) { bestTex = texObj; break; } if (cleanTexName.includes(cleanCand) && cleanCand.length > 3) { bestTex = texObj; break; } }
-                if (bestTex) break;
-            }
-            if (bestTex) { mesh.material = new THREE.MeshStandardMaterial({ map: bestTex, emissiveMap: bestTex, emissive: new THREE.Color(0x888888), color: 0xffffff, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 }); mesh.material.needsUpdate = true; log(`✔[${mesh.name}] -> ${bestTex.name}`); count++; }
-        });
-        if(count > 0) msg(`Matched ${count} materials`); else log("⚠ No matches found");
-    }
+        let count = 0;
 
-    document.getElementById('btn-clear-scene').onclick = () => {
-         if(slots.scene) { groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
-         sceneLib.tex.forEach(t => t.dispose()); sceneLib.tex.clear(); sceneLib.meshes =[]; logBox.innerHTML = ''; logBox.style.display = 'none';
-         msg(T.removeEnv);
-    };
+        // Pre-index textures by normalized stem for O(1)-ish lookup
+        // e.g. "bg1 1024.webp" → stem "bg11024"
+        const texByStem = new Map();
+        for (const [texName, texObj] of sceneLib.tex) {
+            const stem = texStem(texName);
+            if (stem) texByStem.set(stem, texObj);
+        }
+
+        const scoreMatch = (candRaw, texName) => {
+            const c = texStem(candRaw);
+            const t = texStem(texName);
+            if (!c || !t) return 0;
+            if (c === t) return 100;                         // exact stem match (best)
+            if (c.includes(t) && t.length >= 2) return 50 + t.length;
+            if (t.includes(c) && c.length > 3) return 40 + c.length;
+            return 0;
+        };
+
+        sceneLib.meshes.forEach(mesh => {
+            // Prefer explicit texRefs harvested at load time (includes 3DS map filenames)
+            const candidates = [];
+            if (Array.isArray(mesh.userData.texRefs)) candidates.push(...mesh.userData.texRefs);
+            if (mesh.material) {
+                if (Array.isArray(mesh.material)) mesh.material.forEach(m => { if (m && m.name) candidates.push(m.name); });
+                else if (mesh.material.name) candidates.push(mesh.material.name);
+            }
+            if (mesh.name) candidates.push(mesh.name);
+            if (mesh.userData.parentName) candidates.push(mesh.userData.parentName);
+
+            let bestTex = null;
+            let bestScore = 0;
+
+            // 1) exact stem hit via index
+            for (const cand of candidates) {
+                const stem = texStem(cand);
+                if (stem && texByStem.has(stem)) {
+                    bestTex = texByStem.get(stem);
+                    bestScore = 100;
+                    break;
+                }
+            }
+
+            // 2) fuzzy contains either way, pick highest score
+            if (!bestTex) {
+                for (const [texName, texObj] of sceneLib.tex) {
+                    for (const cand of candidates) {
+                        const s = scoreMatch(cand, texName);
+                        if (s > bestScore) {
+                            bestScore = s;
+                            bestTex = texObj;
+                        }
+                    }
+                }
+            }
+
+            if (bestTex) {
+                const prevName = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name || '';
+                mesh.material = new THREE.MeshStandardMaterial({
+                    map: bestTex,
+                    emissiveMap: bestTex,
+                    emissive: new THREE.Color(0x888888),
+                    color: 0xffffff,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    alphaTest: 0.5,
+                    name: prevName || bestTex.name
+                });
+                mesh.material.needsUpdate = true;
+                count++;
+            }
+        });
+        if (count > 0) msg(`Matched ${count} materials`);
+    }
 
     async function loadModelFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
@@ -1093,7 +1564,28 @@
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
     function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = t; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}})}
-    function fitCamera(){const b=new THREE.Box3().setFromObject(root);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.set(c.x+s,c.y+s*0.5,c.y+s);camera.lookAt(c);controls.update()}
+    function fitCamera(){
+        // Prefer garage cam marker while environment is active in free-look mode
+        if (cameraMode === 'fly' && slots.scene) {
+            placeEnvCamera(slots.scene);
+            return;
+        }
+        const b = new THREE.Box3().setFromObject(root);
+        if (b.isEmpty()) return;
+        const c = b.getCenter(new THREE.Vector3());
+        const size = b.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z, 1);
+        const dist = Math.max(maxDim * 1.2, 80);
+        camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
+        camera.lookAt(c);
+        if (cameraMode === 'fly') {
+            cameraTarget.position.copy(camera.position);
+            cameraTarget.quaternion.copy(camera.quaternion);
+        } else {
+            orbitControls.target.copy(c);
+            orbitControls.update();
+        }
+    }
 
     class BinR { constructor(b){this.v=new DataView(b);this.o=0;this.d=new TextDecoder()} sk(n){this.o+=n} pad(l){return(((l+3)>>2)*4)-l} u32(){const v=this.v.getUint32(this.o,1);this.o+=4;return v} i32(){const v=this.v.getInt32(this.o,1);this.o+=4;return v} u16(){const v=this.v.getUint16(this.o,1);this.o+=2;return v} f32(){const v=this.v.getFloat32(this.o,1);this.o+=4;return v} str(){const l=this.u32();const s=this.d.decode(new Uint8Array(this.v.buffer,this.v.byteOffset+this.o,l));this.o+=l+this.pad(l);return s} str0(){let b=[];while(this.o<this.v.byteLength){const c=this.v.getUint8(this.o++);if(c===0)break;b.push(c)}return this.d.decode(new Uint8Array(b))} }
     function parseA3D(buf, n) { const r = new BinR(buf); if(r.v.getUint8(0)!==65) throw new Error("Invalid A3D header"); r.sk(4); const v=r.u16(); r.sk(2); if(v===3) return pV3(r, n); else if(v===2) return pV2(r, n); else throw new Error(`Unsupported A3D version: ${v}`); }
@@ -1112,10 +1604,10 @@
         if(td.t && td.t.length>0){ nds=td.t.map((t, idx)=>{ const o = boneIndicesSet.has(idx) ? new THREE.Bone() : new THREE.Object3D(); o.position.set(...t.p); o.quaternion.set(...t.q); o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); o.name=t.n; return o; }); td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); }); }
         grp.updateMatrixWorld(true);
         function createMesh(geo, matsArr, parentNodeIdx) { if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) { const skData = geo.userData.skinData; const bones = []; const boneInverses = []; for (let k = 0; k < skData.numBones; k++) { const nodeIdx = skData.boneIds[k]; const boneNode = nds[nodeIdx]; bones.push(boneNode); if (bindMats && bindMats[nodeIdx]) { boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); } else { boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert()); } } const skel = new THREE.Skeleton(bones, boneInverses); const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; const skm = new THREE.SkinnedMesh(geo, finalMat); let bindMatrix = null; if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) { bindMatrix = bindMats[parentNodeIdx]; } if (bindMatrix) { skm.bind(skel, bindMatrix); } else { skm.bind(skel); } return skm; } else { const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; return new THREE.Mesh(geo, finalMat); } }
-        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); subMat.name=(mats[idx]?mats[idx].n:"default").toLowerCase(); return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false; m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
+        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); const src=mats[idx]; subMat.name=(src?src.n:"default").toLowerCase(); if(src&&src.t) subMat.userData.texName=src.t; return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false; m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
         if(anim){ const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; }); grp.userData.anim={ tracks: anim.tracks, clips: anim.clips, groups: (anim.clips && anim.clips.length) ? anim.clips[0].groups : (anim.groups||[]), duration: anim.duration, nameToNode }; }
         return grp;
     }
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a1967208baad70b8',t:'MTc4Mzc1ODYxOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
