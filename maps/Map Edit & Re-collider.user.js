@@ -2331,7 +2331,7 @@
     function buildEditorHtml(bootstrap) {
     let html = EMBEDDED_EDITOR_HTML;
 
-    // 1. 注入启动配置 JSON
+    // 1. Inject bootstrap configuration JSON
     const bootJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
     const injectBoot = '<scr' + 'ipt>window.__MAP_EDITOR_BOOT__=' + bootJson + ';</scr' + 'ipt>';
     if (html.includes('</head>')) {
@@ -2340,7 +2340,7 @@
         html = injectBoot + html;
     }
 
-    // 2. 利用 .toString() 提取宿主的公共代码并注入
+    // 2. Extract host shared code using .toString() and inject it
     const injectSharedCode = `
         ${BinaryStream.toString()}
         ${BinaryWriter.toString()}
@@ -2349,7 +2349,7 @@
         ${packHeader.toString()}
     `;
 
-    // 将公共代码塞进 iframe 的 module 脚本顶部
+    // Insert shared code at the top of the iframe's module script
     html = html.replace(
         '<script type="module">',
         '<script type="module">\n' + injectSharedCode + '\n'
