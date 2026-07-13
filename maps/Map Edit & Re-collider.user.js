@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Map Edit & Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      3.2
+// @version      3.2.1
 // @description  Modify map and regenerate collisions to freely customize and explore maps.
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -500,7 +500,82 @@
             return res;
         }
     }
+// ==========================================
+    // Pre-Collision (Markers / Spawns / Atlases) Rebuilder Helpers
+    // ==========================================
+    function parsePreCollision(packet, optMask) {
+        const atlases = [];
+        if (optMask[0]) {
+            const atlasLen = packet.readStringLength();
+            for (let i = 0; i < atlasLen; i++) {
+                const height = packet.readInt32(false);
+                const name = packet.readString();
+                const unknown = packet.readUint32(false);
+                const rectLen = packet.readStringLength();
+                const rects = [];
+                for (let j = 0; j < rectLen; j++) {
+                    const rHeight = packet.readUint32(false);
+                    const rLib = packet.readString();
+                    const rName = packet.readString();
+                    const rWidth = packet.readUint32(false);
+                    const rx = packet.readUint32(false);
+                    const ry = packet.readUint32(false);
+                    rects.push({ rHeight, rLib, rName, rWidth, rx, ry });
+                }
+                const width = packet.readUint32(false);
+                atlases.push({ height, name, unknown, rects, width });
+            }
+        }
+        
+        const markers = [];
+        if (optMask[1]) {
+            const len = packet.readStringLength();
+            for (let i = 0; i < len; i++) {
+                const id = packet.readUint32(false);
+                const name = packet.readString();
+                const px = packet.readFloat32(false);
+                const py = packet.readFloat32(false);
+                const pz = packet.readFloat32(false);
+                const type = packet.readString();
+                markers.push({ id, name, pos: [px, py, pz], type });
+            }
+        }
+        return { atlases, markers };
+    }
 
+    function writePreCollision(atlases, markers, optMask) {
+        const bw = new BinaryWriter();
+        if (optMask[0]) {
+            bw.writeStringLength(atlases.length);
+            for (const a of atlases) {
+                bw.writeInt32(a.height, false);
+                bw.writeString(a.name);
+                bw.writeUint32(a.unknown, false);
+                bw.writeStringLength(a.rects.length);
+                for (const r of a.rects) {
+                    bw.writeUint32(r.rHeight, false);
+                    bw.writeString(r.rLib);
+                    bw.writeString(r.rName);
+                    bw.writeUint32(r.rWidth, false);
+                    bw.writeUint32(r.rx, false);
+                    bw.writeUint32(r.ry, false);
+                }
+                bw.writeUint32(a.width, false);
+            }
+        }
+        if (optMask[1]) {
+            bw.writeStringLength(markers.length);
+            for (const m of markers) {
+                bw.writeUint32(m.id, false);
+                bw.writeString(m.name);
+                bw.writeFloat32(m.pos[0], false);
+                bw.writeFloat32(m.pos[1], false);
+                bw.writeFloat32(m.pos[2], false);
+                bw.writeString(m.type);
+            }
+        }
+        return bw.toUint8Array();
+    }
     async function decompressZlib(uint8array) {
         const ds = new DecompressionStream('deflate');
         const writer = ds.writable.getWriter();
@@ -717,8 +792,6 @@
             for (let i = 0; i < extBytes.length; i++) for (let b = 7; b >= 0; b--) fullOriginalBits.push((extBytes[i] & (1 << b)) === 0);
         }
 
-        // Consumption order == fullOriginalBits order
-        // (optMask = reverse(bits); pop end => first bit of fullOriginalBits first)
         const optMask = [...fullOriginalBits].reverse();
         const consumedBits = [];
         const popBit = () => {
@@ -743,20 +816,9 @@
         result.bodyStart = packet.offset;
         result.preCollisionStart = packet.offset;
 
-        if (popBit()) {
-            const atlasLen = packet.readStringLength();
-            for (let i = 0; i < atlasLen; i++) {
-                packet.readInt32(false); packet.readString(); packet.readUint32(false);
-                const rectLen = packet.readStringLength();
-                for (let j = 0; j < rectLen; j++) {
-                    packet.readUint32(false); packet.readString(); packet.readString();
-                    packet.readUint32(false); packet.readUint32(false); packet.readUint32(false);
-                }
-                packet.readUint32(false);
-            }
-        }
-
-        if (popBit()) skipObjectArray(packet, p => { p.readUint32(false); p.readString(); p.offset += 12; p.readString(); });
+        // Fix: Pop the first two bits using popBit() to ensure proper stack advancement and prevent subsequent misalignment
+        const optMaskPreCol = [popBit(), popBit()];
+        result.preCol = parsePreCollision(packet, optMaskPreCol);
 
         result.bitsBeforeCollision = consumedBits.length;
         result.collisionOffsetStart = packet.offset;
@@ -833,8 +895,7 @@
         result.propsOffsetEnd = packet.offset;
         result.bitsAfterProps = consumedBits.length;
 
-        // Raw body slices (relative to originalPacketBuffer, after bit header)
-        result.rawPreCollision = originalPacketBuffer.slice(result.preCollisionStart, result.collisionOffsetStart);
+        // Raw body slices
         result.rawMaterialsAndLights = originalPacketBuffer.slice(result.collisionOffsetEnd, result.propsOffsetStart);
         result.rawMaterials = originalPacketBuffer.slice(result.materialSectionStart, result.materialSectionEnd);
         result.rawLights = originalPacketBuffer.slice(result.materialSectionEnd, result.propsOffsetStart);
@@ -1147,16 +1208,28 @@
         const bits = [];
         const pushBit = (b) => bits.push(!!b);
         const bw = new BinaryWriter();
+        
+        // Collect IDs of all surviving props in the map
+        const activeIds = new Set(props.map(p => p.id));
+        
         bw.writeStringLength(props.length);
         for (let i = 0; i < props.length; i++) {
             const p = props[i];
             const t = templateByIndex && templateByIndex[i] ? templateByIndex[i] : null;
 
-            const wantGrp = t ? !!(t.grpName && t.grpName !== '') : !!(p.grpName && p.grpName !== '');
+            let grp = (p.grpName && p.grpName !== '') ? p.grpName : ((t && t.grpName) || '');
+            
+            // Clean batch list (e.g. "871;872;883") by filtering out deleted prop IDs
+            if (grp && /^\d+(;\d+)*$/.test(grp)) {
+                const ids = grp.split(';').map(Number);
+                const filteredIds = ids.filter(id => activeIds.has(id));
+                grp = filteredIds.join(';');
+            }
+
+            const wantGrp = grp && grp !== '';
             if (wantGrp) {
                 pushBit(true);
-                const g = (p.grpName && p.grpName !== '') ? p.grpName : ((t && t.grpName) || '_');
-                bw.writeString(g);
+                bw.writeString(grp);
             } else {
                 pushBit(false);
             }
@@ -1200,9 +1273,26 @@
      * Only replace collision body + props body + prop optional bits.
      */
     function rebuildPacketPropsAndCollisions(mapData, props, newShapes3, templateByIndex) {
-        if (mapData.bitsBeforeProps == null || !mapData.rawPreCollision || !mapData.rawMaterialsAndLights) {
+        if (mapData.bitsBeforeProps == null || !mapData.rawMaterialsAndLights) {
             throw new Error('mapData missing section slices for rebuild');
         }
+        
+        // Fix: Collect active prop IDs to filter out deleted IDs from static batch markers
+        const activeIds = new Set(props.map(p => p.id));
+        if (mapData.preCol && mapData.preCol.markers) {
+            for (const m of mapData.preCol.markers) {
+                if (m.type && /^\d+(;\d+)*$/.test(m.type)) {
+                    const ids = m.type.split(';').map(Number);
+                    const filteredIds = ids.filter(id => activeIds.has(id));
+                    m.type = filteredIds.join(';'); // Clean deleted IDs out of the grpName list
+                }
+            }
+        }
+        
+        // Dynamically reconstruct the pre-collision section
+        const optMaskPreCol = [mapData.fullOriginalBits[0], mapData.fullOriginalBits[1]];
+        const rawPreCollision = writePreCollision(mapData.preCol.atlases, mapData.preCol.markers, optMaskPreCol);
+
         const propPart = writePropsSection(props, templateByIndex);
         const colBytes = writeCollisionBytes(newShapes3);
 
@@ -1218,10 +1308,10 @@
 
         const header = packHeader(storageBits);
 
-        const bodyLen = mapData.rawPreCollision.length + colBytes.length + mapData.rawMaterialsAndLights.length + propPart.bytes.length;
+        const bodyLen = rawPreCollision.length + colBytes.length + mapData.rawMaterialsAndLights.length + propPart.bytes.length;
         const body = new Uint8Array(bodyLen);
         let o = 0;
-        body.set(mapData.rawPreCollision, o); o += mapData.rawPreCollision.length;
+        body.set(rawPreCollision, o); o += rawPreCollision.length;
         body.set(colBytes, o); o += colBytes.length;
         body.set(mapData.rawMaterialsAndLights, o); o += mapData.rawMaterialsAndLights.length;
         body.set(propPart.bytes, o);
@@ -1231,7 +1321,7 @@
         packet.set(header.extBytes, header.headerPrefix.length);
         packet.set(body, header.headerPrefix.length + header.extBytes.length);
 
-        console.log('[MapEditor+Recollider] FULL props rewrite', {
+        console.log('[MapEditor+Recollider] FULL props rewrite with filtered markers', {
             keptBits: keptFromConsumed.length,
             propBits: propPart.bits.length,
             props: props.length,
@@ -2097,44 +2187,6 @@
         return { version, lightmaps, mapObjects, mocOffset, bodyEnd, trailing };
     }
 
-    function serializeOneLightmapObject(o) {
-        const bw = new BinaryWriter();
-        bw.writeInt32(o.index, true);
-        bw.writeInt32(o.lightmapIndex, true);
-        if (o.lightmapIndex >= 0) {
-            const so = o.lightmapScaleOffset || [0, 0, 1, 1];
-            for (let k = 0; k < 4; k++) bw.writeFloat32(so[k], true);
-            const hasUVs = (o.uvs && o.uvs.length > 0) ? 1 : 0;
-            bw.writeUint8(hasUVs);
-            if (hasUVs) {
-                bw.writeUint32(o.uvs.length, true);
-                for (const uv of o.uvs) { bw.writeFloat32(uv[0], true); bw.writeFloat32(uv[1], true); }
-            }
-        }
-        bw.writeUint8(o.castShadows ? 1 : 0);
-        bw.writeUint8(o.receiveShadows ? 1 : 0);
-        return bw.toUint8Array();
-    }
-
-    // Append new entries to the ORIGINAL lightmapdata bytes (keep header,
-    // all original entries, and the trailing section intact) and bump the
-    // object count. Returns a fresh Uint8Array.
-    function appendLightmapEntries(origBuffer, newEntries) {
-        const d = parseLightmapDataBuffer(origBuffer);
-        if (!newEntries.length) return new Uint8Array(origBuffer);
-        const buf8 = new Uint8Array(origBuffer);
-        const head = buf8.subarray(0, d.bodyEnd);
-        let newLen = 0;
-        const chunks = newEntries.map(e => { const c = serializeOneLightmapObject(e); newLen += c.length; return c; });
-        const out = new Uint8Array(head.length + newLen + d.trailing.length);
-        out.set(head, 0);
-        let o = head.length;
-        for (const c of chunks) { out.set(c, o); o += c.length; }
-        out.set(d.trailing, o);
-        new DataView(out.buffer, out.byteOffset, out.byteLength).setUint32(d.mocOffset, d.mapObjects.length + newEntries.length, true);
-        return out;
-    }
-
     // Build an extended lightmapdata for a theme that has propEdits: appends
     // one comp-light entry per NEW prop (those appended beyond the original
     // prop count). For a copied object we copy the lightmap settings of a
@@ -2151,13 +2203,16 @@
             pageFetch(mapUrl),
             pageFetchRaw(lmUrl)
         ]);
+        
         const mapBuf = await mapRes.arrayBuffer();
         const lmBuf = await lmRes.arrayBuffer();
+        
+        if (!lmRes.ok) return new Uint8Array(lmBuf); // Fallback if the lightmapdata file does not exist (e.g. 404)
+        
         const mapData = await parseMapBin(mapBuf);
         const lm = parseLightmapDataBuffer(lmBuf);
 
         const originalProps = mapData.props;
-        const originalCount = originalProps.length;
         const themeData = Settings.getThemeData(mapConfig.name, themeConfig.name);
         const propEdits = themeData.propEdits;
         if (!propEdits || !Array.isArray(propEdits.props) || !propEdits.props.length) return new Uint8Array(lmBuf);
@@ -2167,34 +2222,86 @@
         const allowDelete = !!(propEdits.meta && propEdits.meta.allowDelete);
         const merged = mergeSceneEdits(originalProps, rawEdited, { allowDelete });
         const finalProps = merged.props;
-        if (finalProps.length <= originalCount) return new Uint8Array(lmBuf); // nothing added
 
-        // original prop position -> lightmap entry (only lit originals)
+        // Step 1: Map original Index -> original Entry (for tpl lookup)
         const lmByPos = new Map();
-        for (const e of lm.mapObjects) if (e.lightmapIndex >= 0) lmByPos.set(e.index, e);
-        // original prop name||lib -> first original prop (to find its position)
-        const origPosByName = new Map();
-        for (const p of originalProps) {
-            const key = (p.name || '') + '||' + (p.libName || '');
-            if (!origPosByName.has(key)) origPosByName.set(key, p);
-        }
-        const findTemplate = (p) => {
-            const key = (p.name || '') + '||' + (p.libName || '');
-            const op = origPosByName.get(key);
-            if (!op) return null;
-            return lmByPos.get(op.index) || null; // null => source original had NO lightmap
-        };
+        for (const e of lm.mapObjects) lmByPos.set(e.index, e);
 
-        const newEntries = [];
-        for (let pos = originalCount; pos < finalProps.length; pos++) {
-            const p = finalProps[pos];
-            const tpl = findTemplate(p);
-            const li = tpl ? tpl.lightmapIndex : 0;
-            const so = (tpl && tpl.lightmapScaleOffset) ? tpl.lightmapScaleOffset.slice() : [0, 0, 1, 1];
-            newEntries.push({ index: pos, lightmapIndex: li, lightmapScaleOffset: so, castShadows: true, receiveShadows: true });
+        // Step 2: Map original prop ID -> its original array index (for tpl lookup)
+        const origIdToIndex = new Map();
+        for (let i = 0; i < originalProps.length; i++) {
+            origIdToIndex.set(originalProps[i].id, i);
         }
-        console.log('[MapEditor+Recollider] lightmapdata extended with', newEntries.length, 'entries for added props');
-        return appendLightmapEntries(lmBuf, newEntries);
+
+        // Step 3: Perform a Union Merge of original and edited objects in Map to prevent duplicate keys in C# Dictionary
+        const mergedObjects = new Map();
+        
+        // 3a. Populated with all original lightmap entries (preserving original IDs like 883 for static batch indexing)
+        for (const e of lm.mapObjects) {
+            mergedObjects.set(e.index, e);
+        }
+        
+        // 3b. Overlay or write edited props using their new sequential IDs
+        for (let i = 0; i < finalProps.length; i++) {
+            const p = finalProps[i];
+            const origIndex = origIdToIndex.get(p.id);
+            
+            let li = 0; // Default for added props (fully bright fallback to prevent pitch black objects)
+            let so = [0, 0, 1, 1];
+            let uvs = [];
+            let cs = 1;
+            let rs = 1;
+            
+            // Inherit the original lightmap properties for surviving props
+            if (origIndex !== undefined) {
+                const tpl = lmByPos.get(origIndex);
+                if (tpl) {
+                    li = tpl.lightmapIndex;
+                    so = tpl.lightmapScaleOffset || so;
+                    uvs = tpl.uvs || uvs;
+                    cs = tpl.castShadows ? 1 : 0;
+                    rs = tpl.receiveShadows ? 1 : 0;
+                }
+            }
+            
+            mergedObjects.set(p.id, {
+                index: p.id,
+                lightmapIndex: li,
+                lightmapScaleOffset: so,
+                uvs: uvs,
+                castShadows: cs > 0,
+                receiveShadows: rs > 0
+            });
+        }
+
+        // Step 4: Serialize the merged lightmap dataset into a binary stream
+        const bw = new BinaryWriter();
+        bw.writeUint32(lm.version, true);
+        
+        // Copy the lightmap parameters header (lightColor, ambient, angles, lightmaps list)
+        const headerBytes = new Uint8Array(lmBuf).subarray(4, lm.mocOffset);
+        bw.writeBytes(headerBytes);
+        
+        bw.writeUint32(mergedObjects.size, true); // Write the size of the merged objects map
+        
+        for (const o of mergedObjects.values()) {
+            bw.writeInt32(o.index, true); // Write the lookup key (array index for old/new maps)
+            bw.writeInt32(o.lightmapIndex, true);
+            if (o.lightmapIndex >= 0) {
+                for (let k = 0; k < 4; k++) bw.writeFloat32(o.lightmapScaleOffset[k], true);
+                const hasUVs = (o.uvs && o.uvs.length > 0) ? 1 : 0;
+                bw.writeUint8(hasUVs);
+                if (hasUVs) {
+                    bw.writeUint32(o.uvs.length, true);
+                    for (const uv of o.uvs) { bw.writeFloat32(uv[0], true); bw.writeFloat32(uv[1], true); }
+                }
+            }
+            bw.writeUint8(o.castShadows ? 1 : 0); 
+            bw.writeUint8(o.receiveShadows ? 1 : 0); 
+        }
+        
+        bw.writeBytes(lm.trailing); // Write trailing data
+        return bw.toUint8Array();
     }
 
     async function generateMapBinLocalAndGetBlobUrl(url, mapConfig, themeConfig) {
