@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Map Edit & Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.1.1
 // @description  Modify map and regenerate collisions to freely customize and explore maps.
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -861,8 +861,8 @@
                 id: typeof p.id === 'number' ? p.id : t.id,
                 grpName: (p.grpName != null ? p.grpName : (t.grpName || '')),
                 libName: t.libName || '',
-                matID: t.matID,
-                name: t.name,
+                matID: typeof p.matID === 'number' ? p.matID : t.matID,
+                name: p.name || t.name,
                 pos: Array.isArray(p.pos) ? [+p.pos[0], +p.pos[1], +p.pos[2]] : [...t.pos],
                 rot: Array.isArray(p.rot) ? [+p.rot[0], +p.rot[1], +p.rot[2]] : [...(t.rot || [0, 0, 0])],
                 scale: Array.isArray(p.scale) ? [+p.scale[0], +p.scale[1], +p.scale[2]] : [...(t.scale || [1, 1, 1])]
@@ -914,10 +914,17 @@
                 if (usedEdit[j]) continue;
                 const e = edited[j];
                 if (e.name !== orig.name || (e.libName || '') !== (orig.libName || '')) continue;
-                if (nearlyEq(e.pos[0], orig.pos[0]) && nearlyEq(e.pos[1], orig.pos[1]) && nearlyEq(e.pos[2], orig.pos[2])) {
+                if (e.matID === orig.matID && nearlyEq(e.pos[0], orig.pos[0]) && nearlyEq(e.pos[1], orig.pos[1]) && nearlyEq(e.pos[2], orig.pos[2])) {
                     best = j; break;
                 }
-                if (best < 0) best = j;
+                if (best < 0 && e.matID === orig.matID) best = j;
+            }
+            if (best < 0) {
+                for (let j = 0; j < edited.length; j++) {
+                    if (!usedEdit[j] && edited[j].name === orig.name && (edited[j].libName || '') === (orig.libName || '')) {
+                        best = j; break;
+                    }
+                }
             }
             if (best < 0) return null;
             usedEdit[best] = 1;
@@ -973,11 +980,21 @@
             }
         }
 
+        let maxId = 0;
+        if (originalProps && originalProps.length > 0) {
+            for (let i = 0; i < originalProps.length; i++) {
+                const pid = originalProps[i].id;
+                if (typeof pid === 'number' && !isNaN(pid) && pid > maxId) {
+                    maxId = pid;
+                }
+            }
+        }
+        let nextId = maxId + 1;
         for (let j = 0; j < edited.length; j++) {
             if (usedEdit[j]) continue;
             const e = edited[j];
             result.push({
-                id: result.length,
+                id: nextId++,
                 grpName: e.grpName || '',
                 libName: e.libName || '',
                 matID: e.matID,
@@ -988,8 +1005,6 @@
             });
             added++;
         }
-
-        for (let i = 0; i < result.length; i++) result[i].id = i;
 
         const meta = {
             matched, keptUnedited, deleted, added, moved,
@@ -1428,7 +1443,7 @@
                 for (let j = 0; j < mapData.props.length; j++) {
                     if (usedOrig[j]) continue;
                     const o = mapData.props[j];
-                    if (o.name === p.name && (o.libName || '') === (p.libName || '') && o.matID === p.matID) {
+                    if (o.id === p.id && o.name === p.name) {
                         best = j; break;
                     }
                 }
@@ -2347,7 +2362,7 @@
             this.toastEl = document.createElement('div');
             this.toastEl.className = 'toast';
             this.shadow.appendChild(this.toastEl);
-            
+
             // Inject custom dialog
             this.dialogOverlay = document.createElement('div');
             this.dialogOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000001;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;backdrop-filter:blur(4px);pointer-events:auto;';
@@ -2486,7 +2501,7 @@
                 }
             }, { passive: true });
         }
-        
+
         showDialog(title, desc, confirmCallback) {
             this.dialogOverlay.querySelector('#cd-title').innerText = title;
             this.dialogOverlay.querySelector('#cd-desc').innerText = desc;
@@ -2501,7 +2516,7 @@
             this.dialogOverlay.querySelector('.custom-dialog').style.transform = 'scale(0.9)';
             setTimeout(() => { this.dialogOverlay.style.display = 'none'; }, 200);
         }
-        
+
         updateShortcutUI() {
             if (!this.isMobile && this.shortcutText) {
                 const sc = Settings.data.shortcut;
@@ -2604,7 +2619,7 @@
                     // ---- Object editor card ----
                     const propCard = document.createElement('div');
                     propCard.className = 'prop-edit-card';
-                    
+
                     const renderPropCard = () => {
                         const tData = Settings.getThemeData(mapConfig.name, theme.name);
                         const summary = Settings.getPropEditsSummary(mapConfig.name, theme.name);
@@ -2630,7 +2645,7 @@
                                     </div>
                                     <div class="prop-edit-meta ${summary && isEnabled ? 'has' : ''}" id="prop-edit-meta-text-${theme.name}">${metaText}</div>
                                 </div>
-                                
+
                                 <div style="display:flex; gap:8px; align-items:center;">
                                     <button class="icon-btn m3-interactive" data-edit-map style="background:rgba(191,213,255,0.1); color:var(--on-surface-variant); border-radius:12px; width:36px; height:36px;" title="${I18N.editMap}">
                                         <span class="svg-icon" style="width:18px;height:18px;">${ICONS.edit}</span>
@@ -2643,7 +2658,7 @@
                                 </div>
                             </div>
                         `;
-                        
+
                         const toggleInput = propCard.querySelector('[data-toggle-edits]');
                         if (toggleInput) {
                             toggleInput.onchange = () => {
@@ -2653,8 +2668,8 @@
                                 const metaContainer = propCard.querySelector('#prop-edit-meta-text-' + theme.name);
                                 if (metaContainer) {
                                     metaContainer.className = 'prop-edit-meta ' + (summary && isNowEnabled ? 'has' : '');
-                                    metaContainer.innerHTML = isNowEnabled 
-                                        ? I18N.propEditsSummary(summary) 
+                                    metaContainer.innerHTML = isNowEnabled
+                                        ? I18N.propEditsSummary(summary)
                                         : '<span style="color:var(--error);text-decoration:line-through;">' + I18N.propEditsSummary(summary) + '</span>';
                                 }
                             };
@@ -2663,7 +2678,7 @@
                         propCard.querySelector('[data-edit-map]').onclick = () => {
                             this.toggle(false); mapEditorHost.open(mapConfig, theme);
                         };
-                        
+
                         const clearBtn = propCard.querySelector('[data-clear-edits]');
                         if (clearBtn) {
                             clearBtn.onclick = () => {
