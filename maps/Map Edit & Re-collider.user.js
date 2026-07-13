@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Map Edit & Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      3.1.1
+// @version      3.2
 // @description  Modify map and regenerate collisions to freely customize and explore maps.
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -2043,6 +2043,160 @@
     }
 
     const blobCache = {};
+
+    // ==========================================
+    // Lightmap INDEX file (lightmapdata) extension
+    // Root cause of "added/copied objects look darker":
+    //   When propEdits exist we already replace lightmap-0_comp_light with a
+    //   uniform brightest-gray image. Objects that HAVE a lightmapdata entry
+    //   then sample that uniform gray and render uniformly bright. Newly
+    //   added / copied props get NEW indices (appended at the end of the prop
+    //   list) that the original lightmapdata file does NOT cover, so their
+    //   lightmapIndex is treated as -1 -> they never sample comp_light -> they
+    //   keep only real-time lighting and look darker than the rebuilt originals.
+    // Fix: intercept lightmapdata too and append one entry per new prop
+    //   (index = its final position) pointing at the same comp_light
+    //   (lightmapIndex 0) with a valid scaleOffset. comp_light is uniform gray
+    //   so any valid rectangle works and the new object matches the originals.
+    // ==========================================
+    const LIGHTMAP_DATA_RE = /\/lightmapdata\/?(\?.*)?$/i;
+
+    function parseLightmapDataBuffer(buffer) {
+        const s = new BinaryStream(new Uint8Array(buffer));
+        const version = s.readUint32(true);
+        if (version !== 2) throw new Error('Unsupported lightmapdata version: ' + version);
+        s.readUint32(true); // lightColor
+        s.readUint32(true); // ambientColor
+        s.readFloat32(true); // lightAngleX
+        s.readFloat32(true); // lightAngleZ
+        const lightmapCount = s.readUint32(true);
+        const lightmaps = [];
+        for (let i = 0; i < lightmapCount; i++) lightmaps.push(s.readString());
+        const mocOffset = s.offset;
+        const mapObjectCount = s.readUint32(true);
+        const mapObjects = [];
+        for (let i = 0; i < mapObjectCount; i++) {
+            const index = s.readInt32(true);
+            const lightmapIndex = s.readInt32(true);
+            let lightmapScaleOffset = null, uvs = [];
+            if (lightmapIndex >= 0) {
+                lightmapScaleOffset = [s.readFloat32(true), s.readFloat32(true), s.readFloat32(true), s.readFloat32(true)];
+                const hasUVs = s.readUint8();
+                if (hasUVs > 0) {
+                    const vertexCount = s.readUint32(true);
+                    for (let v = 0; v < vertexCount; v++) uvs.push([s.readFloat32(true), s.readFloat32(true)]);
+                }
+            }
+            const castShadows = s.readUint8() > 0;
+            const receiveShadows = s.readUint8() > 0;
+            mapObjects.push({ index, lightmapIndex, lightmapScaleOffset, uvs, castShadows, receiveShadows });
+        }
+        const bodyEnd = s.offset;
+        const buf8 = new Uint8Array(buffer);
+        const trailing = buf8.subarray(bodyEnd);
+        return { version, lightmaps, mapObjects, mocOffset, bodyEnd, trailing };
+    }
+
+    function serializeOneLightmapObject(o) {
+        const bw = new BinaryWriter();
+        bw.writeInt32(o.index, true);
+        bw.writeInt32(o.lightmapIndex, true);
+        if (o.lightmapIndex >= 0) {
+            const so = o.lightmapScaleOffset || [0, 0, 1, 1];
+            for (let k = 0; k < 4; k++) bw.writeFloat32(so[k], true);
+            const hasUVs = (o.uvs && o.uvs.length > 0) ? 1 : 0;
+            bw.writeUint8(hasUVs);
+            if (hasUVs) {
+                bw.writeUint32(o.uvs.length, true);
+                for (const uv of o.uvs) { bw.writeFloat32(uv[0], true); bw.writeFloat32(uv[1], true); }
+            }
+        }
+        bw.writeUint8(o.castShadows ? 1 : 0);
+        bw.writeUint8(o.receiveShadows ? 1 : 0);
+        return bw.toUint8Array();
+    }
+
+    // Append new entries to the ORIGINAL lightmapdata bytes (keep header,
+    // all original entries, and the trailing section intact) and bump the
+    // object count. Returns a fresh Uint8Array.
+    function appendLightmapEntries(origBuffer, newEntries) {
+        const d = parseLightmapDataBuffer(origBuffer);
+        if (!newEntries.length) return new Uint8Array(origBuffer);
+        const buf8 = new Uint8Array(origBuffer);
+        const head = buf8.subarray(0, d.bodyEnd);
+        let newLen = 0;
+        const chunks = newEntries.map(e => { const c = serializeOneLightmapObject(e); newLen += c.length; return c; });
+        const out = new Uint8Array(head.length + newLen + d.trailing.length);
+        out.set(head, 0);
+        let o = head.length;
+        for (const c of chunks) { out.set(c, o); o += c.length; }
+        out.set(d.trailing, o);
+        new DataView(out.buffer, out.byteOffset, out.byteLength).setUint32(d.mocOffset, d.mapObjects.length + newEntries.length, true);
+        return out;
+    }
+
+    // Build an extended lightmapdata for a theme that has propEdits: appends
+    // one comp-light entry per NEW prop (those appended beyond the original
+    // prop count). For a copied object we copy the lightmap settings of a
+    // same-named original (so it matches the brightened source); for unknown
+    // model-list adds we fall back to lightmapIndex 0 + full-rect.
+    async function buildLightmapDataForEdits(mapConfig, themeConfig) {
+        const base = getResourceBase();
+        let path = themeConfig.path.startsWith('/') ? themeConfig.path : '/' + themeConfig.path;
+        let mapUrl = base + path;
+        if (!mapUrl.endsWith('map.bin')) mapUrl += '/map.bin';
+        const lmUrl = mapUrl.replace(/map\.bin$/, 'lightmapdata');
+
+        const [mapRes, lmRes] = await Promise.all([
+            pageFetch(mapUrl),
+            pageFetchRaw(lmUrl)
+        ]);
+        const mapBuf = await mapRes.arrayBuffer();
+        const lmBuf = await lmRes.arrayBuffer();
+        const mapData = await parseMapBin(mapBuf);
+        const lm = parseLightmapDataBuffer(lmBuf);
+
+        const originalProps = mapData.props;
+        const originalCount = originalProps.length;
+        const themeData = Settings.getThemeData(mapConfig.name, themeConfig.name);
+        const propEdits = themeData.propEdits;
+        if (!propEdits || !Array.isArray(propEdits.props) || !propEdits.props.length) return new Uint8Array(lmBuf);
+
+        const rawEdited = applyPropEdits(originalProps, propEdits);
+        if (!rawEdited.length) return new Uint8Array(lmBuf);
+        const allowDelete = !!(propEdits.meta && propEdits.meta.allowDelete);
+        const merged = mergeSceneEdits(originalProps, rawEdited, { allowDelete });
+        const finalProps = merged.props;
+        if (finalProps.length <= originalCount) return new Uint8Array(lmBuf); // nothing added
+
+        // original prop position -> lightmap entry (only lit originals)
+        const lmByPos = new Map();
+        for (const e of lm.mapObjects) if (e.lightmapIndex >= 0) lmByPos.set(e.index, e);
+        // original prop name||lib -> first original prop (to find its position)
+        const origPosByName = new Map();
+        for (const p of originalProps) {
+            const key = (p.name || '') + '||' + (p.libName || '');
+            if (!origPosByName.has(key)) origPosByName.set(key, p);
+        }
+        const findTemplate = (p) => {
+            const key = (p.name || '') + '||' + (p.libName || '');
+            const op = origPosByName.get(key);
+            if (!op) return null;
+            return lmByPos.get(op.index) || null; // null => source original had NO lightmap
+        };
+
+        const newEntries = [];
+        for (let pos = originalCount; pos < finalProps.length; pos++) {
+            const p = finalProps[pos];
+            const tpl = findTemplate(p);
+            const li = tpl ? tpl.lightmapIndex : 0;
+            const so = (tpl && tpl.lightmapScaleOffset) ? tpl.lightmapScaleOffset.slice() : [0, 0, 1, 1];
+            newEntries.push({ index: pos, lightmapIndex: li, lightmapScaleOffset: so, castShadows: true, receiveShadows: true });
+        }
+        console.log('[MapEditor+Recollider] lightmapdata extended with', newEntries.length, 'entries for added props');
+        return appendLightmapEntries(lmBuf, newEntries);
+    }
+
     async function generateMapBinLocalAndGetBlobUrl(url, mapConfig, themeConfig) {
         if (blobCache[url]) return blobCache[url];
         console.log(`[MapEditor+Recollider] Generating map.bin: ${mapConfig.name} - ${themeConfig.name}`);
@@ -2912,6 +3066,26 @@
             console.error('[MapEditor+Recollider] lightmap intercept failed, passthrough', e);
         }
 
+        // ---- lightmapdata (extend for added/copied props) ----
+        try {
+            if (LIGHTMAP_DATA_RE.test(url)) {
+                const pure = url.split('?')[0].split('#')[0];
+                const hit = findThemeByResourceUrl(pure);
+                if (hit && themeHasMapEdits(hit.mapConfig.name, hit.themeConfig.name)) {
+                    const buf = await buildLightmapDataForEdits(hit.mapConfig, hit.themeConfig);
+                    return new Response(buf, {
+                        status: 200, statusText: 'OK',
+                        headers: {
+                            'Content-Type': 'application/octet-stream',
+                            'Content-Length': String(buf.length)
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('[MapEditor+Recollider] lightmapdata intercept failed, passthrough', e);
+        }
+
         // ---- map.bin ----
         if (url.endsWith('map.bin') || url.includes('/map.bin?') || url.includes('map.bin&')) {
             // normalize match: path ends with map.bin
@@ -2956,6 +3130,7 @@
         this._mrec_mapConfig = null;
         this._mrec_themeConfig = null;
         this._mrec_lightmap = false;
+        this._mrec_lightmapdata = false;
         const pure = this._mrec_url.split('?')[0].split('#')[0];
 
         // lightmap comp_light for edited maps
@@ -2963,6 +3138,18 @@
             const hit = findThemeByResourceUrl(this._mrec_url);
             if (hit && themeHasMapEdits(hit.mapConfig.name, hit.themeConfig.name)) {
                 this._mrec_lightmap = true;
+                this._mrec_mapConfig = hit.mapConfig;
+                this._mrec_themeConfig = hit.themeConfig;
+                // Delay real open until send (blob URL ready)
+                return;
+            }
+        }
+
+        // lightmapdata index file — extend for added/copied props
+        if (LIGHTMAP_DATA_RE.test(pure)) {
+            const hit = findThemeByResourceUrl(this._mrec_url);
+            if (hit && themeHasMapEdits(hit.mapConfig.name, hit.themeConfig.name)) {
+                this._mrec_lightmapdata = true;
                 this._mrec_mapConfig = hit.mapConfig;
                 this._mrec_themeConfig = hit.themeConfig;
                 // Delay real open until send (blob URL ready)
@@ -2999,6 +3186,24 @@
                 originalSend.call(this, body);
             }).catch(err => {
                 console.error('[MapEditor+Recollider] lightmap XHR intercept failed, passthrough', err);
+                originalOpen.call(this, this._mrec_method, this._mrec_url, ...this._mrec_openArgs);
+                originalSend.call(this, body);
+            });
+            return;
+        }
+        if (this._mrec_lightmapdata) {
+            const url = this._mrec_url.split('?')[0];
+            buildLightmapDataForEdits(this._mrec_mapConfig, this._mrec_themeConfig).then(buf => {
+                if (!buf || !buf.length) {
+                    originalOpen.call(this, this._mrec_method, this._mrec_url, ...this._mrec_openArgs);
+                    originalSend.call(this, body);
+                    return;
+                }
+                const blobUrl = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
+                originalOpen.call(this, this._mrec_method, blobUrl, ...this._mrec_openArgs);
+                originalSend.call(this, body);
+            }).catch(err => {
+                console.error('[MapEditor+Recollider] lightmapdata XHR intercept failed, passthrough', err);
                 originalOpen.call(this, this._mrec_method, this._mrec_url, ...this._mrec_openArgs);
                 originalSend.call(this, body);
             });
