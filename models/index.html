@@ -1110,7 +1110,7 @@
             const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx')); const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
             let group;
             if(modelEntry.name.endsWith('.a3d')) { const resp = await fetch(modelUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`); group = parseA3D(await resp.arrayBuffer(), modelEntry.name);
-            } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`); group = await loader.loadAsync(modelUrl); group.traverse(o => { if(o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:2}); o.userData.originalName = o.name; } }); }
+            } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`); group = await loader.loadAsync(modelUrl); group.traverse(o => { if(o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:0}); o.userData.originalName = o.name; } }); }
             // Recenter legacy skins (XT/DC/PR/UT/...) that were authored with the
             // root pivot at non-origin scene coordinates.  Safe no-op for modern
             // skins whose pivot is already at (0,0,0).
@@ -1518,7 +1518,6 @@
                     emissiveMap: bestTex,
                     emissive: new THREE.Color(0x888888),
                     color: 0xffffff,
-                    side: THREE.DoubleSide,
                     transparent: true,
                     alphaTest: 0.5,
                     name: prevName || bestTex.name
@@ -1534,7 +1533,7 @@
         const ext = file.name.split('.').pop().toLowerCase();
         let grp;
         if (ext === 'a3d') { grp = parseA3D(await file.arrayBuffer(), file.name); }
-        else if (ext === '3ds') { const loader = new TDSLoader(); loader.setResourcePath(''); grp = await loader.loadAsync(URL.createObjectURL(file)); grp.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:2}); o.userData.originalName=o.name; }}); }
+        else if (ext === '3ds') { const loader = new TDSLoader(); loader.setResourcePath(''); grp = await loader.loadAsync(URL.createObjectURL(file)); grp.traverse(o => { if(o.isMesh) { o.material=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,side:0}); o.userData.originalName=o.name; }}); }
         else { throw new Error(`Unsupported file extension: .${ext}`); }
         // Best-effort recenter for user-imported legacy files too.
         recenterModelAtPivot(grp, ['hull','Hull','turret','Turret','body']);
@@ -1773,7 +1772,7 @@
     function applySkin(geo, skin) { const numVerts = geo.attributes.position.count; if (numVerts !== skin.numVerts) return; const si = new Uint16Array(numVerts * 4); const sw = new Float32Array(numVerts * 4); const influences = Math.min(4, skin.inf); for (let i = 0; i < numVerts; i++) { let wSum = 0; for (let j = 0; j < influences; j++) { const idx = i * skin.inf + j; const internalBone = skin.boneIndices[idx]; const weight = decodeFloat16(skin.boneWeights[idx]); const outIdx = i * 4 + j; si[outIdx] = internalBone; sw[outIdx] = (Number.isFinite(weight) && weight > 0) ? weight : 0; wSum += sw[outIdx]; } if (wSum > 0) { for (let j = 0; j < influences; j++) sw[i * 4 + j] /= wSum; } else { sw[i * 4] = 1; } } geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4)); }
     function parseBindChunk(r){ const numRec=r.u32(); const mats={}; for(let i=0;i<numRec;i++){ const nodeId=r.u32(); const f=[]; for(let j=0;j<12;j++) f.push(r.f32()); const M=new THREE.Matrix4(); M.set(f[0],f[3],f[6],f[9], f[1],f[4],f[7],f[10], f[2],f[5],f[8],f[11], 0,0,0,1); mats[nodeId]=M; } return mats; }
     function build(gd, td, od, fname, mats, anim, skin, bindMats){
-        const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:2});
+        const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.2,side:0});
         const geos=gd.map((d, i)=>{ const g=new THREE.BufferGeometry(); g.userData={n:d.n}; d.vb.forEach(v=>{ if(v.t===1) g.setAttribute('position', new THREE.BufferAttribute(v.d,3)); if(v.t===3) g.setAttribute('normal', new THREE.BufferAttribute(v.d,3)); if(v.t===2){ for(let k=1;k<v.d.length;k+=2) v.d[k]=1.0-v.d[k]; g.setAttribute('uv', new THREE.BufferAttribute(v.d,2)); } }); let idxs=[], o=0; d.sm.forEach((s,subIdx)=>{ for(let k=0;k<s.x.length;k++) idxs.push(s.x[k]); g.addGroup(o,s.x.length,subIdx); o+=s.x.length; }); g.setIndex(idxs); if (skin && skin[i]) { applySkin(g, skin[i]); g.userData.skinData = skin[i]; } return g; });
         const boneIndicesSet = new Set(); if (skin) { Object.values(skin).forEach(sk => { if (sk.boneIds) { sk.boneIds.forEach(id => boneIndicesSet.add(id)); } }); }
         const grp=new THREE.Group(); let nds=[];
