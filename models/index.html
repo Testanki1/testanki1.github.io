@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tanki Online Model Showcase</title>
+    <title>Tanki Model Showcase</title>
     
     <!-- Import official Material Symbols icon library and fonts -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0" />
@@ -114,6 +114,43 @@
         }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+        #part-tooltip { 
+            position: fixed; top: 0; left: 0; z-index: 250; 
+            background: rgba(0, 25, 38, 0.85); 
+            backdrop-filter: blur(12px); 
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--md-sys-color-on-surface); 
+            border: 1px solid rgba(191, 213, 255, 0.15); 
+            border-radius: 8px; padding: 8px 12px; 
+            font-size: 13px; font-weight: 500; 
+            display: flex; align-items: center; gap: 6px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4); 
+            opacity: 0; pointer-events: none; 
+            transform: translate(-50%, -100%) translateY(-10px); 
+            transition: opacity 0.2s cubic-bezier(0.2,0,0,1), transform 0.2s cubic-bezier(0.2,0,0,1); 
+            max-width: min(280px, 80vw); 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            text-transform: none;
+        }
+        #part-tooltip.show { opacity: 1; transform: translate(-50%, -100%) translateY(0); }
+        #part-tooltip .material-symbols-rounded { font-size: 16px; color: var(--md-sys-color-primary); flex-shrink: 0; }
+        #part-tooltip-text { overflow: hidden; text-overflow: ellipsis; }
+        @media (max-width: 768px) {
+            #part-tooltip { font-size: 12px; padding: 6px 10px; border-radius: 6px; }
+        }
+
+        #attach-hull .anim-chip.active,
+        #attach-turret .anim-chip.active {
+            background: rgba(118, 255, 51, 0.18);
+            color: #76FF33;
+            border-color: #76FF33;
+        }
+        #attach-hull .anim-chip.active .chip-dot,
+        #attach-turret .anim-chip.active .chip-dot {
+            opacity: 1;
+            background: #76FF33;
+        }
+
         #drawer { 
             position: absolute; top: 0; right: 0; bottom: 0; width: 360px; max-width: 95vw; 
             background: var(--md-sys-color-surface-container-low); 
@@ -222,8 +259,11 @@
         .native-select-hidden { display: none; }
 
         .anim-chip-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
-        .anim-chip-label { width:100%; font-size: 11px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; color: var(--md-sys-color-outline-variant); margin-bottom: 2px; }
-        .anim-chip { position: relative; font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); cursor: pointer; transition: 0.15s; display:inline-flex; align-items:center; gap:6px; text-transform: capitalize; user-select: none; touch-action: manipulation; }
+        .tex-chip-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+        .tex-chip { font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); display:inline-flex; align-items:center; gap:6px; text-transform: none; }
+        .tex-chip .chip-dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:0.6; }
+        .tex-chip .chip-text, .anim-chip .chip-text { text-transform: none; }
+        .anim-chip { position: relative; font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); cursor: pointer; transition: 0.15s; display:inline-flex; align-items:center; gap:6px; user-select: none; touch-action: manipulation; text-transform: none; }
         .anim-chip .chip-bar { position: absolute; inset: -3px; border-radius: 11px; padding: 3px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0; z-index: 2; }
         .anim-chip.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--md-sys-color-primary-container); }
         .anim-chip.active .chip-bar { opacity: 1; background: conic-gradient(var(--md-sys-color-primary) var(--p, 0%), transparent 0); }
@@ -317,6 +357,12 @@
     </div>
 
     <div id="toast"><span>Ready</span></div>
+
+    <!-- Part name tooltip (right-click desktop / long-press mobile) -->
+    <div id="part-tooltip">
+        <span class="material-symbols-rounded">label</span>
+        <span id="part-tooltip-text"></span>
+    </div>
 
     <!-- Modals -->
     <div id="dialog-scrim"></div>
@@ -466,10 +512,12 @@
             export: "导出 GLB",
             clear: "清空场景",
             loading: "加载中...",
-            screenshot: "已保存高清截图"
+            screenshot: "已保存高清截图",
+            attachTitle: "挂载点",
+            texTitle: "模型中包含的纹理名"
         },
         en: {
-            appTitle: "Model Showcase",
+            appTitle: "Tanki Model Showcase",
             handleLbl: "Menu & Equip",
             tabNormal: "Local File",
             tabAssembly: "Tank Assembly",
@@ -491,12 +539,15 @@
             export: "Export GLB",
             clear: "Clear All Objects",
             loading: "Loading...",
-            screenshot: "4K Screenshot Saved"
+            screenshot: "4K Screenshot Saved",
+            attachTitle: "Attachment Points",
+            texTitle: "Included Textures"
         }
     };
     const T = Dict[userLang];
 
     function applyI18n() {
+        document.title = T.appTitle; 
         document.getElementById('t-app-title').innerText = T.appTitle;
         document.getElementById('t-handle-lbl').innerText = T.handleLbl;
         document.getElementById('t-import-btn').innerText = T.importBtn;
@@ -678,7 +729,467 @@
     canvasEl.addEventListener('pointerup', clearCamPtr);
     canvasEl.addEventListener('pointercancel', clearCamPtr);
     canvasEl.addEventListener('pointerleave', clearCamPtr);
-    canvasEl.addEventListener('contextmenu', (e) => { if (cameraMode === 'fly') e.preventDefault(); });
+    
+// ---- Part name tooltip (desktop right-click / mobile long-press) ----
+const partTooltipEl = document.getElementById('part-tooltip');
+const partTooltipText = document.getElementById('part-tooltip-text');
+const partRaycaster = new THREE.Raycaster();
+
+function cleanPartName(name) {
+    if (!name) return '';
+    const parts = name.split('_').filter(Boolean);
+    const deduped = [];
+    for (const part of parts) {
+        if (part !== deduped[deduped.length - 1]) deduped.push(part);
+    }
+    return deduped.join('_') || name;
+}
+
+function getPartName(object) {
+    let cur = object;
+    while (cur) {
+        let raw;
+        if (cur.isMesh && cur.userData?.originalName) {
+            // A3D meshes store "geoName_nodeName" in originalName.
+            // The semantic part name is the node/bone name (parent), not the geometry name.
+            raw = cur.parent?.name || cur.userData.originalName;
+        } else {
+            raw = cur.name;
+        }
+        const name = cleanPartName(raw);
+        if (name && name !== '' && !/^(Object|Group|Scene|Default|Default1|Material|01 - Default)\d*$/i.test(name)) return name;
+        cur = cur.parent;
+    }
+    return null;
+}
+
+function pickPart(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    partRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+    const intersects = partRaycaster.intersectObjects(scene.children, true);
+    for (const hit of intersects) {
+        const obj = hit.object;
+        if (!obj.visible) continue;
+        const name = getPartName(obj);
+        if (!name) continue;
+        if (obj.isSkinnedMesh) {
+            const boneName = pickBoneByInfluence(obj, hit);
+            if (boneName) return { name: boneName, point: hit.point, object: obj, clientX, clientY };
+        }
+        return { name, point: hit.point, object: obj, clientX, clientY };
+    }
+    return null;
+}
+
+// Pick the bone that most influences the hit triangle's vertices.
+// This gives the actual skinned "part" under the cursor rather than the nearest bone position.
+function pickBoneByInfluence(skinnedMesh, hit) {
+    if (!skinnedMesh.isSkinnedMesh || !skinnedMesh.skeleton || !hit.face) return null;
+    const idxAttr = skinnedMesh.geometry.attributes.skinIndex;
+    const wAttr = skinnedMesh.geometry.attributes.skinWeight;
+    if (!idxAttr || !wAttr) return null;
+    const idxArr = idxAttr.array;
+    const wArr = wAttr.array;
+    const verts = [hit.face.a, hit.face.b, hit.face.c];
+    const scores = new Map();
+    for (const vi of verts) {
+        for (let j = 0; j < 4; j++) {
+            const bi = idxArr[vi * 4 + j];
+            const w = wArr[vi * 4 + j];
+            scores.set(bi, (scores.get(bi) || 0) + w);
+        }
+    }
+    let bestBi = -1, bestW = -1;
+    for (const [bi, w] of scores) {
+        if (w > bestW) { bestW = w; bestBi = bi; }
+    }
+    const bone = skinnedMesh.skeleton.bones[bestBi];
+    return bone && bone.name ? cleanPartName(bone.name) : null;
+}
+
+let tooltipHit = null;
+let tooltipStartPos = null;
+const TT_LONG_PRESS_MS = 600;
+const TT_MOVE_THRESHOLD = 10;
+
+function showPartTooltip(text, x, y) {
+    partTooltipText.textContent = text;
+    partTooltipEl.classList.add('show');
+    positionPartTooltip(x, y);
+}
+
+function positionPartTooltip(x, y) {
+    const rect = partTooltipEl.getBoundingClientRect();
+    let left = x;
+    let top = y - 12;
+    const pad = 8;
+    if (left - rect.width / 2 < pad) left = pad + rect.width / 2;
+    if (left + rect.width / 2 > innerWidth - pad) left = innerWidth - pad - rect.width / 2;
+    if (top - rect.height < pad) top = y + rect.height + 12;
+    partTooltipEl.style.left = `${left}px`;
+    partTooltipEl.style.top = `${top}px`;
+}
+
+function hidePartTooltip() {
+    partTooltipEl.classList.remove('show');
+}
+
+// ---- Attachment points (empty nodes) ----
+function ensureTexUI() {
+    for (const type of ['hull', 'turret']) {
+        if (document.getElementById(`tex-${type}`)) continue;
+        const idx = type === 'hull' ? 1 : 2;
+        const col = document.querySelector(`#panel-assembly .m3-card:nth-of-type(${idx}) .control-col`);
+        if (!col) continue;
+        const wrap = document.createElement('div');
+        wrap.id = `tex-${type}`;
+        wrap.style.display = 'none';
+        wrap.innerHTML = `<div class="icon-grid-label" style="margin-top:10px; margin-bottom:4px; color:var(--md-sys-color-on-surface-variant);">${T.texTitle}</div><div class="tex-chip-row"></div>`;
+        col.appendChild(wrap);
+    }
+}
+
+function collectTextureNames(grp) {
+    const names = new Set();
+    function addName(raw) {
+        if (!raw) return;
+        // Strip extension only; keep original casing from the model file
+        const base = String(raw).replace(/\.[^.]+$/, '');
+        if (base) names.add(base);
+    }
+    // Only model-authored refs — never CDN / loaded file names (map.name, sceneLib.tex).
+    // A3D: group.userData.textureNames + mat.userData.texName
+    // 3DS garage: mesh.userData.textureNames from parse3dsTextureBindings (mat → map filename)
+    if (grp?.userData?.textureNames) grp.userData.textureNames.forEach(addName);
+    grp?.traverse(o => {
+        if (Array.isArray(o.userData?.textureNames)) o.userData.textureNames.forEach(addName);
+        if (!o.isMesh) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(m => {
+            if (m?.userData?.texName) addName(m.userData.texName);
+        });
+    });
+    return Array.from(names);
+}
+
+function renderTextureNames() {
+    ensureTexUI();
+    for (const type of ['hull', 'turret']) {
+        const wrap = document.getElementById(`tex-${type}`);
+        if (!wrap) continue;
+        const row = wrap.querySelector('.tex-chip-row');
+        row.innerHTML = '';
+        const names = collectTextureNames(slots[type]?.group);
+        if (names.length === 0) { wrap.style.display = 'none'; continue; }
+        for (const name of names) {
+            const chip = document.createElement('span');
+            chip.className = 'tex-chip';
+            chip.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${name}</span>`;
+            row.appendChild(chip);
+        }
+        wrap.style.display = 'block';
+    }
+}
+
+function ensureSceneTexUI() {
+    if (document.getElementById('tex-scene')) return;
+    const col = document.querySelector('#group-scene .control-col');
+    if (!col) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'tex-scene';
+    wrap.style.display = 'none';
+    wrap.innerHTML = `<div class="icon-grid-label" style="margin-top:10px; margin-bottom:4px; color:var(--md-sys-color-on-surface-variant);">${T.texTitle}</div><div class="tex-chip-row"></div>`;
+    col.appendChild(wrap);
+}
+
+function renderSceneTextureNames() {
+    ensureSceneTexUI();
+    const wrap = document.getElementById('tex-scene');
+    if (!wrap) return;
+    const row = wrap.querySelector('.tex-chip-row');
+    row.innerHTML = '';
+
+    // Same as hull/turret: only model-referenced texture names (A3D mats / 3DS map refs),
+    // not the raw image filenames loaded into sceneLib.tex.
+    const arr = collectTextureNames(slots.scene);
+    if (arr.length === 0) { wrap.style.display = 'none'; return; }
+    for (const name of arr) {
+        const chip = document.createElement('span');
+        chip.className = 'tex-chip';
+        chip.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${name}</span>`;
+        row.appendChild(chip);
+    }
+    wrap.style.display = 'block';
+}
+
+function ensureAttachUI() {
+    for (const type of ['hull', 'turret']) {
+        if (document.getElementById(`attach-${type}`)) continue;
+        const idx = type === 'hull' ? 1 : 2;
+        const col = document.querySelector(`#panel-assembly .m3-card:nth-of-type(${idx}) .control-col`);
+        if (!col) continue;
+        const wrap = document.createElement('div');
+        wrap.id = `attach-${type}`;
+        wrap.style.display = 'none';
+        wrap.innerHTML = `<div class="icon-grid-label" style="margin-top:10px; margin-bottom:4px; color:var(--md-sys-color-on-surface-variant);">${T.attachTitle}</div><div class="anim-chip-row"></div>`;
+        col.appendChild(wrap);
+    }
+}
+
+function projectNodeTooltip(node, name) {
+    const worldPos = new THREE.Vector3();
+    node.getWorldPosition(worldPos);
+    const screen = worldPos.clone().project(camera);
+    const x = (screen.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-screen.y * 0.5 + 0.5) * window.innerHeight;
+    showPartTooltip(name, x, y);
+}
+
+function toggleAttachmentMarker(type, info) {
+    if (!slots[type]) return;
+    const grp = slots[type].group;
+    if (!grp.userData.attachmentMarkers) grp.userData.attachmentMarkers = new Map();
+    const markers = grp.userData.attachmentMarkers;
+    if (markers.has(info.name)) {
+        const m = markers.get(info.name);
+        unregisterAttachmentMarker(m);
+        m.parent.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) m.material.forEach(mat => mat.dispose());
+            else m.material.dispose();
+        }
+        m.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) child.material.forEach(mat => mat.dispose());
+                else child.material.dispose();
+            }
+        });
+        markers.delete(info.name);
+        if (info.btn) info.btn.classList.remove('active');
+        return;
+    }
+    const worldPos = new THREE.Vector3();
+    info.node.getWorldPosition(worldPos);
+    const localPos = grp.worldToLocal(worldPos.clone());
+
+    // 3D marker: fixed world size beyond threshold, shrinks when camera gets closer than threshold
+    if (!grp.userData.attachmentThreshold) {
+        const box = new THREE.Box3().setFromObject(grp);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z, 1);
+        grp.userData.attachmentBaseRadius = Math.max(1.5, maxDim * 0.018);
+        grp.userData.attachmentThreshold = maxDim * 0.5;
+    }
+    const radius = grp.userData.attachmentBaseRadius;
+    const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 24, 24),
+        new THREE.MeshStandardMaterial({
+            color: 0x76FF33,
+            emissive: 0x76FF33,
+            emissiveIntensity: 0.6,
+            transparent: true,
+            opacity: 0.8,
+            roughness: 0.2,
+            metalness: 0.1,
+            side: THREE.DoubleSide
+        })
+    );
+    marker.name = info.name;
+    marker.userData.isAttachmentMarker = true;
+    marker.userData.markerName = info.name;
+    marker.position.copy(localPos);
+
+    grp.add(marker);
+    markers.set(info.name, marker);
+    registerAttachmentMarker(marker);
+    if (info.btn) info.btn.classList.add('active');
+    projectNodeTooltip(info.node, info.name);
+}
+
+function renderAttachmentPoints() {
+    ensureAttachUI();
+    for (const type of ['hull', 'turret']) {
+        const wrap = document.getElementById(`attach-${type}`);
+        if (!wrap) continue;
+        const row = wrap.querySelector('.anim-chip-row');
+        row.innerHTML = '';
+        const slot = slots[type];
+        const empties = slot?.group?.userData?.emptyNodes || [];
+        if (empties.length === 0) { wrap.style.display = 'none'; continue; }
+        for (const info of empties) {
+            const btn = document.createElement('button');
+            btn.className = 'anim-chip';
+            btn.type = 'button';
+            btn.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${info.name}</span>`;
+            info.btn = btn;
+            const active = slot?.group?.userData?.attachmentMarkers?.has(info.name);
+            if (active) btn.classList.add('active');
+
+            // Add consistent pressing effects
+            btn.addEventListener('pointerdown', () => btn.classList.add('pressing'));
+            btn.addEventListener('pointerup', () => btn.classList.remove('pressing'));
+            btn.addEventListener('pointerleave', () => btn.classList.remove('pressing'));
+            btn.addEventListener('pointercancel', () => btn.classList.remove('pressing'));
+
+            btn.onclick = () => toggleAttachmentMarker(type, info);
+            row.appendChild(btn);
+        }
+        wrap.style.display = 'block';
+    }
+}
+
+let lpTimer = null, lpStart = null;
+let tapStart = null, tapHit = null, tapDidMove = false;
+const TAP_MAX_MS = 250;
+const TAP_MAX_DIST = 10;
+
+let suppressNextContextMenu = false;
+let suppressNextClick = false;
+let attachmentMarkerMeshes = [];
+
+function registerAttachmentMarker(marker) {
+    if (!attachmentMarkerMeshes.includes(marker)) attachmentMarkerMeshes.push(marker);
+}
+function unregisterAttachmentMarker(marker) {
+    const idx = attachmentMarkerMeshes.indexOf(marker);
+    if (idx >= 0) attachmentMarkerMeshes.splice(idx, 1);
+}
+function pruneAttachmentMarkers() {
+    for (let i = attachmentMarkerMeshes.length - 1; i >= 0; i--) {
+        if (!attachmentMarkerMeshes[i].parent) attachmentMarkerMeshes.splice(i, 1);
+    }
+}
+function pickAttachmentMarker(clientX, clientY) {
+    pruneAttachmentMarkers();
+    if (attachmentMarkerMeshes.length === 0) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    partRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+    const hits = partRaycaster.intersectObjects(attachmentMarkerMeshes, true);
+    for (const hit of hits) {
+        const obj = hit.object;
+        if (isAttachmentMarker(obj)) {
+            const name = obj.userData?.markerName || obj.name || getPartName(obj);
+            return { name, point: hit.point, object: obj, clientX, clientY };
+        }
+    }
+    return null;
+}
+
+// Unified pointer handling for tooltip
+function isOnCanvas(e) { return e.target === canvasEl; }
+
+canvasEl.addEventListener('pointerdown', (e) => {
+    if (!isOnCanvas(e)) return;
+    // Track quick taps for attachment markers
+    tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+    tapDidMove = false;
+    suppressNextClick = false;
+
+    const markerHit = pickAttachmentMarker(e.clientX, e.clientY);
+    tapHit = markerHit || pickPart(e.clientX, e.clientY);
+
+    if (e.pointerType === 'mouse') {
+        if (e.button !== 2) { hidePartTooltip(); return; }
+        tooltipStartPos = { x: e.clientX, y: e.clientY };
+        tooltipHit = pickPart(e.clientX, e.clientY);
+    } else if (e.pointerType === 'touch') {
+        lpStart = { x: e.clientX, y: e.clientY };
+        if (lpTimer) clearTimeout(lpTimer);
+        lpTimer = setTimeout(() => {
+            const hit = pickPart(lpStart.x, lpStart.y);
+            if (hit) {
+                showPartTooltip(hit.name, lpStart.x, lpStart.y);
+            }
+            lpTimer = null;
+        }, TT_LONG_PRESS_MS);
+    }
+});
+
+canvasEl.addEventListener('pointermove', (e) => {
+    if (!isOnCanvas(e)) return;
+    if (tapStart && !tapDidMove) {
+        const dx = e.clientX - tapStart.x, dy = e.clientY - tapStart.y;
+        if (Math.hypot(dx, dy) > TAP_MAX_DIST) tapDidMove = true;
+    }
+    if (tooltipStartPos) {
+        const dx = e.clientX - tooltipStartPos.x, dy = e.clientY - tooltipStartPos.y;
+        if (Math.hypot(dx, dy) > TT_MOVE_THRESHOLD) { tooltipStartPos = null; tooltipHit = null; }
+    }
+    if (lpStart && lpTimer) {
+        const dx = e.clientX - lpStart.x, dy = e.clientY - lpStart.y;
+        if (Math.hypot(dx, dy) > TT_MOVE_THRESHOLD) {
+            clearTimeout(lpTimer); lpTimer = null; lpStart = null;
+        }
+    }
+});
+
+canvasEl.addEventListener('pointerup', (e) => {
+    if (!isOnCanvas(e)) return;
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    lpStart = null;
+    suppressNextContextMenu = false;
+
+    if (tapStart) {
+        const dt = performance.now() - tapStart.t;
+        const markerHit = pickAttachmentMarker(e.clientX, e.clientY);
+        if (dt < TAP_MAX_MS && markerHit) {
+            suppressNextContextMenu = true;
+            suppressNextClick = true;
+            showPartTooltip(markerHit.name, e.clientX, e.clientY);
+        }
+    }
+    tapStart = null; tapHit = null; tapDidMove = false;
+});
+
+canvasEl.addEventListener('pointercancel', () => {
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    lpStart = null;
+    tapStart = null; tapHit = null; tapDidMove = false;
+});
+
+canvasEl.addEventListener('click', (e) => {
+    if (!isOnCanvas(e)) return;
+    if (suppressNextClick) {
+        suppressNextClick = false;
+        e.stopPropagation();
+    }
+});
+
+canvasEl.addEventListener('contextmenu', (e) => {
+    if (!isOnCanvas(e)) return;
+    e.preventDefault();
+    if (suppressNextContextMenu) {
+        suppressNextContextMenu = false;
+        return;
+    }
+    if (tooltipHit) {
+        showPartTooltip(tooltipHit.name, tooltipStartPos.x, tooltipStartPos.y);
+        tooltipHit = null; tooltipStartPos = null;
+    }
+});
+
+function isAttachmentMarker(object) {
+    let cur = object;
+    while (cur) {
+        if (cur.userData?.isAttachmentMarker) return true;
+        cur = cur.parent;
+    }
+    return false;
+}
+
+// Hide tooltip on any subsequent press (canvas or UI)
+document.addEventListener('pointerdown', (e) => {
+    if (e.target === partTooltipEl) return;
+    hidePartTooltip();
+});
+
+
 
     function setCameraMode(mode) {
         if (mode === cameraMode) return;
@@ -736,11 +1247,32 @@
 
     const activeMixers = new Set(); const DEG = Math.PI/180; const clock = new THREE.Clock();
 
+    function updateAttachmentMarkerScales() {
+        const worldPos = new THREE.Vector3();
+        for (const type of ['hull', 'turret']) {
+            const slot = slots[type];
+            if (!slot || !slot.group) continue;
+            const markers = slot.group.userData.attachmentMarkers;
+            const threshold = slot.group.userData.attachmentThreshold;
+            if (!markers || markers.size === 0 || !threshold) continue;
+            for (const marker of markers.values()) {
+                marker.getWorldPosition(worldPos);
+                const dist = camera.position.distanceTo(worldPos);
+                let s = 1;
+                if (dist < threshold) {
+                    s = Math.max(0, dist / threshold);
+                }
+                marker.scale.setScalar(s);
+            }
+        }
+    }
+
     function animate(){
         requestAnimationFrame(animate);
         const dt = Math.min(clock.getDelta(), 0.1);
         for(const m of activeMixers) m.update(dt);
         updateChipProgress();
+        updateAttachmentMarkerScales();
         lg.quaternion.copy(camera.quaternion);
         if (cameraMode === 'fly') {
             flyControls.update(dt);
@@ -828,16 +1360,23 @@
     function renderAnimChips(type){
         const box = document.getElementById(`box-${type}-anim`); if(!box) return; const slot = slots[type]; const names = slot?.group?.userData?.animClipNames; box.innerHTML = '';
         if(!names || names.length === 0){ box.style.display = 'none'; activeClips[type].clear(); return; }
-        const label = document.createElement('div'); label.className = 'anim-chip-label';
-        label.innerText = userLang === 'zh' ? '动作（左键/点击: 播放/复位，右键/长按: 循环）' : 'Animations (Left-click/Tap: Play/Reset, Right-click/Hold: Loop)';
+        
+        const label = document.createElement('div');
+        label.className = 'icon-grid-label';
+        label.style.marginTop = '10px';
+        label.style.marginBottom = '4px';
+        label.style.color = 'var(--md-sys-color-on-surface-variant)';
+        label.innerText = userLang === 'zh' ? '动作（左/点: 播放/复位，右/长: 循环）' : 'Animations (Left/Tap: Play/Reset, Right/Hold: Loop)';
         box.appendChild(label);
+
         for(const name of names){
-            const btn = document.createElement('button'); btn.className = 'anim-chip'; btn.type = 'button'; const displayName = formatName(name);
-            btn.innerHTML = `<span class="chip-bar" style="--p:0%; --ang:0deg;"></span><span class="chip-dot"></span><span class="chip-text">${displayName}</span>`;
+            const btn = document.createElement('button'); btn.className = 'anim-chip'; btn.type = 'button';
+            // Keep original animation clip name casing (no formatName)
+            btn.innerHTML = `<span class="chip-bar" style="--p:0%; --ang:0deg;"></span><span class="chip-dot"></span><span class="chip-text">${name}</span>`;
             const bar = btn.querySelector('.chip-bar'); chipRefs.set(btn, { grp: slot.group, clipName: name, bar, type });
             let longPressTimer = null; let longPressed = false;
             const triggerAction = (mode) => { const result = toggleClip(slot.group, name, mode); if(result === 'idle'){ activeClips[type].delete(name); bar.style.setProperty('--p', '0%'); btn.classList.remove('active', 'looping'); } else { activeClips[type].add(name); } syncChipUI(type); };
-            btn.addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'mouse' && ev.button !== 0) return; btn.classList.add('pressing'); if (ev.pointerType === 'touch') { longPressed = false; longPressTimer = setTimeout(() => { longPressed = true; triggerAction('loop'); if(navigator.vibrate) navigator.vibrate(15); }, LONG_PRESS_MS); } });
+            btn.addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'mouse' && ev.button !== 0) return; btn.classList.add('pressing'); if (ev.pointerType === 'touch') { longPressed = false; longPressTimer = setTimeout(() => { longPressed = true; triggerAction('loop');  }, LONG_PRESS_MS); } });
             btn.addEventListener('pointerup', (ev) => { btn.classList.remove('pressing'); if (ev.pointerType === 'mouse' && ev.button !== 0) return; if (ev.pointerType === 'touch') { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } if (!longPressed) triggerAction('once'); } else { triggerAction('once'); } });
             btn.addEventListener('pointerleave', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } btn.classList.remove('pressing'); });
             btn.addEventListener('pointercancel', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } btn.classList.remove('pressing'); });
@@ -981,7 +1520,7 @@
         const link = document.createElement('a'); link.href = dataURL; link.download = `Screenshot_${new Date()}.png`; link.click(); msg(T.screenshot);
     };
 
-    function clearSceneEnvironment(refit = true) {
+    function clearSceneEnvironment(refit = true) { hidePartTooltip();
         if (slots.scene) {
             disposeMixer(slots.scene);
             groupAssembly.remove(slots.scene);
@@ -991,6 +1530,8 @@
         sceneLib.tex.forEach(t => t.dispose());
         sceneLib.tex.clear();
         sceneLib.meshes = [];
+        // Hide garage texture chips when environment is unloaded
+        renderSceneTextureNames();
         // Environment gone → restore orbit camera
         setCameraMode('orbit');
         if (refit) fitCamera();
@@ -1277,38 +1818,49 @@
                     if (o.parent) o.userData.parentName = o.parent.name;
 
                     const refs = [];
+                    const texRefs = [];
                     const pushRef = (v) => { if (v) refs.push(String(v)); };
+                    const pushTex = (v) => { if (v) texRefs.push(String(v)); };
 
-                    // Material name(s) — works for Birthday 16 (mat name == tex stem)
-                    // and for A3D (build() stores lowercased mat name that matches webp stem)
+                    // Candidate refs for texture matching (mesh/material/parent names)
                     const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
                     for (const mat of mats) {
                         pushRef(mat && mat.name);
                         // A3D materials also carry the original texture filename in userData
-                        if (mat && mat.userData && mat.userData.texName) pushRef(mat.userData.texName);
+                        if (mat && mat.userData && mat.userData.texName) {
+                            pushRef(mat.userData.texName);
+                            pushTex(mat.userData.texName);
+                        }
                     }
                     pushRef(o.name);
                     pushRef(o.userData.parentName);
 
-                    // From 3DS binary: map mesh → materials → texture basenames (the real fix)
+                    // From 3DS binary: map mesh → materials → texture filenames
                     if (bindings) {
                         const mlist = bindings.meshMats[o.name] || [];
                         for (const mn of mlist) {
                             pushRef(mn);
-                            if (bindings.matTex[mn]) pushRef(bindings.matTex[mn]);
+                            if (bindings.matTex[mn]) {
+                                pushRef(bindings.matTex[mn]);
+                                pushTex(bindings.matTex[mn]);
+                            }
                         }
                         // Also accept any material currently on the mesh via matTex lookup
                         for (const mat of mats) {
-                            if (mat && mat.name && bindings.matTex[mat.name]) pushRef(bindings.matTex[mat.name]);
+                            if (mat && mat.name && bindings.matTex[mat.name]) {
+                                pushRef(bindings.matTex[mat.name]);
+                                pushTex(bindings.matTex[mat.name]);
+                            }
                         }
                     }
 
                     o.userData.texRefs = Array.from(new Set(refs.filter(Boolean)));
+                    o.userData.textureNames = Array.from(new Set(texRefs.filter(Boolean)));
                     sceneLib.meshes.push(o);
                 });
                 combinedGroup.add(grp);
             }
-            slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector();
+            slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); renderSceneTextureNames();
             setCameraMode('fly');
             placeEnvCamera(combinedGroup);
             msg("Environment Loaded");
@@ -1401,7 +1953,7 @@
         cameraTarget.quaternion.copy(camera.quaternion);
     }
 
-    window.switchMode = function(mode) {
+    hidePartTooltip(); window.switchMode = function(mode) {
         if(currentMode === mode) return; currentMode = mode;
         document.querySelectorAll('.tab-btn').forEach((el,i) => { const modes = ['assembly','normal']; el.classList.toggle('active', modes[i] === mode); });
         ['normal','assembly'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
@@ -1409,7 +1961,7 @@
         if (mode === 'assembly') { if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull'); if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret'); }
     }
 
-    document.getElementById('btn-clear').onclick = () => {
+    document.getElementById('btn-clear').onclick = () => { hidePartTooltip();
         showDialog(T.clearTitle, T.clearDesc, true, T.btnConfirm, () => {
             if(currentMode === 'normal') {
                 while(groupNormal.children.length > 0){ const c = groupNormal.children[0]; disposeMixer(c); dispose(c); groupNormal.remove(c); }
@@ -1424,6 +1976,14 @@
                 setCameraMode('orbit');
             }
             sceneLib.tex.clear(); sceneLib.meshes=[]; msg(T.clear);
+            for (const type of ['hull', 'turret']) {
+                const el = document.getElementById(`attach-${type}`);
+                if (el) el.remove();
+                const texEl = document.getElementById(`tex-${type}`);
+                if (texEl) texEl.remove();
+            }
+            const sceneTexEl = document.getElementById('tex-scene');
+            if (sceneTexEl) sceneTexEl.remove();
         });
     };
 
@@ -1682,7 +2242,7 @@
         if(slots[type]) { const old = slots[type].group; disposeMixer(old); groupAssembly.remove(old); dispose(old); }
         slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
-        fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type);
+        fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames();
     }
 
     function scanMount(grp) {
@@ -1779,9 +2339,29 @@
         if(td.t && td.t.length>0){ nds=td.t.map((t, idx)=>{ const o = boneIndicesSet.has(idx) ? new THREE.Bone() : new THREE.Object3D(); o.position.set(...t.p); o.quaternion.set(...t.q); o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); o.name=t.n; return o; }); td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); }); }
         grp.updateMatrixWorld(true);
         function createMesh(geo, matsArr, parentNodeIdx) { if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) { const skData = geo.userData.skinData; const bones = []; const boneInverses = []; for (let k = 0; k < skData.numBones; k++) { const nodeIdx = skData.boneIds[k]; const boneNode = nds[nodeIdx]; bones.push(boneNode); if (bindMats && bindMats[nodeIdx]) { boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); } else { boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert()); } } const skel = new THREE.Skeleton(bones, boneInverses); const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; const skm = new THREE.SkinnedMesh(geo, finalMat); let bindMatrix = null; if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) { bindMatrix = bindMats[parentNodeIdx]; } if (bindMatrix) { skm.bind(skel, bindMatrix); } else { skm.bind(skel); } return skm; } else { const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; return new THREE.Mesh(geo, finalMat); } }
-        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); const src=mats[idx]; subMat.name=(src?src.n:"default").toLowerCase(); if(src&&src.t) subMat.userData.texName=src.t; return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false; m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
+        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); const src=mats[idx]; subMat.name=(src?src.n:"default"); if(src&&src.t) subMat.userData.texName=src.t; return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false; m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
+        const texNames = new Set();
+        if (mats && mats.length) mats.forEach(m => { if (m.t) { const base = String(m.t).replace(/\.[^.]+$/, ''); if (base) texNames.add(base); } });
+        grp.userData.textureNames = Array.from(texNames);
+
         if(anim){ const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; }); grp.userData.anim={ tracks: anim.tracks, clips: anim.clips, groups: (anim.clips && anim.clips.length) ? anim.clips[0].groups : (anim.groups||[]), duration: anim.duration, nameToNode }; }
+        // Collect empty nodes (attachment points / bones with no geometry assigned)
+        if (td.t && td.t.length > 0) {
+            const usedNodes = new Set();
+            if (od.length > 0) od.forEach(o => { if (o.ti >= 0) usedNodes.add(o.ti); });
+            grp.userData.emptyNodes = [];
+            grp.userData.boneNodes = [];
+            nds.forEach((node, idx) => {
+                if (!node || !node.name || usedNodes.has(idx)) return;
+                if (node.isBone) {
+                    grp.userData.boneNodes.push({ name: node.name, node: node, index: idx });
+                } else {
+                    grp.userData.emptyNodes.push({ name: node.name, node: node, index: idx });
+                }
+            });
+        }
         return grp;
     }
     </script>
+</body>
 </html>
