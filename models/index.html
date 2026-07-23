@@ -2157,11 +2157,33 @@ document.addEventListener('pointerdown', (e) => {
         if(toExport.children.length === 0) { msg(T.emptyScene); return; }
         
         showDialog(T.exportTitle, T.exportDesc, false, T.btnConfirm, () => {
+            // 1. Before export: traverse and temporarily hide all attachment markers
+            const markers = [];
+            root.traverse(o => {
+                if (o.userData && o.userData.isAttachmentMarker && o.visible) {
+                    o.visible = false;
+                    markers.push(o);
+                }
+            });
+
             const exporter = new GLTFExporter();
             exporter.parse(root, (result) => {
-                const blob = new Blob([result], { type: 'application/octet-stream' }); const link = document.createElement('a'); 
-                link.href = URL.createObjectURL(blob); link.download = 'tanki_model.glb'; link.click(); msg(T.export + " OK"); 
-            }, (err) => { console.error(err); msg(String(err.message || err)); }, { binary: true, onlyVisible: true });
+                // 2. On success: restore marker visibility
+                markers.forEach(m => m.visible = true);
+
+                const blob = new Blob([result], { type: 'application/octet-stream' }); 
+                const link = document.createElement('a'); 
+                link.href = URL.createObjectURL(blob); 
+                link.download = 'tanki_model.glb'; 
+                link.click(); 
+                msg(T.export + " OK"); 
+            }, (err) => { 
+                // 3. On error: restore marker visibility
+                markers.forEach(m => m.visible = true);
+                
+                console.error(err); 
+                msg(String(err.message || err)); 
+            }, { binary: true, onlyVisible: true });
         });
     };
 
