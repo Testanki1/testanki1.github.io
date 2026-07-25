@@ -615,7 +615,9 @@
     import { TDSLoader } from 'three/addons/loaders/TDSLoader.js'; 
     import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'; 
 
-    const ASSETS_INDEX_URL = "https://testanki1.github.io/models/assets.json";
+    // assets.json now stores { id, version, [file] } leaves instead of raw
+    // paths; toResourcePath() below reconstructs the CDN path on the fly.
+    const ASSETS_INDEX_URL = "assets.json";
     const ICON_BASE_EQUIP = "https://testanki1.github.io/equipment_icons";
     const ICON_BASE_SKIN = "https://testanki1.github.io/skin_icons";
 
@@ -1913,12 +1915,44 @@ document.addEventListener('pointerdown', (e) => {
         if (sw && !sw.classList.contains('active')) sw.classList.add('active');
     }
 
-    // An assets.json entry is either a plain path string (no skins) or an
-    // object {skinName: path}.  Normalize to the object form so all loaders
-    // and the skin picker can treat them uniformly.
+    // ---- ResourceURL path generator (ID + Version -> 5-level octal path) ----
+    // assets.json no longer stores raw path strings; each leaf is now
+    // { id, version, [file] }. The actual CDN path is derived on demand
+    // using the same bit-splitting scheme as the ID/Path Toolkit
+    // (resource-path-generator.html), so IDs/versions stay authoritative
+    // and paths are just a computed encoding of them.
+    function getHighInt32(longValBigInt) { return Number(longValBigInt >> 32n); }
+    function getLowInt32(longValBigInt) { return Number(longValBigInt & 0xFFFFFFFFn); }
+
+    function toResourcePath(entry) {
+        if (!entry) return null;
+        // Backward-compat: tolerate a raw path string if it ever appears.
+        if (typeof entry === 'string') return entry;
+        const idBigInt = BigInt(entry.id);
+        const versionBigInt = BigInt(entry.version);
+        const highId = getHighInt32(idBigInt);
+        const lowId = getLowInt32(idBigInt);
+        const base = [
+            highId.toString(8),
+            ((lowId >>> 16) & 0xFFFF).toString(8),
+            ((lowId >>> 8) & 0xFF).toString(8),
+            (lowId & 0xFF).toString(8),
+            versionBigInt.toString(8)
+        ].join("/");
+        return entry.file ? `${base}/${entry.file}` : base;
+    }
+
+    // A leaf asset entry now looks like { id, version, [file] }.
+    function isLeafEntry(entry) {
+        return !!entry && typeof entry === 'object' && !Array.isArray(entry) && ('id' in entry) && ('version' in entry);
+    }
+
+    // An assets.json entry is either a single leaf ({id, version}, no skins)
+    // or an object {skinName: leaf}. Normalize to the object form so all
+    // loaders and the skin picker can treat them uniformly.
     function entrySkinsMap(entry) {
         if (!entry) return {};
-        return (typeof entry === 'string') ? { default: entry } : entry;
+        return isLeafEntry(entry) ? { default: entry } : entry;
     }
     // Category key in assetsData for a given UI type ('supply' is pluralized irregularly)
     function catKey(type) { return type === 'supply' ? 'supplies' : `${type}s`; }
@@ -2065,14 +2099,14 @@ document.addEventListener('pointerdown', (e) => {
         if(loadingState[type]) return; 
         const name = document.getElementById(`sel-${type}-name`).value; const skin = document.getElementById(`sel-${type}-skin`).value;
         if(!name || !skin || name==='Loading...' || skin==='-') return;
-        const path = assetsData[`${type}s`][name][skin]; if(!path) return;
+        const path = toResourcePath(assetsData[`${type}s`][name][skin]); if(!path) return;
         const wrapper = document.getElementById(`box-${type}`).querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
         loadingState[type] = true; await loadRemoteAsset(path, type);
         if(wrapper) wrapper.classList.remove('loading'); loadingState[type] = false;
     }
 
     async function triggerSceneLoad() {
-        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value; const path = assetsData.garage && assetsData.garage[variant]; if(!path) return;
+        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value; const path = toResourcePath(assetsData.garage && assetsData.garage[variant]); if(!path) return;
         const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
         loadingState.scene = true; await loadRemoteScene(path, variant);
         if(wrapper) wrapper.classList.remove('loading'); loadingState.scene = false;
@@ -2474,7 +2508,7 @@ document.addEventListener('pointerdown', (e) => {
         const entry = assetsData.supplies && assetsData.supplies[name];
         if (!entry) return;
         const skinsMap = entrySkinsMap(entry);
-        const pathStr = skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0];
+        const pathStr = toResourcePath(skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0]);
         if (!pathStr) return;
         const meta = await fetchMeta(pathStr);
         const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
@@ -2528,7 +2562,7 @@ document.addEventListener('pointerdown', (e) => {
         const entry = assetsData.drones && assetsData.drones[name];
         if (!entry) return;
         const skinsMap = entrySkinsMap(entry);
-        const pathStr = skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0];
+        const pathStr = toResourcePath(skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0]);
         if (!pathStr) return;
         const meta = await fetchMeta(pathStr);
         const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
@@ -3047,7 +3081,7 @@ document.addEventListener('pointerdown', (e) => {
         if (!entry) return;
         const skinsMap = entrySkinsMap(entry);
         const skin = skinsMap.default ? 'default' : Object.keys(skinsMap)[0];
-        const pathStr = skinsMap[skin]; if (!pathStr) return;
+        const pathStr = toResourcePath(skinsMap[skin]); if (!pathStr) return;
         try {
             const meta = await fetchMeta(pathStr);
             const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
@@ -3180,5 +3214,4 @@ document.addEventListener('pointerdown', (e) => {
         return grp;
     }
     </script>
-</body>
 </html>
