@@ -750,19 +750,26 @@
 
     const IconLoader = {
         cache: new Map(),
-        async getEquipmentIcon(internalName) {
-            let filename = internalName; const lower = internalName.toLowerCase();
-            if (lower === 'b0-nk') filename = 'bonk';
-            const url = `${ICON_BASE_EQUIP}/${filename}.svg`;
-            try {
-                if (this.cache.has(url)) return this.cache.get(url);
-                const resp = await fetch(url); if (!resp.ok) throw "Icon 404";
-                let text = await resp.text(); text = text.replace(/<\?xml.*?\?>/g, '').replace(/<!DOCTYPE.*?>/g, '');
+        async getEquipmentIcon(internalName, keepOriginalColor = false) {
+        let filename = internalName; const lower = internalName.toLowerCase();
+        if (lower === 'b0-nk') filename = 'bonk';
+        const url = `${ICON_BASE_EQUIP}/${filename}.svg`;
+        const cacheKey = url + (keepOriginalColor ? '_raw' : '_mono');
+        try {
+            if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+            const resp = await fetch(url); if (!resp.ok) throw "Icon 404";
+            let text = await resp.text(); text = text.replace(/<\?xml.*?\?>/g, '').replace(/<!DOCTYPE.*?>/g, '');
+            
+            // 如果 keepOriginalColor 为 false，才强制把颜色替换为 currentColor（如底盘/炮塔）
+            // 如果为 true，则完整保留 SVG 内部原本的所有 fill / stroke 颜色
+            if (!keepOriginalColor) {
                 text = text.replace(/fill="(?!(none|currentColor))[^"]*"/gi, 'fill="currentColor"');
                 if (!text.includes('fill="currentColor"') && !text.includes('fill="none"')) { text = text.replace('<svg', '<svg fill="currentColor"'); }
-                this.cache.set(url, text); return text;
-            } catch (e) { return null; }
-        },
+            }
+            
+            this.cache.set(cacheKey, text); return text;
+        } catch (e) { return null; }
+    },
         getSkinIconUrl(skinId) {
             if(!skinId) return null; const lower = skinId.toLowerCase();
             if (lower === 'claw' || lower === '螯' || lower === 'spider' || lower === '蜘蛛') return `${ICON_BASE_EQUIP}/bonk.svg`;
@@ -1929,13 +1936,48 @@ document.addEventListener('pointerdown', (e) => {
         const grid = wrapper.querySelector('.icon-grid'); const selText = wrapper.querySelector(`#sel-txt-${nativeSelectId}`);
 
         for (const item of items) {
-            const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; if (type === 'env' || type === 'grenade' || type === 'drone' || type === 'supply') btn.classList.add('text-btn'); btn.title = item.label;
+            const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; 
+            // 1. 不再把 supply 当作纯文本按钮 (移除 'supply')
+            if (type === 'env' || type === 'grenade' || type === 'drone') btn.classList.add('text-btn'); 
+            btn.title = item.label;
             if (item.value === currentVal) { btn.classList.add('selected'); selText.innerText = item.label; }
-            if (type === 'model') { IconLoader.getEquipmentIcon(item.value).then(svg => { if (svg) btn.innerHTML = svg; else btn.innerText = item.label.substring(0, 2); });
-            } else if (type === 'skin') { const url = IconLoader.getSkinIconUrl(item.value); if (url) { const img = document.createElement('img'); img.src = url; img.loading = "lazy"; img.alt = item.label; img.onerror = () => { btn.innerText = item.label; btn.classList.add('text-btn'); }; btn.appendChild(img); } else { btn.innerText = item.label.substring(0, 2); }
-            } else if (type === 'env' || type === 'grenade' || type === 'drone' || type === 'supply') { btn.innerText = item.label; }
+
+            // Load SVG for 'model' and 'supply' using IconLoader.getEquipmentIcon
+            if (type === 'model' || type === 'supply') {
+                const keepRawColor = (type === 'supply'); // 道具箱保留 SVG 原生彩色
+                IconLoader.getEquipmentIcon(item.value, keepRawColor).then(svg => {
+                    if (svg) {
+                        btn.innerHTML = svg;
+                    } else {
+                        btn.innerText = item.label;
+                        btn.classList.add('text-btn'); // 降级处理
+                    }
+                });
+            } else if (type === 'skin') { 
+                const url = IconLoader.getSkinIconUrl(item.value); 
+                if (url) { 
+                    const img = document.createElement('img'); img.src = url; img.loading = "lazy"; img.alt = item.label; 
+                    img.onerror = () => { btn.innerText = item.label; btn.classList.add('text-btn'); }; 
+                    btn.appendChild(img); 
+                } else { 
+                    btn.innerText = item.label.substring(0, 2); 
+                }
+            } else if (type === 'env' || type === 'grenade' || type === 'drone') { 
+                btn.innerText = item.label; 
+            }
 
             btn.onclick = () => {
+                // 如果在“更多”面板中，点击当前卡片时，清除其他卡片里的选中样式
+                const card = btn.closest('.m3-card');
+                const panelMore = btn.closest('#panel-more');
+                if (panelMore && card) {
+                    panelMore.querySelectorAll('.m3-card').forEach(otherCard => {
+                        if (otherCard !== card) {
+                            otherCard.querySelectorAll('.icon-grid-btn').forEach(b => b.classList.remove('selected'));
+                        }
+                    });
+                }
+
                 grid.querySelectorAll('.icon-grid-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected'); selText.innerText = item.label;
                 nativeSel.value = item.value; nativeSel.dispatchEvent(new Event('change'));
@@ -2350,7 +2392,23 @@ document.addEventListener('pointerdown', (e) => {
         document.querySelectorAll('.tab-btn').forEach((el,i) => { const modes = ['assembly','more','normal']; el.classList.toggle('active', modes[i] === mode); });
         ['normal','assembly','more'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
         groupNormal.visible = (mode === 'normal'); groupMore.visible = (mode === 'more'); groupAssembly.visible = (mode === 'assembly');
-        if (mode === 'assembly') { if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull'); if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret'); }
+        
+        // --- 镜头模式切换修复 ---
+        if (mode === 'assembly') {
+            // 切回坦克组装：如果开了显示环境，恢复自由镜头 fly，否则保持 orbit
+            const envActive = document.querySelector('.env-toggle')?.classList.contains('active');
+            if (slots.scene && envActive) {
+                setCameraMode('fly');
+            } else {
+                setCameraMode('orbit');
+            }
+            if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
+            if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
+        } else {
+            // 切到“更多”或“本地文件”：环境已被隐藏，强制切回轨道视角 orbit 专注于显示当前模型
+            setCameraMode('orbit');
+        }
+
         if (mode === 'more') enterMoreMode();
         fitCamera();
     }
