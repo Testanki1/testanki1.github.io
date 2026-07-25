@@ -57,7 +57,10 @@
             
             --hull: var(--tanki-green); 
             --turret: var(--tanki-green); 
-            --scene: var(--tanki-orange); 
+            --scene: var(--tanki-orange);
+            --grenade: var(--tanki-purple);
+            --drone: var(--tanki-cyan); 
+            --supply: #BFD5FF;
         }
 
         .material-symbols-rounded {
@@ -254,6 +257,12 @@
         #box-turret .icon-grid-btn.selected, #box-turret-skin .icon-grid-btn.selected { border-color: var(--turret); background: rgba(118, 255, 51, 0.15); color: var(--turret); }
         #box-scene .icon-grid-label, #box-scene .selection-text { color: var(--scene); }
         #box-scene .icon-grid-btn.selected { border-color: var(--scene); background: rgba(255, 128, 0, 0.15); color: var(--scene); }
+        #box-grenade .icon-grid-label, #box-grenade .selection-text { color: var(--grenade); }
+        #box-grenade .icon-grid-btn.selected { border-color: var(--grenade); background: rgba(213, 128, 255, 0.15); color: var(--grenade); }
+        #box-drone .icon-grid-label, #box-drone .selection-text, #box-drone-skin .icon-grid-label, #box-drone-skin .selection-text { color: var(--drone); }
+        #box-drone .icon-grid-btn.selected, #box-drone-skin .icon-grid-btn.selected { border-color: var(--drone); background: rgba(0, 212, 255, 0.15); color: var(--drone); }
+        #box-supply .icon-grid-label, #box-supply .selection-text, #box-supply-skin .icon-grid-label, #box-supply-skin .selection-text { color: var(--supply); }
+        #box-supply .icon-grid-btn.selected, #box-supply-skin .icon-grid-btn.selected { border-color: var(--supply); background: rgba(191, 213, 255, 0.15); color: var(--supply); }
 
 .icon-grid-wrapper.loading::after { 
     content: ''; 
@@ -290,9 +299,10 @@
 
         .anim-chip-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
         .tex-chip-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
-        .tex-chip { font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); display:inline-flex; align-items:center; gap:6px; text-transform: none; }
-        .tex-chip .chip-dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:0.6; }
+        .tex-chip { font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); display:inline-flex; align-items:center; gap:6px; text-transform: none; max-width: 100%; }
+        .tex-chip .chip-dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:0.6; flex-shrink: 0; }
         .tex-chip .chip-text, .anim-chip .chip-text { text-transform: none; }
+        .tex-chip .chip-text { overflow-wrap: anywhere; line-height: 1.35; }
         .anim-chip { position: relative; font-family: inherit; font-size: 12px; font-weight:500; letter-spacing:0.2px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); cursor: pointer; transition: 0.15s; display:inline-flex; align-items:center; gap:6px; user-select: none; touch-action: manipulation; text-transform: none; }
         .anim-chip .chip-bar { position: absolute; inset: -3px; border-radius: 11px; padding: 3px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0; z-index: 2; }
         .anim-chip.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--md-sys-color-primary-container); }
@@ -312,8 +322,12 @@
 .env-label { font-size: 14px; font-weight: 500; color: var(--md-sys-color-on-surface); }
 .env-switch { width: 52px; height: 32px; background: var(--md-sys-color-surface-container-highest); border: 2px solid var(--md-sys-color-outline-variant); border-radius: 100px; position: relative; transition: 0.2s; box-sizing: border-box; }
 .env-switch::after { content: ''; position: absolute; top: 50%; left: 6px; transform: translateY(-50%); width: 16px; height: 16px; background: var(--md-sys-color-outline); border-radius: 50%; transition: 0.2s cubic-bezier(0.2, 0, 0, 1.3); }
-.env-toggle.active .env-switch { background: var(--scene); border-color: var(--scene); }
+/* All four category switches share the same brand green */
+.env-toggle.active .env-switch { background: #76FF33; border-color: #76FF33; }
 .env-toggle.active .env-switch::after { background: var(--md-sys-color-on-primary); width: 24px; height: 24px; left: calc(100% - 28px); }
+.env-switch.active { background: #76FF33; border-color: #76FF33; }
+.env-switch.active::after { background: var(--md-sys-color-on-primary); width: 24px; height: 24px; left: calc(100% - 28px); }
+.card-switch { margin-left: auto; cursor: pointer; flex-shrink: 0; }
         
         #group-scene { display: none; margin-top: 10px; border-style:dashed; }
         #group-scene.visible { display: block; animation: fadeIn 0.3s; }
@@ -467,6 +481,9 @@
             <button class="toolbar-btn tab-btn active" onclick="switchMode('assembly')" id="tab-btn-assembly" title="Tank Assembly">
                 <span class="material-symbols-rounded">widgets</span>
             </button>
+            <button class="toolbar-btn tab-btn" onclick="switchMode('more')" id="tab-btn-more" title="More">
+                <span class="material-symbols-rounded">more_horiz</span>
+            </button>
             <button class="toolbar-btn tab-btn" onclick="switchMode('normal')" id="tab-btn-normal" title="Local File">
                 <span class="material-symbols-rounded">folder_open</span>
             </button>
@@ -484,12 +501,13 @@
         <!-- Assembly Mode -->
         <div id="panel-assembly" class="drawer-content active">
             <!-- Hull Card -->
-            <div class="m3-card">
+            <div class="m3-card" id="card-hull">
                 <div class="card-title" style="color:var(--hull)">
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M2 3L3 2H7L8 3H16V5H6V6H10L12 8H15L16 9V11L14 13H2L0 11V8L2 6V3Z" fill="currentColor"/>
                     </svg>
                     <span id="t-hull-title">Hull</span>
+                    <div class="env-switch active card-switch" id="sw-hull"></div>
                 </div>
                 <div class="control-col">
                     <div id="box-hull"><select id="sel-hull-name" class="native-select-hidden"></select></div>
@@ -499,17 +517,33 @@
             </div>
 
             <!-- Turret Card -->
-            <div class="m3-card">
+            <div class="m3-card" id="card-turret">
                 <div class="card-title" style="color:var(--turret)">
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0H7V12H9V0H11V6L14 9V13L11 16V16H9H7H5V16L2 13V9L5 6V0Z" fill="currentColor"/>
                     </svg>
                     <span id="t-turret-title">Turret</span>
+                    <div class="env-switch active card-switch" id="sw-turret"></div>
                 </div>
                 <div class="control-col">
                     <div id="box-turret"><select id="sel-turret-name" class="native-select-hidden"></select></div>
                     <div id="box-turret-skin"><select id="sel-turret-skin" class="native-select-hidden"></select></div>
                     <div id="box-turret-anim" class="anim-chip-row" style="display:none;"></div>
+                </div>
+            </div>
+
+            <!-- Grenade Card (mounted on turret "fmnt" attach point) -->
+            <div class="m3-card" id="card-grenade">
+                <div class="card-title" style="color:var(--grenade)">
+                    <svg width="18" height="18" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M61.1605 10.8754L40.0002 4L18.84 10.8754L13.8931 17.6842C14.6914 18.0298 15.25 18.8247 15.25 19.75C15.25 20.9926 14.2426 22 13 22H10.7575L5.76221 28.8754V44.5H11.7961L19.4602 33.0038C20.2948 31.752 21.6998 31 23.2044 31H34.2961C35.8007 31 37.2057 31.752 38.0403 33.0038L45.7044 44.5H56.7961L64.4602 33.0038C65.2948 31.752 66.6998 31 68.2044 31H74.2383V28.8754L69.243 22H67C65.7574 22 64.75 20.9926 64.75 19.75C64.75 18.8245 65.3087 18.0296 66.1073 17.684L61.1605 10.8754ZM34.375 19.75C34.375 20.9926 33.3676 22 32.125 22C30.8824 22 29.875 20.9926 29.875 19.75C29.875 18.5074 30.8824 17.5 32.125 17.5C33.3676 17.5 34.375 18.5074 34.375 19.75ZM20.875 22C22.1176 22 23.125 20.9926 23.125 19.75C23.125 18.5074 22.1176 17.5 20.875 17.5C19.6324 17.5 18.625 18.5074 18.625 19.75C18.625 20.9926 19.6324 22 20.875 22ZM50.125 19.75C50.125 20.9926 49.1176 22 47.875 22C46.6324 22 45.625 20.9926 45.625 19.75C45.625 18.5074 46.6324 17.5 47.875 17.5C49.1176 17.5 50.125 18.5074 50.125 19.75ZM59.125 22C60.3676 22 61.375 20.9926 61.375 19.75C61.375 18.5074 60.3676 17.5 59.125 17.5C57.8824 17.5 56.875 18.5074 56.875 19.75C56.875 20.9926 57.8824 22 59.125 22Z" fill="#D580FF"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M74.2383 35.5H68.2044L60.5403 46.9961C59.7057 48.248 58.3007 49 56.7961 49H45.7044C44.1998 49 42.7948 48.248 41.9602 46.9961L34.2961 35.5H23.2044L15.5403 46.9961C14.7057 48.248 13.3007 49 11.7961 49H5.76221V51.1246L10.7575 58H13C14.2426 58 15.25 59.0074 15.25 60.25C15.25 61.1753 14.6914 61.9702 13.8931 62.3158L18.84 69.1246L40.0002 76L61.1605 69.1246L66.1073 62.3159C65.3087 61.9704 64.75 61.1755 64.75 60.25C64.75 59.0074 65.7574 58 67 58H69.243L74.2383 51.1246V35.5ZM34.375 60.25C34.375 61.4926 33.3676 62.5 32.125 62.5C30.8824 62.5 29.875 61.4926 29.875 60.25C29.875 59.0074 30.8824 58 32.125 58C33.3676 58 34.375 59.0074 34.375 60.25ZM20.875 62.5C22.1176 62.5 23.125 61.4926 23.125 60.25C23.125 59.0074 22.1176 58 20.875 58C19.6324 58 18.625 59.0074 18.625 60.25C18.625 61.4926 19.6324 62.5 20.875 62.5ZM50.125 60.25C50.125 61.4926 49.1176 62.5 47.875 62.5C46.6324 62.5 45.625 61.4926 45.625 60.25C45.625 59.0074 46.6324 58 47.875 58C49.1176 58 50.125 59.0074 50.125 60.25ZM59.125 62.5C60.3676 62.5 61.375 61.4926 61.375 60.25C61.375 59.0074 60.3676 58 59.125 58C57.8824 58 56.875 59.0074 56.875 60.25C56.875 61.4926 57.8824 62.5 59.125 62.5Z" fill="#D580FF"/>
+                    </svg>
+                    <span id="t-grenade-title">Grenade</span>
+                    <div class="env-switch card-switch" id="sw-grenade"></div>
+                </div>
+                <div class="control-col">
+                    <div id="box-grenade"><select id="sel-grenade-name" class="native-select-hidden"></select></div>
                 </div>
             </div>
 
@@ -524,6 +558,40 @@
                 <div class="card-title" style="color:var(--scene)" id="t-scene-title">Map / Garage</div>
                 <div class="control-col">
                     <div id="box-scene"><select id="sel-scene-var" class="native-select-hidden"></select></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- More Mode -->
+        <div id="panel-more" class="drawer-content">
+            <!-- Drone -->
+            <div class="m3-card" id="card-drone">
+                <div class="card-title" style="color:var(--drone)">
+                    <svg width="18" height="18" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.5 0L0 7.5L10 25H15L17.5 22.5L15 20L20 15L22.5 17.5L25 15V10L7.5 0Z" fill="#00D4FF"/>
+                        <path d="M7.5 80L0 72.5L10 55H15L17.5 57.5L15 60L20 65L22.5 62.5L25 65V70L7.5 80Z" fill="#00D4FF"/>
+                        <path d="M80 72.5L72.5 80L55 70V65L57.5 62.5L60 65L65 60L62.5 57.5L65 55H70L80 72.5Z" fill="#00D4FF"/>
+                        <path d="M72.5 0L80 7.5L70 25H65L62.5 22.5L65 20L60 15L57.5 17.5L55 15V10L72.5 0Z" fill="#00D4FF"/>
+                        <path d="M32.5 45C32.5 43.6193 33.6193 42.5 35 42.5C36.3807 42.5 37.5 43.6193 37.5 45V50C37.5 51.3807 36.3807 52.5 35 52.5C33.6193 52.5 32.5 51.3807 32.5 50V45Z" fill="#00D4FF"/>
+                        <path d="M45 42.5C43.6193 42.5 42.5 43.6193 42.5 45V50C42.5 51.3807 43.6193 52.5 45 52.5C46.3807 52.5 47.5 51.3807 47.5 50V45C47.5 43.6193 46.3807 42.5 45 42.5Z" fill="#00D4FF"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M31.4017 16.0983C32.1049 15.3951 33.0587 15 34.0533 15H45.9467C46.9413 15 47.8951 15.3951 48.5983 16.0983L63.9017 31.4017C64.6049 32.1049 65 33.0587 65 34.0533V45.9467C65 46.9413 64.6049 47.8951 63.9016 48.5983L48.5983 63.9017C47.8951 64.6049 46.9413 65 45.9467 65H34.0533C33.0587 65 32.1049 64.6049 31.4017 63.9016L16.0983 48.5983C15.3951 47.8951 15 46.9413 15 45.9467V34.0533C15 33.0587 15.3951 32.1049 16.0983 31.4017L31.4017 16.0983ZM57.5 47.5L45 35H35L21.6406 47.5L35 60H45L57.5 47.5Z" fill="#00D4FF"/>
+                    </svg>
+                    <span id="t-drone-title">Drone</span>
+                </div>
+                <div class="control-col">
+                    <div id="box-drone"><select id="sel-drone-name" class="native-select-hidden"></select></div>
+                    <div id="box-drone-skin"><select id="sel-drone-skin" class="native-select-hidden"></select></div>
+                </div>
+            </div>
+            <!-- Supply box -->
+            <div class="m3-card" id="card-supply">
+                <div class="card-title" style="color:var(--supply)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.95465 1.5C3.55683 1.5 3.1753 1.65803 2.89399 1.93934L1.93934 2.89399C1.65804 3.1753 1.5 3.55683 1.5 3.95465V9.04535C1.5 9.44317 1.65803 9.8247 1.93934 10.106L2.89399 11.0607C3.1753 11.342 3.55683 11.5 3.95465 11.5H10.5C11.0523 11.5 11.5 11.0523 11.5 10.5V3.95465C11.5 3.55683 11.342 3.1753 11.0607 2.89399L10.106 1.93934C9.8247 1.65804 9.44317 1.5 9.04535 1.5H3.95465ZM3.84491 5.2753C3.58632 5.49695 3.4375 5.82052 3.4375 6.1611V7.37451L6.5 4.74951L9.5625 7.37451V6.1611C9.5625 5.82052 9.41368 5.49695 9.15509 5.2753L6.5 2.99951L3.84491 5.2753ZM3.84491 7.9003C3.58632 8.12195 3.4375 8.44552 3.4375 8.7861V9.99951L6.5 7.37451L9.5625 9.99951V8.7861C9.5625 8.44552 9.41368 8.12195 9.15509 7.9003L6.5 5.62451L3.84491 7.9003Z" fill="#BFD5FF"/><path fill-rule="evenodd" clip-rule="evenodd" d="M3.95465 12.5C3.55683 12.5 3.1753 12.658 2.89399 12.9393L1.93934 13.894C1.65804 14.1753 1.5 14.5568 1.5 14.9547V20.0453C1.5 20.4432 1.65803 20.8247 1.93934 21.106L2.89399 22.0607C3.1753 22.342 3.55683 22.5 3.95465 22.5H9.04535C9.44317 22.5 9.8247 22.342 10.106 22.0607L11.0607 21.106C11.342 20.8247 11.5 20.4432 11.5 20.0453V13.5C11.5 12.9477 11.0523 12.5 10.5 12.5H3.95465ZM3.875 14.2912L3 19.687L7.375 16.6245L4.3125 20.9995L9.70833 20.1245L7.375 19.2495L10 13.9995L4.75 16.6245L3.875 14.2912Z" fill="#BFD5FF"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14.9551 1.5C14.5572 1.5 14.1757 1.65803 13.8944 1.93934L12.9397 2.89403C12.6584 3.17531 12.5004 3.55681 12.5004 3.9546L12.5 10.4999C12.5 11.0522 12.9477 11.5 13.5 11.5H20.0458C20.4436 11.5 20.8251 11.342 21.1064 11.0607L22.0611 10.106C22.3424 9.8247 22.5004 9.44317 22.5004 9.04535V3.95465C22.5004 3.55683 22.3424 3.1753 22.0611 2.89399L21.1064 1.93934C20.8251 1.65804 20.4436 1.5 20.0458 1.5H14.9551ZM18.3783 4.31105L19.3617 3.32776V3H18.8152C17.6084 3 16.6301 3.97829 16.6301 5.18508C16.6301 5.50567 16.6992 5.81014 16.8232 6.08443L14.2263 8.68119C13.9246 8.9829 13.9246 9.47209 14.2263 9.7738C14.528 10.0755 15.0172 10.0755 15.3189 9.77379L17.9158 7.17702C18.1901 7.30109 18.4946 7.37016 18.8153 7.37016C20.0222 7.37016 21.0006 6.39179 21.0006 5.18491V4.63881H20.6728L19.6895 5.62209H19.2524L18.3783 4.74806V4.31105Z" fill="#BFD5FF"/><path d="M19.6429 15.535V16.375L17.5 15.75L17.5 20.073C17.4601 20.057 17.4162 20.0387 17.3689 20.018C17.127 19.9122 16.8098 19.7496 16.4982 19.5224C15.8694 19.0639 15.3571 18.4207 15.3571 17.5V15.535L17.5 14.91L19.6429 15.535Z" fill="#BFD5FF"/><path fill-rule="evenodd" clip-rule="evenodd" d="M20.0453 12.5C20.4432 12.5 20.8247 12.658 21.106 12.9393L22.0607 13.894C22.342 14.1753 22.5 14.5568 22.5 14.9547V20.0453C22.5 20.4432 22.342 20.8247 22.0607 21.106L21.106 22.0607C20.8247 22.342 20.4432 22.5 20.0453 22.5H14.9547C14.5568 22.5 14.1753 22.342 13.894 22.0607L12.9393 21.106C12.658 20.8247 12.5 20.4432 12.5 20.0453V13.5C12.5 12.9477 12.9477 12.5 13.5 12.5H20.0453ZM20.3625 18.4323C19.7744 20.3366 17.5 21 17.5 21C17.5 21 14.5 20.125 14.5 17.5V15.205C14.5 15.0097 14.6268 14.838 14.8108 14.7843L17.5 14L20.1892 14.7843C20.3732 14.838 20.5 15.0097 20.5 15.205V17.5C20.5 17.8394 20.4499 18.1495 20.3625 18.4323Z" fill="#BFD5FF"/></svg>
+                    <span id="t-supply-title">Supply</span>
+                </div>
+                <div class="control-col">
+                    <div id="box-supply"><select id="sel-supply-name" class="native-select-hidden"></select></div>
+                    <div id="box-supply-skin"><select id="sel-supply-skin" class="native-select-hidden"></select></div>
                 </div>
             </div>
         </div>
@@ -558,10 +626,14 @@
         'default': '默认', 'firebird': '火焰炮', 'freeze': '冰风暴', 'isida': '磁力炮', 'tesla': '特斯拉', 'hammer': '滑膛炮',
         'twins': '离子炮', 'ricochet': '火龙珠', 'smoky': '轰天炮', 'striker': '火箭炮', 'vulcan': '极速炮',
         'thunder': '雷暴炮', 'tsunami': '海啸', 'scorpion': '蝎子', 'railgun': '激光炮', 'magnum': '马格南', 'gauss': '电磁炮', 'shaft': '镭射炮',
+        'none': '无', 'bomb': '炸弹', 'mortar': '迫击榴弹', 'medic': '医疗球', 'salyut': '礼花', 'tsar': '沙皇',
+        'pumpkin': '南瓜', 'snowball': '雪球', 'teleport': '传送', 'smoke': '烟雾弹',
         'wasp': '黄蜂轻甲', 'hornet': '蜂王', 'hopper': '霍珀', 'paladin': '圣骑士', 'hunter': '猎人中甲',
         'crusader': '十字军', 'viking': '维京', 'dictator': '独裁者', 'ares': '阿瑞斯', 'titan': '泰坦', 'mammoth': '猛犸象',
         'brutus': '布鲁特斯', 'mechanic': '机械师', 'trickster': '魔术师', 'saboteur': '破坏者', 'booster': '助推器',
         'defender': '守卫者', 'hyperion': '亥伯龙神', 'crisis': '危机', 'supply': '道具', 'ut': '超高', 'pr': '青春',
+        'repair_kit': '修理包', 'boosted_armor': '双倍护甲', 'boosted_damage': '双倍伤害', 'speed_boost': '加速',
+        'nuclear_energy': '核能', 'crystal_box': '水晶箱', 'goldbox': '金箱', 'key_box': '钥匙箱',
         'lc': '遗产', 'xt': 'XT', 'dc': '恶魔', 'gt': 'GT（跑车）', 'hd': 'HD（高清）', 'rf': 'RF（复古未来）', 'se': 'SE（秘密）', 'vt': 'VT（老兵）',
         'dk': 'DK（暗黑）', 'sp': 'SP（蒸汽朋克）', 'ic': 'IC（冰）', 'old': '旧', 'terminator': '终结者', 'juggernaut': '剑圣'
     };
@@ -594,7 +666,13 @@
         attachTitle: "挂载点",
         texTitle: "模型中包含的纹理名",
         affectedParts: "包含部件：",
-        loadProgress: "加载中："
+        loadProgress: "加载中：",
+        grenadeTitle: "榴弹",
+        noFmnt: "该炮塔没有 fmnt 挂载点",
+        grenadeFail: "榴弹加载失败",
+        tabMore: "更多",
+        droneTitle: "无人机",
+        supplyTitle: "道具箱"
     },
     en: {
         appTitle: "Tanki Model Showcase",
@@ -623,7 +701,13 @@
         attachTitle: "Attachment Points",
         texTitle: "Texture names included in the model",
         affectedParts: "Affected Parts:",
-        loadProgress: "Loading"
+        loadProgress: "Loading",
+        grenadeTitle: "Grenade",
+        noFmnt: "This turret has no fmnt mount point",
+        grenadeFail: "Failed to load grenade",
+        tabMore: "More",
+        droneTitle: "Drone",
+        supplyTitle: "Supply"
     }
 };
     const T = Dict[userLang];
@@ -636,18 +720,27 @@
         document.getElementById('t-res-title').innerText = T.resTitle;
         document.getElementById('t-hull-title').innerText = T.hullTitle;
         document.getElementById('t-turret-title').innerText = T.turretTitle;
+        document.getElementById('t-grenade-title').innerText = T.grenadeTitle;
+        document.getElementById('t-drone-title').innerText = T.droneTitle;
+        document.getElementById('t-supply-title').innerText = T.supplyTitle;
         document.getElementById('t-env-label').innerText = T.envLabel;
         document.getElementById('t-scene-title').innerText = T.sceneTitle;
 
         document.getElementById('tab-btn-assembly').title = T.tabAssembly;
+        document.getElementById('tab-btn-more').title = T.tabMore;
         document.getElementById('tab-btn-normal').title = T.tabNormal;
         document.getElementById('btn-export').title = T.export;
         document.getElementById('btn-clear').title = T.clear;
     }
 
     const EN_ACRO = new Set(['XT', 'LC', 'DC', 'GT', 'HD', 'RF', 'SE', 'VT', 'DK', 'SP', 'IC', 'UT', 'PR', 'UFO']);
-    const EN_TERMS = { '万圣节': 'Halloween', '新年': 'New Year', '生日': 'Birthday', 'UFO 日': 'UFO Day', '雪人': 'Snowman', '番茄炮': 'Tomato', '螯': 'Claw', '蜘蛛': 'Spider' };
+    const EN_TERMS = { '万圣节': 'Halloween', '新年': 'New Year', '生日': 'Birthday', 'UFO 日': 'UFO Day', '雪人': 'Snowman', '番茄炮': 'Tomato', '螯': 'Claw', '蜘蛛': 'Spider',
+        '五月假期': 'May Holiday', '夏季节日': 'Summer Festival', '能量箱子': 'Energy Box', '坦克手日': "Tanker's Day", '秋季节日': 'Autumn Festival' };
+    // Whole-name overrides (otherwise construced per-token below)
+    const EN_OVERRIDES = { 'goldbox': 'Gold Box' };
     function formatName(name) {
+        if (userLang === 'zh' && CNDict[name.toLowerCase()]) return CNDict[name.toLowerCase()];
+        if (userLang !== 'zh' && EN_OVERRIDES[name.toLowerCase()]) return EN_OVERRIDES[name.toLowerCase()];
         let text = name.replace(/_/g, ' ');
         if(userLang === 'zh') return text.split(' ').map(part => CNDict[part.toLowerCase()] || part).join(' ');
         Object.entries(EN_TERMS).forEach(([zh, en]) => { text = text.replace(new RegExp(zh, 'g'), en); });
@@ -684,8 +777,12 @@
     };
 
     let currentMode = 'assembly'; 
-    const slots = { hull: null, turret: null, scene: null };
-    const pools = { hull:[], turret:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
+    const slots = { hull: null, turret: null, scene: null, grenade: null, more: null };
+    // Grenade mirrors the environment switch: default OFF, but its picker
+    // still pre-selects the first option.  ON loads & mounts it; OFF fully
+    // unloads it (keeps the 3D scene clean, same as the garage).
+    const visState = { hull: true, turret: true, grenade: false };
+    const pools = { hull:[], turret:[], grenade:[], drone:[], supply:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
     let assetsData = null; const sceneLib = { tex: new Map(), meshes:[] };
     let normalMeshes = [], normalTextures =[]; let mountPos = null;
 
@@ -853,7 +950,7 @@ function pickPart(clientX, clientY) {
     const intersects = partRaycaster.intersectObjects(scene.children, true);
     for (const hit of intersects) {
         const obj = hit.object;
-        if (!obj.visible) continue;
+        if (!isEffectivelyVisible(obj)) continue; // skip meshes inside hidden groups too
         const name = getPartName(obj);
         if (!name) continue;
         if (obj.isSkinnedMesh) {
@@ -948,11 +1045,13 @@ function hidePartTooltip() {
 }
 
 // ---- Attachment points (empty nodes) ----
+// NOTE: grenade models ship zero empty nodes (verified across all of
+// assets.grenades), so renderAttachmentPoints intentionally stays
+// hull/turret-only while renderTextureNames covers grenades too.
 function ensureTexUI() {
-    for (const type of ['hull', 'turret']) {
+    for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply']) {
         if (document.getElementById(`tex-${type}`)) continue;
-        const idx = type === 'hull' ? 1 : 2;
-        const col = document.querySelector(`#panel-assembly .m3-card:nth-of-type(${idx}) .control-col`);
+        const col = document.querySelector(`#card-${type} .control-col`);
         if (!col) continue;
         const wrap = document.createElement('div');
         wrap.id = `tex-${type}`;
@@ -967,6 +1066,7 @@ function collectTextureNames(grp) {
     function addName(raw) {
         if (!raw) return;
         // Strip extension only; keep original casing from the model file
+        // (grenade mats may carry the artist's Windows source path — shown as-is).
         const base = String(raw).replace(/\.[^.]+$/, '');
         if (base) names.add(base);
     }
@@ -974,7 +1074,10 @@ function collectTextureNames(grp) {
     // A3D: group.userData.textureNames + mat.userData.texName
     // 3DS garage: mesh.userData.textureNames from parse3dsTextureBindings (mat → map filename)
     if (grp?.userData?.textureNames) grp.userData.textureNames.forEach(addName);
+    // Grenade clones are parented into the turret subtree (fmnt) — their
+    // materials belong to the grenade card, not the turret's chip list.
     grp?.traverse(o => {
+        if (isUnderGrenade(o)) return;
         if (Array.isArray(o.userData?.textureNames)) o.userData.textureNames.forEach(addName);
         if (!o.isMesh) return;
         const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -987,16 +1090,20 @@ function collectTextureNames(grp) {
 
 function renderTextureNames() {
     ensureTexUI();
-    for (const type of ['hull', 'turret']) {
+    for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply']) {
         const wrap = document.getElementById(`tex-${type}`);
         if (!wrap) continue;
         const row = wrap.querySelector('.tex-chip-row');
         row.innerHTML = '';
-        const names = collectTextureNames(slots[type]?.group);
+        const grp = type === 'grenade' ? slots.grenade?.template
+                 : (type === 'drone' || type === 'supply') ? (slots.more?.cat === type ? slots.more.group : null)
+                 : slots[type]?.group;
+        const names = collectTextureNames(grp);
         if (names.length === 0) { wrap.style.display = 'none'; continue; }
         for (const name of names) {
             const chip = document.createElement('span');
             chip.className = 'tex-chip';
+            chip.title = name;
             chip.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${name}</span>`;
             row.appendChild(chip);
         }
@@ -1029,6 +1136,7 @@ function renderSceneTextureNames() {
     for (const name of arr) {
         const chip = document.createElement('span');
         chip.className = 'tex-chip';
+        chip.title = name;
         chip.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${name}</span>`;
         row.appendChild(chip);
     }
@@ -1117,6 +1225,9 @@ function toggleAttachmentMarker(type, info) {
     grp.add(marker);
     markers.set(info.name, marker);
     registerAttachmentMarker(marker);
+    // Respect an active turret-off switch for markers created while hidden
+    // (grenade clones are exempt in applyTypeVisibility; markers are not).
+    if (type === 'turret' && visState.turret === false) { marker.userData.origVisible = true; marker.visible = false; }
     if (info.btn) info.btn.classList.add('active');
     projectNodeTooltip(info.node, info.name);
 }
@@ -1184,7 +1295,7 @@ function pickAttachmentMarker(clientX, clientY) {
     const hits = partRaycaster.intersectObjects(attachmentMarkerMeshes, true);
     for (const hit of hits) {
         const obj = hit.object;
-        if (isAttachmentMarker(obj)) {
+        if (isAttachmentMarker(obj) && isEffectivelyVisible(obj)) {
             const name = obj.userData?.markerName || obj.name || getPartName(obj);
             return { name, point: hit.point, object: obj, clientX, clientY };
         }
@@ -1332,8 +1443,9 @@ document.addEventListener('pointerdown', (e) => {
     }
     
     const root = new THREE.Group(); root.rotation.set(-Math.PI/2, 0, 0); scene.add(root);
-    const groupNormal = new THREE.Group(); const groupAssembly = new THREE.Group();
-    groupNormal.visible = false; groupAssembly.visible = true; root.add(groupNormal); root.add(groupAssembly);
+    const groupNormal = new THREE.Group(); const groupAssembly = new THREE.Group(); const groupMore = new THREE.Group();
+    groupNormal.visible = false; groupAssembly.visible = true; groupMore.visible = false;
+    root.add(groupNormal); root.add(groupAssembly); root.add(groupMore);
     const lg = new THREE.Group(); scene.add(lg); lg.add(new THREE.AmbientLight(0xffffff, 1.2));
     const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun); lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
@@ -1678,6 +1790,73 @@ document.addEventListener('pointerdown', (e) => {
 
     applyI18n(); document.body.classList.remove('fouc-loading');
 
+    // ---- Per-category visibility switches (hull / turret / grenade) ----
+    // Same style as the environment toggle, but hiding only affects the model —
+    // the picker options always stay visible, and the switch state survives
+    // model/skin reloads.  Grenades mount *inside* the turret's node tree, and
+    // three.js inherits `visible` from ancestors — so the turret switch hides
+    // turret meshes one by one (preserving authored hidden collision boxes via
+    // origVisible) and never touches grenade clones, which obey their own
+    // switch independently of whether the turret is shown.
+    function isEffectivelyVisible(o) {
+        let p = o;
+        while (p) { if (p.visible === false) return false; p = p.parent; }
+        return true;
+    }
+    function isUnderGrenade(o) {
+        let p = o;
+        while (p) { if (p.userData && p.userData.isGrenadeClone) return true; p = p.parent; }
+        return false;
+    }
+    function applyTypeVisibility(type) {
+        if (type === 'grenade') {
+            if (!slots.turret || !slots.turret.group) return;
+            slots.turret.group.traverse(o => { if (o.userData && o.userData.isGrenadeClone) o.visible = visState.grenade; });
+            return;
+        }
+        const slot = slots[type];
+        if (!slot || !slot.group) return;
+        if (type === 'turret') {
+            slot.group.traverse(o => {
+                if (isUnderGrenade(o) || !o.isMesh) return;
+                if (o.userData.origVisible === undefined) o.userData.origVisible = o.visible;
+                o.visible = visState.turret ? o.userData.origVisible : false;
+            });
+            return;
+        }
+        slot.group.visible = visState[type];
+    }
+    function toggleType(type) {
+        if (type === 'grenade') { toggleGrenadeEnabled(); return; }
+        visState[type] = !visState[type];
+        const sw = document.getElementById('sw-' + type);
+        if (sw) sw.classList.toggle('active', visState[type]);
+        applyTypeVisibility(type);
+        fitCamera();
+    }
+    // Environment-style semantics for grenades: OFF unloads outright
+    // (clearGrenadeTemplate); ON loads the currently picked grenade.
+    // Picking an entry while OFF flips the switch ON — same as the garage.
+    function enableGrenadeSwitch() {
+        visState.grenade = true;
+        const sw = document.getElementById('sw-grenade');
+        if (sw && !sw.classList.contains('active')) sw.classList.add('active');
+    }
+    function toggleGrenadeEnabled() {
+        visState.grenade = !visState.grenade;
+        const sw = document.getElementById('sw-grenade');
+        if (sw) sw.classList.toggle('active', visState.grenade);
+        if (visState.grenade) {
+            if (!slots.grenade) triggerGrenadeLoad();
+        } else {
+            clearGrenadeTemplate();
+        }
+    }
+    ['hull', 'turret', 'grenade'].forEach(t => {
+        const sw = document.getElementById('sw-' + t);
+        if (sw) sw.addEventListener('click', (e) => { e.stopPropagation(); toggleType(t); });
+    });
+
     document.getElementById('btn-cam').onclick = () => {
         const tw = 3840; const th = 2160; const ow = innerWidth; const oh = innerHeight; const opr = renderer.getPixelRatio(); const oa = camera.aspect;
         renderer.setPixelRatio(1); renderer.setSize(tw, th, false); camera.aspect = tw / th; camera.updateProjectionMatrix();
@@ -1703,22 +1882,39 @@ document.addEventListener('pointerdown', (e) => {
         if (refit) fitCamera();
     }
 
+    // Same switch semantics for every category: turning off affects only the
+    // model — the options below stay visible, even for the environment.
     window.toggleScene = function() {
         const toggle = document.querySelector('.env-toggle');
-        const box = document.getElementById('group-scene');
         const active = toggle.classList.toggle('active');
+        const sw = document.getElementById('scene-sw');
+        if (sw) sw.classList.toggle('active', active);
         if (active) {
-            box.classList.add('visible');
             // Load environment if none is currently in the scene
             if (!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad();
             else if (slots.scene) setCameraMode('fly');
         } else {
             // Turning off must fully unload the environment (not just hide the UI),
             // otherwise the garage still affects the camera framing/center.
-            box.classList.remove('visible');
             clearSceneEnvironment(true);
         }
     }
+    function activateSceneToggle() {
+        const toggle = document.querySelector('.env-toggle');
+        if (!toggle.classList.contains('active')) toggle.classList.add('active');
+        const sw = document.getElementById('scene-sw');
+        if (sw && !sw.classList.contains('active')) sw.classList.add('active');
+    }
+
+    // An assets.json entry is either a plain path string (no skins) or an
+    // object {skinName: path}.  Normalize to the object form so all loaders
+    // and the skin picker can treat them uniformly.
+    function entrySkinsMap(entry) {
+        if (!entry) return {};
+        return (typeof entry === 'string') ? { default: entry } : entry;
+    }
+    // Category key in assetsData for a given UI type ('supply' is pluralized irregularly)
+    function catKey(type) { return type === 'supply' ? 'supplies' : `${type}s`; }
 
     async function renderIconGrid(nativeSelectId, type, items) {
         const nativeSel = document.getElementById(nativeSelectId); const container = nativeSel.parentElement;
@@ -1727,17 +1923,17 @@ document.addEventListener('pointerdown', (e) => {
         let currentVal = nativeSel.value || (items[0] && items[0].value); if (!currentVal) return;
 
         const wrapper = document.createElement('div'); wrapper.className = 'icon-grid-wrapper';
-        let labelTxt = ""; if(type === 'model') labelTxt = T.lblModel; else if(type === 'skin') labelTxt = T.lblSkin; else if(type === 'env') labelTxt = T.lblEnv;
+        let labelTxt = ""; if(type === 'model') labelTxt = T.lblModel; else if(type === 'skin') labelTxt = T.lblSkin; else if(type === 'env') labelTxt = T.lblEnv; else if(type === 'grenade') labelTxt = T.grenadeTitle; else if(type === 'drone') labelTxt = T.droneTitle; else if(type === 'supply') labelTxt = T.supplyTitle;
 
         wrapper.innerHTML = `<div class="icon-grid-header"><div class="icon-grid-label">${labelTxt}</div><div class="selection-text" id="sel-txt-${nativeSelectId}"></div></div><div class="icon-grid"></div>`;
         const grid = wrapper.querySelector('.icon-grid'); const selText = wrapper.querySelector(`#sel-txt-${nativeSelectId}`);
 
         for (const item of items) {
-            const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; if (type === 'env') btn.classList.add('text-btn'); btn.title = item.label;
+            const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; if (type === 'env' || type === 'grenade' || type === 'drone' || type === 'supply') btn.classList.add('text-btn'); btn.title = item.label;
             if (item.value === currentVal) { btn.classList.add('selected'); selText.innerText = item.label; }
             if (type === 'model') { IconLoader.getEquipmentIcon(item.value).then(svg => { if (svg) btn.innerHTML = svg; else btn.innerText = item.label.substring(0, 2); });
-            } else if (type === 'skin') { const url = IconLoader.getSkinIconUrl(item.value); if (url) { const img = document.createElement('img'); img.src = url; img.loading = "lazy"; img.alt = item.label; btn.appendChild(img); } else { btn.innerText = item.label.substring(0, 2); }
-            } else if (type === 'env') { btn.innerText = item.label; }
+            } else if (type === 'skin') { const url = IconLoader.getSkinIconUrl(item.value); if (url) { const img = document.createElement('img'); img.src = url; img.loading = "lazy"; img.alt = item.label; img.onerror = () => { btn.innerText = item.label; btn.classList.add('text-btn'); }; btn.appendChild(img); } else { btn.innerText = item.label.substring(0, 2); }
+            } else if (type === 'env' || type === 'grenade' || type === 'drone' || type === 'supply') { btn.innerText = item.label; }
 
             btn.onclick = () => {
                 grid.querySelectorAll('.icon-grid-btn').forEach(b => b.classList.remove('selected'));
@@ -1750,9 +1946,13 @@ document.addEventListener('pointerdown', (e) => {
     }
 
     async function updateSkinSelect(type, name) {
-        const skins = assetsData[`${type}s`][name] || {}; const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) })); skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
+        const skins = entrySkinsMap((assetsData[catKey(type)] || {})[name]); const skinItems = Object.keys(skins).map(k => ({ value: k, label: formatName(k) })); skinItems.sort((a,b) => (a.value==='default') ? -1 : 1);
         await renderIconGrid(`sel-${type}-skin`, 'skin', skinItems);
-        document.getElementById(`sel-${type}-skin`).onchange = () => { if(currentMode==='assembly') triggerLoad(type); };
+        document.getElementById(`sel-${type}-skin`).onchange = () => {
+            if (type === 'drone') { moreState.cat = 'drone'; if(currentMode==='more') triggerDroneLoad(); }
+            else if (type === 'supply') { moreState.cat = 'supply'; if(currentMode==='more') triggerSupplyLoad(); }
+            else if (currentMode==='assembly') triggerLoad(type);
+        };
     }
 
     async function populateUI() {
@@ -1767,10 +1967,36 @@ document.addEventListener('pointerdown', (e) => {
         const selTurret = document.getElementById('sel-turret-name');
         selTurret.onchange = async () => { await updateSkinSelect('turret', selTurret.value); if(currentMode==='assembly') triggerLoad('turret'); };
 
-        const selScene = document.getElementById('sel-scene-var'); const garageData = assetsData.festivals?.garage || {};
+        // Optional grenade picker — mounts assets.json "grenades" onto the turret's
+        // "fmnt" node.  Environment-style: the first entry stays pre-selected while
+        // the card switch starts OFF; picking an entry flips the switch ON.
+        const grenadeKeys = Object.keys(assetsData.grenades || {});
+        const grenadeItems = grenadeKeys.map(k => ({ value: k, label: formatName(k) }));
+        await renderIconGrid('sel-grenade-name', 'grenade', grenadeItems);
+        document.getElementById('sel-grenade-name').onchange = () => { enableGrenadeSwitch(); triggerGrenadeLoad(); };
+
+        // "More" tab — drones (assets.json "drones")
+        const droneKeys = Object.keys(assetsData.drones || {});
+        const droneItems = droneKeys.map(k => ({ value: k, label: formatName(k) }));
+        await renderIconGrid('sel-drone-name', 'drone', droneItems);
+        const selDrone = document.getElementById('sel-drone-name');
+        selDrone.onchange = async () => { moreState.cat = 'drone'; await updateSkinSelect('drone', selDrone.value); if(currentMode==='more') triggerDroneLoad(); };
+        if (droneItems.length) await updateSkinSelect('drone', droneItems[0].value);
+
+        // "More" tab — supply boxes (assets.json "supplies")
+        const supplyKeys = Object.keys(assetsData.supplies || {});
+        const supplyItems = supplyKeys.map(k => ({ value: k, label: formatName(k) }));
+        await renderIconGrid('sel-supply-name', 'supply', supplyItems);
+        const selSupply = document.getElementById('sel-supply-name');
+        selSupply.onchange = async () => { moreState.cat = 'supply'; await updateSkinSelect('supply', selSupply.value); if(currentMode==='more') triggerSupplyLoad(); };
+        if (supplyItems.length) await updateSkinSelect('supply', supplyItems[0].value);
+
+        const selScene = document.getElementById('sel-scene-var'); const garageData = assetsData.garage || {};
         const sceneItems = Object.keys(garageData).map(k => ({ value: k, label: translateDataKey(k) }));
         await renderIconGrid('sel-scene-var', 'env', sceneItems);
-        selScene.onchange = () => triggerSceneLoad();
+        // Options are permanently visible now; picking an environment implies enabling it
+        document.getElementById('group-scene').classList.add('visible');
+        selScene.onchange = () => { activateSceneToggle(); triggerSceneLoad(); };
         if(hullItems.length) await updateSkinSelect('hull', hullItems[0].value);
         if(turretItems.length) await updateSkinSelect('turret', turretItems[0].value);
     }
@@ -1780,12 +2006,13 @@ document.addEventListener('pointerdown', (e) => {
         
         try {
             msg(T.loading); const resp = await fetch(ASSETS_INDEX_URL); if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-            assetsData = await resp.json(); await populateUI();
+            assetsData = await resp.json();
+            await populateUI();
             if(currentMode==='assembly') { if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull'); if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret'); }
         } catch(e) { console.error(e); msg(String(e.message || e)); }
     })();
 
-    let loadingState = { hull: false, turret: false, scene: false };
+    let loadingState = { hull: false, turret: false, scene: false, grenade: false, drone: false, supply: false };
     
     async function fetchMeta(path) {
         const url = `${RES_BASE}/${path}/meta.info`; const res = await fetch(url);
@@ -1803,7 +2030,7 @@ document.addEventListener('pointerdown', (e) => {
     }
 
     async function triggerSceneLoad() {
-        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value; const path = assetsData.festivals.garage[variant]; if(!path) return;
+        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value; const path = assetsData.garage && assetsData.garage[variant]; if(!path) return;
         const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
         loadingState.scene = true; await loadRemoteScene(path, variant);
         if(wrapper) wrapper.classList.remove('loading'); loadingState.scene = false;
@@ -2120,10 +2347,192 @@ document.addEventListener('pointerdown', (e) => {
 
     hidePartTooltip(); window.switchMode = function(mode) {
         if(currentMode === mode) return; currentMode = mode;
-        document.querySelectorAll('.tab-btn').forEach((el,i) => { const modes = ['assembly','normal']; el.classList.toggle('active', modes[i] === mode); });
-        ['normal','assembly'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
-        groupNormal.visible = (mode === 'normal'); groupAssembly.visible = (mode === 'assembly');
+        document.querySelectorAll('.tab-btn').forEach((el,i) => { const modes = ['assembly','more','normal']; el.classList.toggle('active', modes[i] === mode); });
+        ['normal','assembly','more'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
+        groupNormal.visible = (mode === 'normal'); groupMore.visible = (mode === 'more'); groupAssembly.visible = (mode === 'assembly');
         if (mode === 'assembly') { if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull'); if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret'); }
+        if (mode === 'more') enterMoreMode();
+        fitCamera();
+    }
+
+    // ---- "More" tab ----
+    // Hosts drones (assets.json "drones") and supply boxes ("supplies") as two
+    // stacked cards.  Only one model is ever on screen: whichever picker was
+    // used last replaces the display.  moreState.cat remembers the active card
+    // so re-entering the tab reloads what was shown last.
+    const moreState = { cat: 'drone' };
+
+    function clearMoreModel() {
+        if (slots.more) {
+            disposeMixer(slots.more.group);
+            groupMore.remove(slots.more.group);
+            dispose(slots.more.group);
+            slots.more = null;
+        }
+        pools.drone.forEach(p => p.tex.dispose());
+        pools.drone = [];
+        pools.supply.forEach(p => p.tex.dispose());
+        pools.supply = [];
+        renderTextureNames(); // hide drone/supply texture chips
+    }
+
+    function enterMoreMode() {
+        // Auto-load the active category's current pick if nothing is on screen
+        if (!slots.more) { if (moreState.cat === 'supply') triggerSupplyLoad(); else triggerDroneLoad(); }
+        else fitCamera();
+    }
+
+    async function triggerDroneLoad() {
+        if (currentMode !== 'more' || moreState.cat !== 'drone') return;
+        if (loadingState.drone) return;
+        const name = document.getElementById('sel-drone-name').value;
+        const skin = document.getElementById('sel-drone-skin').value;
+        if (!name || name === 'Loading...' || !skin || skin === '-') return;
+        const wrapper = document.getElementById('box-drone').querySelector('.icon-grid-wrapper');
+        if (wrapper) wrapper.classList.add('loading');
+        loadingState.drone = true;
+        try { await loadDroneAsset(name, skin); }
+        catch(e) { console.error(e); msg(String(e.message || e)); }
+        if (wrapper) wrapper.classList.remove('loading');
+        loadingState.drone = false;
+    }
+
+    async function triggerSupplyLoad() {
+        if (currentMode !== 'more' || moreState.cat !== 'supply') return;
+        if (loadingState.supply) return;
+        const name = document.getElementById('sel-supply-name').value;
+        const skin = document.getElementById('sel-supply-skin').value;
+        if (!name || name === 'Loading...' || !skin || skin === '-') return;
+        const wrapper = document.getElementById('box-supply').querySelector('.icon-grid-wrapper');
+        if (wrapper) wrapper.classList.add('loading');
+        loadingState.supply = true;
+        try { await loadSupplyAsset(name, skin); }
+        catch(e) { console.error(e); msg(String(e.message || e)); }
+        if (wrapper) wrapper.classList.remove('loading');
+        loadingState.supply = false;
+    }
+
+    async function loadSupplyAsset(name, skin) {
+        const entry = assetsData.supplies && assetsData.supplies[name];
+        if (!entry) return;
+        const skinsMap = entrySkinsMap(entry);
+        const pathStr = skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0];
+        if (!pathStr) return;
+        const meta = await fetchMeta(pathStr);
+        const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
+        if (!modelEntry) throw new Error("A3D/3DS model file not found");
+        const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
+        const resp = await fetch(modelUrl); if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        let group;
+        if (modelEntry.name.toLowerCase().endsWith('.a3d')) {
+            group = parseA3D(buf, modelEntry.name);
+        } else {
+            // Same as drones: supply .3ds may reference author-side source
+            // textures that don't exist on the CDN — stub them to 1x1 pixels,
+            // extract the refs for the card's texture-name chips.
+            const bindings = parse3dsTextureBindings(buf);
+            const stubMgr = new THREE.LoadingManager();
+            const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+            stubMgr.setURLModifier((url) => {
+                if (/\.(png|jpg|jpeg|bmp|tga|gif|webp|psd|tif|tiff|dds)(\?|$)/i.test(url) || !/^https?:|^data:|^blob:/i.test(url)) {
+                    return PIXEL;
+                }
+                return url;
+            });
+            const loader = new TDSLoader(stubMgr);
+            loader.setResourcePath('');
+            group = loader.parse(buf, '');
+            const supplyTexRefs = new Set();
+            Object.values(bindings.matTex).forEach(t => { if (t) supplyTexRefs.add(t); });
+            if (supplyTexRefs.size) group.userData.textureNames = Array.from(supplyTexRefs);
+            group.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:0}); o.userData.originalName = o.name; } });
+        }
+        // Supply textures: use the .webp images as specified by the assets layout
+        const imgEntries = meta.filter(f => f.name.match(/\.webp$/i));
+        if (imgEntries.length > 0) {
+            pools.supply.forEach(p => p.tex.dispose());
+            pools.supply = await Promise.all(imgEntries.map(async imgEntry => {
+                const tex = await new THREE.TextureLoader().loadAsync(`${RES_BASE}/${pathStr}/${imgEntry.name}`);
+                setupTex(tex); tex.name = imgEntry.name; return { name: imgEntry.name, tex: tex };
+            }));
+            applyTexturesFromPool(group, pools.supply);
+        }
+        clearMoreModelKeepPools('supply');
+        slots.more = { cat: 'supply', group: group, name: modelEntry.name };
+        groupMore.add(group);
+        registerAnim(group);
+        renderTextureNames(); // supply texture chips (if the model references any)
+        if (currentMode === 'more') fitCamera();
+    }
+
+    async function loadDroneAsset(name, skin) {
+        const entry = assetsData.drones && assetsData.drones[name];
+        if (!entry) return;
+        const skinsMap = entrySkinsMap(entry);
+        const pathStr = skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0];
+        if (!pathStr) return;
+        const meta = await fetchMeta(pathStr);
+        const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
+        if (!modelEntry) throw new Error("A3D/3DS model file not found");
+        const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
+        const resp = await fetch(modelUrl); if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        let group;
+        if (modelEntry.name.toLowerCase().endsWith('.a3d')) {
+            group = parseA3D(buf, modelEntry.name);
+        } else {
+            // Drone .3ds files reference source textures (e.g. DRONNATA.PSD)
+            // that don't exist on the CDN (and some formats browsers can't even
+            // decode).  Stub those requests to a 1x1 pixel, exactly like the
+            // garage loader does — real lightmap.webp is applied afterwards.
+            // Extract the model-authored texture refs BEFORE parsing so the
+            // drone card can list them as chips (same as hull/turret/grenade).
+            const bindings = parse3dsTextureBindings(buf);
+            const stubMgr = new THREE.LoadingManager();
+            const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+            stubMgr.setURLModifier((url) => {
+                if (/\.(png|jpg|jpeg|bmp|tga|gif|webp|psd|tif|tiff|dds)(\?|$)/i.test(url) || !/^https?:|^data:|^blob:/i.test(url)) {
+                    return PIXEL;
+                }
+                return url;
+            });
+            const loader = new TDSLoader(stubMgr);
+            loader.setResourcePath('');
+            group = loader.parse(buf, '');
+            const droneTexRefs = new Set();
+            Object.values(bindings.matTex).forEach(t => { if (t) droneTexRefs.add(t); });
+            if (droneTexRefs.size) group.userData.textureNames = Array.from(droneTexRefs);
+            group.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:0}); o.userData.originalName = o.name; } });
+        }
+        const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx'));
+        if (imgEntries.length > 0) {
+            pools.drone.forEach(p => p.tex.dispose());
+            pools.drone = await Promise.all(imgEntries.map(async imgEntry => {
+                const tex = await new THREE.TextureLoader().loadAsync(`${RES_BASE}/${pathStr}/${imgEntry.name}`);
+                setupTex(tex); tex.name = imgEntry.name; return { name: imgEntry.name, tex: tex };
+            }));
+            applyTexturesFromPool(group, pools.drone);
+        }
+        clearMoreModelKeepPools('drone');
+        slots.more = { cat: 'drone', group: group, name: modelEntry.name };
+        groupMore.add(group);
+        registerAnim(group);
+        renderTextureNames(); // drone texture chips (if the model references any)
+        if (currentMode === 'more') fitCamera();
+    }
+
+    // remove the previous "more" model but keep the freshly loaded texture pool
+    // (loadDroneAsset disposes + refills pools.drone itself beforehand)
+    function clearMoreModelKeepPools(keepCat) {
+        if (slots.more) {
+            disposeMixer(slots.more.group);
+            groupMore.remove(slots.more.group);
+            dispose(slots.more.group);
+            slots.more = null;
+        }
+        // The other category's cached textures die with its model
+        for (const c of ['drone', 'supply']) if (c !== keepCat) { pools[c].forEach(p => p.tex.dispose()); pools[c] = []; }
     }
 
     document.getElementById('btn-clear').onclick = () => { hidePartTooltip();
@@ -2131,17 +2540,33 @@ document.addEventListener('pointerdown', (e) => {
             if(currentMode === 'normal') {
                 while(groupNormal.children.length > 0){ const c = groupNormal.children[0]; disposeMixer(c); dispose(c); groupNormal.remove(c); }
                 normalMeshes =[]; normalTextures.forEach(t=>t.dispose()); normalTextures =[]; document.getElementById('list-normal').innerHTML="";
+            } else if(currentMode === 'more') {
+                clearMoreModel();
             } else {
                 if(slots.hull)  { disposeMixer(slots.hull.group);  groupAssembly.remove(slots.hull.group);  dispose(slots.hull.group); }
                 if(slots.turret){ disposeMixer(slots.turret.group);groupAssembly.remove(slots.turret.group);dispose(slots.turret.group);}
                 if(slots.scene) { disposeMixer(slots.scene);       groupAssembly.remove(slots.scene);      dispose(slots.scene); }
                 slots.hull=null; slots.turret=null; slots.scene=null; pools.hull=[]; pools.turret=[];
+                // Take any mounted grenades down with the scene
+                clearGrenadeTemplate();
+                attachGrenadesToTurret._warned = null;
+                // Restore hull/turret switches to ON; grenade & environment go
+                // back to their default OFF state (picker selection untouched).
+                ['hull','turret'].forEach(t => {
+                    visState[t] = true;
+                    const sw = document.getElementById('sw-' + t);
+                    if (sw) sw.classList.add('active');
+                });
+                visState.grenade = false;
+                document.getElementById('sw-grenade')?.classList.remove('active');
+                document.querySelector('.env-toggle')?.classList.remove('active');
+                document.getElementById('scene-sw')?.classList.remove('active');
                 ['hull','turret','scene'].forEach(t => { activeClips[t].clear(); renderAnimChips(t); });
                 mountPos = null;
                 setCameraMode('orbit');
             }
             sceneLib.tex.clear(); sceneLib.meshes=[]; msg(T.clear);
-            for (const type of ['hull', 'turret']) {
+            for (const type of ['hull', 'turret', 'grenade']) {
                 const el = document.getElementById(`attach-${type}`);
                 if (el) el.remove();
                 const texEl = document.getElementById(`tex-${type}`);
@@ -2153,7 +2578,7 @@ document.addEventListener('pointerdown', (e) => {
     };
 
     document.getElementById('btn-export').onclick = () => {
-        const toExport = currentMode === 'normal' ? groupNormal : groupAssembly;
+        const toExport = currentMode === 'normal' ? groupNormal : (currentMode === 'more' ? groupMore : groupAssembly);
         if(toExport.children.length === 0) { msg(T.emptyScene); return; }
         
         showDialog(T.exportTitle, T.exportDesc, false, T.btnConfirm, () => {
@@ -2429,7 +2854,10 @@ document.addEventListener('pointerdown', (e) => {
         if(slots[type]) { const old = slots[type].group; disposeMixer(old); groupAssembly.remove(old); dispose(old); }
         slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
+        applyTypeVisibility(type); // keep the card switch state across reloads
         fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames();
+        // Grenades ride the turret — re-mount them on the replacement model's fmnt
+        if(type==='turret') attachGrenadesToTurret();
     }
 
     function scanMount(grp) {
@@ -2468,7 +2896,136 @@ document.addEventListener('pointerdown', (e) => {
             slots.turret.group.position.set(0,0,0);
         }
     }
-    
+
+    // ---- Grenade mounting (assets.json "grenades" -> turret "fmnt") ----
+    // Tanki turret A3D files ship exactly one empty node named "fmnt" (verified
+    // on all 19 turrets): a point on the rear-top of the turret body where
+    // grenade gear is strapped.  Grenades are mounted as children of that node
+    // with an identity local transform — fmnt's rotation and scale are identity
+    // on every turret rig, and parenting below the node keeps the grenade glued
+    // through turret animations and hull-mount snapping.
+    function findFmntNodes(grp) {
+        if (!grp) return [];
+        // Prefer the collected empty-node list; fall back to a name scan so
+        // TDS-loaded (.3ds) turrets without userData.emptyNodes still work.
+        const fromEmpties = (grp.userData.emptyNodes || [])
+            .filter(e => e.name && e.name.toLowerCase() === 'fmnt')
+            .map(e => e.node);
+        if (fromEmpties.length) return fromEmpties;
+        const out = [];
+        grp.traverse(o => { if (!o.isMesh && o.name && o.name.toLowerCase() === 'fmnt') out.push(o); });
+        return out;
+    }
+
+    function unloadGrenadeClones() {
+        if (!slots.turret || !slots.turret.group) return;
+        const stale = [];
+        slots.turret.group.traverse(o => { if (o.userData && o.userData.isGrenadeClone) stale.push(o); });
+        stale.forEach(c => { c.parent.remove(c); });
+    }
+
+    function attachGrenadesToTurret() {
+        unloadGrenadeClones();
+        if (!slots.grenade || !slots.grenade.template) return;
+        if (!slots.turret || !slots.turret.group) return;
+        const fmnts = findFmntNodes(slots.turret.group);
+        if (fmnts.length === 0) {
+            // Warn once per turret model so skin switching does not spam toasts
+            if (attachGrenadesToTurret._warned !== slots.turret.group) {
+                attachGrenadesToTurret._warned = slots.turret.group;
+                msg(T.noFmnt);
+            }
+            return;
+        }
+        attachGrenadesToTurret._warned = null;
+        for (const f of fmnts) {
+            const clone = slots.grenade.template.clone(true);
+            clone.userData.isGrenadeClone = true;
+            clone.position.set(0, 0, 0);
+            clone.quaternion.identity();
+            clone.scale.set(1, 1, 1);
+            f.add(clone);
+        }
+        applyTypeVisibility('grenade'); // respect the grenade switch on (re)mount
+    }
+
+    function clearGrenadeTemplate() {
+        unloadGrenadeClones();
+        if (slots.grenade) {
+            dispose(slots.grenade.template);
+            pools.grenade.forEach(p => p.tex.dispose());
+            slots.grenade = null;
+        }
+        pools.grenade = [];
+        renderTextureNames(); // drop the grenade texture chips
+    }
+
+    function revertGrenadePick() {
+        // There is no "None" entry — a failed load folds into the card
+        // switch instead: turn the grenade switch OFF and keep the picker as-is
+        // (clicking any entry retries the load and flips it back ON on success).
+        visState.grenade = false;
+        const sw = document.getElementById('sw-grenade');
+        if (sw) sw.classList.remove('active');
+        applyTypeVisibility('grenade');
+    }
+
+    async function triggerGrenadeLoad() {
+        if (loadingState.grenade) return;
+        const name = document.getElementById('sel-grenade-name').value;
+        if (name === undefined || name === null || name === 'Loading...') return;
+        const wrapper = document.getElementById('box-grenade').querySelector('.icon-grid-wrapper');
+        if (wrapper) wrapper.classList.add('loading');
+        loadingState.grenade = true;
+        await loadGrenadeAsset(name);
+        if (wrapper) wrapper.classList.remove('loading');
+        loadingState.grenade = false;
+    }
+
+    async function loadGrenadeAsset(name) {
+        clearGrenadeTemplate();
+        if (!name) return;
+        const entry = assetsData.grenades && assetsData.grenades[name];
+        if (!entry) return;
+        const skinsMap = entrySkinsMap(entry);
+        const skin = skinsMap.default ? 'default' : Object.keys(skinsMap)[0];
+        const pathStr = skinsMap[skin]; if (!pathStr) return;
+        try {
+            const meta = await fetchMeta(pathStr);
+            const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
+            if (!modelEntry) throw new Error("A3D/3DS model file not found");
+            const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
+            let group;
+            if (modelEntry.name.toLowerCase().endsWith('.a3d')) {
+                const resp = await fetch(modelUrl); if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                group = parseA3D(await resp.arrayBuffer(), modelEntry.name);
+            } else {
+                const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`);
+                group = await loader.loadAsync(modelUrl);
+                group.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:0}); o.userData.originalName = o.name; } });
+            }
+            const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx'));
+            if (imgEntries.length > 0) {
+                pools.grenade = await Promise.all(imgEntries.map(async imgEntry => {
+                    const tex = await new THREE.TextureLoader().loadAsync(`${RES_BASE}/${pathStr}/${imgEntry.name}`);
+                    setupTex(tex); tex.name = imgEntry.name; return { name: imgEntry.name, tex: tex };
+                }));
+                applyTexturesFromPool(group, pools.grenade);
+            }
+            slots.grenade = { template: group, name: modelEntry.name };
+            // A successful pick implies the grenade switch should be ON
+            visState.grenade = true;
+            const sw = document.getElementById('sw-grenade');
+            if (sw) sw.classList.add('active');
+            attachGrenadesToTurret();
+            renderTextureNames(); // show grenade texture chips alongside hull/turret
+        } catch(e) {
+            console.error(e);
+            msg(`${T.grenadeFail}: ${e.message || e}`);
+            revertGrenadePick();
+        }
+    }
+
     function applyNormalTexture(tex) {
         const base = tex.name.toLowerCase().split('.')[0];
         normalMeshes.forEach(m => {
@@ -2486,13 +3043,28 @@ document.addEventListener('pointerdown', (e) => {
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
     function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = t; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}})}
+    // Tight bbox over effectively-visible meshes only (respects per-category
+    // switches, skips grenade clones when hidden, ignores attachment markers).
+    function computeVisibleBBox(grp) {
+        const box = new THREE.Box3();
+        grp.updateMatrixWorld(true);
+        grp.traverse(o => {
+            if (!o.isMesh || o.userData.isAttachmentMarker) return;
+            if (!isEffectivelyVisible(o)) return;
+            const g = o.geometry; if (!g) return;
+            if (!g.boundingBox) g.computeBoundingBox();
+            if (!g.boundingBox) return;
+            box.union(g.boundingBox.clone().applyMatrix4(o.matrixWorld));
+        });
+        return box;
+    }
     function fitCamera(){
         // Prefer garage cam marker while environment is active in free-look mode
         if (cameraMode === 'fly' && slots.scene) {
             placeEnvCamera(slots.scene);
             return;
         }
-        const b = new THREE.Box3().setFromObject(root);
+        const b = computeVisibleBBox(root);
         if (b.isEmpty()) return;
         const c = b.getCenter(new THREE.Vector3());
         const size = b.getSize(new THREE.Vector3());
