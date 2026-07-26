@@ -2978,22 +2978,75 @@ let cameraTarget;
                      try {
                          await processMap(window.currentMapData, true, null, window.currentLightmapData);
                          if (editorGroup) {
-                             editorGroup.updateMatrixWorld(true);
-                             const box = new THREE.Box3().setFromObject(editorGroup, true);
-                             if (!box.isEmpty() && box.min.x !== Infinity) {
-                                 const center = box.getCenter(new THREE.Vector3());
-                                 const size = box.getSize(new THREE.Vector3());
-                                 const maxDim = Math.max(size.x, size.z);
-                                 const fov = camera.fov * (Math.PI / 180);
-                                 let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                                 cameraDistance = Math.max(cameraDistance, 50) * 1.2;
-                                 camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
-                                camera.lookAt(center);
-                                if (typeof cameraTarget !== 'undefined' && cameraTarget) {
-                                    cameraTarget.position.copy(camera.position);
+                    editorGroup.updateMatrixWorld(true);
+                    const box = new THREE.Box3().setFromObject(editorGroup, true);
+                    if (!box.isEmpty() && box.min.x !== Infinity) {
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.z);
+                        
+                        // 1. Get the positions of all real mesh objects
+                        const positions = [];
+                        editorGroup.traverse((child) => {
+                            if (child.isMesh && !child.userData.isCollisionGroup && child !== ghost) {
+                                const p = new THREE.Vector3();
+                                child.getWorldPosition(p);
+                                positions.push(p);
+                            }
+                        });
+                        
+                        // 2. Calculate the dense center using medians (ignoring distant skyboxes/decals)
+                        let denseCenter = box.getCenter(new THREE.Vector3());
+                        if (positions.length > 0) {
+                            const xs = positions.map(p => p.x).sort((a, b) => a - b);
+                            const ys = positions.map(p => p.y).sort((a, b) => a - b);
+                            const zs = positions.map(p => p.z).sort((a, b) => a - b);
+                            const mid = Math.floor(positions.length / 2);
+                            denseCenter.set(xs[mid], ys[mid], zs[mid]);
+                        }
+                        
+                        // 3. Calculate initial distance and base position
+                        const fov = camera.fov * (Math.PI / 180);
+                        let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                        cameraDistance = Math.max(cameraDistance, 50) * 1.2;
+                        camera.position.set(denseCenter.x, denseCenter.y + cameraDistance * 0.6, denseCenter.z + cameraDistance);
+                        camera.lookAt(denseCenter);
+                        
+                        // 4. Raycast to prevent clipping into walls or floors
+                        const direction = new THREE.Vector3();
+                        camera.getWorldDirection(direction);
+                        const raycaster = new THREE.Raycaster(camera.position, direction);
+                        const intersects = raycaster.intersectObjects(editorGroup.children, true);
+                        
+                        let hitPoint = null;
+                        for (let i = 0; i < intersects.length; i++) {
+                            let obj = intersects[i].object;
+                            let isGhostOrCol = false;
+                            while (obj && obj !== editorGroup) {
+                                if (obj === ghost || obj.userData.isCollisionGroup) {
+                                    isGhostOrCol = true;
+                                    break;
                                 }
+                                obj = obj.parent;
+                            }
+                            if (!isGhostOrCol) {
+                                hitPoint = intersects[i].point;
+                                break;
                             }
                         }
+                        
+                        // Adjust camera based on raycast hit
+                        if (hitPoint) {
+                            camera.position.copy(hitPoint).add(direction.clone().multiplyScalar(-100)); // Hit an entity, back up slightly
+                        } else {
+                            camera.position.copy(denseCenter).add(direction.clone().multiplyScalar(-1000)); // No hit, back up significantly to overview
+                        }
+                        
+                        // 5. Sync FlyControls target
+                        if (typeof cameraTarget !== 'undefined' && cameraTarget) {
+                            cameraTarget.position.copy(camera.position);
+                        }
+                    }
+                }
                         showToast("Original map loaded successfully!", false);
                      } catch (err) { console.error(err); showToast("Failed to load original map."); }
                  });
