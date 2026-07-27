@@ -479,6 +479,9 @@
            of the neighbouring frame at the cell edges while scaling, which makes
            the border visibly shimmer every frame. */
         .paint-current .paint-preview-thumb canvas { width:100%; height:100%; display:block; }
+        /* One thumbnail hosts at most ONE canvas: either the sprite-sheet blit
+           (.paint-thumb-sheet, official camos) or a local animated mirror
+           (.paint-thumb-live). Local videos use a native <video> element. */
         .paint-current .paint-preview-thumb .paint-cat-icon { width:24px; height:24px; }
         .paint-current.disabled .paint-preview-thumb, .paint-current.disabled .paint-preview-name { opacity:0.45; }
         .paint-current .paint-preview-name { font-size:13px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -617,6 +620,8 @@
 /* Local entries inside the picker grid */
 .paint-item.local .paint-badge { color:#76FF33; }
 .paint-item .paint-thumb-video { width:100%; height:100%; object-fit:cover; display:block; background:#001926; }
+/* Canvas mirrors of a local paint's live frame — kept in lockstep with the model */
+.paint-item canvas.paint-thumb-live, .paint-current .paint-preview-thumb canvas.paint-thumb-live { width:100%; height:100%; display:block; background:#001926; }
 .paint-item .paint-del {
     position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
     background:rgba(0,0,0,0.65); color:#fff; border:none; cursor:pointer; z-index:3;
@@ -1199,6 +1204,12 @@ if (pCls) pCls.title = T.btnClose;
     //         'animated'-> GIF / animated WebP / APNG, decoded to frames
     //         'video'   -> mp4/webm/mov/... driven by a <video> element
     const LOCAL_PAINTS = new Map(); window.LOCAL_PAINTS = LOCAL_PAINTS;
+    // Live thumbnails tracked for frame-sync (see fillLocalThumb).
+    // MUST be declared here: buildPaintCards() runs during module
+    // evaluation and reaches releaseThumbMirrors(), so a `const`
+    // further down the file would throw a TDZ ReferenceError and
+    // take the entire script (and the page) down with it.
+    const localThumbs = new Set();   // { el, rec }
     let localPaintSeq = 0;
     // Per-paint pattern scale multiplier (1 = the automatic physical size).
     let paintScaleMul = 1.0; window.paintScaleMul = paintScaleMul;
@@ -2352,6 +2363,7 @@ document.addEventListener('pointerdown', (e) => {
 
             if (!info) {
                 row.classList.add('empty');
+                releaseThumbMirrors(thumb);
                 thumb.style.backgroundImage = '';
                 thumb.innerHTML = PAINT_CAT_ICON;
                 nameEl.innerText = T.paintNone;
@@ -2369,8 +2381,9 @@ document.addEventListener('pointerdown', (e) => {
                 // Show only the animated/static paint type; omit resolution.
                 typeEl.innerText = isLocalAnim ? T.paintTypeAnimated : T.paintTypeStatic;
 
-                // Live <img>/<video> preview — the browser animates it for free.
-                const existing = thumb.querySelector('img, video');
+                // Preview: a canvas mirror of the very frame the model shows
+                // (still images keep the cheap <img> path).
+                const existing = thumb.querySelector('img, video, canvas');
                 if(!existing || existing.dataset.localId !== String(localRec.id)){
                     const el = fillLocalThumb(thumb, localRec);
                     el.dataset.localId = String(localRec.id);
@@ -2378,13 +2391,20 @@ document.addEventListener('pointerdown', (e) => {
                 return;
             }
 
+            // Leaving a local paint behind: drop its live mirror, otherwise the
+            // sprite-sheet renderer below and tickLocalThumbs() would both keep
+            // drawing into the very same canvas (two animations superimposed).
+            releaseThumbMirrors(thumb);
+
             typeEl.innerText = info.isAnimated ? T.paintTypeAnimated : T.paintTypeStatic;
             const url = `${RES_BASE}/${info.path}/${getPaintFileName(info)}`;
             if (info.isAnimated && info.frame) {
-                let cv = thumb.querySelector('canvas');
+                // Only ever reuse a canvas this renderer owns (.paint-thumb-sheet).
+                let cv = thumb.querySelector('canvas.paint-thumb-sheet');
                 if (!cv) {
                     thumb.innerHTML = '';
                     cv = document.createElement('canvas');
+                    cv.className = 'paint-thumb-sheet';
                     const dpr = Math.min(3, window.devicePixelRatio || 1);
                     cv.width = Math.round(48 * dpr);
                     cv.height = Math.round(48 * dpr);
@@ -2421,7 +2441,7 @@ document.addEventListener('pointerdown', (e) => {
         if (!rec.ready) return;
         const sx = (frameIdx % cols) * f.frameWidth;
         const sy = Math.floor(frameIdx / cols) * f.frameHeight;
-        document.querySelectorAll('.paint-current:not(.empty) .paint-preview-thumb canvas').forEach(cv => {
+        document.querySelectorAll('.paint-current:not(.empty) .paint-preview-thumb canvas.paint-thumb-sheet').forEach(cv => {
             const ctx = cv.getContext('2d');
             if (!ctx) return;
             ctx.imageSmoothingEnabled = true;
@@ -3632,11 +3652,15 @@ document.addEventListener('pointerdown', (e) => {
         const now = performance.now();
         const fps = f.fps || 15;
         const frameDur = 1000 / fps;
-        const totalFrames = f.numFrames || (f.cols * f.rows);
+        // Derive cols/rows exactly the way the picker grid and the card
+        // thumbnail do, so all three land on the same frame index.
+        const cols = f.cols || Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
+        const rows = f.rows || Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
+        const totalFrames = f.numFrames || (cols * rows);
         const currentFrame = Math.floor(now / frameDur) % totalFrames;
 
-        const col = currentFrame % f.cols;
-        const row = Math.floor(currentFrame / f.cols);
+        const col = currentFrame % cols;
+        const row = Math.floor(currentFrame / cols);
         const offsetX = col * f.frameWidth / f.imageWidth;
         const offsetY = 1 - (row + 1) * f.frameHeight / f.imageHeight;
 
@@ -4257,17 +4281,122 @@ document.addEventListener('pointerdown', (e) => {
         if(!LOCAL_PAINTS.size) return;
         const now = performance.now();
         const activeName = currentPaintName;
+        // A paint's master canvas must advance if it is applied to the model
+        // OR if a visible canvas thumb is mirroring it — both read the *same*
+        // surface, which is exactly what keeps them in lockstep.
+        const mirrored = localPaintsNeedingTick();
         for(const [name, rec] of LOCAL_PAINTS){
             if(!rec.tick) continue;                       // video self-updates
-            // Only the applied paint has to reach the GPU every frame; the rest
-            // are just <img> thumbnails the browser animates for free.
-            if(name !== activeName || !visState.paint) continue;
+            const isApplied = (name === activeName && visState.paint);
+            if(!isApplied && !mirrored.has(name)) continue;
             rec.tick(now);
+        }
+        // Mirror the freshly-advanced frames into every live thumbnail.
+        tickLocalThumbs();
+    }
+
+    /* ---- Thumbnail <-> model sync -------------------------------------- *
+     *  Previews are plain native elements again (<img> / <video>) so they
+     *  stay pixel-sharp — the browser rasterises them at full device
+     *  resolution, which no canvas copy can beat.
+     *
+     *  Sync is done the cheap way, per kind:
+     *    video     every thumb plays the same file; we just nudge its
+     *              currentTime back onto the master's playhead when it
+     *              drifts, so the picker, the card and the model agree.
+     *    animated  the master canvas that feeds the GPU is mirrored into a
+     *              canvas thumb (GIF/APNG sources are small, so a 1:1
+     *              device-pixel copy loses nothing).
+     *    static    nothing to synchronise.
+     * -------------------------------------------------------------------- */
+
+    // Hard-seeking a <video> every frame would stutter, so small drift is
+    // corrected by gently trimming playbackRate and only a real desync
+    // (a thumb that just mounted, or one the browser throttled) is seeked.
+    const THUMB_SEEK_THRESHOLD = 0.25;   // seconds -> jump
+    const THUMB_DRIFT_TOLERANCE = 0.04;  // seconds -> nudge the rate
+
+    function thumbLive(t){
+        if(!t.el.isConnected || !LOCAL_PAINTS.has(t.rec.name)){
+            localThumbs.delete(t);
+            return false;
+        }
+        return t.el.offsetParent !== null;   // skip hidden pickers entirely
+    }
+
+    // Snap a preview <video> onto the master's playhead.
+    function syncThumbVideo(el, rec){
+        const master = rec.media;
+        if(!master || !master.duration || !isFinite(master.duration)) return;
+        if(el.readyState < 1 || el.seeking) return;
+        if(master.paused !== el.paused){
+            if(master.paused) el.pause();
+            else { const p = el.play(); if(p && p.catch) p.catch(()=>{}); }
+        }
+        const drift = el.currentTime - master.currentTime;
+        const ad = Math.abs(drift);
+        if(ad > THUMB_SEEK_THRESHOLD){
+            try{ el.currentTime = master.currentTime; }catch(e){}
+            el.playbackRate = 1;
+        } else if(ad > THUMB_DRIFT_TOLERANCE){
+            el.playbackRate = drift > 0 ? 0.95 : 1.05;   // catch up smoothly
+        } else if(el.playbackRate !== 1){
+            el.playbackRate = 1;
         }
     }
 
-    // Drop a live <img>/<video> preview into a thumbnail container.
+    // Copy the master canvas (the exact surface uploaded to the GPU) into a
+    // canvas thumb at 1:1 device pixels.
+    function syncThumbCanvas(el, rec){
+        const src = rec.texture && rec.texture.image;
+        if(!src || !src.width) return;
+        const dpr = Math.max(1, Math.min(4, window.devicePixelRatio || 1));
+        const w = Math.max(1, Math.round((el.clientWidth || 48) * dpr));
+        const h = Math.max(1, Math.round((el.clientHeight || 48) * dpr));
+        if(el.width !== w || el.height !== h){ el.width = w; el.height = h; }
+        const ctx = el.getContext('2d');
+        if(!ctx) return;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        // object-fit: cover
+        const k = Math.max(w / src.width, h / src.height);
+        const dw = src.width * k, dh = src.height * k;
+        ctx.clearRect(0, 0, w, h);
+        try{ ctx.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh); }catch(e){}
+    }
+
+    // Called from the render loop once the master surfaces have advanced.
+    function tickLocalThumbs(){
+        if(!localThumbs.size) return;
+        for(const t of Array.from(localThumbs)){
+            if(!thumbLive(t)) continue;
+            if(t.rec.kind === 'video') syncThumbVideo(t.el, t.rec);
+            else syncThumbCanvas(t.el, t.rec);
+        }
+    }
+
+    // Which local paints still need their master surface advanced?
+    // (the applied one, plus any that a visible canvas thumb is mirroring)
+    function localPaintsNeedingTick(){
+        const need = new Set();
+        for(const t of Array.from(localThumbs)){
+            if(t.rec.kind !== 'video' && thumbLive(t)) need.add(t.rec.name);
+        }
+        return need;
+    }
+
+    // Forget any thumb inside `container` — a recycled thumbnail must never
+    // stay registered against the paint it used to show.
+    function releaseThumbMirrors(container){
+        if(!container) return;
+        for(const t of Array.from(localThumbs)){
+            if(container === t.el || container.contains(t.el)) localThumbs.delete(t);
+        }
+    }
+
+    // Drop a preview of a local paint into a thumbnail container.
     function fillLocalThumb(container, rec, cls){
+        releaseThumbMirrors(container);
         container.innerHTML = '';
         container.style.backgroundImage = '';
         let el;
@@ -4277,13 +4406,26 @@ document.addEventListener('pointerdown', (e) => {
             el.loop = true; el.muted = true; el.defaultMuted = true;
             el.autoplay = true; el.playsInline = true; el.preload = 'auto';
             el.setAttribute('muted', ''); el.setAttribute('playsinline', '');
+            if(cls) el.className = cls;
+            container.appendChild(el);
             const p = el.play(); if(p && p.catch) p.catch(() => pendingVideoResume.add(el));
-        } else {
-            el = document.createElement('img');
-            el.src = rec.url;
-            el.alt = rec.name;
-            el.decoding = 'async';
+            el.addEventListener('loadeddata', () => syncThumbVideo(el, rec), { once: true });
+            localThumbs.add({ el, rec });
+            return el;
         }
+        if(rec.kind === 'animated'){
+            el = document.createElement('canvas');
+            el.className = (cls ? cls + ' ' : '') + 'paint-thumb-live';
+            container.appendChild(el);
+            localThumbs.add({ el, rec });
+            syncThumbCanvas(el, rec);
+            requestAnimationFrame(() => { if(el.isConnected) syncThumbCanvas(el, rec); });
+            return el;
+        }
+        el = document.createElement('img');
+        el.src = rec.url;
+        el.alt = rec.name;
+        el.decoding = 'async';
         if(cls) el.className = cls;
         container.appendChild(el);
         return el;
