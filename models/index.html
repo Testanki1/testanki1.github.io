@@ -98,7 +98,7 @@
         }
         .app-title { font-weight: 500; font-size: 20px; color: var(--md-sys-color-on-surface); text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
         
-        .top-bar-actions { display: flex; gap: 12px; pointer-events: auto; }
+        .top-bar-actions { display: flex; gap: 12px; pointer-events: auto; align-items: center; }
         .action-btn {
             width: 44px; height: 44px; border-radius: 50%;
             background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface);
@@ -107,6 +107,41 @@
         }
         .action-btn:hover { background: color-mix(in srgb, var(--md-sys-color-surface-container-high), white 10%); transform: scale(1.05); color: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary);}
         .action-btn .material-symbols-rounded { font-size: 22px; }
+        .action-btn > svg { width: 32px; height: 32px; display: block; pointer-events: none; }
+
+        /* Capture controls: grouped, compact, non-destructive blue active state */
+        .media-actions {
+            display: flex; align-items: center; gap: 4px; padding: 4px;
+            border-radius: 18px; border: 1px solid rgba(191, 213, 255, 0.18);
+            background: rgba(0, 43, 64, 0.72);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+        .media-actions .action-btn {
+            width: 48px; height: 40px; border-radius: 14px;
+            background: rgba(0, 54, 80, 0.58); border-color: transparent;
+            box-shadow: none; color: var(--tanki-light-blue);
+        }
+        .media-actions .action-btn > svg { width: 28px; height: 28px; transition: transform 0.18s, filter 0.18s; }
+        .media-actions .action-btn:hover {
+            background: rgba(191, 213, 255, 0.12);
+            border-color: rgba(191, 213, 255, 0.55);
+            color: #fff; transform: none;
+        }
+        .media-actions .action-btn:hover > svg { transform: translateY(-1px); filter: drop-shadow(0 0 6px rgba(191,213,255,0.35)); }
+        .media-actions .action-btn:active { transform: scale(0.95); }
+        #btn-cam:hover svg path, #btn-rec:hover svg path { fill: #ffffff; }
+        #btn-rec.recording {
+            border-color: var(--tanki-cyan);
+            background: rgba(0, 212, 255, 0.18);
+            box-shadow: 0 0 0 1px rgba(0,212,255,0.18), 0 0 18px rgba(0,212,255,0.28);
+            animation: capturePulse 1.45s ease-in-out infinite;
+        }
+        #btn-rec.recording svg path { fill: var(--tanki-cyan); }
+        @keyframes capturePulse {
+            0%, 100% { box-shadow: 0 0 0 1px rgba(0,212,255,0.18), 0 0 12px rgba(0,212,255,0.18); }
+            50% { box-shadow: 0 0 0 1px rgba(0,212,255,0.35), 0 0 22px rgba(0,212,255,0.38); }
+        }
 
         #toast { 
             position: absolute; top: 24px; left: 50%; transform: translateX(-50%) translateY(-20px); 
@@ -476,9 +511,6 @@
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* ==================== M3 Expressive 风格迷彩选择界面 ==================== */
-
-/* 1. 修正关闭按钮：去除红色，改为中性 M3 悬停色 */
 #paint-picker-close {
     color: var(--md-sys-color-on-surface-variant);
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
@@ -494,7 +526,6 @@
     transform: none;
 }
 
-/* 2. 迷彩网格卡片 (.paint-item) M3 容器规范 */
 .paint-item {
     transition: border-color 0.18s, box-shadow 0.18s;
 }
@@ -504,7 +535,6 @@
     z-index: 2;
 }
 
-/* 3. M3 Expressive 胶囊分段标签栏 (#paint-tabs) */
 #paint-tabs {
     background: rgba(0, 34, 51, 0.8);
     padding: 4px;
@@ -527,7 +557,6 @@
     font-weight: 600;
 }
 
-/* 4. M3 搜索框 (#paint-search) */
 #paint-search {
     transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
@@ -677,9 +706,18 @@
     <div id="top-bar">
         <div class="app-title" id="t-app-title">Model showcase</div>
         <div class="top-bar-actions">
-            <button id="btn-cam" class="action-btn" title="4K Screenshot">
-                <span class="material-symbols-rounded">photo_camera</span>
-            </button>
+            <div class="media-actions" aria-label="Capture controls">
+                <button id="btn-cam" class="action-btn" type="button" title="Photo" aria-label="Photo">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 0H20L24 4H30L32 6V26L30 28H2L0 26V6L2 4H8L12 0ZM16 10L10 16L16 22L22 16L16 10Z" fill="#BFD5FF"/>
+                    </svg>
+                </button>
+                <button id="btn-rec" class="action-btn" type="button" title="Record Video" aria-label="Record Video">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M28 6L24 0H32V26L30 28H2L0 26V2L2 0H4L8 6H12L8 0H12L16 6H20L16 0H20L24 6H28ZM22 16L12 10V22L22 16Z" fill="#BFD5FF"/>
+                    </svg>
+                </button>
+            </div>
             <button id="btn-menu" class="action-btn" title="Menu" onclick="window.toggleDrawer()">
                 <span class="material-symbols-rounded">menu</span>
             </button>
@@ -922,6 +960,13 @@
         clear: "清空场景",
         loading: "加载中...",
         screenshot: "已保存截图",
+        cameraPhotoTitle: "拍照",
+        cameraVideoTitle: "录像",
+        recordingStart: "开始录像",
+        recordingStop: "停止录像",
+        recordingSaved: "已保存录像",
+        recordingUnsupported: "当前浏览器不支持录像",
+        recordingFailed: "录像失败",
         attachTitle: "挂载点",
         texTitle: "模型中包含的纹理名",
         affectedParts: "包含部件：",
@@ -991,6 +1036,13 @@
         clear: "Clear All Objects",
         loading: "Loading...",
         screenshot: "Screenshot Saved",
+        cameraPhotoTitle: "Photo",
+        cameraVideoTitle: "Record Video",
+        recordingStart: "Recording started",
+        recordingStop: "Stop Recording",
+        recordingSaved: "Video saved",
+        recordingUnsupported: "Recording is not supported in this browser",
+        recordingFailed: "Recording failed",
         attachTitle: "Attachment Points",
         texTitle: "Texture names included in the model",
         affectedParts: "Affected Parts:",
@@ -1065,6 +1117,14 @@ if (pCls) pCls.title = T.btnClose;
         document.getElementById('tab-btn-normal').title = T.tabNormal;
         document.getElementById('btn-export').title = T.export;
         document.getElementById('btn-clear').title = T.clear;
+        const photoBtn = document.getElementById('btn-cam');
+        if (photoBtn) { photoBtn.title = T.cameraPhotoTitle; photoBtn.setAttribute('aria-label', T.cameraPhotoTitle); }
+        const recordBtn = document.getElementById('btn-rec');
+        if (recordBtn) {
+            const isRecording = recordBtn.classList.contains('recording');
+            recordBtn.title = isRecording ? T.recordingStop : T.cameraVideoTitle;
+            recordBtn.setAttribute('aria-label', recordBtn.title);
+        }
     }
 
     const EN_ACRO = new Set(['XT', 'LC', 'DC', 'GT', 'HD', 'RF', 'SE', 'VT', 'DK', 'SP', 'IC', 'UT', 'PR', 'UFO']);
@@ -1880,6 +1940,7 @@ document.addEventListener('pointerdown', (e) => {
             orbitControls.update();
         }
         renderer.render(scene, camera);
+        if (window.__renderRecordingFrame) window.__renderRecordingFrame();
     }
     animate();
 
@@ -2506,6 +2567,165 @@ document.addEventListener('pointerdown', (e) => {
         renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL('image/png');
         renderer.setPixelRatio(opr); renderer.setSize(ow, oh); camera.aspect = oa; camera.updateProjectionMatrix(); renderer.render(scene, camera);
         const link = document.createElement('a'); link.href = dataURL; link.download = `Screenshot_${new Date()}.png`; link.click(); msg(T.screenshot);
+    };
+
+    const RECORD_WIDTH = 2560;
+    const RECORD_HEIGHT = 1440;
+    const RECORD_FPS = 60;
+    const RECORD_BITRATE = 30000000;
+    let mediaRecorder = null;
+    let recordingChunks = [];
+    let recordingStream = null;
+    let recordCanvas = null;
+    let recordRenderer = null;
+    let recordCamera = null;
+    let isRecordingHighRes = false;
+
+    function getRecordMimeType() {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+        const candidates = [
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm',
+            'video/mp4;codecs=h264',
+            'video/mp4'
+        ];
+        return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+    }
+
+    function ensureRecordingRenderer() {
+        if (recordRenderer && recordCanvas && recordCamera) return;
+        recordCanvas = document.createElement('canvas');
+        recordCanvas.width = RECORD_WIDTH;
+        recordCanvas.height = RECORD_HEIGHT;
+        recordCanvas.style.cssText = 'position:fixed;left:-99999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+        recordCanvas.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(recordCanvas);
+
+        recordRenderer = new THREE.WebGLRenderer({
+            canvas: recordCanvas,
+            antialias: true,
+            preserveDrawingBuffer: true,
+            logarithmicDepthBuffer: true
+        });
+        recordRenderer.setPixelRatio(1);
+        recordRenderer.setSize(RECORD_WIDTH, RECORD_HEIGHT, false);
+        recordRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        recordRenderer.shadowMap.enabled = true;
+
+        recordCamera = camera.clone();
+        recordCamera.aspect = RECORD_WIDTH / RECORD_HEIGHT;
+        recordCamera.updateProjectionMatrix();
+    }
+
+    function renderRecordingFrame() {
+        if (!isRecordingHighRes || !recordRenderer || !recordCamera) return;
+        recordCamera.position.copy(camera.position);
+        recordCamera.quaternion.copy(camera.quaternion);
+        recordCamera.fov = camera.fov;
+        recordCamera.near = camera.near;
+        recordCamera.far = camera.far;
+        recordCamera.zoom = camera.zoom;
+        recordCamera.aspect = RECORD_WIDTH / RECORD_HEIGHT;
+        recordCamera.updateProjectionMatrix();
+        recordRenderer.render(scene, recordCamera);
+    }
+    window.__renderRecordingFrame = renderRecordingFrame;
+
+    function setRecordingUI(isRecording) {
+        const btn = document.getElementById('btn-rec');
+        if (!btn) return;
+        btn.classList.toggle('recording', !!isRecording);
+        const title = isRecording ? T.recordingStop : T.cameraVideoTitle;
+        btn.title = title;
+        btn.setAttribute('aria-label', title);
+    }
+
+    function cleanupRecordingStream() {
+        if (recordingStream) {
+            recordingStream.getTracks().forEach(track => track.stop());
+            recordingStream = null;
+        }
+        isRecordingHighRes = false;
+        setRecordingUI(false);
+    }
+
+    function stopCanvasRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+    }
+
+    function createMediaRecorder(stream, mimeType) {
+        const options = { videoBitsPerSecond: RECORD_BITRATE };
+        if (mimeType) options.mimeType = mimeType;
+        try {
+            return new MediaRecorder(stream, options);
+        } catch (e) {
+            // Some engines accept the codec but reject high-bitrate options.
+            return new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        }
+    }
+
+    function startCanvasRecording() {
+        if (!document.createElement('canvas').captureStream || !window.MediaRecorder) {
+            msg(T.recordingUnsupported);
+            return;
+        }
+        try {
+            ensureRecordingRenderer();
+            recordingChunks = [];
+            isRecordingHighRes = true;
+            renderRecordingFrame();
+            recordingStream = recordCanvas.captureStream(RECORD_FPS);
+            const mimeType = getRecordMimeType();
+            mediaRecorder = createMediaRecorder(recordingStream, mimeType);
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) recordingChunks.push(event.data);
+            };
+
+            mediaRecorder.onerror = (event) => {
+                console.error(event.error || event);
+                msg(T.recordingFailed);
+                cleanupRecordingStream();
+            };
+
+            mediaRecorder.onstop = () => {
+                const type = mediaRecorder?.mimeType || mimeType || 'video/webm';
+                const blob = new Blob(recordingChunks, { type });
+                recordingChunks = [];
+                mediaRecorder = null;
+                cleanupRecordingStream();
+
+                if (!blob.size) {
+                    msg(T.recordingFailed);
+                    return;
+                }
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Video_${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                msg(T.recordingSaved);
+            };
+
+            mediaRecorder.start(1000);
+            setRecordingUI(true);
+            msg(T.recordingStart);
+        } catch (e) {
+            console.error(e);
+            cleanupRecordingStream();
+            mediaRecorder = null;
+            msg(T.recordingFailed);
+        }
+    }
+
+    document.getElementById('btn-rec').onclick = () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') stopCanvasRecording();
+        else startCanvasRecording();
     };
 
     function clearSceneEnvironment(refit = true) { hidePartTooltip();
@@ -4888,7 +5108,7 @@ document.addEventListener('pointerdown', (e) => {
         }`;
 
     // Pick a bake resolution that respects the source lightmap: no point
-    // baking a 256px part at 2K, and no point clipping a 2K part to 512.
+    // baking a small part at an unnecessarily large size, and no point clipping a large part too far.
     function chooseBakeSize(mat){
         const img = mat.map && mat.map.image;
         let s = 1024;
@@ -5661,4 +5881,4 @@ document.addEventListener('pointerdown', (e) => {
             <div class="drop-sub" id="t-drop-sub">PNG / JPG / WEBP / BMP / GIF / animated WEBP / APNG, plus MP4 / WEBM video</div>
         </div>
     </div>
-</html>
+<</html>
