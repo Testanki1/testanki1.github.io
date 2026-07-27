@@ -478,10 +478,7 @@
         /* Animated thumbs are drawn on a canvas: CSS sprite-sheets bleed a sliver
            of the neighbouring frame at the cell edges while scaling, which makes
            the border visibly shimmer every frame. */
-        .paint-current .paint-preview-thumb canvas { width:100%; height:100%; display:block; }
-        /* One thumbnail hosts at most ONE canvas: either the sprite-sheet blit
-           (.paint-thumb-sheet, official camos) or a local animated mirror
-           (.paint-thumb-live). Local videos use a native <video> element. */
+        .paint-current .paint-preview-thumb canvas { width:100%; height:100%; display:block; object-fit:cover; }
         .paint-current .paint-preview-thumb .paint-cat-icon { width:24px; height:24px; }
         .paint-current.disabled .paint-preview-thumb, .paint-current.disabled .paint-preview-name { opacity:0.45; }
         .paint-current .paint-preview-name { font-size:13px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -620,8 +617,6 @@
 /* Local entries inside the picker grid */
 .paint-item.local .paint-badge { color:#76FF33; }
 .paint-item .paint-thumb-video { width:100%; height:100%; object-fit:cover; display:block; background:#001926; }
-/* Canvas mirrors of a local paint's live frame — kept in lockstep with the model */
-.paint-item canvas.paint-thumb-live, .paint-current .paint-preview-thumb canvas.paint-thumb-live { width:100%; height:100%; display:block; background:#001926; }
 .paint-item .paint-del {
     position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
     background:rgba(0,0,0,0.65); color:#fff; border:none; cursor:pointer; z-index:3;
@@ -1204,12 +1199,6 @@ if (pCls) pCls.title = T.btnClose;
     //         'animated'-> GIF / animated WebP / APNG, decoded to frames
     //         'video'   -> mp4/webm/mov/... driven by a <video> element
     const LOCAL_PAINTS = new Map(); window.LOCAL_PAINTS = LOCAL_PAINTS;
-    // Live thumbnails tracked for frame-sync (see fillLocalThumb).
-    // MUST be declared here: buildPaintCards() runs during module
-    // evaluation and reaches releaseThumbMirrors(), so a `const`
-    // further down the file would throw a TDZ ReferenceError and
-    // take the entire script (and the page) down with it.
-    const localThumbs = new Set();   // { el, rec }
     let localPaintSeq = 0;
     // Per-paint pattern scale multiplier (1 = the automatic physical size).
     let paintScaleMul = 1.0; window.paintScaleMul = paintScaleMul;
@@ -2363,7 +2352,6 @@ document.addEventListener('pointerdown', (e) => {
 
             if (!info) {
                 row.classList.add('empty');
-                releaseThumbMirrors(thumb);
                 thumb.style.backgroundImage = '';
                 thumb.innerHTML = PAINT_CAT_ICON;
                 nameEl.innerText = T.paintNone;
@@ -2381,9 +2369,10 @@ document.addEventListener('pointerdown', (e) => {
                 // Show only the animated/static paint type; omit resolution.
                 typeEl.innerText = isLocalAnim ? T.paintTypeAnimated : T.paintTypeStatic;
 
-                // Preview: a canvas mirror of the very frame the model shows
-                // (still images keep the cheap <img> path).
-                const existing = thumb.querySelector('img, video, canvas');
+                // Live preview — a <canvas> for animated/video (kept in sync
+                // with the model by renderLocalPaintThumbs) or a live <img>
+                // for static images.
+                const existing = thumb.querySelector('img, canvas');
                 if(!existing || existing.dataset.localId !== String(localRec.id)){
                     const el = fillLocalThumb(thumb, localRec);
                     el.dataset.localId = String(localRec.id);
@@ -2391,20 +2380,13 @@ document.addEventListener('pointerdown', (e) => {
                 return;
             }
 
-            // Leaving a local paint behind: drop its live mirror, otherwise the
-            // sprite-sheet renderer below and tickLocalThumbs() would both keep
-            // drawing into the very same canvas (two animations superimposed).
-            releaseThumbMirrors(thumb);
-
             typeEl.innerText = info.isAnimated ? T.paintTypeAnimated : T.paintTypeStatic;
             const url = `${RES_BASE}/${info.path}/${getPaintFileName(info)}`;
             if (info.isAnimated && info.frame) {
-                // Only ever reuse a canvas this renderer owns (.paint-thumb-sheet).
-                let cv = thumb.querySelector('canvas.paint-thumb-sheet');
+                let cv = thumb.querySelector('canvas');
                 if (!cv) {
                     thumb.innerHTML = '';
                     cv = document.createElement('canvas');
-                    cv.className = 'paint-thumb-sheet';
                     const dpr = Math.min(3, window.devicePixelRatio || 1);
                     cv.width = Math.round(48 * dpr);
                     cv.height = Math.round(48 * dpr);
@@ -2441,7 +2423,7 @@ document.addEventListener('pointerdown', (e) => {
         if (!rec.ready) return;
         const sx = (frameIdx % cols) * f.frameWidth;
         const sy = Math.floor(frameIdx / cols) * f.frameHeight;
-        document.querySelectorAll('.paint-current:not(.empty) .paint-preview-thumb canvas.paint-thumb-sheet').forEach(cv => {
+        document.querySelectorAll('.paint-current:not(.empty) .paint-preview-thumb canvas').forEach(cv => {
             const ctx = cv.getContext('2d');
             if (!ctx) return;
             ctx.imageSmoothingEnabled = true;
@@ -3640,10 +3622,13 @@ document.addEventListener('pointerdown', (e) => {
 
     function updatePaintAnimation(dt){
         tickGridAnim(dt);
-        // Local GIF / animated-WebP / APNG paints: blit the browser-driven
-        // <img>'s current frame into its canvas texture. (Video paints use
+        // Local GIF / animated-WebP / APNG paints: blit the clock-derived
+        // frame into the model's canvas texture. (Video paints use
         // THREE.VideoTexture, which refreshes itself during render.)
         tickLocalPaints();
+        // Keep every local animated/video thumbnail in lock-step with the
+        // camouflage currently on the model (shared clock / shared <video>).
+        renderLocalPaintThumbs(performance.now());
         const pas = window.paintAnimState || paintAnimState;
         if(!pas || !pas.entry) return;
         const entry = pas.entry;
@@ -3652,15 +3637,11 @@ document.addEventListener('pointerdown', (e) => {
         const now = performance.now();
         const fps = f.fps || 15;
         const frameDur = 1000 / fps;
-        // Derive cols/rows exactly the way the picker grid and the card
-        // thumbnail do, so all three land on the same frame index.
-        const cols = f.cols || Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
-        const rows = f.rows || Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
-        const totalFrames = f.numFrames || (cols * rows);
+        const totalFrames = f.numFrames || (f.cols * f.rows);
         const currentFrame = Math.floor(now / frameDur) % totalFrames;
 
-        const col = currentFrame % cols;
-        const row = Math.floor(currentFrame / cols);
+        const col = currentFrame % f.cols;
+        const row = Math.floor(currentFrame / f.cols);
         const offsetX = col * f.frameWidth / f.imageWidth;
         const offsetY = 1 - (row + 1) * f.frameHeight / f.imageHeight;
 
@@ -3954,6 +3935,25 @@ document.addEventListener('pointerdown', (e) => {
         });
     }
 
+    // ---- Shared clock for local animated paints --------------------------
+    // CDN camouflage animations all stay in step because every consumer
+    // (model, picker grid, card thumbnail) derives its frame from the SAME
+    // global performance.now() clock.  Local animated paints now do the same:
+    // the model texture AND every thumbnail canvas all ask this one function
+    // "which frame is showing right now?", so the UI and the 3D model can
+    // never drift apart.  (`loopDuration` is the sum of all frame durations.)
+    function localAnimFrameIndex(frames, loopDuration, now){
+        if(!frames || !frames.length || !loopDuration) return 0;
+        let t = now % loopDuration;
+        if(t < 0) t += loopDuration;
+        let acc = 0;
+        for(let i = 0; i < frames.length; i++){
+            acc += frames[i].duration;
+            if(t < acc) return i;
+        }
+        return frames.length - 1;
+    }
+
     // ---- Builders for the three kinds -------------------------------------
     // Decode a still image to a canvas-backed source.
     //
@@ -4058,23 +4058,22 @@ document.addEventListener('pointerdown', (e) => {
             tex.generateMipmaps = false;            // too costly per frame
             tex.minFilter = THREE.LinearFilter;
 
-            let idx = 0, acc = 0, prev = performance.now();
+            // Drive the model texture from the SAME global clock the thumbnail
+            // canvases use (localAnimFrameIndex), so the camouflage on the tank
+            // and every preview tile show the identical frame at every moment.
+            const loopDuration = frames.reduce((s, f) => s + f.duration, 0);
+            let lastIdx = -1;
             const tick = (now) => {
-                const dt = now - prev; prev = now;
-                // A backgrounded tab can hand us a huge delta; don't spin.
-                acc += Math.min(dt, 250);
-                let guard = 0;
-                while(acc >= frames[idx].duration && guard++ < frames.length){
-                    acc -= frames[idx].duration;
-                    idx = (idx + 1) % frames.length;
-                    ctx.clearRect(0, 0, tw, th);
-                    ctx.drawImage(frames[idx].bitmap, 0, 0, tw, th);
-                    tex.needsUpdate = true;
-                }
+                const idx = localAnimFrameIndex(frames, loopDuration, now);
+                if(idx === lastIdx) return;
+                lastIdx = idx;
+                ctx.clearRect(0, 0, tw, th);
+                ctx.drawImage(frames[idx].bitmap, 0, 0, tw, th);
+                tex.needsUpdate = true;
             };
             return {
                 texture: tex, width: sw, height: sh, tick, media: null,
-                frames, frameCount: frames.length,
+                frames, frameCount: frames.length, loopDuration,
                 dispose(){ frames.forEach(f => { try{ f.bitmap.close(); }catch(e){} }); }
             };
         }
@@ -4192,6 +4191,8 @@ document.addEventListener('pointerdown', (e) => {
             aspect: (built.width && built.height) ? (built.width / built.height) : 1,
             tick: built.tick,
             media: built.media,
+            frames: built.frames || null,
+            loopDuration: built.loopDuration || 0,
             frameCount: built.frameCount || 0,
             dispose: built.dispose || null,
             id: ++localPaintSeq
@@ -4281,154 +4282,99 @@ document.addEventListener('pointerdown', (e) => {
         if(!LOCAL_PAINTS.size) return;
         const now = performance.now();
         const activeName = currentPaintName;
-        // A paint's master canvas must advance if it is applied to the model
-        // OR if a visible canvas thumb is mirroring it — both read the *same*
-        // surface, which is exactly what keeps them in lockstep.
-        const mirrored = localPaintsNeedingTick();
         for(const [name, rec] of LOCAL_PAINTS){
             if(!rec.tick) continue;                       // video self-updates
-            const isApplied = (name === activeName && visState.paint);
-            if(!isApplied && !mirrored.has(name)) continue;
+            // Only the applied paint has to reach the GPU every frame; the rest
+            // are just <img> thumbnails the browser animates for free.
+            if(name !== activeName || !visState.paint) continue;
             rec.tick(now);
         }
-        // Mirror the freshly-advanced frames into every live thumbnail.
-        tickLocalThumbs();
     }
 
-    /* ---- Thumbnail <-> model sync -------------------------------------- *
-     *  Previews are plain native elements again (<img> / <video>) so they
-     *  stay pixel-sharp — the browser rasterises them at full device
-     *  resolution, which no canvas copy can beat.
-     *
-     *  Sync is done the cheap way, per kind:
-     *    video     every thumb plays the same file; we just nudge its
-     *              currentTime back onto the master's playhead when it
-     *              drifts, so the picker, the card and the model agree.
-     *    animated  the master canvas that feeds the GPU is mirrored into a
-     *              canvas thumb (GIF/APNG sources are small, so a 1:1
-     *              device-pixel copy loses nothing).
-     *    static    nothing to synchronise.
-     * -------------------------------------------------------------------- */
-
-    // Hard-seeking a <video> every frame would stutter, so small drift is
-    // corrected by gently trimming playbackRate and only a real desync
-    // (a thumb that just mounted, or one the browser throttled) is seeked.
-    const THUMB_SEEK_THRESHOLD = 0.25;   // seconds -> jump
-    const THUMB_DRIFT_TOLERANCE = 0.04;  // seconds -> nudge the rate
-
-    function thumbLive(t){
-        if(!t.el.isConnected || !LOCAL_PAINTS.has(t.rec.name)){
-            localThumbs.delete(t);
-            return false;
-        }
-        return t.el.offsetParent !== null;   // skip hidden pickers entirely
-    }
-
-    // Snap a preview <video> onto the master's playhead.
-    function syncThumbVideo(el, rec){
-        const master = rec.media;
-        if(!master || !master.duration || !isFinite(master.duration)) return;
-        if(el.readyState < 1 || el.seeking) return;
-        if(master.paused !== el.paused){
-            if(master.paused) el.pause();
-            else { const p = el.play(); if(p && p.catch) p.catch(()=>{}); }
-        }
-        const drift = el.currentTime - master.currentTime;
-        const ad = Math.abs(drift);
-        if(ad > THUMB_SEEK_THRESHOLD){
-            try{ el.currentTime = master.currentTime; }catch(e){}
-            el.playbackRate = 1;
-        } else if(ad > THUMB_DRIFT_TOLERANCE){
-            el.playbackRate = drift > 0 ? 0.95 : 1.05;   // catch up smoothly
-        } else if(el.playbackRate !== 1){
-            el.playbackRate = 1;
-        }
-    }
-
-    // Copy the master canvas (the exact surface uploaded to the GPU) into a
-    // canvas thumb at 1:1 device pixels.
-    function syncThumbCanvas(el, rec){
-        const src = rec.texture && rec.texture.image;
-        if(!src || !src.width) return;
-        const dpr = Math.max(1, Math.min(4, window.devicePixelRatio || 1));
-        const w = Math.max(1, Math.round((el.clientWidth || 48) * dpr));
-        const h = Math.max(1, Math.round((el.clientHeight || 48) * dpr));
-        if(el.width !== w || el.height !== h){ el.width = w; el.height = h; }
-        const ctx = el.getContext('2d');
-        if(!ctx) return;
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        // object-fit: cover
-        const k = Math.max(w / src.width, h / src.height);
-        const dw = src.width * k, dh = src.height * k;
-        ctx.clearRect(0, 0, w, h);
-        try{ ctx.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh); }catch(e){}
-    }
-
-    // Called from the render loop once the master surfaces have advanced.
-    function tickLocalThumbs(){
-        if(!localThumbs.size) return;
-        for(const t of Array.from(localThumbs)){
-            if(!thumbLive(t)) continue;
-            if(t.rec.kind === 'video') syncThumbVideo(t.el, t.rec);
-            else syncThumbCanvas(t.el, t.rec);
-        }
-    }
-
-    // Which local paints still need their master surface advanced?
-    // (the applied one, plus any that a visible canvas thumb is mirroring)
-    function localPaintsNeedingTick(){
-        const need = new Set();
-        for(const t of Array.from(localThumbs)){
-            if(t.rec.kind !== 'video' && thumbLive(t)) need.add(t.rec.name);
-        }
-        return need;
-    }
-
-    // Forget any thumb inside `container` — a recycled thumbnail must never
-    // stay registered against the paint it used to show.
-    function releaseThumbMirrors(container){
-        if(!container) return;
-        for(const t of Array.from(localThumbs)){
-            if(container === t.el || container.contains(t.el)) localThumbs.delete(t);
-        }
-    }
-
-    // Drop a preview of a local paint into a thumbnail container.
+    // Drop the current frame of a local paint into a thumbnail container.
+    //
+    // Animated (decoded-frame) and video paints render onto a <canvas> instead
+    // of a live <img>/<video>: the canvas is repainted every frame by
+    // renderLocalPaintThumbs() from the SAME clock (animated) or the SAME
+    // <video> element (video) that drives the camouflage on the 3D model, so a
+    // preview tile is always an exact mirror of what is on the tank.  Static
+    // images keep the cheap live-<img> path.
     function fillLocalThumb(container, rec, cls){
-        releaseThumbMirrors(container);
         container.innerHTML = '';
         container.style.backgroundImage = '';
-        let el;
-        if(rec.kind === 'video'){
-            el = document.createElement('video');
-            el.src = rec.url;
-            el.loop = true; el.muted = true; el.defaultMuted = true;
-            el.autoplay = true; el.playsInline = true; el.preload = 'auto';
-            el.setAttribute('muted', ''); el.setAttribute('playsinline', '');
-            if(cls) el.className = cls;
-            container.appendChild(el);
-            const p = el.play(); if(p && p.catch) p.catch(() => pendingVideoResume.add(el));
-            el.addEventListener('loadeddata', () => syncThumbVideo(el, rec), { once: true });
-            localThumbs.add({ el, rec });
-            return el;
+        const useCanvas = rec.kind === 'video'
+            || (rec.kind === 'animated' && rec.frames && rec.frames.length > 0);
+        if(useCanvas){
+            const cv = document.createElement('canvas');
+            // Backing store = the source's NATIVE resolution, aspect preserved,
+            // with no artificial size cap.  drawImage is therefore a 1:1 copy
+            // (zero resampling / zero quality loss); the browser then simply
+            // GPU-scales the full-resolution bitmap down into the square tile
+            // via object-fit:cover — exactly like a native <img>/<video>.
+            let w = rec.width || 0, h = rec.height || 0;
+            if(!w || !h){ w = 1; h = 1; }
+            cv.width = Math.max(1, Math.round(w));
+            cv.height = Math.max(1, Math.round(h));
+            cv.className = cls || 'paint-thumb';
+            cv.dataset.localPaint = rec.name;
+            container.appendChild(cv);
+            renderLocalThumbCanvas(cv, rec, performance.now());
+            return cv;
         }
-        if(rec.kind === 'animated'){
-            el = document.createElement('canvas');
-            el.className = (cls ? cls + ' ' : '') + 'paint-thumb-live';
-            container.appendChild(el);
-            localThumbs.add({ el, rec });
-            syncThumbCanvas(el, rec);
-            requestAnimationFrame(() => { if(el.isConnected) syncThumbCanvas(el, rec); });
-            return el;
-        }
-        el = document.createElement('img');
+        const el = document.createElement('img');
         el.src = rec.url;
         el.alt = rec.name;
         el.decoding = 'async';
         if(cls) el.className = cls;
         container.appendChild(el);
         return el;
+    }
+
+    // Blit one local paint's current frame into a thumbnail canvas.
+    //   video    -> draw the shared <video> element (rec.media) the model's
+    //               VideoTexture also samples, so tile == model frame-for-frame.
+    //   animated -> draw frames[localAnimFrameIndex(...)] using the same clock
+    //               the model texture tick uses.
+    function renderLocalThumbCanvas(cv, rec, now){
+        const ctx = cv.getContext('2d');
+        if(!ctx) return;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        if(rec.kind === 'video'){
+            const v = rec.media;
+            if(!v || !v.videoWidth) return;
+            ctx.drawImage(v, 0, 0, cv.width, cv.height);
+            return;
+        }
+        if(rec.kind === 'animated' && rec.frames && rec.frames.length){
+            const idx = localAnimFrameIndex(rec.frames, rec.loopDuration, now);
+            if(idx === cv._lastFrame) return;
+            cv._lastFrame = idx;
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            ctx.drawImage(rec.frames[idx].bitmap, 0, 0, cv.width, cv.height);
+        }
+    }
+
+    // Per-frame sweep (called from the render loop): repaint every visible
+    // local animated/video thumbnail so it tracks the model. Gated so it does
+    // nothing when neither the picker nor an animated local card is on screen.
+    function renderLocalPaintThumbs(now){
+        if(!LOCAL_PAINTS.size) return;
+        const pickerOpen = !!document.getElementById('paint-picker')?.classList.contains('show');
+        const cur = currentPaintName ? LOCAL_PAINTS.get(currentPaintName) : null;
+        const needCard = !!cur && (cur.kind === 'animated' || cur.kind === 'video');
+        if(!pickerOpen && !needCard) return;
+        const targets = [];
+        if(pickerOpen){
+            document.querySelectorAll('#paint-grid canvas[data-local-paint]').forEach(c => targets.push(c));
+        }
+        if(needCard){
+            document.querySelectorAll('.paint-preview-thumb canvas[data-local-paint]').forEach(c => targets.push(c));
+        }
+        for(const cv of targets){
+            const rec = LOCAL_PAINTS.get(cv.dataset.localPaint);
+            if(rec) renderLocalThumbCanvas(cv, rec, now);
+        }
     }
 
     function localTypeLabel(kind){
