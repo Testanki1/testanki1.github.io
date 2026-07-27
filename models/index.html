@@ -416,6 +416,251 @@
         #anim-popover.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
         #anim-popover .popover-header { font-size: 11px; color: var(--md-sys-color-primary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
         #anim-popover .popover-content { overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.5; color: var(--md-sys-color-on-surface-variant); font-size: 12px;}
+    
+        :root { --paint: #FFCC00; }
+        .card-paint .icon-grid-label, .card-paint .selection-text { color: var(--paint); }
+        #paint-picker { position:fixed; inset:0; background:rgba(0,25,38,0.97); z-index:600; display:none; flex-direction:column; }
+        #paint-picker.show { display:flex !important; }
+        #paint-picker-header { display:flex; flex-direction:column; gap:10px; padding:12px 16px; background:#002b40; border-bottom:1px solid rgba(255,255,255,0.08); }
+        #paint-search { flex:1; min-width:0; height:42px; background:#003650; border:1px solid #004466; border-radius:12px; color:#fff; padding:0 14px; font-size:14px; outline:none; }
+        #paint-tabs { display:flex; gap:8px; width:100%; background:rgba(0,54,80,0.5); padding:4px; border-radius:100px; border:1px solid #004466; box-sizing:border-box; }
+        .paint-tab-btn { flex:1; text-align:center; padding:8px 12px; border-radius:100px; border:1px solid transparent; background:transparent; color:#BFD5FF; cursor:pointer; font-size:13px; transition:all 0.2s; white-space:nowrap; }
+        .paint-tab-btn.active { background:rgba(118,255,51,0.15); color:#76FF33; border-color:#76FF33; font-weight:600; }
+        #paint-grid { flex:1; overflow-y:auto; padding:16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(110px,1fr)); grid-auto-rows:max-content; gap:12px; align-content:start; }
+        .paint-item { width:100%; aspect-ratio:1; min-height:110px; border-radius:12px; overflow:hidden; position:relative; cursor:pointer; border:2px solid transparent; background:#003650; box-sizing:border-box; }
+        .paint-item.selected { border-color: var(--paint); box-shadow: 0 0 12px rgba(255, 204, 0, 0.4); }
+        .paint-item .paint-thumb { width:100%; height:100%; object-fit:cover; display:block; }
+        .paint-item .paint-thumb-anim { width:100%; height:100%; background-repeat:no-repeat; display:block; }
+        .paint-item .paint-name { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(to top, rgba(0,0,0,0.85), transparent); color:#fff; font-size:11px; padding:12px 6px 4px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+        .paint-item .paint-badge { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.65); color:#FFCC00; font-size:9px; padding:2px 6px; border-radius:20px; backdrop-filter:blur(4px); pointer-events:none; z-index:2; }
+        .paint-item.animated .paint-badge { color:#00D4FF; }
+
+        /* Current-paint row doubles as the picker entry point */
+        .paint-current { display:flex; align-items:center; gap:12px; padding:10px; background:#003650; border:1px solid rgba(255,204,0,0.25); border-radius:12px; cursor:pointer; transition:background 0.18s, border-color 0.18s; user-select:none; }
+        .paint-current:hover, .paint-current:focus-visible { background:#004466; border-color:var(--paint); outline:none; }
+        .paint-current:active { transform:scale(0.99); }
+        .paint-current .paint-preview-thumb { width:48px; height:48px; flex:0 0 48px; border-radius:8px; background-color:#002233; border:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; color:rgba(255,204,0,0.5); overflow:hidden; }
+        /* Animated thumbs are drawn on a canvas: CSS sprite-sheets bleed a sliver
+           of the neighbouring frame at the cell edges while scaling, which makes
+           the border visibly shimmer every frame. */
+        .paint-current .paint-preview-thumb canvas { width:100%; height:100%; display:block; }
+        .paint-current .paint-preview-thumb .paint-cat-icon { width:24px; height:24px; }
+        .paint-current.disabled .paint-preview-thumb, .paint-current.disabled .paint-preview-name { opacity:0.45; }
+        .paint-current .paint-preview-name { font-size:13px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .paint-current .paint-preview-type { font-size:11px; color:#BFD5FF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .paint-current.empty .paint-preview-name { color:#BFD5FF; }
+        .paint-current .paint-current-chevron { color:var(--paint); flex:0 0 auto; opacity:0.8; }
+        .paint-cat-icon { flex:0 0 auto; }
+        /* 迷彩选择界面 交互特效 (无变暗效果，边框使用 #BFD5FF) */
+
+/* 1. 迷彩网格卡片 (.paint-item) 悬停边框高亮 */
+.paint-item {
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+.paint-item:hover {
+    border-color: #BFD5FF;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 10px rgba(191, 213, 255, 0.3);
+    z-index: 2;
+}
+/* 已完全移除点击时的变暗（.paint-item:active）动画 */
+
+/* 2. 标签切换按钮 (.paint-tab-btn) 背景色高亮 */
+.paint-tab-btn {
+    transition: background-color 0.18s, color 0.18s, border-color 0.18s;
+}
+.paint-tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+.paint-tab-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ==================== M3 Expressive 风格迷彩选择界面 ==================== */
+
+/* 1. 修正关闭按钮：去除红色，改为中性 M3 悬停色 */
+#paint-picker-close {
+    color: var(--md-sys-color-on-surface-variant);
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+#paint-picker-close:hover {
+    background: var(--md-state-hover);             /* 中性高亮：rgba(191, 213, 255, 0.1) */
+    border-color: var(--md-sys-color-outline);      /* 淡蓝边框：#BFD5FF */
+    color: var(--md-sys-color-on-surface);
+    transform: none;
+}
+#paint-picker-close:active {
+    background: var(--md-state-focus);
+    transform: none;
+}
+
+/* 2. 迷彩网格卡片 (.paint-item) M3 容器规范 */
+.paint-item {
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+.paint-item:hover {
+    border-color: #BFD5FF;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 10px rgba(191, 213, 255, 0.3);
+    z-index: 2;
+}
+
+/* 3. M3 Expressive 胶囊分段标签栏 (#paint-tabs) */
+#paint-tabs {
+    background: rgba(0, 34, 51, 0.8);
+    padding: 4px;
+    border-radius: 100px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+}
+.paint-tab-btn {
+    border-radius: 100px;
+    font-weight: 500;
+    transition: background-color 0.2s cubic-bezier(0.2, 0, 0, 1), color 0.2s;
+}
+.paint-tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+.paint-tab-btn.active {
+    background: var(--md-sys-color-primary-container);  /* 动感主色高亮容器 */
+    color: var(--tanki-green);
+    border-color: var(--tanki-green);
+    font-weight: 600;
+}
+
+/* 4. M3 搜索框 (#paint-search) */
+#paint-search {
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+#paint-search:hover {
+    border-color: #006699;
+}
+#paint-search:focus {
+    border-color: var(--tanki-cyan);
+    background-color: #003e5c;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.35);
+}
+
+/* ==================== 本地图片 / 视频迷彩 ==================== */
+
+/* Row that holds the "current paint" entry + the local-file button */
+.paint-current-row { display:flex; align-items:stretch; gap:8px; }
+.paint-current-row .paint-current { flex:1; min-width:0; }
+
+/* Material Symbols square button next to the paint picker entry */
+.paint-local-btn {
+    flex:0 0 auto; width:48px; align-self:stretch; min-height:70px;
+    display:flex; align-items:center; justify-content:center;
+    background:#003650; color:var(--paint);
+    border:1px solid rgba(255,204,0,0.25); border-radius:12px;
+    cursor:pointer; transition:background 0.18s, border-color 0.18s, color 0.18s, transform 0.12s;
+    padding:0;
+}
+.paint-local-btn:hover, .paint-local-btn:focus-visible {
+    background:#004466; border-color:var(--paint); outline:none;
+    box-shadow:0 0 10px rgba(255,204,0,0.25);
+}
+.paint-local-btn:active { transform:scale(0.96); }
+.paint-local-btn .material-symbols-rounded { font-size:24px; }
+.paint-local-btn input[type="file"] { display:none; }
+
+/* "LOCAL" chip on the current-paint row + a remove button for local paints */
+.paint-local-chip {
+    display:inline-flex; align-items:center; gap:3px;
+    background:rgba(0,212,255,0.15); color:var(--tanki-cyan);
+    font-size:9px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;
+    padding:1px 6px; border-radius:20px; margin-left:6px; vertical-align:middle;
+}
+.paint-local-chip .material-symbols-rounded { font-size:11px; }
+.paint-preview-type-row { display:flex; align-items:center; gap:2px; min-width:0; }
+.paint-current .paint-remove-btn {
+    flex:0 0 auto; width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:transparent; border:none; color:var(--md-sys-color-on-surface-variant);
+    cursor:pointer; transition:background 0.15s, color 0.15s; padding:0;
+}
+.paint-current .paint-remove-btn:hover { background:rgba(255,102,102,0.15); color:var(--tanki-salmon); }
+.paint-current .paint-remove-btn .material-symbols-rounded { font-size:18px; }
+
+/* Video thumbs inside the 48px preview box */
+.paint-current .paint-preview-thumb video,
+.paint-current .paint-preview-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* Local entries inside the picker grid */
+.paint-item.local .paint-badge { color:#76FF33; }
+.paint-item .paint-thumb-video { width:100%; height:100%; object-fit:cover; display:block; background:#001926; }
+.paint-item .paint-del {
+    position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
+    background:rgba(0,0,0,0.65); color:#fff; border:none; cursor:pointer; z-index:3;
+    display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s, background 0.15s;
+    backdrop-filter:blur(4px); padding:0;
+}
+.paint-item:hover .paint-del, .paint-item.selected .paint-del { opacity:1; }
+.paint-item .paint-del:hover { background:var(--tanki-salmon); }
+.paint-item .paint-del .material-symbols-rounded { font-size:15px; }
+
+/* Big "add local file" tile that leads the picker grid */
+.paint-item.paint-add-tile {
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    background:rgba(118,255,51,0.06); border:2px dashed rgba(118,255,51,0.45); color:#76FF33;
+    text-align:center; padding:10px; font-size:11px; line-height:1.35;
+}
+.paint-item.paint-add-tile:hover {
+    background:rgba(118,255,51,0.12); border-color:#76FF33; border-style:dashed;
+    box-shadow:0 6px 16px rgba(0,0,0,0.5), 0 0 10px rgba(118,255,51,0.3);
+}
+.paint-item.paint-add-tile .material-symbols-rounded { font-size:32px; }
+.paint-item.paint-add-tile input[type="file"] { display:none; }
+
+/* Pattern-scale slider (shown once a paint is active) */
+.paint-scale-row { display:none; flex-direction:column; gap:2px; padding:2px 2px 0; }
+.paint-scale-row.show { display:flex; }
+.paint-scale-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.paint-scale-label { font-size:11px; color:var(--md-sys-color-on-surface-variant); letter-spacing:0.4px; text-transform:uppercase; }
+.paint-scale-val {
+    font-size:11px; color:var(--paint); font-variant-numeric:tabular-nums; cursor:pointer;
+    padding:2px 8px; border-radius:20px; border:1px solid transparent; transition:0.15s; background:transparent;
+}
+.paint-scale-val:hover { background:rgba(255,204,0,0.12); border-color:rgba(255,204,0,0.4); }
+.paint-scale-row input[type="range"] {
+    -webkit-appearance:none; appearance:none; width:100%; height:20px; background:transparent; cursor:pointer; margin:0;
+}
+.paint-scale-row input[type="range"]::-webkit-slider-runnable-track { height:4px; border-radius:100px; background:#004466; }
+.paint-scale-row input[type="range"]::-moz-range-track { height:4px; border-radius:100px; background:#004466; }
+.paint-scale-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; width:16px; height:16px; margin-top:-6px;
+    border-radius:50%; background:var(--paint); border:2px solid #002233; transition:transform 0.12s;
+}
+.paint-scale-row input[type="range"]::-moz-range-thumb {
+    width:16px; height:16px; border-radius:50%; background:var(--paint); border:2px solid #002233;
+}
+.paint-scale-row input[type="range"]:active::-webkit-slider-thumb { transform:scale(1.25); }
+
+/* Full-window drag & drop overlay (drop straight onto the 3D model) */
+#paint-drop-overlay {
+    position:fixed; inset:0; z-index:900; display:none;
+    align-items:center; justify-content:center; pointer-events:none;
+    background:rgba(0,25,38,0.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    opacity:0; transition:opacity 0.18s cubic-bezier(0.2,0,0,1);
+}
+#paint-drop-overlay.show { display:flex; opacity:1; }
+#paint-drop-overlay .drop-card {
+    display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center;
+    padding:38px 46px; border-radius:28px; max-width:min(460px, 84vw);
+    border:3px dashed var(--paint); background:rgba(0,43,64,0.85);
+    box-shadow:0 18px 48px rgba(0,0,0,0.5);
+    transform:scale(0.94); transition:transform 0.18s cubic-bezier(0.2,0,0,1.3);
+}
+#paint-drop-overlay.show .drop-card { transform:scale(1); }
+#paint-drop-overlay .drop-icon {
+    width:76px; height:76px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,204,0,0.14); color:var(--paint);
+}
+#paint-drop-overlay .drop-icon .material-symbols-rounded { font-size:40px; }
+#paint-drop-overlay .drop-title { font-size:19px; font-weight:600; color:#fff; }
+#paint-drop-overlay .drop-hint { font-size:14px; color:var(--tanki-green); font-weight:500; }
+#paint-drop-overlay .drop-sub { font-size:11.5px; color:var(--md-sys-color-on-surface-variant); line-height:1.55; }
+@keyframes dropPulse { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+#paint-drop-overlay.show .drop-icon { animation:dropPulse 1.5s ease-in-out infinite; }
     </style>
     <script type="importmap">
         { 
@@ -532,6 +777,11 @@
                 </div>
             </div>
 
+
+            <!-- Paint Card (injected by buildPaintCards) -->
+            <div class="paint-card-slot" data-panel="assembly"></div>
+
+
             <!-- Grenade Card (mounted on turret "fmnt" attach point) -->
             <div class="m3-card" id="card-grenade">
                 <div class="card-title" style="color:var(--grenade)">
@@ -594,6 +844,9 @@
                     <div id="box-supply-skin"><select id="sel-supply-skin" class="native-select-hidden"></select></div>
                 </div>
             </div>
+
+            <!-- Paint Card (injected by buildPaintCards) -->
+            <div class="paint-card-slot" data-panel="more"></div>
         </div>
 
         <!-- Normal Mode -->
@@ -617,7 +870,7 @@
 
     // assets.json now stores { id, version, [file] } leaves instead of raw
     // paths; toResourcePath() below reconstructs the CDN path on the fly.
-    const ASSETS_INDEX_URL = "assets.json";
+    const ASSETS_INDEX_URL = "https://testanki1.github.io/models/assets.json";
     const ICON_BASE_EQUIP = "https://testanki1.github.io/equipment_icons";
     const ICON_BASE_SKIN = "https://testanki1.github.io/skin_icons";
 
@@ -657,6 +910,10 @@
         sceneTitle: "地图 / 车库",
         exportTitle: "导出 GLB 模型",
         exportDesc: "确定要将当前场景导出为包含纹理的 GLB 3D 模型吗？",
+        exportDescPaint: "确定要导出 GLB 吗？当前迷彩会被烘焙进贴图，用任何 3D 软件打开都和这里看到的一致。",
+        exportBaking: "正在烘焙迷彩贴图…",
+        exportBakingN: "正在烘焙迷彩贴图",
+        exportBakeFail: "迷彩烘焙失败，已导出不含迷彩的模型",
         clearTitle: "清空场景",
         clearDesc: "确定要彻底清空场景中的所有加载对象吗？",
         btnCancel: "取消",
@@ -674,7 +931,36 @@
         grenadeFail: "手榴弹加载失败",
         tabMore: "更多",
         droneTitle: "无人机",
-        supplyTitle: "道具箱"
+        supplyTitle: "道具箱",
+        paintTitle: "迷彩",
+        paintBtn: "选择迷彩",
+        paintSearch: "搜索迷彩...",
+        paintAll: "全部",
+        paintStatic: "静态",
+        paintAnimated: "动画",
+        paintClear: "清除迷彩",
+        paintTypeStatic: "静态迷彩",
+        paintTypeAnimated: "动画迷彩",
+        paintApplied: "已应用迷彩",
+        paintCleared: "已清除迷彩",
+        paintNone: "未选择迷彩",
+        paintTapToPick: "点击选择迷彩",
+        paintLocal: "本地",
+        paintAddLocal: "添加本地图片 / 视频作为迷彩",
+        paintTypeLocalStatic: "本地图片",
+        paintTypeLocalAnim: "本地动图",
+        paintTypeLocalVideo: "本地视频",
+        paintLoading: "正在读取",
+        paintLoadFail: "读取失败",
+        paintUnsupported: "不支持的文件类型",
+        paintRemoved: "已移除本地迷彩",
+        paintRemove: "移除",
+        paintScale: "图案缩放",
+        paintScaleReset: "点击数值可重置",
+        dropTitle: "松开即可应用为迷彩",
+        dropOnModel: "松开：把它涂到坦克上",
+        dropSub: "支持 PNG / JPG / WEBP / BMP / GIF / 动态 WEBP / APNG，以及 MP4 / WEBM 等视频",
+        dropVideoBlocked: "浏览器阻止了自动播放，点击画面继续播放视频"
     },
     en: {
         appTitle: "Tanki Model Showcase",
@@ -692,9 +978,14 @@
         sceneTitle: "Map / Garage",
         exportTitle: "Export GLB",
         exportDesc: "Are you sure you want to export the current scene as a GLB model with textures?",
+        exportDescPaint: "Export as GLB? The active paint will be baked into the textures, so the model looks the same in any 3D app.",
+        exportBaking: "Baking paint into textures…",
+        exportBakingN: "Baking paint textures",
+        exportBakeFail: "Paint baking failed — exported without paint",
         clearTitle: "Clear Scene",
         clearDesc: "Are you sure you want to completely clear all loaded objects from the scene?",
         btnCancel: "Cancel",
+        btnClose: "Close",
         btnConfirm: "Confirm",
         export: "Export GLB",
         clear: "Clear All Objects",
@@ -709,7 +1000,36 @@
         grenadeFail: "Failed to load grenade",
         tabMore: "More",
         droneTitle: "Drone",
-        supplyTitle: "Supply"
+        supplyTitle: "Supply",
+        paintTitle: "Paint",
+        paintBtn: "Select Paint",
+        paintSearch: "Search paints...",
+        paintAll: "All",
+        paintStatic: "Static",
+        paintAnimated: "Animated",
+        paintClear: "Clear Paint",
+        paintTypeStatic: "Static Paint",
+        paintTypeAnimated: "Animated Paint",
+        paintApplied: "Paint applied",
+        paintCleared: "Paint cleared",
+        paintNone: "No paint selected",
+        paintTapToPick: "Tap to choose a paint",
+        paintLocal: "Local",
+        paintAddLocal: "Add local image / video as paint",
+        paintTypeLocalStatic: "Local Image",
+        paintTypeLocalAnim: "Local Animation",
+        paintTypeLocalVideo: "Local Video",
+        paintLoading: "Reading",
+        paintLoadFail: "Failed to read",
+        paintUnsupported: "Unsupported file type",
+        paintRemoved: "Local paint removed",
+        paintRemove: "Remove",
+        paintScale: "Pattern scale",
+        paintScaleReset: "Tap the value to reset",
+        dropTitle: "Drop to apply as paint",
+        dropOnModel: "Release: paint it onto the tank",
+        dropSub: "PNG / JPG / WEBP / BMP / GIF / animated WEBP / APNG, plus MP4 / WEBM video",
+        dropVideoBlocked: "Autoplay blocked — click the viewport to resume the video"
     }
 };
     const T = Dict[userLang];
@@ -725,6 +1045,18 @@
         document.getElementById('t-grenade-title').innerText = T.grenadeTitle;
         document.getElementById('t-drone-title').innerText = T.droneTitle;
         document.getElementById('t-supply-title').innerText = T.supplyTitle;
+        document.querySelectorAll('.t-paint-title').forEach(el => { el.innerText = T.paintTitle; });
+        const psEl = document.getElementById('paint-search'); if (psEl) psEl.placeholder = T.paintSearch;
+        const pAll = document.getElementById('t-paint-tab-all'); if (pAll) pAll.innerText = T.paintAll;
+        const pSta = document.getElementById('t-paint-tab-static'); if (pSta) pSta.innerText = T.paintStatic;
+        const pAni = document.getElementById('t-paint-tab-anim'); if (pAni) pAni.innerText = T.paintAnimated;
+        const pLoc = document.getElementById('t-paint-tab-local'); if (pLoc) pLoc.innerText = T.paintLocal;
+        const dTitle = document.getElementById('t-drop-title'); if (dTitle) dTitle.innerText = T.dropTitle;
+        const dHint = document.getElementById('t-drop-hint'); if (dHint) dHint.innerText = T.dropOnModel;
+        const dSub = document.getElementById('t-drop-sub'); if (dSub) dSub.innerText = T.dropSub;
+        document.querySelectorAll('.paint-local-btn').forEach(b => { b.title = T.paintAddLocal; });
+        const pCls = document.getElementById('paint-picker-close'); 
+if (pCls) pCls.title = T.btnClose;
         document.getElementById('t-env-label').innerText = T.envLabel;
         document.getElementById('t-scene-title').innerText = T.sceneTitle;
 
@@ -790,9 +1122,38 @@
     // Grenade mirrors the environment switch: default OFF, but its picker
     // still pre-selects the first option.  ON loads & mounts it; OFF fully
     // unloads it (keeps the 3D scene clean, same as the garage).
-    const visState = { hull: true, turret: true, grenade: false };
-    const pools = { hull:[], turret:[], grenade:[], drone:[], supply:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
+    const visState = { hull: true, turret: true, grenade: false, paint: false }; window.visState = visState;
+    const pools = { hull:[], turret:[], grenade:[], drone:[], supply:[], paint:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
     let assetsData = null; const sceneLib = { tex: new Map(), meshes:[] };
+    let PAINTS_CATALOG = {}; window.PAINTS_CATALOG = PAINTS_CATALOG;
+    let currentPaintName = null;
+    let currentPaintEntry = null;
+    const paintCache = new Map();
+    let paintAnimState = null; window.paintAnimState = null;
+    let currentPaintFilter = 'all';
+    let activeGridAnimItems = [];
+
+    // ---- Local (user-supplied) camouflages -------------------------------
+    // Anything the user picks from disk or drags onto the page lands here.
+    // Keyed by the same display name used by the CDN catalog, so the whole
+    // existing pipeline (selectPaint / applyPaintToGroup / the picker grid /
+    // the card thumbnail) keeps working unchanged — a local paint is just a
+    // catalog entry with `isLocal: true` and a ready-made THREE.Texture.
+    //   kind: 'static'  -> single still frame (png/jpg/webp/bmp/avif/svg...)
+    //         'animated'-> GIF / animated WebP / APNG, decoded to frames
+    //         'video'   -> mp4/webm/mov/... driven by a <video> element
+    const LOCAL_PAINTS = new Map(); window.LOCAL_PAINTS = LOCAL_PAINTS;
+    let localPaintSeq = 0;
+    // Per-paint pattern scale multiplier (1 = the automatic physical size).
+    let paintScaleMul = 1.0; window.paintScaleMul = paintScaleMul;
+    const PAINT_SCALE_MIN = 0.1, PAINT_SCALE_MAX = 10.0;
+    // Photos/videos carry far more detail than a tiling camo, so they start
+    // ~2.5x larger (fewer repeats) — a recognisable picture instead of mush.
+    const LOCAL_PAINT_DEFAULT_SCALE = 2.5;
+
+    const IMAGE_EXT_RE = /\.(png|jpe?g|jfif|pjpeg|pjp|webp|bmp|dib|gif|apng|avif|ico|cur|tiff?|svg|jxl|heic|heif)$/i;
+    const VIDEO_EXT_RE = /\.(mp4|m4v|webm|ogv|ogg|mov|qt|avi|mkv|3gp|3g2|mpe?g|mpg|ts|m2ts|flv|wmv)$/i;
+
     let normalMeshes = [], normalTextures =[]; let mountPos = null;
 
     let swipeStartY = 0, currentSwipeY = 0;
@@ -1510,6 +1871,7 @@ document.addEventListener('pointerdown', (e) => {
         for(const m of activeMixers) m.update(dt);
         updateChipProgress();
         updateAttachmentMarkerScales();
+        if(typeof updatePaintAnimation === 'function') updatePaintAnimation(dt);
         lg.quaternion.copy(camera.quaternion);
         if (cameraMode === 'fly') {
             flyControls.update(dt);
@@ -1721,6 +2083,7 @@ document.addEventListener('pointerdown', (e) => {
             if (!e.target.closest('#drawer') && 
                 !e.target.closest('#top-bar') && 
                 !e.target.closest('#dialog-scrim') && 
+                !e.target.closest('#paint-picker') && 
                 !e.target.closest('.m3-dialog')) {
                 window.toggleDrawer();
             }
@@ -1797,6 +2160,260 @@ document.addEventListener('pointerdown', (e) => {
 
     function msg(t){const el=document.getElementById('toast');el.innerText=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2000)}
 
+    // ---- Paint card (camouflage) ----
+    // The card lives in BOTH the "Assembly" and "More" tabs, so it is built
+    // from one template and injected into every .paint-card-slot placeholder.
+    // Category icon = the middle (paint-bucket) art of the supplied badge SVG.
+    const PAINT_CAT_ICON = `<svg class="paint-cat-icon" width="18" height="18" viewBox="5.4 5.85 11.65 11.65" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 15.7505C9 15.2703 8.80924 14.8097 8.46969 14.4702L7.50006 13.5005L6.53042 14.4702C6.20579 14.7948 6.01716 15.2301 6.00121 15.6873C5.98426 16.092 6.13026 16.5022 6.43921 16.8112C7.02498 17.397 7.97469 17.397 8.56045 16.8112C8.85334 16.5183 9 16.1344 9 15.7505Z" fill="currentColor"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M13.6078 6.6402C13.7543 6.49374 13.7543 6.25629 13.6078 6.10984C13.4614 5.96339 13.224 5.96339 13.0775 6.10984C11.2912 7.89624 9.50603 9.68362 7.71968 11.4699C7.57902 11.6106 7.5 11.8014 7.5 12.0003C7.5 12.1992 7.57902 12.39 7.71967 12.5307L11.4699 16.2808C11.6106 16.4215 11.8013 16.5005 12.0003 16.5005C12.1992 16.5005 12.3899 16.4215 12.5306 16.2808L16.2805 12.5306C16.5734 12.2376 16.5734 11.7628 16.2805 11.4699L12.5295 7.71864L13.6078 6.6402ZM12.0003 8.2501L8.24999 12.0003H15.7501L12.0003 8.2501Z" fill="currentColor"/>
+    </svg>`;
+    window.PAINT_CAT_ICON = PAINT_CAT_ICON;
+
+    function buildPaintCards() {
+        document.querySelectorAll('.paint-card-slot').forEach(slot => {
+            if (slot.dataset.built) return;
+            slot.dataset.built = '1';
+            slot.className = 'm3-card card-paint';
+            slot.innerHTML = `
+                <div class="card-title" style="color:var(--paint)">
+                    ${PAINT_CAT_ICON}
+                    <span class="t-paint-title">Paint</span>
+                    <div class="env-switch card-switch sw-paint"></div>
+                </div>
+                <div class="control-col">
+                    <div class="paint-current-row">
+                        <div class="paint-current empty" role="button" tabindex="0">
+                            <div class="paint-preview-thumb">${PAINT_CAT_ICON}</div>
+                            <div style="flex:1; min-width:0;">
+                                <div class="paint-preview-name"></div>
+                                <div class="paint-preview-type-row">
+                                    <div class="paint-preview-type"></div>
+                                </div>
+                            </div>
+                            <span class="material-symbols-rounded paint-current-chevron">chevron_right</span>
+                        </div>
+                        <label class="paint-local-btn" role="button" tabindex="0" title="${T.paintAddLocal}">
+                            <span class="material-symbols-rounded">perm_media</span>
+                            <input type="file" class="paint-local-input" accept="image/*,video/*" multiple>
+                        </label>
+                    </div>
+                    <div class="paint-scale-row">
+                        <div class="paint-scale-head">
+                            <span class="paint-scale-label">${T.paintScale}</span>
+                            <button type="button" class="paint-scale-val" title="${T.paintScaleReset}">1.0&times;</button>
+                        </div>
+                        <input type="range" class="paint-scale-input" min="0.1" max="10" step="0.05" value="1">
+                    </div>
+                </div>`;
+            const row = slot.querySelector('.paint-current');
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('.paint-remove-btn')) return;
+                e.stopPropagation(); openPaintPicker();
+            });
+            row.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openPaintPicker(); }
+            });
+            slot.querySelector('.sw-paint').addEventListener('click', (e) => {
+                e.stopPropagation();
+                setPaintEnabled(!visState.paint);
+            });
+
+            // --- Local image / video button ---------------------------------
+            const localBtn = slot.querySelector('.paint-local-btn');
+            const localInput = slot.querySelector('.paint-local-input');
+            localBtn.addEventListener('click', (e) => e.stopPropagation());
+            localBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); localInput.click(); }
+            });
+            localInput.addEventListener('click', (e) => e.stopPropagation());
+            localInput.addEventListener('change', async (e) => {
+                const files = Array.from(e.target.files || []);
+                e.target.value = '';
+                await importLocalPaintFiles(files, true);
+            });
+
+            // --- Pattern scale slider ---------------------------------------
+            const scaleInput = slot.querySelector('.paint-scale-input');
+            const scaleVal = slot.querySelector('.paint-scale-val');
+            scaleInput.addEventListener('click', (e) => e.stopPropagation());
+            scaleInput.addEventListener('input', (e) => {
+                e.stopPropagation();
+                setPaintScale(parseFloat(e.target.value));
+            });
+            scaleVal.addEventListener('click', (e) => {
+                e.stopPropagation();
+                setPaintScale(currentPaintEntry && currentPaintEntry.isLocal ? LOCAL_PAINT_DEFAULT_SCALE : 1);
+            });
+        });
+        renderPaintCurrent();
+    }
+    function setPaintSwitches(on) {
+        document.querySelectorAll('.sw-paint').forEach(sw => sw.classList.toggle('active', !!on));
+    }
+    // Off-DOM image cache for the card thumbnails, so switching frames never
+    // triggers a network hit or a layout pass.
+    const paintThumbImgCache = new Map();
+    function getPaintThumbImage(url){
+        let rec = paintThumbImgCache.get(url);
+        if (rec) return rec;
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        rec = { img, ready: false };
+        img.onload = () => { rec.ready = true; renderPaintCurrentFrame(true); };
+        img.src = url;
+        paintThumbImgCache.set(url, rec);
+        return rec;
+    }
+
+    // Repaint every card's "current paint" row from currentPaintName.
+    // Animated paints draw onto a <canvas> instead of using a CSS sprite sheet:
+    // scaling a 64px sheet cell into a 48px box makes the browser's filtering
+    // bleed a sliver of the adjacent frame along the edges, and because that
+    // sliver changes every frame the border appears to shimmer/jitter.
+    function renderPaintCurrent() {
+        const info = currentPaintName ? PAINTS_CATALOG[currentPaintName] : null;
+        const localRec = currentPaintName ? LOCAL_PAINTS.get(currentPaintName) : null;
+
+        // Pattern-scale slider only makes sense while something is applied.
+        document.querySelectorAll('.paint-scale-row').forEach(r => {
+            r.classList.toggle('show', !!info && visState.paint);
+            const inp = r.querySelector('.paint-scale-input');
+            const val = r.querySelector('.paint-scale-val');
+            if(inp && document.activeElement !== inp) inp.value = String(paintScaleMul);
+            if(val) val.innerHTML = paintScaleMul.toFixed(2) + '&times;';
+        });
+
+        document.querySelectorAll('.paint-current').forEach(row => {
+            const thumb = row.querySelector('.paint-preview-thumb');
+            const nameEl = row.querySelector('.paint-preview-name');
+            const typeEl = row.querySelector('.paint-preview-type');
+            const typeRow = row.querySelector('.paint-preview-type-row') || typeEl.parentElement;
+            row.classList.toggle('disabled', !!info && !visState.paint);
+
+            // Rebuild the "LOCAL" chip / delete button from scratch each pass.
+            typeRow.querySelector('.paint-local-chip')?.remove();
+            row.querySelector('.paint-remove-btn')?.remove();
+
+            if (!info) {
+                row.classList.add('empty');
+                thumb.style.backgroundImage = '';
+                thumb.innerHTML = PAINT_CAT_ICON;
+                nameEl.innerText = T.paintNone;
+                typeEl.innerText = T.paintTapToPick;
+                return;
+            }
+            row.classList.remove('empty');
+            nameEl.innerText = currentPaintName;
+
+            // ---- Local image / video paint ----------------------------------
+            if (localRec) {
+                typeEl.innerText = localTypeLabel(localRec.kind)
+                    + (localRec.width ? ` · ${localRec.width}×${localRec.height}` : '');
+                const chip = document.createElement('span');
+                chip.className = 'paint-local-chip';
+                chip.innerHTML = `<span class="material-symbols-rounded">${
+                    localRec.kind === 'video' ? 'movie' : (localRec.kind === 'animated' ? 'gif_box' : 'image')
+                }</span>${T.paintLocal}`;
+                typeRow.appendChild(chip);
+
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'paint-remove-btn';
+                del.title = T.paintRemove;
+                del.innerHTML = '<span class="material-symbols-rounded">close</span>';
+                del.addEventListener('click', (e) => {
+                    e.stopPropagation(); e.preventDefault();
+                    removeLocalPaint(currentPaintName);
+                });
+                row.insertBefore(del, row.querySelector('.paint-current-chevron'));
+
+                // Live <img>/<video> preview — the browser animates it for free.
+                const existing = thumb.querySelector('img, video');
+                if(!existing || existing.dataset.localId !== String(localRec.id)){
+                    const el = fillLocalThumb(thumb, localRec);
+                    el.dataset.localId = String(localRec.id);
+                }
+                return;
+            }
+
+            typeEl.innerText = info.isAnimated ? T.paintTypeAnimated : T.paintTypeStatic;
+            const url = `${RES_BASE}/${info.path}/${getPaintFileName(info)}`;
+            if (info.isAnimated && info.frame) {
+                let cv = thumb.querySelector('canvas');
+                if (!cv) {
+                    thumb.innerHTML = '';
+                    cv = document.createElement('canvas');
+                    const dpr = Math.min(3, window.devicePixelRatio || 1);
+                    cv.width = Math.round(48 * dpr);
+                    cv.height = Math.round(48 * dpr);
+                    thumb.appendChild(cv);
+                }
+                thumb.style.backgroundImage = '';
+                getPaintThumbImage(url);
+                renderPaintCurrentFrame(true);
+            } else {
+                thumb.innerHTML = '';
+                thumb.style.backgroundImage = `url('${url}')`;
+                thumb.style.backgroundSize = 'cover';
+                thumb.style.backgroundPosition = 'center';
+                thumb.style.backgroundRepeat = 'no-repeat';
+            }
+        });
+    }
+
+    // Blit the current sprite-sheet cell of the active animated paint into each
+    // card canvas. `force` redraws even if the frame index has not advanced.
+    let lastThumbFrame = -1;
+    function renderPaintCurrentFrame(force){
+        const info = currentPaintName ? PAINTS_CATALOG[currentPaintName] : null;
+        if (!info || !info.isAnimated || !info.frame) return;
+        const f = info.frame;
+        const cols = Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
+        const rows = Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
+        const totalFrames = f.numFrames || (cols * rows);
+        const fps = f.fps || 15;
+        const frameIdx = Math.floor(performance.now() / (1000 / fps)) % totalFrames;
+        if (!force && frameIdx === lastThumbFrame) return;
+        lastThumbFrame = frameIdx;
+        const rec = getPaintThumbImage(`${RES_BASE}/${info.path}/${getPaintFileName(info)}`);
+        if (!rec.ready) return;
+        const sx = (frameIdx % cols) * f.frameWidth;
+        const sy = Math.floor(frameIdx / cols) * f.frameHeight;
+        document.querySelectorAll('.paint-current:not(.empty) .paint-preview-thumb canvas').forEach(cv => {
+            const ctx = cv.getContext('2d');
+            if (!ctx) return;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            // Draw exactly one cell — no neighbouring pixels can bleed in.
+            ctx.drawImage(rec.img, sx, sy, f.frameWidth, f.frameHeight, 0, 0, cv.width, cv.height);
+        });
+    }
+
+    // Enable/disable the paint without forgetting the pick, so flipping the
+    // switch back on restores the last selected camouflage.
+    function setPaintEnabled(on){
+        visState.paint = !!on;
+        setPaintSwitches(visState.paint);
+        if (visState.paint) {
+            if (currentPaintName) selectPaint(currentPaintName);
+            else renderPaintCurrent();
+        } else {
+            // Strip the shader materials but KEEP currentPaintName/-Entry.
+            if(slots.hull?.group) clearPaintFromGroup(slots.hull.group);
+            if(slots.turret?.group) clearPaintFromGroup(slots.turret.group);
+            if(slots.more?.group) clearPaintFromGroup(slots.more.group);
+            paintAnimState = null; window.paintAnimState = null;
+            renderPaintCurrent();
+            msg(T.paintCleared);
+        }
+    }
+    window.setPaintEnabled = setPaintEnabled;
+    window.buildPaintCards = buildPaintCards;
+    window.renderPaintCurrent = renderPaintCurrent;
+
+    buildPaintCards();
     applyI18n(); document.body.classList.remove('fouc-loading');
 
     // ---- Per-category visibility switches (hull / turret / grenade) ----
@@ -1865,6 +2482,23 @@ document.addEventListener('pointerdown', (e) => {
         const sw = document.getElementById('sw-' + t);
         if (sw) sw.addEventListener('click', (e) => { e.stopPropagation(); toggleType(t); });
     });
+    // Paint card switch / picker entry point are wired in buildPaintCards()
+    document.getElementById('paint-picker-close')?.addEventListener('click', (e)=>{ e.stopPropagation(); closePaintPicker(); });
+    const ps=document.getElementById('paint-search'); if(ps){ if(userLang!=='zh') ps.style.display='none'; ps.addEventListener('input', (e)=>{ renderPaintGrid(e.target.value, currentPaintFilter); }); }
+    document.addEventListener('click', (e)=>{
+        const btn = e.target.closest('.paint-tab-btn');
+        if(btn){
+            e.stopPropagation();
+            document.querySelectorAll('.paint-tab-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            currentPaintFilter = btn.getAttribute('data-filter') || btn.dataset?.filter || 'all';
+            window.currentPaintFilter = currentPaintFilter;
+            renderPaintGrid(document.getElementById('paint-search')?.value||'', currentPaintFilter);
+        }
+    });
+    document.getElementById('paint-picker')?.addEventListener('click', (e)=>{ if(e.target.id==='paint-picker') closePaintPicker(); });
+    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && document.getElementById('paint-picker')?.classList.contains('show')) closePaintPicker(); });
+
 
     document.getElementById('btn-cam').onclick = () => {
         const tw = 3840; const th = 2160; const ow = innerWidth; const oh = innerHeight; const opr = renderer.getPixelRatio(); const oa = camera.aspect;
@@ -2075,6 +2709,7 @@ document.addEventListener('pointerdown', (e) => {
         selScene.onchange = () => { activateSceneToggle(); triggerSceneLoad(); };
         if(hullItems.length) await updateSkinSelect('hull', hullItems[0].value);
         if(turretItems.length) await updateSkinSelect('turret', turretItems[0].value);
+        if(typeof buildPaintsCatalogFromAssets === 'function'){ buildPaintsCatalogFromAssets(); }
     }
 
     (async function init() {
@@ -2091,8 +2726,16 @@ document.addEventListener('pointerdown', (e) => {
     let loadingState = { hull: false, turret: false, scene: false, grenade: false, drone: false, supply: false };
     
     async function fetchMeta(path) {
-        const url = `${RES_BASE}/${path}/meta.info`; const res = await fetch(url);
-        if(!res.ok) throw new Error(`Fetch meta.info failed: HTTP ${res.status}`); return await res.json();
+        const primaryUrl = `${RES_BASE}/${path}/meta.info`;
+        try {
+            const res = await fetch(primaryUrl);
+            if (res.ok) return await res.json();
+        } catch(e){}
+        const altBase = RES_BASE.includes('3dtank') ? "https://s.eu.tankionline.com" : "https://res.3dtank.com";
+        const altUrl = `${altBase}/${path}/meta.info`;
+        const resAlt = await fetch(altUrl);
+        if(!resAlt.ok) throw new Error(`Fetch meta.info failed: HTTP ${resAlt.status}`);
+        return await resAlt.json();
     }
 
     async function triggerLoad(type) {
@@ -2119,7 +2762,14 @@ document.addEventListener('pointerdown', (e) => {
             let modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds')); if(!modelEntry) throw new Error("A3D/3DS model file not found");
             const imgEntries = meta.filter(f => f.name.match(/\.(webp|png|jpg|jpeg)$/i) && !f.name.endsWith('.ktx')); const modelUrl = `${RES_BASE}/${pathStr}/${modelEntry.name}`;
             let group;
-            if(modelEntry.name.endsWith('.a3d')) { const resp = await fetch(modelUrl); if(!resp.ok) throw new Error(`HTTP ${resp.status}`); group = parseA3D(await resp.arrayBuffer(), modelEntry.name);
+            if(modelEntry.name.endsWith('.a3d')) {
+                let resp = await fetch(modelUrl);
+                if(!resp.ok) {
+                    const altBase = RES_BASE.includes('3dtank') ? "https://s.eu.tankionline.com" : "https://res.3dtank.com";
+                    resp = await fetch(`${altBase}/${pathStr}/${modelEntry.name}`);
+                }
+                if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                group = parseA3D(await resp.arrayBuffer(), modelEntry.name);
             } else { const loader = new TDSLoader(); loader.setResourcePath(`${RES_BASE}/${pathStr}/`); group = await loader.loadAsync(modelUrl); group.traverse(o => { if(o.isMesh) { o.material = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.4, side:0}); o.userData.originalName = o.name; } }); }
             // Recenter legacy skins (XT/DC/PR/UT/...) that were authored with the
             // root pivot at non-origin scene coordinates.  Safe no-op for modern
@@ -2127,7 +2777,12 @@ document.addEventListener('pointerdown', (e) => {
             const pivotNames = type === 'hull' ? ['hull', 'Hull', 'body'] : ['turret', 'Turret'];
             recenterModelAtPivot(group, pivotNames);
             pools[type] =[];
-            if(imgEntries.length > 0) { const texPromises = imgEntries.map(async entry => { const texUrl = `${RES_BASE}/${pathStr}/${entry.name}`; const tex = await new THREE.TextureLoader().loadAsync(texUrl); setupTex(tex); tex.name = entry.name; return { name: entry.name, tex: tex }; }); pools[type] = await Promise.all(texPromises); applyTexturesFromPool(group, pools[type]); }
+            if(imgEntries.length > 0) { const texPromises = imgEntries.map(async entry => { const texUrl = `${RES_BASE}/${pathStr}/${entry.name}`; let tex;
+                try { tex = await new THREE.TextureLoader().loadAsync(texUrl); }
+                catch(e) {
+                    const altBase = RES_BASE.includes('3dtank') ? "https://s.eu.tankionline.com" : "https://res.3dtank.com";
+                    tex = await new THREE.TextureLoader().loadAsync(`${altBase}/${pathStr}/${entry.name}`);
+                } setupTex(tex); tex.name = entry.name; return { name: entry.name, tex: tex }; }); pools[type] = await Promise.all(texPromises); applyTexturesFromPool(group, pools[type]); }
             equipAssembly(group, modelEntry.name, type);
         } catch(e) { console.error(e); msg(String(e.message || e)); }
     }
@@ -2144,8 +2799,1483 @@ document.addEventListener('pointerdown', (e) => {
         });
     }
 
-    // Normalize texture/material labels for matching:
-    // "BG1 1024.PNG" / "bg1_1024.webp" / "Material #9" -> comparable stems
+
+    // ---- Paint Shader System (Scheme 2 - reference blending) - Fixed circular JSON ----
+    const paintedMaterials = [];
+    const paintOriginalMap = new WeakMap();
+    // Every live paint material (any kind), so the pattern-scale slider can
+    // retune the tiling uniform without rebuilding or recompiling anything.
+    const allPaintMats = new Set();
+
+    // ---- UV texel-density measurement -------------------------------------
+    // Returns "how many world units one UV unit spans" for a mesh, i.e. the
+    // physical size of one full texture repeat on that surface.
+    //
+    // NOTE ON METHOD: this samples |dP/du| and |dP/dv| PER TRIANGLE and takes the
+    // median.  A global sqrt(sum(worldArea)/sum(uvArea)) looks equivalent but is
+    // NOT: tank hulls mirror/overlap large parts of their unwrap (both track
+    // sides share one patch of the atlas), so the summed uvArea double-counts and
+    // the ratio collapses — on the stock hull it reports 215 instead of the true
+    // 931, a 4.3x error, while agreeing to within 6% on the turret.  The median
+    // of per-triangle derivatives is immune to overlap and to a few degenerate
+    // seam triangles.
+    const uvDensityCache = new WeakMap();
+    function measureWorldUnitsPerUV(mesh){
+        if(!mesh || !mesh.isMesh) return null;
+        const g = mesh.geometry;
+        const cached = uvDensityCache.get(g);
+        if(cached !== undefined) return cached;
+        const pos = g?.attributes?.position, uv = g?.attributes?.uv;
+        if(!pos || !uv){ uvDensityCache.set(g, null); return null; }
+        mesh.updateWorldMatrix(true, false);
+        const sc = new THREE.Vector3();
+        mesh.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), sc);
+        const meshScale = (Math.abs(sc.x) + Math.abs(sc.y) + Math.abs(sc.z)) / 3 || 1;
+        const idx = g.index ? g.index.array : null;
+        const triCount = (idx ? idx.length : pos.count) / 3;
+        const stride = Math.max(1, Math.floor(triCount / 2000));
+        const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+        const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+        const dPdu = new THREE.Vector3(), dPdv = new THREE.Vector3();
+        const samples = [];
+        for(let t = 0; t < triCount; t += stride){
+            const i = t * 3;
+            const i0 = idx ? idx[i] : i, i1 = idx ? idx[i+1] : i+1, i2 = idx ? idx[i+2] : i+2;
+            a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+            e1.subVectors(b, a); e2.subVectors(c, a);
+            const du1 = uv.getX(i1) - uv.getX(i0), dv1 = uv.getY(i1) - uv.getY(i0);
+            const du2 = uv.getX(i2) - uv.getX(i0), dv2 = uv.getY(i2) - uv.getY(i0);
+            const det = du1 * dv2 - du2 * dv1;
+            if(Math.abs(det) < 1e-12) continue;
+            dPdu.copy(e1).multiplyScalar(dv2).addScaledVector(e2, -dv1).divideScalar(det);
+            dPdv.copy(e1).multiplyScalar(-du2).addScaledVector(e2, du1).divideScalar(det);
+            const su = dPdu.length(), sv = dPdv.length();
+            if(!isFinite(su) || !isFinite(sv) || su <= 0 || sv <= 0) continue;
+            samples.push(Math.sqrt(su * sv));   // isotropic scale of this triangle
+        }
+        let ratio = null;
+        if(samples.length){
+            samples.sort((x, y) => x - y);
+            ratio = samples[samples.length >> 1] * meshScale;
+        }
+        uvDensityCache.set(g, ratio);
+        return ratio;
+    }
+
+    // World units spanned by one camouflage repeat at the reference resolution.
+    // 465 = the hull's historical tile size (it sits at ~930 world units per UV
+    // unit and the legacy default density was 2), so the hull keeps the look it
+    // always had and the turret/grenade are brought into line with it.
+    const PAINT_BASE_TILE = 465.0;
+
+    // ---- Mirrored-UV detection (fixes flipped camo on shared/mirrored parts) --
+    // Many tank hulls reuse ("mirror") one UV island for both left/right sides
+    // to save texture space: the base lightmap was authored knowing this, so it
+    // still looks correct. But the camouflage pattern is sampled with the SAME
+    // uv coordinates, so on the mirrored half an asymmetric pattern reads
+    // backwards. We detect which triangles are mirrored by the *sign* of their
+    // UV-space signed area (same determinant already computed for texel-density
+    // measurement) and bake a per-vertex 0/1 flag. Only the camo sampling uses
+    // this flag to flip U back — the original base texture (map/lightmap) is
+    // left completely untouched, so nothing about the model's real texture
+    // changes; only the procedurally-applied camo gets auto-corrected.
+    function computeMirrorFlags(mesh){
+        if(!mesh || !mesh.isMesh) return;
+        const g = mesh.geometry;
+        if(!g || g.attributes.mirrorFlag) return; // already computed
+        const pos = g.attributes.position, uv = g.attributes.uv;
+        const vertCount = pos ? pos.count : 0;
+        if(!uv || !vertCount){
+            if(pos) g.setAttribute('mirrorFlag', new THREE.BufferAttribute(new Float32Array(vertCount), 1));
+            return;
+        }
+        const idx = g.index ? g.index.array : null;
+        const triCount = (idx ? idx.length : pos.count) / 3;
+        const votesPos = new Float32Array(vertCount);
+        const votesNeg = new Float32Array(vertCount);
+        let totalPos = 0, totalNeg = 0;
+        for(let t = 0; t < triCount; t++){
+            const i = t * 3;
+            const i0 = idx ? idx[i] : i, i1 = idx ? idx[i+1] : i+1, i2 = idx ? idx[i+2] : i+2;
+            const u0 = uv.getX(i0), v0 = uv.getY(i0);
+            const u1 = uv.getX(i1), v1 = uv.getY(i1);
+            const u2 = uv.getX(i2), v2 = uv.getY(i2);
+            const det = (u1 - u0) * (v2 - v0) - (u2 - u0) * (v1 - v0);
+            if(Math.abs(det) < 1e-12) continue;
+            if(det < 0){ votesNeg[i0]++; votesNeg[i1]++; votesNeg[i2]++; totalNeg++; }
+            else { votesPos[i0]++; votesPos[i1]++; votesPos[i2]++; totalPos++; }
+        }
+        const flags = new Float32Array(vertCount);
+        // Whichever orientation is the majority across the whole mesh is treated
+        // as "normal"; vertices whose triangles mostly voted the opposite way
+        // are the mirrored island and get flagged.
+        const majorityIsPos = totalPos >= totalNeg;
+        for(let i = 0; i < vertCount; i++){
+            const p = votesPos[i], n = votesNeg[i];
+            if(p === 0 && n === 0) continue;
+            flags[i] = (majorityIsPos ? (n > p) : (p > n)) ? 1 : 0;
+        }
+        g.setAttribute('mirrorFlag', new THREE.BufferAttribute(flags, 1));
+    }
+
+    function createPaintShaderMat(originalMat, paintEntry, worldUnitsPerUV){
+        const newMat = originalMat.clone();
+        const lightMapTex = originalMat.map;
+        newMat.map = lightMapTex;
+        // Option 3: Clear emissive self-glow channel on camouflage material
+        if (newMat.emissive) newMat.emissive.setHex(0x000000);
+        newMat.emissiveIntensity = 0.0;
+        newMat.emissiveMap = null;
+        newMat.needsUpdate = true;
+        const isAnim = !!paintEntry.isAnimated && !!paintEntry.frame;
+        const frame = paintEntry.frame;
+
+        // ---- Tiling density -------------------------------------------------
+        // Tile in UV space (no triplanar: that blends two projections together
+        // in the ~45-degree band between axes, which smears the pattern and can
+        // mirror asymmetric artwork).  To still get a consistent PHYSICAL size
+        // across parts, the UV repeat count is derived from each mesh's own texel
+        // density: repeats = (world units per UV unit) / (world units per tile).
+        let texWidth = 150;
+        // For animated camouflages, use single-frame width (frameWidth) instead of full sprite sheet image width
+        if (frame && frame.frameWidth) {
+            texWidth = frame.frameWidth;
+        } else if (paintEntry.info && paintEntry.info.frame && paintEntry.info.frame.frameWidth) {
+            texWidth = paintEntry.info.frame.frameWidth;
+        } else if (paintEntry.texture && paintEntry.texture.image && paintEntry.texture.image.width) {
+            texWidth = paintEntry.texture.image.width;
+        }
+        texWidth = Math.max(1, texWidth);
+        // 废弃根据贴图分辨率强行缩放图案的错误逻辑，直接使用标准物理基准
+    const tileWorld = PAINT_BASE_TILE; 
+
+    let autoDensity;
+    if (worldUnitsPerUV && isFinite(worldUnitsPerUV) && worldUnitsPerUV > 1e-6) {
+        autoDensity = worldUnitsPerUV / tileWorld;
+    } else {
+        // 降级情况直接给默认平铺 2 次即可，不需要用像素反推
+        autoDensity = 2.0; 
+    }
+
+    // ================== 新增：分别调整动静迷彩密度 ==================
+    const isLocal = !!paintEntry.isLocal;
+    if (isLocal) {
+        // 本地图片/视频：用户自己的素材，不做任何“官方迷彩”式的密度补偿，
+        // 直接按物理基准平铺一次，剩下的交给“图案缩放”滑块。
+        autoDensity *= 1.0;
+    } else if (isAnim) {
+        // 动态迷彩太密集 -> 乘以小于 1 的数字，降低密度（图案放大）
+        // 比如 0.5 表示密度减半（图案放大为原来的2倍）
+        autoDensity *= 0.25;  
+    } else {
+        // 静态迷彩太稀疏 -> 乘以大于 1 的数字，提高密度（图案缩小并重复更多次）
+        // 比如 2.0 表示密度翻倍（图案缩小为原来的二分之一）
+        autoDensity *= 2.0;  
+    }
+    // ================================================================
+
+    // Guard rails only — deliberately NOT quantised: snapping to 0.5 steps
+    autoDensity = THREE.MathUtils.clamp(autoDensity, 0.02, 64.0);
+
+        // Aspect correction: official camos are square sheets, but a local
+        // photo can be any shape (e.g. 1920x1080). Tiling a 16:9 image with an
+        // equal U/V repeat squashes it, so V gets scaled by width/height to
+        // keep every pixel square on the hull.
+        const paintAspect = (isLocal && paintEntry.aspect && isFinite(paintEntry.aspect) && paintEntry.aspect > 0)
+            ? paintEntry.aspect : 1.0;
+        // The slider divides the density (bigger scale = fewer, larger repeats).
+        const userScale = THREE.MathUtils.clamp(
+            (paintEntry.scale && isFinite(paintEntry.scale)) ? paintEntry.scale : 1.0,
+            PAINT_SCALE_MIN, PAINT_SCALE_MAX);
+        const finalDensity = THREE.MathUtils.clamp(autoDensity / userScale, 0.005, 256.0);
+
+        // three.js caches compiled programs by this key and skips onBeforeCompile
+        // on a hit, so the key has to cover everything baked into the shader.
+        // NOTE: the density is a *uniform*, not baked into the source, so the
+        // slider must NOT be part of the key (otherwise every drag recompiles).
+        const cacheKey = 'paint_uv_' + (paintEntry.isAnimated ? 'anim' : 'static')
+            + (isLocal ? '_local' : '');
+        newMat.customProgramCacheKey = function(){ return cacheKey; };
+
+        newMat.userData.paintEntry = paintEntry;
+        newMat.userData.isPaintMat = true;
+        newMat.userData.paintDensity = finalDensity;
+        newMat.userData.paintBaseDensity = autoDensity;   // pre-slider value
+        newMat.userData.paintAspect = paintAspect;
+        newMat.userData.paintTileWorld = tileWorld;
+        allPaintMats.add(newMat);
+        newMat.onBeforeCompile = (shader)=>{
+            shader.uniforms.paintMap = { value: paintEntry.texture };
+            shader.uniforms.paintFrameOffset = { value: new THREE.Vector2(0, 0) };
+            shader.uniforms.paintFrameScale = { value: new THREE.Vector2(1, 1) };
+            shader.uniforms.paintUseFrameTransform = { value: isAnim ? 1.0 : 0.0 };
+            shader.uniforms.paintTexelSize = { value: new THREE.Vector2(0.01, 0.01) };
+            shader.uniforms.multihui = { value: new THREE.Vector2(1, 1) };
+            shader.uniforms.uvTransform = { value: new THREE.Vector2(1, 1) };
+            // x = U repeats, y = V repeats (aspect-corrected for local media)
+            shader.uniforms.paintUvScale = { value: new THREE.Vector2(finalDensity, finalDensity * paintAspect) };
+            // Pass the per-vertex mirror flag (computed in computeMirrorFlags)
+            // through to the fragment shader so ONLY the camo sampling can flip
+            // its U coordinate back on the mirrored UV island. Nothing else
+            // about the mesh, its base map, or its real UVs is touched.
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                `#include <common>
+                attribute float mirrorFlag;
+                varying float vPaintMirror;
+                `
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                `#include <begin_vertex>
+                vPaintMirror = mirrorFlag;
+                `
+            );
+            if(isAnim && frame){
+                shader.uniforms.paintFrameScale.value.set(frame.frameWidth / frame.imageWidth, frame.frameHeight / frame.imageHeight);
+                shader.uniforms.paintFrameOffset.value.set(0, 1 - frame.frameHeight / frame.imageHeight);
+                shader.uniforms.paintTexelSize.value.set(2.0 / frame.imageWidth, 2.0 / frame.imageHeight);
+                shader.uniforms.paintUseFrameTransform.value = 1.0;
+            } else {
+                shader.uniforms.paintFrameScale.value.set(1,1);
+                shader.uniforms.paintFrameOffset.value.set(0,0);
+                shader.uniforms.paintTexelSize.value.set(0.5 / 256, 0.5 / 256);
+                shader.uniforms.paintUseFrameTransform.value = 0.0;
+            }
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `#include <common>
+                uniform sampler2D paintMap;
+                uniform vec2 paintFrameOffset;
+                uniform vec2 paintFrameScale;
+                uniform float paintUseFrameTransform;
+                uniform vec2 paintTexelSize;
+                uniform vec2 multihui;
+                uniform vec2 uvTransform;
+                uniform vec2 paintUvScale;
+                varying float vPaintMirror;
+                `
+            );
+            const customMapFragment = `
+                #ifdef USE_MAP
+                    vec4 lightTex = texture2D(map, vMapUv);
+                    vec3 baseLightColor = lightTex.rgb;
+
+                    // ==================== 1. 核心修复开始 ====================
+                    // 在对 UV 进行任何镜像翻转 (vPaintMirror) 或取模 (fract/mix) 之前
+                    // 基于原始连续的 vMapUv 计算平滑的像素级 UV 导数 dx, dy
+                    vec2 dx = dFdx(vMapUv * paintUvScale);
+                    vec2 dy = dFdy(vMapUv * paintUvScale);
+                    // ========================================================
+
+                    vec2 camoBaseUv = vMapUv;
+                    if(vPaintMirror > 0.5) camoBaseUv.x = 1.0 - camoBaseUv.x;
+                    vec2 tiledPaintUv = camoBaseUv * paintUvScale;
+                    vec2 paintUv = tiledPaintUv;
+                    if(paintUseFrameTransform > 0.5){
+                        vec2 safeTiledUv = mix(paintTexelSize, vec2(1.0) - paintTexelSize, fract(tiledPaintUv / paintFrameScale));
+                        paintUv = safeTiledUv * paintFrameScale + paintFrameOffset;
+                    }
+
+                    // ==================== 2. 核心采样替换 ====================
+                    // 使用带有平滑导数的渐变采样，防止在接缝/翻转/帧边缘触发 Mipmap 异常
+                    vec4 paintTex = texture2DGradEXT(paintMap, paintUv, dx, dy);
+                    // ========================================================
+
+                    vec3 paintColor = paintTex.rgb * 3.0;
+                    float scuffingFactor = step(0.5, lightTex.r);
+                    vec3 colorWithoutScuffing = 2.0 * paintColor * baseLightColor;
+                    vec3 colorWithScuffing = 1.0 - 2.0 * (1.0 - baseLightColor) * (1.0 - paintColor);
+                    vec3 blendedColor = mix(colorWithoutScuffing, colorWithScuffing, scuffingFactor);
+                    float detailsAlpha = lightTex.a;
+                    vec3 finalColor = mix(blendedColor, baseLightColor, detailsAlpha);
+                    diffuseColor.rgb *= finalColor;
+                #endif
+            `;
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <map_fragment>',
+                customMapFragment
+            );
+
+            // GLSL Shader Mixer: Mix roughness and metalness per-pixel based on lightmap alpha (detailsAlpha)
+            // Camouflage area (detailsAlpha = 0): Matte non-reflective (roughness=0.85, metalness=0.0)
+            // Model detail area (detailsAlpha = 1, e.g. metal vents, glass, chrome): Preserves model's original metallic reflections!
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <roughnessmap_fragment>',
+                `#include <roughnessmap_fragment>
+                #ifdef USE_MAP
+                    vec4 lightTexForRough = texture2D(map, vMapUv);
+                    roughnessFactor = mix(0.85, roughnessFactor, lightTexForRough.a);
+                #endif
+                `
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <metalnessmap_fragment>',
+                `#include <metalnessmap_fragment>
+                #ifdef USE_MAP
+                    vec4 lightTexForMetal = texture2D(map, vMapUv);
+                    metalnessFactor = mix(0.0, metalnessFactor, lightTexForMetal.a);
+                #endif
+                `
+            );
+
+            newMat.userData.shader = shader;
+            if(isAnim){
+                paintedMaterials.push({mat: newMat, shader, frame, paintEntry});
+            }
+        };
+        return newMat;
+    }
+    function isPaintableMeshName(name){ return true; }
+    function isPaintableMaterial(mat, hullNameUpper){ return true; }
+    function isPaintableMesh(mesh){
+        if(!mesh || !mesh.isMesh) return false;
+        if(mesh.userData.isAttachmentMarker) return false;
+        return true;
+    }
+    function getPaintFileName(info){
+        if(info.isAnimated) return 'image.webp';
+        return info.hasTexture ? 'texture.webp' : 'image.webp';
+    }
+    async function fetchPaintMeta(name){
+        const info = PAINTS_CATALOG[name];
+        if(!info) return null;
+        if(info.isLocal) return info;   // user file: nothing to fetch
+        try{
+            const metaUrl = `${RES_BASE}/${info.path}/meta.info`;
+            const res = await fetch(metaUrl);
+            if(!res.ok) return info;
+            const meta = await res.json();
+            const files = meta.map(f=>f.name);
+            const hasFrame = files.includes('frame.json');
+            const hasTexture = files.includes('texture.webp');
+            const hasFrameWebp = files.includes('frame.webp');
+            info.hasTexture = hasTexture;
+            info.hasFrameWebp = hasFrameWebp;
+            if(hasFrame !== info.isAnimated){
+                info.isAnimated = hasFrame;
+            }
+            if(hasFrame && !info.frame){
+                try{
+                    const frameRes = await fetch(`${RES_BASE}/${info.path}/frame.json`);
+                    if(frameRes.ok) info.frame = await frameRes.json();
+                }catch{}
+            }
+            return info;
+        }catch(e){
+            return info;
+        }
+    }
+    async function loadPaintTexture(paintName){
+        const info = PAINTS_CATALOG[paintName];
+        if(!info) throw new Error('Paint not found: '+paintName);
+        if(paintCache.has(paintName)) return paintCache.get(paintName);
+        // Local paints are built at import time and pre-seeded into paintCache;
+        // if we get here for one, its record was dropped — fail loudly instead
+        // of trying to fetch a CDN path that does not exist.
+        if(info.isLocal) throw new Error('Local paint unavailable: '+paintName);
+        await fetchPaintMeta(paintName);
+        const file = getPaintFileName(info);
+        const url = `${RES_BASE}/${info.path}/${file}`;
+        const tex = await new THREE.TextureLoader().loadAsync(url);
+        setupTex(tex);
+        tex.name = paintName;
+        let frameData = null;
+        if(info.isAnimated && info.frame){
+            const f = info.frame;
+            const cols = Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
+            const rows = Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(f.frameWidth / f.imageWidth, f.frameHeight / f.imageHeight);
+            tex.offset.set(0, 1 - f.frameHeight / f.imageHeight);
+            frameData = {
+                fps: f.fps,
+                frameWidth: f.frameWidth,
+                frameHeight: f.frameHeight,
+                imageWidth: f.imageWidth,
+                imageHeight: f.imageHeight,
+                numFrames: f.numFrames || (cols * rows),
+                cols, rows,
+                currentFrame: 0,
+                time: 0
+            };
+        } else {
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(1,1);
+        }
+        const entry = { texture: tex, isAnimated: !!info.isAnimated, frame: frameData, info, name: paintName };
+        paintCache.set(paintName, entry);
+        return entry;
+    }
+
+    function applyPaintToGroup(grp, paintEntry){
+        if(!grp || !paintEntry) return 0;
+        let applied = 0;
+        const hullNameUpper = (slots.hull?.group?.name || document.getElementById('sel-hull-name')?.value || '').toUpperCase();
+        grp.traverse(o=>{
+            if(!o.isMesh) return;
+            if(o.userData.isAttachmentMarker) return;
+            const fullName = ((o.userData.originalName||'') + ' ' + (o.name||'') + ' ' + (o.parent?.name||'') + ' ' + (o.parent?.parent?.name||''));
+            if(!isPaintableMeshName(fullName)) return;
+            const geom = o.geometry;
+            if(geom && geom.attributes.uv && !geom.attributes.uv2){
+                geom.setAttribute('uv2', geom.attributes.uv.clone());
+            }
+            // Physical-size matching: how much world surface one UV unit covers.
+            const worldUnitsPerUV = measureWorldUnitsPerUV(o);
+            // Bake the mirrored-UV-island flag once per geometry (cheap, cached
+            // via the attribute itself) so the paint shader can flip the camo's
+            // U coordinate back on parts that reuse a mirrored UV island.
+            computeMirrorFlags(o);
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            const newMats = [];
+            let changed = false;
+            mats.forEach(mat=>{
+                if(!mat) { newMats.push(mat); return; }
+                if(!isPaintableMaterial(mat, hullNameUpper)) { newMats.push(mat); return; }
+                let baseMat = mat;
+                while (paintOriginalMap.has(baseMat)) {
+                    baseMat = paintOriginalMap.get(baseMat);
+                }
+                // Switching paints replaces an existing painted material —
+                // retire the old one so the scale slider and the animation
+                // loop never iterate over orphaned (or disposed) materials.
+                if(paintOriginalMap.has(mat)){
+                    allPaintMats.delete(mat);
+                    for(let i=paintedMaterials.length-1;i>=0;i--){
+                        if(paintedMaterials[i].mat === mat) paintedMaterials.splice(i,1);
+                    }
+                    paintOriginalMap.delete(mat);
+                    try{ mat.dispose(); }catch(e){}
+                }
+                const paintedMat = createPaintShaderMat(baseMat, paintEntry, worldUnitsPerUV);
+                paintOriginalMap.set(paintedMat, baseMat);
+                newMats.push(paintedMat);
+                applied++;
+                changed = true;
+            });
+            if(changed){
+                o.material = Array.isArray(o.material) ? newMats : newMats[0];
+            }
+        });
+        return applied;
+    }
+
+    function clearPaintFromGroup(grp){
+        if(!grp) return;
+        grp.traverse(o=>{
+            if(!o.isMesh) return;
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            const restored = [];
+            let changed = false;
+            mats.forEach(mat=>{
+                if(paintOriginalMap.has(mat)){
+                    let orig = mat;
+                    while (paintOriginalMap.has(orig)) {
+                        orig = paintOriginalMap.get(orig);
+                    }
+                    restored.push(orig);
+                    changed = true;
+                    for(let i=paintedMaterials.length-1;i>=0;i--){
+                        if(paintedMaterials[i].mat === mat) paintedMaterials.splice(i,1);
+                    }
+                    allPaintMats.delete(mat);
+                    paintOriginalMap.delete(mat);
+                    try{ mat.dispose(); }catch(e){}
+                } else {
+                    restored.push(mat);
+                }
+            });
+            if(changed){
+                o.material = Array.isArray(o.material) ? restored : restored[0];
+            }
+        });
+    }
+
+    function tickGridAnim(dt){
+        if(!document.getElementById('paint-picker')?.classList.contains('show')) return;
+        if(!activeGridAnimItems.length) return;
+        const now = performance.now();
+        for(const item of activeGridAnimItems){
+            const f = item.frame;
+            if(!f) continue;
+            const fps = f.fps || 15;
+            const frameDur = 1000 / fps;
+            const currentFrame = Math.floor(now / frameDur) % item.totalFrames;
+            if(currentFrame !== item.lastFrame){
+                item.lastFrame = currentFrame;
+                const col = currentFrame % item.cols;
+                const row = Math.floor(currentFrame / item.cols);
+                const xPerc = item.cols > 1 ? (col / (item.cols - 1)) * 100 : 0;
+                const yPerc = item.rows > 1 ? (row / (item.rows - 1)) * 100 : 0;
+                item.el.style.backgroundPosition = `${xPerc.toFixed(2)}% ${yPerc.toFixed(2)}%`;
+            }
+        }
+    }
+
+    function updatePaintAnimation(dt){
+        tickGridAnim(dt);
+        // Local GIF / animated-WebP / APNG paints: blit the browser-driven
+        // <img>'s current frame into its canvas texture. (Video paints use
+        // THREE.VideoTexture, which refreshes itself during render.)
+        tickLocalPaints();
+        const pas = window.paintAnimState || paintAnimState;
+        if(!pas || !pas.entry) return;
+        const entry = pas.entry;
+        if(!entry.isAnimated || !entry.frame) return;
+        const f = entry.frame;
+        const now = performance.now();
+        const fps = f.fps || 15;
+        const frameDur = 1000 / fps;
+        const totalFrames = f.numFrames || (f.cols * f.rows);
+        const currentFrame = Math.floor(now / frameDur) % totalFrames;
+
+        const col = currentFrame % f.cols;
+        const row = Math.floor(currentFrame / f.cols);
+        const offsetX = col * f.frameWidth / f.imageWidth;
+        const offsetY = 1 - (row + 1) * f.frameHeight / f.imageHeight;
+
+        for(const pm of paintedMaterials){
+            if(pm.shader && pm.shader.uniforms && pm.shader.uniforms.paintFrameOffset){
+                pm.shader.uniforms.paintFrameOffset.value.set(offsetX, offsetY);
+            }
+        }
+        if(entry.texture){
+            entry.texture.offset.x = offsetX;
+            entry.texture.offset.y = offsetY;
+        }
+
+        // Advance the card thumbnails (canvas blit — see renderPaintCurrentFrame)
+        renderPaintCurrentFrame(false);
+    }
+
+    async function buildPaintsCatalogFromAssets(){
+        let raw = assetsData?.paints;
+        if(!raw) return;
+        let dict = raw.paints || raw;
+        if(typeof dict !== 'object') return;
+        PAINTS_CATALOG = {}; window.PAINTS_CATALOG = PAINTS_CATALOG;
+        for(const [name, leaf] of Object.entries(dict)){
+            try{
+                const p = toResourcePath(leaf);
+                if(!p) continue;
+                PAINTS_CATALOG[name] = { path: p, isAnimated: false, frame: null, hasTexture: false, hasFrameWebp: false, _leaf: leaf };
+            }catch{}
+        }
+        // The catalog object is rebuilt from scratch here, so re-insert any
+        // camouflages the user imported from disk (they have no CDN path and
+        // would otherwise silently disappear from the picker).
+        for(const [name, rec] of LOCAL_PAINTS){
+            PAINTS_CATALOG[name] = {
+                path: null, isLocal: true, localKind: rec.kind,
+                isAnimated: false, frame: null,
+                hasTexture: true, hasFrameWebp: false, _leaf: null
+            };
+            if(rec.entry) rec.entry.info = PAINTS_CATALOG[name];
+        }
+        renderPaintGrid(document.getElementById('paint-search')?.value || '', currentPaintFilter);
+        // Local paints have no meta.info to probe — skip them entirely so the
+        // worker never rewrites their badge/thumbnail.
+        const names = Object.keys(PAINTS_CATALOG).filter(n => !PAINTS_CATALOG[n].isLocal);
+        let idx=0;
+        const concurrency=12;
+        const now = performance.now();
+        async function worker(){
+            while(idx < names.length){
+                const n = names[idx++];
+                await fetchPaintMeta(n);
+                const el = document.querySelector(`.paint-item[data-name="${CSS.escape(n)}"]`);
+                if(el){
+                    const info = PAINTS_CATALOG[n];
+                    el.classList.toggle('animated', !!info.isAnimated);
+                    el.classList.toggle('static', !info.isAnimated);
+                    const badge = el.querySelector('.paint-badge');
+                    if(badge) badge.innerText = info.isAnimated ? (userLang==='zh' ? '动画' : 'ANI') : (userLang==='zh' ? '静态' : 'STA');
+                    
+                    if (info.isAnimated && info.frame && !el.querySelector('.paint-thumb-anim')) {
+                        const oldImg = el.querySelector('.paint-thumb');
+                        if (oldImg) oldImg.remove();
+                        const file = getPaintFileName(info);
+                        const url = `${RES_BASE}/${info.path}/${file}`;
+                        const f = info.frame;
+                        const cols = Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
+                        const rows = Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
+                        const totalFrames = f.numFrames || (cols * rows);
+                        const thumb = document.createElement('div');
+                        thumb.className = 'paint-thumb-anim';
+                        thumb.style.backgroundImage = `url('${url}')`;
+                        thumb.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+                        thumb.style.backgroundPosition = `0% 0%`;
+                        if (badge) el.insertBefore(thumb, badge);
+                        else el.appendChild(thumb);
+                        activeGridAnimItems.push({
+                            el: thumb,
+                            frame: f,
+                            cols,
+                            rows,
+                            totalFrames,
+                            startTime: now,
+                            lastFrame: -1
+                        });
+                    }
+                }
+            }
+        }
+        const workers = Array.from({length: concurrency}, ()=>worker());
+        await Promise.all(workers);
+        renderPaintGrid(document.getElementById('paint-search')?.value || '', currentPaintFilter);
+        renderPaintCurrent();
+    }
+
+    function selectPaint(name){
+        if(!name || !PAINTS_CATALOG[name]){
+            clearCurrentPaint();
+            return;
+        }
+        const info = PAINTS_CATALOG[name];
+        currentPaintName = name;
+        visState.paint = true;
+        setPaintSwitches(true);
+        // Each paint remembers its own scale; local media starts a bit larger
+        // because photos/videos carry much more detail than a tiling camo.
+        const rememberedScale = paintCache.get(name)?.scale;
+        paintScaleMul = (typeof rememberedScale === 'number' && isFinite(rememberedScale))
+            ? rememberedScale
+            : (info.isLocal ? LOCAL_PAINT_DEFAULT_SCALE : 1);
+        window.paintScaleMul = paintScaleMul;
+        renderPaintCurrent();
+        loadPaintTexture(name).then(entry=>{
+            entry.scale = paintScaleMul;
+            currentPaintEntry = entry;
+            if(entry.isAnimated){
+                paintAnimState = { entry, time: 0 };
+                if(entry.frame){
+                    entry.frame.currentFrame = 0;
+                    entry.frame.time = 0;
+                }
+            } else {
+                paintAnimState = null;
+            }
+            renderPaintCurrent();
+            if(slots.hull?.group) applyPaintToGroup(slots.hull.group, entry);
+            if(slots.turret?.group) applyPaintToGroup(slots.turret.group, entry);
+            if(slots.more?.group) applyPaintToGroup(slots.more.group, entry);
+            msg(`${T.paintApplied}: ${name}`);
+            document.querySelectorAll('.paint-item').forEach(el => {
+                el.classList.toggle('selected', el.dataset.name === name);
+            });
+        }).catch(e=>{
+            console.error(e);
+            msg(String(e.message||e));
+        });
+    }
+
+    function clearCurrentPaint(){
+        currentPaintName = null;
+        currentPaintEntry = null;
+        paintAnimState = null;
+        if(slots.hull?.group) clearPaintFromGroup(slots.hull.group);
+        if(slots.turret?.group) clearPaintFromGroup(slots.turret.group);
+        if(slots.more?.group) clearPaintFromGroup(slots.more.group);
+        visState.paint = false;
+        setPaintSwitches(false);
+        renderPaintCurrent();
+        document.querySelectorAll('.paint-item').forEach(el => {
+            el.classList.remove('selected');
+        });
+        msg(T.paintCleared);
+    }
+
+    /* ==================================================================== *
+     *  LOCAL CAMOUFLAGES — pick an image/video from disk, or drop one on
+     *  the model.  A local paint is registered as an ordinary catalog entry
+     *  (`PAINTS_CATALOG[name] = { isLocal:true, ... }`) plus a record in
+     *  LOCAL_PAINTS that owns the GPU texture and any live media element,
+     *  so every existing code path — picker grid, card thumbnail, shader
+     *  material, model reload re-apply — keeps working untouched.
+     *
+     *  Three kinds of source are supported:
+     *    static   any still raster/vector the browser can decode
+     *             (png jpg jpeg webp bmp avif svg ico tiff heic …)
+     *    animated GIF / animated WebP / APNG — the browser animates a live
+     *             <img>, we blit its current frame into a canvas each tick,
+     *             so *any* animated format the browser knows just works.
+     *    video    mp4 / webm / mov / mkv … driven by THREE.VideoTexture.
+     * ==================================================================== */
+
+    // Off-screen (but still *rendered*, otherwise browsers pause animation)
+    // host for the live <img>/<video> elements that drive animated paints.
+    let localMediaHost = null;
+    function getLocalMediaHost(){
+        if(localMediaHost && localMediaHost.isConnected) return localMediaHost;
+        localMediaHost = document.createElement('div');
+        localMediaHost.id = 'local-paint-media-host';
+        localMediaHost.setAttribute('aria-hidden', 'true');
+        localMediaHost.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;'
+            + 'overflow:hidden;opacity:0.01;pointer-events:none;z-index:0;';
+        document.body.appendChild(localMediaHost);
+        return localMediaHost;
+    }
+
+    function isImageFile(f){ return (f.type && f.type.startsWith('image/')) || IMAGE_EXT_RE.test(f.name || ''); }
+    function isVideoFile(f){ return (f.type && f.type.startsWith('video/')) || VIDEO_EXT_RE.test(f.name || ''); }
+    function isMediaFile(f){ return isImageFile(f) || isVideoFile(f); }
+
+    // "MyPattern.final.PNG" -> "MyPattern.final"   (name = filename sans extension)
+    function fileStemAsPaintName(fileName){
+        const base = String(fileName || '').replace(/^.*[\\/]/, '');
+        const stem = base.replace(/\.[^.\s]+$/, '').trim();
+        return stem || base || 'Local paint';
+    }
+    function uniquePaintName(base){
+        if(!PAINTS_CATALOG[base]) return base;
+        let i = 2;
+        while(PAINTS_CATALOG[`${base} (${i})`]) i++;
+        return `${base} (${i})`;
+    }
+
+    // ---- Animation sniffing ------------------------------------------------
+    // Decide whether a still-image file actually contains multiple frames, so
+    // static photos take the cheap path and animations take the live path.
+    function asciiAt(b, off, len){
+        let s = '';
+        for(let i = 0; i < len; i++) s += String.fromCharCode(b[off + i] || 0);
+        return s;
+    }
+    function findAscii(b, needle, from, to){
+        const n = needle.length, end = Math.min(to, b.length) - n;
+        for(let i = from; i <= end; i++){
+            let ok = true;
+            for(let j = 0; j < n; j++){ if(b[i + j] !== needle.charCodeAt(j)){ ok = false; break; } }
+            if(ok) return i;
+        }
+        return -1;
+    }
+    // Walk GIF blocks and stop as soon as a 2nd image descriptor shows up.
+    function gifIsAnimated(b){
+        let p = 13;
+        const flags = b[10];
+        if(flags & 0x80) p += 3 * (1 << ((flags & 7) + 1));   // global colour table
+        let frames = 0;
+        const skipSubBlocks = () => { while(p < b.length){ const n = b[p++]; if(!n) break; p += n; } };
+        while(p < b.length){
+            const block = b[p++];
+            if(block === 0x3B) break;                          // trailer
+            if(block === 0x21){ p++; skipSubBlocks(); continue; } // extension
+            if(block === 0x2C){                                 // image descriptor
+                if(++frames > 1) return true;
+                p += 8;
+                const lf = b[p++];
+                if(lf & 0x80) p += 3 * (1 << ((lf & 7) + 1));   // local colour table
+                p++;                                            // LZW min code size
+                skipSubBlocks();
+                continue;
+            }
+            break;                                              // unknown -> bail out
+        }
+        return false;
+    }
+    async function sniffAnimatedImage(file){
+        try{
+            const cap = Math.min(file.size, 8 * 1024 * 1024);
+            const b = new Uint8Array(await file.slice(0, cap).arrayBuffer());
+            if(b.length < 16) return false;
+            // PNG signature -> APNG if an acTL chunk precedes the image data
+            if(b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47){
+                const idat = findAscii(b, 'IDAT', 8, b.length);
+                return findAscii(b, 'acTL', 8, idat > 0 ? idat : Math.min(b.length, 65536)) >= 0;
+            }
+            if(asciiAt(b, 0, 3) === 'GIF') return gifIsAnimated(b);
+            if(asciiAt(b, 0, 4) === 'RIFF' && asciiAt(b, 8, 4) === 'WEBP'){
+                // VP8X extended header carries an ANIMATION flag (bit 1)
+                if(asciiAt(b, 12, 4) === 'VP8X' && (b[20] & 0x02)) return true;
+                return findAscii(b, 'ANIM', 12, 512) >= 0;
+            }
+        }catch(e){ /* unreadable header -> treat as a still */ }
+        return false;
+    }
+
+    // ---- Texture sizing ----------------------------------------------------
+    // Accept literally any resolution: clamp to the GPU limit and, on the
+    // (rare) WebGL1 fallback, snap to power-of-two so REPEAT tiling is legal.
+    function nearestPOT(v){ return Math.max(1, Math.pow(2, Math.round(Math.log2(Math.max(1, v))))); }
+    function fitTextureSize(w, h){
+        const caps = renderer.capabilities;
+        const isGL2 = caps.isWebGL2 !== false;
+        const maxS = caps.maxTextureSize || 4096;
+        let tw = Math.max(1, Math.round(w) || 1), th = Math.max(1, Math.round(h) || 1);
+        if(!isGL2){ tw = nearestPOT(tw); th = nearestPOT(th); }
+        const big = Math.max(tw, th);
+        if(big > maxS){
+            const k = maxS / big;
+            tw = Math.max(1, Math.floor(tw * k));
+            th = Math.max(1, Math.floor(th * k));
+            if(!isGL2){ tw = nearestPOT(tw); th = nearestPOT(th); }
+        }
+        return { tw, th };
+    }
+
+    function decodeImageElement(url){
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('decode failed'));
+            img.src = url;
+        });
+    }
+
+    // ---- Builders for the three kinds -------------------------------------
+    // Decode a still image to a canvas-backed source.
+    //
+    // IMPORTANT — why everything is funnelled through a <canvas>:
+    // WebGL's UNPACK_FLIP_Y_WEBGL (which is how three.js implements
+    // `texture.flipY = true`) is specified to have NO EFFECT on an ImageBitmap
+    // source. So handing three.js a raw ImageBitmap yields a texture that is
+    // upside-down relative to every other source type — the camo appears
+    // flipped, and on mirrored UV islands that reads as a mirrored pattern.
+    // Painting the bitmap into a 2D canvas first gives a source that honours
+    // flipY normally, so local images line up with the official camouflages.
+    async function buildStaticLocalTexture(file, url){
+        let source = null, sw = 0, sh = 0, closeAfter = null;
+        // createImageBitmap covers the widest format range and honours EXIF.
+        if(typeof createImageBitmap === 'function'){
+            try{
+                source = await createImageBitmap(file, { imageOrientation: 'from-image', premultiplyAlpha: 'none' });
+                sw = source.width; sh = source.height;
+                closeAfter = source;
+            }catch(e){ source = null; }
+        }
+        if(!source){    // SVG and other exotics decode fine through <img>
+            const img = await decodeImageElement(url);
+            source = img;
+            sw = img.naturalWidth || img.width || 1;
+            sh = img.naturalHeight || img.height || 1;
+        }
+        const { tw, th } = fitTextureSize(sw, sh);
+        const cv = document.createElement('canvas');
+        cv.width = tw; cv.height = th;
+        const ctx = cv.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(source, 0, 0, tw, th);
+        if(closeAfter && closeAfter.close) closeAfter.close();
+        const tex = new THREE.CanvasTexture(cv);
+        setupTex(tex);
+        return { texture: tex, width: sw, height: sh, tick: null, media: null };
+    }
+
+    // Decode every frame up-front with WebCodecs. This is the reliable path:
+    // an <img> parked off-screen is frequently throttled or frozen outright by
+    // the browser (it only animates images it considers visible), and it gives
+    // no control over timing. ImageDecoder hands us exact frames + per-frame
+    // durations for GIF, animated WebP and APNG alike.
+    async function decodeAnimationFrames(file){
+        if(typeof ImageDecoder === 'undefined') return null;
+        const type = file.type || guessMimeFromName(file.name);
+        try{
+            if(ImageDecoder.isTypeSupported && !(await ImageDecoder.isTypeSupported(type))) return null;
+            const dec = new ImageDecoder({
+                data: await file.arrayBuffer(), type, preferAnimation: true
+            });
+            await dec.tracks.ready;
+            const track = dec.tracks.selectedTrack;
+            if(!track || !track.animated || track.frameCount < 2){ dec.close(); return null; }
+            // frameCount is only final once the whole stream is parsed.
+            try{ await dec.completed; }catch(e){}
+            const total = Math.min(dec.tracks.selectedTrack.frameCount || track.frameCount, 600);
+            const frames = [];
+            for(let i = 0; i < total; i++){
+                let res;
+                try{ res = await dec.decode({ frameIndex: i }); }
+                catch(e){ break; }
+                const img = res.image;
+                // duration is in microseconds; clamp out 0/absurd values.
+                let ms = (img.duration || 0) / 1000;
+                if(!isFinite(ms) || ms <= 0) ms = 100;
+                frames.push({ bitmap: img, duration: THREE.MathUtils.clamp(ms, 20, 10000) });
+            }
+            dec.close();
+            if(frames.length < 2){ frames.forEach(f => f.bitmap.close()); return null; }
+            return frames;
+        }catch(e){
+            return null;
+        }
+    }
+    function guessMimeFromName(n){
+        const e = String(n||'').toLowerCase().split('.').pop();
+        return ({ gif:'image/gif', webp:'image/webp', png:'image/png', apng:'image/png',
+                  avif:'image/avif', jpg:'image/jpeg', jpeg:'image/jpeg' })[e] || 'image/png';
+    }
+
+    async function buildAnimatedLocalTexture(file, url){
+        const frames = await decodeAnimationFrames(file);
+
+        // ---- Preferred path: real decoded frames, driven by our own clock ---
+        if(frames && frames.length > 1){
+            const first = frames[0].bitmap;
+            const sw = first.displayWidth || first.codedWidth || 1;
+            const sh = first.displayHeight || first.codedHeight || 1;
+            const { tw, th } = fitTextureSize(sw, sh);
+
+            const cv = document.createElement('canvas');
+            cv.width = tw; cv.height = th;
+            const ctx = cv.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(first, 0, 0, tw, th);
+
+            const tex = new THREE.CanvasTexture(cv);
+            setupTex(tex);
+            tex.generateMipmaps = false;            // too costly per frame
+            tex.minFilter = THREE.LinearFilter;
+
+            let idx = 0, acc = 0, prev = performance.now();
+            const tick = (now) => {
+                const dt = now - prev; prev = now;
+                // A backgrounded tab can hand us a huge delta; don't spin.
+                acc += Math.min(dt, 250);
+                let guard = 0;
+                while(acc >= frames[idx].duration && guard++ < frames.length){
+                    acc -= frames[idx].duration;
+                    idx = (idx + 1) % frames.length;
+                    ctx.clearRect(0, 0, tw, th);
+                    ctx.drawImage(frames[idx].bitmap, 0, 0, tw, th);
+                    tex.needsUpdate = true;
+                }
+            };
+            return {
+                texture: tex, width: sw, height: sh, tick, media: null,
+                frames, frameCount: frames.length,
+                dispose(){ frames.forEach(f => { try{ f.bitmap.close(); }catch(e){} }); }
+            };
+        }
+
+        // ---- Fallback: let the browser animate a live <img> -----------------
+        // Kept for engines without WebCodecs. The element must be on-screen-ish
+        // (1px, nearly transparent) or the animation may never start.
+        const img = await decodeImageElement(url);
+        const sw = img.naturalWidth || img.width || 1;
+        const sh = img.naturalHeight || img.height || 1;
+        const { tw, th } = fitTextureSize(sw, sh);
+        img.style.cssText = `position:absolute;left:0;top:0;width:${tw}px;height:${th}px;`;
+        getLocalMediaHost().appendChild(img);
+
+        const cv = document.createElement('canvas');
+        cv.width = tw; cv.height = th;
+        const ctx = cv.getContext('2d');
+        ctx.drawImage(img, 0, 0, tw, th);
+
+        const tex = new THREE.CanvasTexture(cv);
+        setupTex(tex);
+        tex.generateMipmaps = false;
+        tex.minFilter = THREE.LinearFilter;
+
+        let last = 0;
+        const tick = (now) => {                    // ~30 fps is plenty
+            if(now - last < 33) return;
+            last = now;
+            try{ ctx.clearRect(0, 0, tw, th); ctx.drawImage(img, 0, 0, tw, th); tex.needsUpdate = true; }catch(e){}
+        };
+        return { texture: tex, width: sw, height: sh, tick, media: img };
+    }
+
+    function buildVideoLocalTexture(url){
+        return new Promise((resolve, reject) => {
+            const v = document.createElement('video');
+            v.src = url;
+            v.loop = true;
+            v.muted = true;                 // muted is what makes autoplay legal
+            v.defaultMuted = true;
+            v.autoplay = true;
+            v.playsInline = true;
+            v.crossOrigin = 'anonymous';
+            v.preload = 'auto';
+            v.setAttribute('muted', '');
+            v.setAttribute('playsinline', '');
+            v.setAttribute('webkit-playsinline', '');
+            v.style.cssText = 'position:absolute;left:0;top:0;width:1px;height:1px;';
+            getLocalMediaHost().appendChild(v);
+
+            let settled = false;
+            const fail = () => { if(settled) return; settled = true; try{ v.remove(); }catch(e){} reject(new Error('video decode failed')); };
+            v.onerror = fail;
+            setTimeout(() => { if(!settled && !v.videoWidth) fail(); }, 20000);
+
+            v.onloadeddata = () => {
+                if(settled) return;
+                settled = true;
+                const sw = v.videoWidth || 1, sh = v.videoHeight || 1;
+                const tex = new THREE.VideoTexture(v);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                tex.generateMipmaps = false;
+                try{ tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); }catch(e){}
+                const p = v.play();
+                if(p && p.catch) p.catch(() => { pendingVideoResume.add(v); msg(T.dropVideoBlocked); });
+                resolve({ texture: tex, width: sw, height: sh, tick: null, media: v });
+            };
+            v.load();
+        });
+    }
+
+    // Browsers may still refuse muted autoplay; resume on the first gesture.
+    const pendingVideoResume = new Set();
+    function resumeBlockedVideos(){
+        if(!pendingVideoResume.size) return;
+        pendingVideoResume.forEach(v => { const p = v.play(); if(p && p.catch) p.catch(()=>{}); });
+        pendingVideoResume.clear();
+    }
+    ['pointerdown', 'keydown', 'touchstart'].forEach(ev =>
+        window.addEventListener(ev, resumeBlockedVideos, { passive: true }));
+
+    // ---- Registration ------------------------------------------------------
+    async function createLocalPaint(file){
+        const url = URL.createObjectURL(file);
+        let built, kind;
+        try{
+            if(isVideoFile(file)){
+                kind = 'video';
+                built = await buildVideoLocalTexture(url);
+            } else {
+                kind = (await sniffAnimatedImage(file)) ? 'animated' : 'static';
+                built = kind === 'animated'
+                    ? await buildAnimatedLocalTexture(file, url)
+                    : await buildStaticLocalTexture(file, url);
+            }
+        }catch(err){
+            URL.revokeObjectURL(url);
+            throw err;
+        }
+
+        const name = uniquePaintName(fileStemAsPaintName(file.name));
+        const tex = built.texture;
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(1, 1);
+        tex.offset.set(0, 0);
+        tex.name = name;
+
+        const rec = {
+            name, kind, url, file,
+            texture: tex,
+            width: built.width, height: built.height,
+            aspect: (built.width && built.height) ? (built.width / built.height) : 1,
+            tick: built.tick,
+            media: built.media,
+            frameCount: built.frameCount || 0,
+            dispose: built.dispose || null,
+            id: ++localPaintSeq
+        };
+        LOCAL_PAINTS.set(name, rec);
+
+        // A local paint masquerades as a normal catalog entry. isAnimated stays
+        // false on purpose: local animations update the texture *in place*
+        // instead of walking a sprite sheet, so the shader treats them as
+        // ordinary single-frame maps and no frame transform is needed.
+        PAINTS_CATALOG[name] = {
+            path: null, isLocal: true, localKind: kind,
+            isAnimated: false, frame: null,
+            hasTexture: true, hasFrameWebp: false, _leaf: null
+        };
+
+        // Ready-to-use paint entry, pre-seeded into the shared cache.
+        const entry = {
+            texture: tex, isAnimated: false, frame: null,
+            info: PAINTS_CATALOG[name], name,
+            isLocal: true, localKind: kind, aspect: rec.aspect,
+            scale: LOCAL_PAINT_DEFAULT_SCALE
+        };
+        paintCache.set(name, entry);
+        rec.entry = entry;
+        return rec;
+    }
+
+    // Entry point shared by the file button and the drag & drop overlay.
+    async function importLocalPaintFiles(fileList, autoSelect){
+        const files = Array.from(fileList || []).filter(isMediaFile);
+        if(!files.length){ msg(T.paintUnsupported); return []; }
+        const added = [];
+        for(const f of files){
+            try{
+                msg(`${T.paintLoading}: ${f.name}`);
+                const rec = await createLocalPaint(f);
+                added.push(rec.name);
+            }catch(err){
+                console.error('[local paint]', f.name, err);
+                msg(`${T.paintLoadFail}: ${f.name}`);
+            }
+        }
+        if(added.length){
+            refreshPaintGridIfOpen();
+            if(autoSelect !== false) selectPaint(added[added.length - 1]);
+            else renderPaintCurrent();
+        }
+        return added;
+    }
+    window.importLocalPaintFiles = importLocalPaintFiles;
+    // Read-only introspection helper (handy from the devtools console):
+    // what is applied right now, and where did it come from?
+    window.getCurrentPaint = () => ({
+        name: currentPaintName,
+        entry: currentPaintEntry,
+        scale: paintScaleMul,
+        enabled: !!visState.paint,
+        local: currentPaintName ? (LOCAL_PAINTS.get(currentPaintName) || null) : null
+    });
+
+    function removeLocalPaint(name){
+        const rec = LOCAL_PAINTS.get(name);
+        if(!rec) return;
+        if(currentPaintName === name) clearCurrentPaint();
+        LOCAL_PAINTS.delete(name);
+        delete PAINTS_CATALOG[name];
+        paintCache.delete(name);
+        try{ if(rec.texture) rec.texture.dispose(); }catch(e){}
+        try{ if(rec.dispose) rec.dispose(); }catch(e){}   // close decoded frames
+        if(rec.media){
+            pendingVideoResume.delete(rec.media);
+            try{ if(rec.media.pause) rec.media.pause(); }catch(e){}
+            try{ rec.media.removeAttribute('src'); if(rec.media.load) rec.media.load(); }catch(e){}
+            try{ rec.media.remove(); }catch(e){}
+        }
+        try{ URL.revokeObjectURL(rec.url); }catch(e){}
+        refreshPaintGridIfOpen();
+        renderPaintCurrent();
+        msg(T.paintRemoved);
+    }
+    window.removeLocalPaint = removeLocalPaint;
+
+    // Keep the live <img>/<video>-backed textures flowing (called from the
+    // main render loop through updatePaintAnimation).
+    function tickLocalPaints(){
+        if(!LOCAL_PAINTS.size) return;
+        const now = performance.now();
+        const activeName = currentPaintName;
+        for(const [name, rec] of LOCAL_PAINTS){
+            if(!rec.tick) continue;                       // video self-updates
+            // Only the applied paint has to reach the GPU every frame; the rest
+            // are just <img> thumbnails the browser animates for free.
+            if(name !== activeName || !visState.paint) continue;
+            rec.tick(now);
+        }
+    }
+
+    // Drop a live <img>/<video> preview into a thumbnail container.
+    function fillLocalThumb(container, rec, cls){
+        container.innerHTML = '';
+        container.style.backgroundImage = '';
+        let el;
+        if(rec.kind === 'video'){
+            el = document.createElement('video');
+            el.src = rec.url;
+            el.loop = true; el.muted = true; el.defaultMuted = true;
+            el.autoplay = true; el.playsInline = true; el.preload = 'auto';
+            el.setAttribute('muted', ''); el.setAttribute('playsinline', '');
+            const p = el.play(); if(p && p.catch) p.catch(() => pendingVideoResume.add(el));
+        } else {
+            el = document.createElement('img');
+            el.src = rec.url;
+            el.alt = rec.name;
+            el.decoding = 'async';
+        }
+        if(cls) el.className = cls;
+        container.appendChild(el);
+        return el;
+    }
+
+    function localTypeLabel(kind){
+        if(kind === 'video') return T.paintTypeLocalVideo;
+        if(kind === 'animated') return T.paintTypeLocalAnim;
+        return T.paintTypeLocalStatic;
+    }
+
+    function refreshPaintGridIfOpen(){
+        if(document.getElementById('paint-picker')?.classList.contains('show')){
+            renderPaintGrid(document.getElementById('paint-search')?.value || '', currentPaintFilter);
+        }
+    }
+
+    // ---- Pattern scale -----------------------------------------------------
+    // Purely a uniform tweak: no shader recompile, no material rebuild.
+    function setPaintScale(v){
+        if(!isFinite(v)) v = 1;
+        paintScaleMul = THREE.MathUtils.clamp(v, PAINT_SCALE_MIN, PAINT_SCALE_MAX);
+        window.paintScaleMul = paintScaleMul;
+        if(currentPaintEntry) currentPaintEntry.scale = paintScaleMul;
+        for(const mat of allPaintMats){
+            const base = mat.userData.paintBaseDensity;
+            if(!base) continue;
+            const d = THREE.MathUtils.clamp(base / paintScaleMul, 0.005, 256.0);
+            const asp = mat.userData.paintAspect || 1;
+            mat.userData.paintDensity = d;
+            const sh = mat.userData.shader;
+            if(sh && sh.uniforms && sh.uniforms.paintUvScale) sh.uniforms.paintUvScale.value.set(d, d * asp);
+        }
+        document.querySelectorAll('.paint-scale-row').forEach(r => {
+            const inp = r.querySelector('.paint-scale-input');
+            const val = r.querySelector('.paint-scale-val');
+            if(inp && document.activeElement !== inp) inp.value = String(paintScaleMul);
+            if(val) val.innerHTML = paintScaleMul.toFixed(2) + '&times;';
+        });
+    }
+    window.setPaintScale = setPaintScale;
+
+    /* ---- Drag & drop: anywhere on the page, including onto the model ---- */
+    (function setupPaintDragAndDrop(){
+        const overlay = document.getElementById('paint-drop-overlay');
+        if(!overlay) return;
+        const hintEl = document.getElementById('t-drop-hint');
+        let depth = 0, lastProbe = 0, overModel = false;
+
+        const hasFiles = (e) => {
+            const dt = e.dataTransfer;
+            if(!dt) return false;
+            if(dt.types && Array.from(dt.types).includes('Files')) return true;
+            return !!(dt.items && dt.items.length);
+        };
+        // Is the cursor over an actual tank part? Purely cosmetic - it only
+        // swaps the overlay's sub-title, the drop applies either way.
+        const probeModel = (e) => {
+            const now = performance.now();
+            if(now - lastProbe < 90) return;
+            lastProbe = now;
+            const x = (e.clientX / innerWidth) * 2 - 1;
+            const y = -(e.clientY / innerHeight) * 2 + 1;
+            partRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+            const groups = [slots.hull?.group, slots.turret?.group, slots.more?.group].filter(Boolean);
+            const hit = groups.length ? partRaycaster.intersectObjects(groups, true).some(h => h.object?.isMesh) : false;
+            if(hit !== overModel){
+                overModel = hit;
+                if(hintEl) hintEl.innerText = hit ? T.dropOnModel : T.dropTitle;
+                overlay.classList.toggle('over-model', hit);
+            }
+        };
+        const show = () => { overlay.classList.add('show'); };
+        const hide = () => { depth = 0; overlay.classList.remove('show'); };
+
+        window.addEventListener('dragenter', (e) => {
+            if(!hasFiles(e)) return;
+            e.preventDefault();
+            depth++;
+            show();
+        });
+        window.addEventListener('dragover', (e) => {
+            if(!hasFiles(e)) return;
+            e.preventDefault();
+            try{ e.dataTransfer.dropEffect = 'copy'; }catch(err){}
+            if(!overlay.classList.contains('show')) { depth = Math.max(depth, 1); show(); }
+            probeModel(e);
+        });
+        window.addEventListener('dragleave', (e) => {
+            if(!overlay.classList.contains('show')) return;
+            depth--;
+            if(depth <= 0 || (!e.relatedTarget && (e.clientX <= 0 || e.clientY <= 0
+                || e.clientX >= innerWidth || e.clientY >= innerHeight))) hide();
+        });
+        window.addEventListener('drop', async (e) => {
+            if(!hasFiles(e)) return;
+            e.preventDefault();
+            hide();
+            const dt = e.dataTransfer;
+            let files = Array.from(dt.files || []);
+            if(!files.length && dt.items){
+                files = Array.from(dt.items)
+                    .filter(i => i.kind === 'file')
+                    .map(i => i.getAsFile())
+                    .filter(Boolean);
+            }
+            if(!files.length) return;
+            await importLocalPaintFiles(files, true);
+        });
+        window.addEventListener('dragend', hide);
+        window.addEventListener('blur', hide);
+    })();
+
+    // The picker has no close button: picking a camouflage dismisses it, and
+    // Esc / the Android back gesture also back out (a history entry is pushed
+    // on open so the hardware Back key closes the sheet instead of the page).
+    function openPaintPicker(){
+        const el = document.getElementById('paint-picker');
+        if(!el || el.classList.contains('show')) return;
+        el.classList.add('show');
+        try{ history.pushState({ paintPicker: true }, ''); }catch{}
+        document.querySelectorAll('.paint-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', (btn.getAttribute('data-filter') || btn.dataset?.filter) === currentPaintFilter);
+        });
+        renderPaintGrid(document.getElementById('paint-search')?.value || '', currentPaintFilter);
+        // Bring the active pick into view so the current choice is obvious
+        requestAnimationFrame(()=>{
+            const sel = document.querySelector('.paint-item.selected');
+            if(sel) sel.scrollIntoView({ block:'center' });
+        });
+    }
+
+    function closePaintPicker(fromPopState){
+        const el = document.getElementById('paint-picker');
+        if(!el || !el.classList.contains('show')) return;
+        el.classList.remove('show');
+        if(!fromPopState && history.state && history.state.paintPicker){
+            try{ history.back(); }catch{}
+        }
+    }
+    window.addEventListener('popstate', ()=>{
+        if(document.getElementById('paint-picker')?.classList.contains('show')) closePaintPicker(true);
+    });
+
+    function renderPaintGrid(filterText='', typeFilter=currentPaintFilter){
+        currentPaintFilter = typeFilter; window.currentPaintFilter = currentPaintFilter;
+        const grid = document.getElementById('paint-grid');
+        if(!grid) return;
+
+        document.querySelectorAll('.paint-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', (btn.getAttribute('data-filter') || btn.dataset?.filter) === currentPaintFilter);
+        });
+
+        const search = (filterText||'').trim().toLowerCase();
+        const countEl = document.getElementById('paint-count');
+        let names = Object.keys(PAINTS_CATALOG);
+        // Local paints answer to their own tab, and are hidden from the
+        // static/animated tabs so the CDN library stays clean.
+        if(typeFilter==='local') names = names.filter(n=>PAINTS_CATALOG[n].isLocal);
+        else if(typeFilter==='static') names = names.filter(n=>!PAINTS_CATALOG[n].isLocal && !PAINTS_CATALOG[n].isAnimated);
+        else if(typeFilter==='animated') names = names.filter(n=>!PAINTS_CATALOG[n].isLocal && PAINTS_CATALOG[n].isAnimated);
+        if(search){
+            names = names.filter(n=>n.toLowerCase().includes(search));
+        }
+        names.sort((a,b)=>{
+            // Newest local imports first, then the alphabetical CDN library.
+            const la = LOCAL_PAINTS.get(a), lb = LOCAL_PAINTS.get(b);
+            if(la && lb) return lb.id - la.id;
+            if(la) return -1;
+            if(lb) return 1;
+            return a.localeCompare(b, userLang==='zh' ? 'zh' : 'en');
+        });
+        if(countEl) countEl.innerText = `${names.length}`;
+
+        grid.innerHTML = '';
+        activeGridAnimItems = [];
+        const frag = document.createDocumentFragment();
+        const now = performance.now();
+
+        // "Add local file" tile always leads the grid (except when searching).
+        if(!search){
+            const add = document.createElement('label');
+            add.className = 'paint-item paint-add-tile';
+            add.title = T.paintAddLocal;
+            add.innerHTML = `<span class="material-symbols-rounded">perm_media</span>
+                <span>${T.paintAddLocal}</span>
+                <input type="file" accept="image/*,video/*" multiple>`;
+            const inp = add.querySelector('input');
+            inp.addEventListener('change', async (e) => {
+                const files = Array.from(e.target.files || []);
+                e.target.value = '';
+                const added = await importLocalPaintFiles(files, true);
+                if(added.length) closePaintPicker();
+            });
+            frag.appendChild(add);
+        }
+
+        for(const name of names){
+            const localRec = LOCAL_PAINTS.get(name);
+            if(localRec){
+                const item = document.createElement('div');
+                item.className = 'paint-item local ' + localRec.kind;
+                if(name===currentPaintName) item.classList.add('selected');
+                item.dataset.name = name;
+
+                fillLocalThumb(item, localRec, localRec.kind === 'video' ? 'paint-thumb-video' : 'paint-thumb');
+
+                const badge = document.createElement('div');
+                badge.className='paint-badge';
+                badge.innerText = localRec.kind === 'video'
+                    ? (userLang==='zh' ? '视频' : 'VID')
+                    : (localRec.kind === 'animated' ? (userLang==='zh' ? '动图' : 'GIF')
+                                                    : (userLang==='zh' ? '本地' : 'IMG'));
+                item.appendChild(badge);
+
+                const del = document.createElement('button');
+                del.type='button'; del.className='paint-del'; del.title = T.paintRemove;
+                del.innerHTML = '<span class="material-symbols-rounded">delete</span>';
+                del.onclick = (e)=>{ e.stopPropagation(); removeLocalPaint(name); };
+                item.appendChild(del);
+
+                const nameEl = document.createElement('div');
+                nameEl.className='paint-name';
+                nameEl.innerText=name;
+                item.appendChild(nameEl);
+
+                item.onclick=()=>{ selectPaint(name); closePaintPicker(); };
+                frag.appendChild(item);
+                continue;
+            }
+            const info = PAINTS_CATALOG[name];
+            const item = document.createElement('div');
+            item.className = 'paint-item ' + (info.isAnimated ? 'animated' : 'static');
+            if(name===currentPaintName) item.classList.add('selected');
+            item.dataset.name = name;
+
+            const file = getPaintFileName(info);
+            const url = `${RES_BASE}/${info.path}/${file}`;
+
+            if (info.isAnimated && info.frame) {
+                const f = info.frame;
+                const cols = Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
+                const rows = Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
+                const totalFrames = f.numFrames || (cols * rows);
+
+                const thumb = document.createElement('div');
+                thumb.className = 'paint-thumb-anim';
+                thumb.style.backgroundImage = `url('${url}')`;
+                thumb.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+                thumb.style.backgroundPosition = `0% 0%`;
+                item.appendChild(thumb);
+
+                activeGridAnimItems.push({
+                    el: thumb,
+                    frame: f,
+                    cols,
+                    rows,
+                    totalFrames,
+                    startTime: now,
+                    lastFrame: -1
+                });
+            } else {
+                const img = document.createElement('img');
+                img.className='paint-thumb';
+                img.loading='lazy';
+                img.src=url;
+                img.alt=name;
+                img.onerror=()=>{ img.style.display='none'; item.style.background='#002233'; };
+                item.appendChild(img);
+            }
+
+            const badge = document.createElement('div');
+            badge.className='paint-badge';
+            badge.innerText = info.isAnimated ? (userLang==='zh' ? '动画' : 'ANI') : (userLang==='zh' ? '静态' : 'STA');
+            item.appendChild(badge);
+
+            if(userLang==='zh'){
+                const nameEl = document.createElement('div');
+                nameEl.className='paint-name';
+                nameEl.innerText=name;
+                item.appendChild(nameEl);
+            }
+
+            item.onclick=()=>{ selectPaint(name); closePaintPicker(); };
+            frag.appendChild(item);
+        }
+        grid.appendChild(frag);
+    }
+
+    window.openPaintPicker = openPaintPicker;
+    window.closePaintPicker = closePaintPicker;
+    window.renderPaintGrid = renderPaintGrid;
+    window.selectPaint = selectPaint;
+    window.clearCurrentPaint = clearCurrentPaint;
+
+
     function texStem(s) {
         if (!s) return '';
         return String(s).toLowerCase()
@@ -2555,6 +4685,7 @@ document.addEventListener('pointerdown', (e) => {
         groupMore.add(group);
         registerAnim(group);
         renderTextureNames(); // supply texture chips (if the model references any)
+        if(visState.paint && currentPaintEntry && group) applyPaintToGroup(group, currentPaintEntry);
         if (currentMode === 'more') fitCamera();
     }
 
@@ -2611,6 +4742,7 @@ document.addEventListener('pointerdown', (e) => {
         groupMore.add(group);
         registerAnim(group);
         renderTextureNames(); // drone texture chips (if the model references any)
+        if(visState.paint && currentPaintEntry && group) applyPaintToGroup(group, currentPaintEntry);
         if (currentMode === 'more') fitCamera();
     }
 
@@ -2650,9 +4782,20 @@ document.addEventListener('pointerdown', (e) => {
                     if (sw) sw.classList.add('active');
                 });
                 visState.grenade = false;
+                visState.paint = false;
                 document.getElementById('sw-grenade')?.classList.remove('active');
+                setPaintSwitches(false);
                 document.querySelector('.env-toggle')?.classList.remove('active');
                 document.getElementById('scene-sw')?.classList.remove('active');
+                currentPaintName = null;
+                currentPaintEntry = null;
+                paintAnimState = null;
+                // Imported local paints stay in the library (they are the
+                // user's own files) — only the active selection is dropped.
+                paintScaleMul = 1; window.paintScaleMul = 1;
+                allPaintMats.clear();
+                renderPaintCurrent();
+
                 ['hull','turret','scene'].forEach(t => { activeClips[t].clear(); renderAnimChips(t); });
                 mountPos = null;
                 setCameraMode('orbit');
@@ -2669,11 +4812,256 @@ document.addEventListener('pointerdown', (e) => {
         });
     };
 
+    /* ====================================================================== *
+     *  PAINT BAKING FOR EXPORT
+     *
+     *  The camouflage only exists inside an onBeforeCompile patch: the colour
+     *  you see is computed live from (lightmap x paint) with per-mesh UV
+     *  tiling and mirrored-island correction. GLTFExporter writes standard
+     *  glTF materials, so all of that would be silently dropped and the GLB
+     *  would come out plain.
+     *
+     *  So before exporting we re-run the exact same blend off-screen, once
+     *  per painted mesh, rasterised in UV space: render a full-screen quad
+     *  whose vertex positions ARE the mesh's UVs, sample the lightmap and the
+     *  paint with the mesh's own density/mirror flags, and read the result
+     *  back into a plain texture. That texture replaces `map` on a clean
+     *  MeshStandardMaterial, so any 3D app shows what the browser showed.
+     *
+     *  Animated paints (GIF / APNG / video) bake whichever frame is on screen
+     *  at the moment you hit export — glTF has no animated-texture concept.
+     * ====================================================================== */
+
+    // Rasterise UV space: gl_Position comes straight from the uv attribute,
+    // so every texel of the output IS that mesh's texture space.
+    const BAKE_VS = `
+        attribute vec2 uv;
+        attribute vec3 position;
+        attribute float mirrorFlag;
+        varying vec2 vUv;
+        varying float vMirror;
+        void main(){
+            vUv = uv;
+            vMirror = mirrorFlag;
+            // uv (0..1) -> clip space (-1..1)
+            gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
+        }`;
+
+    // Same maths as the live shader's customMapFragment, minus the lighting
+    // (the exported material keeps its own roughness/metalness response).
+    const BAKE_FS = `
+        precision highp float;
+        uniform sampler2D map;
+        uniform sampler2D paintMap;
+        uniform vec2 paintUvScale;
+        uniform vec2 paintFrameOffset;
+        uniform vec2 paintFrameScale;
+        uniform float paintUseFrameTransform;
+        uniform vec2 paintTexelSize;
+        uniform float hasMap;
+        varying vec2 vUv;
+        varying float vMirror;
+        void main(){
+            vec4 lightTex = hasMap > 0.5 ? texture2D(map, vUv) : vec4(1.0);
+            vec3 baseLightColor = lightTex.rgb;
+
+            vec2 camoBaseUv = vUv;
+            if(vMirror > 0.5) camoBaseUv.x = 1.0 - camoBaseUv.x;
+            vec2 tiledPaintUv = camoBaseUv * paintUvScale;
+            vec2 paintUv = tiledPaintUv;
+            if(paintUseFrameTransform > 0.5){
+                vec2 safeTiledUv = mix(paintTexelSize, vec2(1.0) - paintTexelSize, fract(tiledPaintUv / paintFrameScale));
+                paintUv = safeTiledUv * paintFrameScale + paintFrameOffset;
+            } else {
+                paintUv = fract(tiledPaintUv);
+            }
+
+            vec4 paintTex = texture2D(paintMap, paintUv);
+            vec3 paintColor = paintTex.rgb * 3.0;
+            float scuffingFactor = step(0.5, lightTex.r);
+            vec3 colorWithoutScuffing = 2.0 * paintColor * baseLightColor;
+            vec3 colorWithScuffing = 1.0 - 2.0 * (1.0 - baseLightColor) * (1.0 - paintColor);
+            vec3 blendedColor = mix(colorWithoutScuffing, colorWithScuffing, scuffingFactor);
+            float detailsAlpha = lightTex.a;
+            vec3 finalColor = mix(blendedColor, baseLightColor, detailsAlpha);
+            gl_FragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
+        }`;
+
+    // Pick a bake resolution that respects the source lightmap: no point
+    // baking a 256px part at 2K, and no point clipping a 2K part to 512.
+    function chooseBakeSize(mat){
+        const img = mat.map && mat.map.image;
+        let s = 1024;
+        if(img && img.width) s = Math.max(img.width, img.height);
+        s = Math.pow(2, Math.round(Math.log2(THREE.MathUtils.clamp(s, 256, 2048))));
+        const maxS = renderer.capabilities.maxTextureSize || 2048;
+        return Math.min(s, maxS);
+    }
+
+    // Bake one painted material into a flat colour texture.
+    function bakePaintedMaterial(mesh, mat, bakeScene, bakeCam){
+        const pe = mat.userData.paintEntry;
+        if(!pe || !pe.texture) return null;
+        const size = chooseBakeSize(mat);
+
+        const target = new THREE.WebGLRenderTarget(size, size, {
+            minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat, type: THREE.UnsignedByteType,
+            colorSpace: THREE.SRGBColorSpace, depthBuffer: false, stencilBuffer: false
+        });
+
+        const density = mat.userData.paintDensity || 1;
+        const aspect  = mat.userData.paintAspect  || 1;
+        const frame   = pe.frame;
+        const isAnim  = !!pe.isAnimated && !!frame;
+
+        // Reuse the *live* uniforms for animated sheets so the exported frame
+        // is exactly the one currently on screen.
+        const liveShader = mat.userData.shader;
+        const offset = (isAnim && liveShader?.uniforms?.paintFrameOffset)
+            ? liveShader.uniforms.paintFrameOffset.value.clone()
+            : new THREE.Vector2(0, 0);
+
+        const geom = new THREE.BufferGeometry();
+        const g = mesh.geometry;
+        geom.setAttribute('position', g.attributes.position);
+        geom.setAttribute('uv', g.attributes.uv);
+        geom.setAttribute('mirrorFlag', g.attributes.mirrorFlag
+            || new THREE.BufferAttribute(new Float32Array(g.attributes.position.count), 1));
+        if(g.index) geom.setIndex(g.index);
+
+        const bakeMat = new THREE.RawShaderMaterial({
+            vertexShader: BAKE_VS,
+            fragmentShader: BAKE_FS,
+            uniforms: {
+                map: { value: mat.map || null },
+                hasMap: { value: mat.map ? 1.0 : 0.0 },
+                paintMap: { value: pe.texture },
+                paintUvScale: { value: new THREE.Vector2(density, density * aspect) },
+                paintFrameOffset: { value: offset },
+                paintFrameScale: { value: isAnim
+                    ? new THREE.Vector2(frame.frameWidth / frame.imageWidth, frame.frameHeight / frame.imageHeight)
+                    : new THREE.Vector2(1, 1) },
+                paintUseFrameTransform: { value: isAnim ? 1.0 : 0.0 },
+                paintTexelSize: { value: isAnim
+                    ? new THREE.Vector2(2.0 / frame.imageWidth, 2.0 / frame.imageHeight)
+                    : new THREE.Vector2(0.5 / 256, 0.5 / 256) }
+            },
+            side: THREE.DoubleSide, depthTest: false, depthWrite: false
+        });
+
+        const quad = new THREE.Mesh(geom, bakeMat);
+        quad.frustumCulled = false;
+        bakeScene.add(quad);
+
+        const prevTarget = renderer.getRenderTarget();
+        renderer.setRenderTarget(target);
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear(true, false, false);
+        renderer.render(bakeScene, bakeCam);
+        renderer.setRenderTarget(prevTarget);
+
+        bakeScene.remove(quad);
+        bakeMat.dispose();
+        geom.dispose();
+
+        // Pull the pixels back so the result is a normal image the exporter
+        // can embed (a render target alone would not be serialised).
+        const buf = new Uint8Array(size * size * 4);
+        renderer.readRenderTargetPixels(target, 0, 0, size, size, buf);
+        target.dispose();
+
+        const cv = document.createElement('canvas');
+        cv.width = size; cv.height = size;
+        const ctx = cv.getContext('2d');
+        const imgData = ctx.createImageData(size, size);
+        // WebGL returns bottom-up rows; flip so the canvas reads top-down.
+        const rowBytes = size * 4;
+        for(let y = 0; y < size; y++){
+            const src = (size - 1 - y) * rowBytes;
+            imgData.data.set(buf.subarray(src, src + rowBytes), y * rowBytes);
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        const tex = new THREE.CanvasTexture(cv);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.flipY = true;
+        tex.name = (mat.name || mesh.name || 'part') + '_paint_baked';
+        tex.needsUpdate = true;
+        return tex;
+    }
+
+    // Swap every painted material for a plain one carrying the baked texture,
+    // returning an undo list so the live scene is restored afterwards.
+    function bakePaintForExport(root){
+        const restore = [];
+        if(!visState.paint || !currentPaintEntry) return restore;
+
+        const bakeScene = new THREE.Scene();
+        const bakeCam = new THREE.Camera();   // positions are already clip-space
+        let baked = 0, failed = 0;
+
+        root.traverse(o => {
+            if(!o.isMesh || !o.geometry) return;
+            if(!o.geometry.attributes.uv) return;
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            if(!mats.some(m => m && m.userData && m.userData.isPaintMat)) return;
+
+            const newMats = mats.map(m => {
+                if(!m || !m.userData || !m.userData.isPaintMat) return m;
+                let tex = null;
+                try{ tex = bakePaintedMaterial(o, m, bakeScene, bakeCam); }
+                catch(e){ console.error('[bake]', e); }
+                if(!tex){ failed++; return m; }
+                baked++;
+                // A clean standard material: no custom shader, no emissive
+                // double-up — just the baked colour plus the original surface
+                // response so it reads correctly in Blender / viewers.
+                const out = new THREE.MeshStandardMaterial({
+                    map: tex,
+                    color: 0xffffff,
+                    roughness: (m.roughness !== undefined ? m.roughness : 0.85),
+                    metalness: (m.metalness !== undefined ? m.metalness : 0.0),
+                    side: m.side,
+                    transparent: m.transparent,
+                    alphaTest: m.alphaTest,
+                    name: (m.name || 'paint') + '_baked'
+                });
+                out.userData.bakedTexture = tex;
+                return out;
+            });
+
+            restore.push({ mesh: o, material: o.material });
+            o.material = Array.isArray(o.material) ? newMats : newMats[0];
+        });
+
+        if(baked) console.log(`[export] baked ${baked} painted material(s)${failed ? `, ${failed} failed` : ''}`);
+        restore._baked = baked;
+        return restore;
+    }
+
+    function restoreAfterBake(restore){
+        for(const r of restore){
+            const cur = Array.isArray(r.mesh.material) ? r.mesh.material : [r.mesh.material];
+            cur.forEach(m => {
+                if(m && m.userData && m.userData.bakedTexture){
+                    try{ m.userData.bakedTexture.dispose(); }catch(e){}
+                    try{ m.dispose(); }catch(e){}
+                }
+            });
+            r.mesh.material = r.material;
+        }
+    }
+    window.bakePaintForExport = bakePaintForExport;
+    window.restoreAfterBake = restoreAfterBake;
+
     document.getElementById('btn-export').onclick = () => {
         const toExport = currentMode === 'normal' ? groupNormal : (currentMode === 'more' ? groupMore : groupAssembly);
         if(toExport.children.length === 0) { msg(T.emptyScene); return; }
-        
-        showDialog(T.exportTitle, T.exportDesc, false, T.btnConfirm, () => {
+
+        const willBake = !!(visState.paint && currentPaintEntry);
+        showDialog(T.exportTitle, willBake ? T.exportDescPaint : T.exportDesc, false, T.btnConfirm, () => {
             // 1. Before export: traverse and temporarily hide all attachment markers
             const markers = [];
             root.traverse(o => {
@@ -2683,25 +5071,45 @@ document.addEventListener('pointerdown', (e) => {
                 }
             });
 
-            const exporter = new GLTFExporter();
-            exporter.parse(root, (result) => {
-                // 2. On success: restore marker visibility
-                markers.forEach(m => m.visible = true);
+            // 1b. Bake the live camouflage into ordinary textures, otherwise
+            // the custom paint shader is lost and the GLB exports unpainted.
+            // Deferred one frame so the toast can actually paint first.
+            if (willBake) msg(T.exportBaking);
+            const runExport = () => {
+                let restore = [];
+                try {
+                    restore = willBake ? bakePaintForExport(root) : [];
+                } catch (e) {
+                    console.error('[export] bake failed', e);
+                    msg(T.exportBakeFail);
+                }
+                const cleanup = () => {
+                    try { restoreAfterBake(restore); } catch (e) { console.error(e); }
+                    markers.forEach(m => m.visible = true);
+                };
 
-                const blob = new Blob([result], { type: 'application/octet-stream' }); 
-                const link = document.createElement('a'); 
-                link.href = URL.createObjectURL(blob); 
-                // Append raw timestamp to filename
-                link.download = `tanki_model_${Date.now()}.glb`; 
-                link.click(); 
-                msg(T.export + " OK"); 
-            }, (err) => { 
-                // 3. On error: restore marker visibility
-                markers.forEach(m => m.visible = true);
-                
-                console.error(err); 
-                msg(String(err.message || err)); 
-            }, { binary: true, onlyVisible: true });
+                const exporter = new GLTFExporter();
+                exporter.parse(root, (result) => {
+                    // 2. On success: restore the live scene
+                    cleanup();
+
+                    const blob = new Blob([result], { type: 'application/octet-stream' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    // Append raw timestamp to filename
+                    link.download = `tanki_model_${Date.now()}.glb`;
+                    link.click();
+                    msg(T.export + " OK");
+                }, (err) => {
+                    // 3. On error: restore the live scene
+                    cleanup();
+
+                    console.error(err);
+                    msg(String(err.message || err));
+                }, { binary: true, onlyVisible: true });
+            };
+            if (willBake) requestAnimationFrame(() => requestAnimationFrame(runExport));
+            else runExport();
         });
     };
 
@@ -2948,6 +5356,12 @@ document.addEventListener('pointerdown', (e) => {
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
         applyTypeVisibility(type); // keep the card switch state across reloads
         fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames();
+        
+        // Auto-reapply active camouflage when equipping a new skin or model
+        if (visState.paint && currentPaintEntry) {
+            applyPaintToGroup(grp, currentPaintEntry);
+        }
+
         // Grenades ride the turret — re-mount them on the replacement model's fmnt
         if(type==='turret') attachGrenadesToTurret();
     }
@@ -3036,6 +5450,9 @@ document.addEventListener('pointerdown', (e) => {
             clone.position.set(0, 0, 0);
             clone.quaternion.identity();
             clone.scale.set(1, 1, 1);
+            if (visState.paint && currentPaintEntry) {
+                applyPaintToGroup(clone, currentPaintEntry);
+            }
             f.add(clone);
         }
         applyTypeVisibility('grenade'); // respect the grenade switch on (re)mount
@@ -3214,4 +5631,34 @@ document.addEventListener('pointerdown', (e) => {
         return grp;
     }
     </script>
+
+    <!-- Fullscreen Paint Picker -->
+    <div id="paint-picker">
+        <div id="paint-picker-header">
+            <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                <input id="paint-search" type="text" placeholder="搜索迷彩..." />
+                <div id="paint-count" style="font-size:12px; color:#BFD5FF; white-space:nowrap;"></div>
+                <button id="paint-picker-close" class="action-btn" type="button" title="Close" style="flex-shrink:0;">
+    <span class="material-symbols-rounded">close</span>
+</button>
+            </div>
+            <div id="paint-tabs">
+                <button class="paint-tab-btn active" data-filter="all" id="t-paint-tab-all">全部</button>
+                <button class="paint-tab-btn" data-filter="static" id="t-paint-tab-static">静态</button>
+                <button class="paint-tab-btn" data-filter="animated" id="t-paint-tab-anim">动画</button>
+                <button class="paint-tab-btn" data-filter="local" id="t-paint-tab-local">本地</button>
+            </div>
+        </div>
+        <div id="paint-grid"></div>
+    </div>
+
+    <!-- Drag & drop an image/video anywhere (incl. straight onto the model) -->
+    <div id="paint-drop-overlay">
+        <div class="drop-card">
+            <div class="drop-icon"><span class="material-symbols-rounded">imagesmode</span></div>
+            <div class="drop-title" id="t-drop-title">Drop to apply as paint</div>
+            <div class="drop-hint" id="t-drop-hint">Release: paint it onto the tank</div>
+            <div class="drop-sub" id="t-drop-sub">PNG / JPG / WEBP / BMP / GIF / animated WEBP / APNG, plus MP4 / WEBM video</div>
+        </div>
+    </div>
 </html>
