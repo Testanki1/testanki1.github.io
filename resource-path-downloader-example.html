@@ -25,50 +25,50 @@
 <script>
 const host = "https://res.3dtank.com/";
 
-const dirs = [
+const resources = [
     // Libraries
-    "553/105167/27/302/30546776460526/",
-    "570/174542/371/71/31167243462337/",
+    { id: 1561396189122, version: 1697451237718 },
+    { id: 1619091716409, version: 1734001714399 },
     
     // Sandbox REMASTER MM
-    "570/174542/371/60/31656237623505/",
-    "570/174542/371/64/31656237623467/",
-    "570/174542/371/65/31656237623460/",
-    "570/174542/371/61/31656237623514/",
-    "570/174542/371/66/31656237623464/",
-    "570/174542/371/62/31656237623520/",
-    "0/1/304/263/31656237623476/",
+    { id: 1619091716400, version: 1775742428997 },
+    { id: 1619091716404, version: 1775742428983 },
+    { id: 1619091716405, version: 1775742428976 },
+    { id: 1619091716401, version: 1775742429004 },
+    { id: 1619091716406, version: 1775742428980 },
+    { id: 1619091716402, version: 1775742429008 },
+    { id: 115891,          version: 1775742428990 },
     
     // Forest REMASTER MM
-    "0/16723/204/372/31656237623200/",
-    "0/16723/204/143/31656237623216/",
-    "0/16723/204/144/31656237623222/",
+    { id: 500401402,       version: 1775742428800 },
+    { id: 500401251,       version: 1775742428814 },
+    { id: 500401252,       version: 1775742428818 },
     
     // Sandal REMASTER MM
-    "544/77313/263/311/31656237623450/",
-    "544/77313/263/312/31656237623442/",
-    "544/77313/263/313/31656237623432/",
-    "544/77313/263/314/31656237623436/",
+    { id: 1531135636425,   version: 1775742428968 },
+    { id: 1531135636426,   version: 1775742428962 },
+    { id: 1531135636427,   version: 1775742428954 },
+    { id: 1531135636428,   version: 1775742428958 },
     
     // New Year REMASTER
-    "570/174542/371/72/31656237624047/",
+    { id: 1619091716410,   version: 1775742429223 },
     
     // Highland REMASTER MM
-    "570/174542/371/116/31656237623240/",
-    "570/174542/371/160/31656237625001/",
-    "570/174542/371/121/31656237623231/",
-    "570/174542/371/124/31656237623250/",
+    { id: 1619091716430,   version: 1775742428832 },
+    { id: 1619091716464,   version: 1775742429697 },
+    { id: 1619091716433,   version: 1775742428825 },
+    { id: 1619091716436,   version: 1775742428840 },
     
     // Cross REMASTER MM
-    "570/174542/371/130/31656237623152/",
-    "570/174542/371/146/31656237623143/",
-    "570/174542/371/133/31656237623140/",
-    "570/174542/371/136/31656237623161/",
+    { id: 1619091716440,   version: 1775742428778 },
+    { id: 1619091716454,   version: 1775742428771 },
+    { id: 1619091716443,   version: 1775742428768 },
+    { id: 1619091716446,   version: 1775742428785 },
     
     // Parma REMASTER MM
-    "570/174542/371/104/31656237623400/",
-    "570/174542/371/107/31656237623367/",
-    "570/174542/371/112/31656237623407/"
+    { id: 1619091716420,   version: 1775742428928 },
+    { id: 1619091716423,   version: 1775742428919 },
+    { id: 1619091716426,   version: 1775742428935 }
 ];
 
 const el = document.getElementById("p");
@@ -82,37 +82,28 @@ function update() {
     el.innerText = `${d} MB / ${t} MB (${pct}%)`;
 }
 
-function parsePath(str) {
-    try {
-        const p = str.split('/').filter(x => x);
-        if (p.length !== 5) return { folder: str, date: new Date() };
-        
-        const v = p.map(x => BigInt("0o" + x));
-        const id = (v[0] << 32n) | (v[1] << 16n) | (v[2] << 8n) | v[3];
-        
-        const tsNumber = Number(v[4]);
+function buildPath(id, version) {
+    const v0 = Math.floor(id / 4294967296).toString(8);
+    const v1 = (Math.floor(id / 65536) % 65536).toString(8);
+    const v2 = (Math.floor(id / 256) % 256).toString(8);
+    const v3 = (id % 256).toString(8);
+    const v4 = version.toString(8);
 
-        return {
-            folder: `${id}_${tsNumber}`,
-            date: new Date(tsNumber) 
-        };
-    } catch {
-        return { folder: str, date: new Date() };
-    }
+    return `${v0}/${v1}/${v2}/${v3}/${v4}/`;
 }
 
 async function run() {
     const zipWriter = new zip.ZipWriter(new zip.BlobWriter("application/zip"));
     const q = [];
 
-    const metaPromises = dirs.map(async (d) => {
+    const metaPromises = resources.map(async (item) => {
         try {
+            const d = buildPath(item.id, item.version);
+            const folderName = `${item.id}_${item.version}`;
+            const itemDate = new Date(item.version);
+
             const res = await fetch(host + d + "meta.info");
             if (!res.ok) return;
-            
-            const parsed = parsePath(d);
-            const folderName = parsed.folder;
-            const itemDate = parsed.date;
 
             await zipWriter.add(folderName + "/", null, { directory: true, lastModDate: itemDate });
 
