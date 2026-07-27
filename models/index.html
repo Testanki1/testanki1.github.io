@@ -461,7 +461,7 @@
         #paint-tabs { display:flex; gap:8px; width:100%; background:rgba(0,54,80,0.5); padding:4px; border-radius:100px; border:1px solid #004466; box-sizing:border-box; }
         .paint-tab-btn { flex:1; text-align:center; padding:8px 12px; border-radius:100px; border:1px solid transparent; background:transparent; color:#BFD5FF; cursor:pointer; font-size:13px; transition:all 0.2s; white-space:nowrap; }
         .paint-tab-btn.active { background:rgba(118,255,51,0.15); color:#76FF33; border-color:#76FF33; font-weight:600; }
-        #paint-grid { flex:1; overflow-y:auto; padding:16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(110px,1fr)); grid-auto-rows:max-content; gap:12px; align-content:start; }
+        #paint-grid { flex:1; overflow-y:scroll; padding:16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(110px,1fr)); grid-auto-rows:max-content; gap:12px; align-content:start; }
         .paint-item { width:100%; aspect-ratio:1; min-height:110px; border-radius:12px; overflow:hidden; position:relative; cursor:pointer; border:2px solid transparent; background:#003650; box-sizing:border-box; }
         .paint-item.selected { border-color: var(--paint); box-shadow: 0 0 12px rgba(255, 204, 0, 0.4); }
         .paint-item .paint-thumb { width:100%; height:100%; object-fit:cover; display:block; }
@@ -815,11 +815,6 @@
                 </div>
             </div>
 
-
-            <!-- Paint Card (injected by buildPaintCards) -->
-            <div class="paint-card-slot" data-panel="assembly"></div>
-
-
             <!-- Grenade Card (mounted on turret "fmnt" attach point) -->
             <div class="m3-card" id="card-grenade">
                 <div class="card-title" style="color:var(--grenade)">
@@ -834,7 +829,8 @@
                     <div id="box-grenade"><select id="sel-grenade-name" class="native-select-hidden"></select></div>
                 </div>
             </div>
-
+            <!-- Paint Card (injected by buildPaintCards) -->
+            <div class="paint-card-slot" data-panel="assembly"></div>
             <!-- Environment Toggle -->
 <div class="env-toggle" onclick="toggleScene()">
     <div class="env-label" id="t-env-label">Show Environment</div>
@@ -2369,25 +2365,11 @@ document.addEventListener('pointerdown', (e) => {
 
             // ---- Local image / video paint ----------------------------------
             if (localRec) {
-                typeEl.innerText = localTypeLabel(localRec.kind)
-                    + (localRec.width ? ` · ${localRec.width}×${localRec.height}` : '');
-                const chip = document.createElement('span');
-                chip.className = 'paint-local-chip';
-                chip.innerHTML = `<span class="material-symbols-rounded">${
-                    localRec.kind === 'video' ? 'movie' : (localRec.kind === 'animated' ? 'gif_box' : 'image')
-                }</span>${T.paintLocal}`;
-                typeRow.appendChild(chip);
-
-                const del = document.createElement('button');
-                del.type = 'button';
-                del.className = 'paint-remove-btn';
-                del.title = T.paintRemove;
-                del.innerHTML = '<span class="material-symbols-rounded">close</span>';
-                del.addEventListener('click', (e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    removeLocalPaint(currentPaintName);
-                });
-                row.insertBefore(del, row.querySelector('.paint-current-chevron'));
+                // 判断是否为视频或动图
+                const isLocalAnim = (localRec.kind === 'video' || localRec.kind === 'animated');
+                
+                // 仅显示“动态迷彩”或“静态迷彩”，去掉分辨率
+                typeEl.innerText = isLocalAnim ? T.paintTypeAnimated : T.paintTypeStatic;
 
                 // Live <img>/<video> preview — the browser animates it for free.
                 const existing = thumb.querySelector('img, video');
@@ -5881,4 +5863,4 @@ document.addEventListener('pointerdown', (e) => {
             <div class="drop-sub" id="t-drop-sub">PNG / JPG / WEBP / BMP / GIF / animated WEBP / APNG, plus MP4 / WEBM video</div>
         </div>
     </div>
-<</html>
+</html>
