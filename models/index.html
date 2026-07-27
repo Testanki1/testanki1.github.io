@@ -486,9 +486,9 @@
         .paint-current.empty .paint-preview-name { color:#BFD5FF; }
         .paint-current .paint-current-chevron { color:var(--paint); flex:0 0 auto; opacity:0.8; }
         .paint-cat-icon { flex:0 0 auto; }
-        /* 迷彩选择界面 交互特效 (无变暗效果，边框使用 #BFD5FF) */
+        /* Paint picker interactions: no darkening; hover border uses #BFD5FF. */
 
-/* 1. 迷彩网格卡片 (.paint-item) 悬停边框高亮 */
+/* 1. Highlight the paint-grid card border on hover. */
 .paint-item {
     transition: border-color 0.18s, box-shadow 0.18s;
 }
@@ -497,9 +497,9 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 10px rgba(191, 213, 255, 0.3);
     z-index: 2;
 }
-/* 已完全移除点击时的变暗（.paint-item:active）动画 */
+/* The darkening effect on .paint-item:active is intentionally removed. */
 
-/* 2. 标签切换按钮 (.paint-tab-btn) 背景色高亮 */
+/* 2. Highlight paint-filter tabs with a background color. */
 .paint-tab-btn {
     transition: background-color 0.18s, color 0.18s, border-color 0.18s;
 }
@@ -516,8 +516,8 @@
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 #paint-picker-close:hover {
-    background: var(--md-state-hover);             /* 中性高亮：rgba(191, 213, 255, 0.1) */
-    border-color: var(--md-sys-color-outline);      /* 淡蓝边框：#BFD5FF */
+    background: var(--md-state-hover);             /* Neutral hover highlight. */
+    border-color: var(--md-sys-color-outline);      /* Light-blue border. */
     color: var(--md-sys-color-on-surface);
     transform: none;
 }
@@ -551,7 +551,7 @@
     color: #ffffff;
 }
 .paint-tab-btn.active {
-    background: var(--md-sys-color-primary-container);  /* 动感主色高亮容器 */
+    background: var(--md-sys-color-primary-container);  /* Primary-color active container. */
     color: var(--tanki-green);
     border-color: var(--tanki-green);
     font-weight: 600;
@@ -569,7 +569,7 @@
     box-shadow: 0 0 10px rgba(0, 212, 255, 0.35);
 }
 
-/* ==================== 本地图片 / 视频迷彩 ==================== */
+/* ==================== Local image / video paints ==================== */
 
 /* Row that holds the "current paint" entry + the local-file button */
 .paint-current-row { display:flex; align-items:stretch; gap:8px; }
@@ -1150,8 +1150,8 @@ if (pCls) pCls.title = T.btnClose;
             const resp = await fetch(url); if (!resp.ok) throw "Icon 404";
             let text = await resp.text(); text = text.replace(/<\?xml.*?\?>/g, '').replace(/<!DOCTYPE.*?>/g, '');
             
-            // 如果 keepOriginalColor 为 false，才强制把颜色替换为 currentColor（如底盘/炮塔）
-            // 如果为 true，则完整保留 SVG 内部原本的所有 fill / stroke 颜色
+            // Only force all colors to currentColor (for hull/turret icons) when keepOriginalColor is false.
+            // When true, retain every original SVG fill and stroke color.
             if (!keepOriginalColor) {
                 text = text.replace(/fill="(?!(none|currentColor))[^"]*"/gi, 'fill="currentColor"');
                 if (!text.includes('fill="currentColor"') && !text.includes('fill="none"')) { text = text.replace('<svg', '<svg fill="currentColor"'); }
@@ -2365,10 +2365,10 @@ document.addEventListener('pointerdown', (e) => {
 
             // ---- Local image / video paint ----------------------------------
             if (localRec) {
-                // 判断是否为视频或动图
+                // Determine whether this source is video or animated media.
                 const isLocalAnim = (localRec.kind === 'video' || localRec.kind === 'animated');
                 
-                // 仅显示“动态迷彩”或“静态迷彩”，去掉分辨率
+                // Show only the animated/static paint type; omit resolution.
                 typeEl.innerText = isLocalAnim ? T.paintTypeAnimated : T.paintTypeStatic;
 
                 // Live <img>/<video> preview — the browser animates it for free.
@@ -2561,6 +2561,9 @@ document.addEventListener('pointerdown', (e) => {
     let recordCanvas = null;
     let recordRenderer = null;
     let recordCamera = null;
+    let recordingVideoTrack = null;
+    let recordingStartedAt = 0;
+    let recordingStoppedAt = 0;
     let isRecordingHighRes = false;
 
     function getRecordMimeType() {
@@ -2611,8 +2614,90 @@ document.addEventListener('pointerdown', (e) => {
         recordCamera.aspect = RECORD_WIDTH / RECORD_HEIGHT;
         recordCamera.updateProjectionMatrix();
         recordRenderer.render(scene, recordCamera);
+        // captureStream(0) only receives frames explicitly requested.  This
+        // ties WebM timestamps to the render loop rather than to the monitor's
+        // refresh rate, avoiding files whose displayed duration and seek bar
+        // disagree after the tab/device drops frames.
+        if (recordingVideoTrack && typeof recordingVideoTrack.requestFrame === 'function') {
+            recordingVideoTrack.requestFrame();
+        }
     }
     window.__renderRecordingFrame = renderRecordingFrame;
+
+    // Some MediaRecorder implementations write WebM clusters but omit the
+    // Segment/Info Duration field. Players can play such a file, but report an
+    // infinite/zero duration, so their progress bar cannot seek. Add or update
+    // that metadata using the real elapsed recording time before download.
+    function readEbmlVint(bytes, at, forId = false) {
+        if (at >= bytes.length) return null;
+        const first = bytes[at];
+        let width = 1, mask = 0x80;
+        while (width <= 8 && !(first & mask)) { width++; mask >>= 1; }
+        if (width > 8 || at + width > bytes.length) return null;
+        let value = forId ? first : (first & (mask - 1));
+        for (let i = 1; i < width; i++) value = value * 256 + bytes[at + i];
+        return { width, value, dataStart: at + width };
+    }
+    function writeEbmlVint(value, width) {
+        const out = new Uint8Array(width);
+        for (let i = width - 1; i >= 0; i--) { out[i] = value & 255; value = Math.floor(value / 256); }
+        out[0] |= 1 << (8 - width);
+        return out;
+    }
+    function concatBytes(parts) {
+        const total = parts.reduce((n, p) => n + p.length, 0);
+        const out = new Uint8Array(total); let offset = 0;
+        parts.forEach(p => { out.set(p, offset); offset += p.length; });
+        return out;
+    }
+    async function fixWebmDuration(blob, durationMs) {
+        if (!/video\/webm/i.test(blob.type)) return blob;
+        try {
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            // Find the Segment (18538067) and then its Info element (1549A966).
+            let segment = -1;
+            for (let i = 0; i + 4 <= bytes.length; i++) {
+                if (bytes[i] === 0x18 && bytes[i+1] === 0x53 && bytes[i+2] === 0x80 && bytes[i+3] === 0x67) { segment = i; break; }
+            }
+            if (segment < 0) return blob;
+            const segSize = readEbmlVint(bytes, segment + 4);
+            if (!segSize) return blob;
+            const segEnd = Math.min(bytes.length, segSize.dataStart + segSize.value);
+            let pos = segSize.dataStart, info = null;
+            while (pos + 2 < segEnd) {
+                const id = readEbmlVint(bytes, pos, true); if (!id) break;
+                const size = readEbmlVint(bytes, id.dataStart); if (!size) break;
+                const end = Math.min(segEnd, size.dataStart + size.value);
+                if (id.value === 0x1549A966) { info = { start: pos, id, size, end }; break; }
+                if (end <= pos) break; pos = end;
+            }
+            if (!info) return blob;
+            const durationData = new Uint8Array(8);
+            new DataView(durationData.buffer).setFloat64(0, Math.max(1, durationMs), false);
+            const durationElement = concatBytes([new Uint8Array([0x44, 0x89, 0x88]), durationData]);
+            let child = info.size.dataStart, oldDuration = null;
+            while (child + 2 < info.end) {
+                const id = readEbmlVint(bytes, child, true); if (!id) break;
+                const size = readEbmlVint(bytes, id.dataStart); if (!size) break;
+                const end = Math.min(info.end, size.dataStart + size.value);
+                if (id.value === 0x4489) { oldDuration = { start: child, end }; break; }
+                if (end <= child) break; child = end;
+            }
+            const payload = oldDuration
+                ? concatBytes([bytes.slice(info.size.dataStart, oldDuration.start), durationElement, bytes.slice(oldDuration.end, info.end)])
+                : concatBytes([bytes.slice(info.size.dataStart, info.end), durationElement]);
+            // Info's size VINT has enough room in browser-generated WebM. If it
+            // does not, leave the original intact rather than corrupting it.
+            const max = Math.pow(2, 7 * info.size.width) - 2;
+            if (payload.length > max) return blob;
+            const rewrittenInfo = concatBytes([bytes.slice(info.start, info.id.dataStart), writeEbmlVint(payload.length, info.size.width), payload]);
+            const out = concatBytes([bytes.slice(0, info.start), rewrittenInfo, bytes.slice(info.end)]);
+            return new Blob([out], { type: blob.type });
+        } catch (err) {
+            console.warn('Could not add WebM duration metadata:', err);
+            return blob; // Download remains usable even on an unusual container.
+        }
+    }
 
     function setRecordingUI(isRecording) {
         const btn = document.getElementById('btn-rec');
@@ -2629,11 +2714,13 @@ document.addEventListener('pointerdown', (e) => {
             recordingStream = null;
         }
         isRecordingHighRes = false;
+        recordingVideoTrack = null;
         setRecordingUI(false);
     }
 
     function stopCanvasRecording() {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            recordingStoppedAt = performance.now();
             mediaRecorder.stop();
         }
     }
@@ -2657,11 +2744,23 @@ document.addEventListener('pointerdown', (e) => {
         try {
             ensureRecordingRenderer();
             recordingChunks = [];
+            // Manual frame capture prevents the stream clock from advancing
+            // without a rendered video frame (the source of broken seek bars).
+            recordingStream = recordCanvas.captureStream(0);
+            recordingVideoTrack = recordingStream.getVideoTracks()[0] || null;
+            // Older implementations do not expose requestFrame(); retain a
+            // conventional FPS stream there instead of producing an empty file.
+            if (!recordingVideoTrack || typeof recordingVideoTrack.requestFrame !== 'function') {
+                recordingStream.getTracks().forEach(track => track.stop());
+                recordingStream = recordCanvas.captureStream(RECORD_FPS);
+                recordingVideoTrack = null;
+            }
             isRecordingHighRes = true;
-            renderRecordingFrame();
-            recordingStream = recordCanvas.captureStream(RECORD_FPS);
+            recordingStartedAt = performance.now();
+            recordingStoppedAt = 0;
             const mimeType = getRecordMimeType();
             mediaRecorder = createMediaRecorder(recordingStream, mimeType);
+            renderRecordingFrame();
 
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) recordingChunks.push(event.data);
@@ -2673,9 +2772,11 @@ document.addEventListener('pointerdown', (e) => {
                 cleanupRecordingStream();
             };
 
-            mediaRecorder.onstop = () => {
-                const type = mediaRecorder?.mimeType || mimeType || 'video/webm';
-                const blob = new Blob(recordingChunks, { type });
+            const recorder = mediaRecorder;
+            mediaRecorder.onstop = async () => {
+                const type = recorder.mimeType || mimeType || 'video/webm';
+                let blob = new Blob(recordingChunks, { type });
+                const elapsedMs = Math.max(1, (recordingStoppedAt || performance.now()) - recordingStartedAt);
                 recordingChunks = [];
                 mediaRecorder = null;
                 cleanupRecordingStream();
@@ -2684,6 +2785,7 @@ document.addEventListener('pointerdown', (e) => {
                     msg(T.recordingFailed);
                     return;
                 }
+                blob = await fixWebmDuration(blob, elapsedMs);
 
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
@@ -2694,7 +2796,9 @@ document.addEventListener('pointerdown', (e) => {
                 msg(T.recordingSaved);
             };
 
-            mediaRecorder.start(1000);
+            // A single finalized container is less error-prone than a chain
+            // of one-second fragments, especially in Chromium's WebM writer.
+            mediaRecorder.start();
             setRecordingUI(true);
             msg(T.recordingStart);
         } catch (e) {
@@ -2807,20 +2911,20 @@ document.addEventListener('pointerdown', (e) => {
 
         for (const item of items) {
             const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; 
-            // 1. 不再把 supply 当作纯文本按钮 (移除 'supply')
+            // 1. Do not treat supply as a plain text button (remove 'supply').
             if (type === 'env' || type === 'grenade' || type === 'drone') btn.classList.add('text-btn'); 
             btn.title = item.label;
             if (item.value === currentVal) { btn.classList.add('selected'); selText.innerText = item.label; }
 
             // Load SVG for 'model' and 'supply' using IconLoader.getEquipmentIcon
             if (type === 'model' || type === 'supply') {
-                const keepRawColor = (type === 'supply'); // 道具箱保留 SVG 原生彩色
+                const keepRawColor = (type === 'supply'); // Preserve the supply box SVG's native colors.
                 IconLoader.getEquipmentIcon(item.value, keepRawColor).then(svg => {
                     if (svg) {
                         btn.innerHTML = svg;
                     } else {
                         btn.innerText = item.label;
-                        btn.classList.add('text-btn'); // 降级处理
+                        btn.classList.add('text-btn'); // Fallback behavior.
                     }
                 });
             } else if (type === 'skin') { 
@@ -2837,7 +2941,7 @@ document.addEventListener('pointerdown', (e) => {
             }
 
             btn.onclick = () => {
-                // 如果在“更多”面板中，点击当前卡片时，清除其他卡片里的选中样式
+                // In the More panel, selecting this card clears selections in the other cards.
                 const card = btn.closest('.m3-card');
                 const panelMore = btn.closest('#panel-more');
                 if (panelMore && card) {
@@ -3148,30 +3252,30 @@ document.addEventListener('pointerdown', (e) => {
             texWidth = paintEntry.texture.image.width;
         }
         texWidth = Math.max(1, texWidth);
-        // 废弃根据贴图分辨率强行缩放图案的错误逻辑，直接使用标准物理基准
+        // Do not derive pattern scale from texture resolution; use the standard physical baseline.
     const tileWorld = PAINT_BASE_TILE; 
 
     let autoDensity;
     if (worldUnitsPerUV && isFinite(worldUnitsPerUV) && worldUnitsPerUV > 1e-6) {
         autoDensity = worldUnitsPerUV / tileWorld;
     } else {
-        // 降级情况直接给默认平铺 2 次即可，不需要用像素反推
+        // Fallback: use two default repeats; do not infer scale from pixels.
         autoDensity = 2.0; 
     }
 
-    // ================== 新增：分别调整动静迷彩密度 ==================
+    // ================== Animated/static paint density adjustments ==================
     const isLocal = !!paintEntry.isLocal;
     if (isLocal) {
-        // 本地图片/视频：用户自己的素材，不做任何“官方迷彩”式的密度补偿，
-        // 直接按物理基准平铺一次，剩下的交给“图案缩放”滑块。
+        // Local images/videos are user media and receive no official-paint density compensation.
+        // Tile once at the physical baseline; the Pattern scale slider handles the rest.
         autoDensity *= 1.0;
     } else if (isAnim) {
-        // 动态迷彩太密集 -> 乘以小于 1 的数字，降低密度（图案放大）
-        // 比如 0.5 表示密度减半（图案放大为原来的2倍）
+        // Animated paint is too dense: multiply by a value below 1 to enlarge the pattern.
+        // For example, 0.5 halves density and doubles pattern size.
         autoDensity *= 0.25;  
     } else {
-        // 静态迷彩太稀疏 -> 乘以大于 1 的数字，提高密度（图案缩小并重复更多次）
-        // 比如 2.0 表示密度翻倍（图案缩小为原来的二分之一）
+        // Static paint is too sparse: multiply by a value above 1 for more, smaller repeats.
+        // For example, 2.0 doubles density and halves pattern size.
         autoDensity *= 2.0;  
     }
     // ================================================================
@@ -3263,9 +3367,9 @@ document.addEventListener('pointerdown', (e) => {
                     vec4 lightTex = texture2D(map, vMapUv);
                     vec3 baseLightColor = lightTex.rgb;
 
-                    // ==================== 1. 核心修复开始 ====================
-                    // 在对 UV 进行任何镜像翻转 (vPaintMirror) 或取模 (fract/mix) 之前
-                    // 基于原始连续的 vMapUv 计算平滑的像素级 UV 导数 dx, dy
+                    // ==================== 1. Core fix ====================
+                    // Before applying mirrored-UV correction (vPaintMirror) or wrapping (fract/mix),
+                    // derive smooth per-pixel UV derivatives dx and dy from continuous vMapUv.
                     vec2 dx = dFdx(vMapUv * paintUvScale);
                     vec2 dy = dFdy(vMapUv * paintUvScale);
                     // ========================================================
@@ -3279,8 +3383,8 @@ document.addEventListener('pointerdown', (e) => {
                         paintUv = safeTiledUv * paintFrameScale + paintFrameOffset;
                     }
 
-                    // ==================== 2. 核心采样替换 ====================
-                    // 使用带有平滑导数的渐变采样，防止在接缝/翻转/帧边缘触发 Mipmap 异常
+                    // ==================== 2. Sampling replacement ====================
+                    // Use gradient sampling with smooth derivatives to avoid mipmap artifacts at seams, flips, and frame edges.
                     vec4 paintTex = texture2DGradEXT(paintMap, paintUv, dx, dy);
                     // ========================================================
 
@@ -4759,9 +4863,9 @@ document.addEventListener('pointerdown', (e) => {
         ['normal','assembly','more'].forEach(m => document.getElementById('panel-'+m).classList.toggle('active', m===mode));
         groupNormal.visible = (mode === 'normal'); groupMore.visible = (mode === 'more'); groupAssembly.visible = (mode === 'assembly');
         
-        // --- 镜头模式切换修复 ---
+        // --- Camera mode switching fix ---
         if (mode === 'assembly') {
-            // 切回坦克组装：如果开了显示环境，恢复自由镜头 fly，否则保持 orbit
+            // Return to assembly: use fly mode with an active environment, otherwise orbit mode.
             const envActive = document.querySelector('.env-toggle')?.classList.contains('active');
             if (slots.scene && envActive) {
                 setCameraMode('fly');
@@ -4771,7 +4875,7 @@ document.addEventListener('pointerdown', (e) => {
             if(!slots.hull && document.getElementById('sel-hull-name').value) triggerLoad('hull');
             if(!slots.turret && document.getElementById('sel-turret-name').value) triggerLoad('turret');
         } else {
-            // 切到“更多”或“本地文件”：环境已被隐藏，强制切回轨道视角 orbit 专注于显示当前模型
+            // More/local-file modes hide the environment, so force orbit mode for the displayed model.
             setCameraMode('orbit');
         }
 
