@@ -3318,12 +3318,8 @@ document.addEventListener('pointerdown', (e) => {
             shader.uniforms.paintTexelSize = { value: new THREE.Vector2(0.01, 0.01) };
             shader.uniforms.multihui = { value: new THREE.Vector2(1, 1) };
             shader.uniforms.uvTransform = { value: new THREE.Vector2(1, 1) };
-            // x = U repeats, y = V repeats (aspect-corrected for local media)
             shader.uniforms.paintUvScale = { value: new THREE.Vector2(finalDensity, finalDensity * paintAspect) };
-            // Pass the per-vertex mirror flag (computed in computeMirrorFlags)
-            // through to the fragment shader so ONLY the camo sampling can flip
-            // its U coordinate back on the mirrored UV island. Nothing else
-            // about the mesh, its base map, or its real UVs is touched.
+
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <common>',
                 `#include <common>
@@ -3362,17 +3358,15 @@ document.addEventListener('pointerdown', (e) => {
                 varying float vPaintMirror;
                 `
             );
+
+            // ================== 核心混合算法 (极致鲜艳 + 金属质感) ==================
             const customMapFragment = `
                 #ifdef USE_MAP
                     vec4 lightTex = texture2D(map, vMapUv);
                     vec3 baseLightColor = lightTex.rgb;
 
-                    // ==================== 1. Core fix ====================
-                    // Before applying mirrored-UV correction (vPaintMirror) or wrapping (fract/mix),
-                    // derive smooth per-pixel UV derivatives dx and dy from continuous vMapUv.
                     vec2 dx = dFdx(vMapUv * paintUvScale);
                     vec2 dy = dFdy(vMapUv * paintUvScale);
-                    // ========================================================
 
                     vec2 camoBaseUv = vMapUv;
                     if(vPaintMirror > 0.5) camoBaseUv.x = 1.0 - camoBaseUv.x;
@@ -3383,18 +3377,23 @@ document.addEventListener('pointerdown', (e) => {
                         paintUv = safeTiledUv * paintFrameScale + paintFrameOffset;
                     }
 
-                    // ==================== 2. Sampling replacement ====================
-                    // Use gradient sampling with smooth derivatives to avoid mipmap artifacts at seams, flips, and frame edges.
                     vec4 paintTex = texture2DGradEXT(paintMap, paintUv, dx, dy);
-                    // ========================================================
-
-                    vec3 paintColor = paintTex.rgb * 3.0;
-                    float scuffingFactor = step(0.5, lightTex.r);
-                    vec3 colorWithoutScuffing = 2.0 * paintColor * baseLightColor;
-                    vec3 colorWithScuffing = 1.0 - 2.0 * (1.0 - baseLightColor) * (1.0 - paintColor);
-                    vec3 blendedColor = mix(colorWithoutScuffing, colorWithScuffing, scuffingFactor);
+                    vec3 paintColor = paintTex.rgb;
+                    
+                    // 【关键修正：强力提亮】
+                    // 补偿底层纹理暗沉，放大 4.5 倍以恢复游戏内原版的鲜亮感，同时用 clamp 截断防曝光
+                    vec3 blendedColor = paintColor * baseLightColor * 4.5;
+                    
+                    // 提取坦克模型原本表面的高光和磨损掉漆（金属白边独立于迷彩显示）
+                    vec3 highlights = max(vec3(0.0), baseLightColor - vec3(0.25)) * 1.5;
+                    
+                    // 结合迷彩和高光划痕
+                    vec3 finalPaint = clamp(blendedColor + highlights, 0.0, 1.0);
+                    
+                    // detailsAlpha 决定哪里是迷彩(0.0)，哪里是黑色通风口等不喷漆的地方(1.0)
                     float detailsAlpha = lightTex.a;
-                    vec3 finalColor = mix(blendedColor, baseLightColor, detailsAlpha);
+                    vec3 finalColor = mix(finalPaint, baseLightColor, detailsAlpha);
+                    
                     diffuseColor.rgb *= finalColor;
                 #endif
             `;
@@ -3404,27 +3403,7 @@ document.addEventListener('pointerdown', (e) => {
                 customMapFragment
             );
 
-            // GLSL Shader Mixer: Mix roughness and metalness per-pixel based on lightmap alpha (detailsAlpha)
-            // Camouflage area (detailsAlpha = 0): Matte non-reflective (roughness=0.85, metalness=0.0)
-            // Model detail area (detailsAlpha = 1, e.g. metal vents, glass, chrome): Preserves model's original metallic reflections!
-            shader.fragmentShader = shader.fragmentShader.replace(
-                '#include <roughnessmap_fragment>',
-                `#include <roughnessmap_fragment>
-                #ifdef USE_MAP
-                    vec4 lightTexForRough = texture2D(map, vMapUv);
-                    roughnessFactor = mix(0.85, roughnessFactor, lightTexForRough.a);
-                #endif
-                `
-            );
-            shader.fragmentShader = shader.fragmentShader.replace(
-                '#include <metalnessmap_fragment>',
-                `#include <metalnessmap_fragment>
-                #ifdef USE_MAP
-                    vec4 lightTexForMetal = texture2D(map, vMapUv);
-                    metalnessFactor = mix(0.0, metalnessFactor, lightTexForMetal.a);
-                #endif
-                `
-            );
+            // 【彻底删除了粗糙度覆盖，让迷彩重新拥有光滑金属反光！】
 
             newMat.userData.shader = shader;
             if(isAnim){
@@ -5267,14 +5246,17 @@ document.addEventListener('pointerdown', (e) => {
             }
 
             vec4 paintTex = texture2D(paintMap, paintUv);
-            vec3 paintColor = paintTex.rgb * 3.0;
-            float scuffingFactor = step(0.5, lightTex.r);
-            vec3 colorWithoutScuffing = 2.0 * paintColor * baseLightColor;
-            vec3 colorWithScuffing = 1.0 - 2.0 * (1.0 - baseLightColor) * (1.0 - paintColor);
-            vec3 blendedColor = mix(colorWithoutScuffing, colorWithScuffing, scuffingFactor);
+            vec3 paintColor = paintTex.rgb;
+
+            // 保持与实时渲染完全一致的明亮、鲜艳度及金属划痕提取
+            vec3 blendedColor = paintColor * baseLightColor * 4.5;
+            vec3 highlights = max(vec3(0.0), baseLightColor - vec3(0.25)) * 1.5;
+            vec3 finalPaint = clamp(blendedColor + highlights, 0.0, 1.0);
+            
             float detailsAlpha = lightTex.a;
-            vec3 finalColor = mix(blendedColor, baseLightColor, detailsAlpha);
-            gl_FragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
+            vec3 finalColor = mix(finalPaint, baseLightColor, detailsAlpha);
+            
+            gl_FragColor = vec4(finalColor, 1.0);
         }`;
 
     // Pick a bake resolution that respects the source lightmap: no point
