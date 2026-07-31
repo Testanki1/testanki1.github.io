@@ -127,7 +127,6 @@
             transform: translateY(-2px);
         }
 
-        /* 新增：包裹名称与版本号的容器 */
         .name-wrapper {
             display: flex;
             align-items: center;
@@ -141,7 +140,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* 调整为 BFD5FF 相关的配色 */
         .server-version {
             font-size: 0.75rem;
             color: #BFD5FF;
@@ -192,21 +190,6 @@
             opacity: 0.3;
             margin: 0 4px;
             border-radius: 1px;
-        }
-
-        .status-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px; 
-            height: 28px;
-            flex-shrink: 0;
-        }
-
-        .status-icon svg {
-            display: block;
-            width: 100%;
-            height: 100%;
         }
 
         .loader {
@@ -284,12 +267,6 @@
             noServers: isChinese ? '当前暂无服务器' : 'No servers available currently'
         };
 
-        const svgs = {
-            error: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle opacity="0.4" cx="16" cy="16" r="16" fill="#FF6666"/><circle cx="16" cy="16" r="12" fill="#FF6666"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 22V20H18V22H14ZM14 10L14 18H15.3333C16.8061 18 18 16.8061 18 15.3333V10H14Z" fill="#001926"/></svg>`,
-            open: `<svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="15" cy="15" r="8" fill="#76FF33"/><circle cx="15" cy="15" r="11.5" stroke="#76FF33" stroke-opacity="0.25" stroke-width="7"/></svg>`,
-            closed: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M32 20H35.4477C35.8013 20 36.1405 20.1405 36.3905 20.3905L37.6095 21.6095C37.8595 21.8595 38 22.1987 38 22.5523V37.4477C38 37.8013 37.8595 38.1405 37.6095 38.3905L36.3905 39.6095C36.1405 39.8595 35.8013 40 35.4477 40H12.5523C12.1987 40 11.8595 39.8595 11.6095 39.6095L10.3905 38.3905C10.1405 38.1405 10 37.8013 10 37.4477V22.5523C10 22.1987 10.1405 21.8595 10.3905 21.6095L11.6095 20.3905C11.8595 20.1405 12.1987 20 12.5523 20H16V16C16 11.5817 19.5817 8 24 8C28.4183 8 32 11.5817 32 16V20ZM29 20V16C29 13.2386 26.7614 11 24 11C21.2386 11 19 13.2386 19 16V20H29ZM20 30L24 26L28 30L24 34L20 30Z" fill="#BFD5FF"/></svg>`
-        };
-
         document.title = texts.title;
         document.getElementById('header-title-text').textContent = texts.title;
         document.querySelector('.header-subtitle').textContent = texts.subtitle;
@@ -299,27 +276,7 @@
             document.documentElement.lang = "en";
         }
 
-        let serverStatusData = {};
         let isChecking = false; 
-
-        function getPriority(status) {
-            if (status === 'Open') return 4;
-            if (status === 'Closed') return 3;
-            if (status === 'Error') return 2;
-            if (status === 'Offline') return 1;
-            return 0;
-        }
-
-        async function fetchServerStatus() {
-            try {
-                const response = await fetch(`https://testanki1.github.io/server_status.json?t=${Date.now()}`);
-                if (response.ok) {
-                    serverStatusData = await response.json();
-                }
-            } catch (error) {
-                console.error("Failed to fetch server status json:", error);
-            }
-        }
 
         async function checkURL(url) {
             const noCacheUrl = `${url}?t=${Date.now()}`;
@@ -331,7 +288,6 @@
             }
         }
 
-        // 修改：在按钮中注入包裹版本号和名称的容器结构
         function createButtonElement(label, link) {
             const container = document.createElement('a');
             container.className = 'button-container';
@@ -385,11 +341,7 @@
             badgeWrapper.appendChild(iconSwords);
             badgeWrapper.appendChild(inbattlesCount);
 
-            const statusIcon = document.createElement('span');
-            statusIcon.className = 'status-icon';
-
             infoWrapper.appendChild(badgeWrapper);
-            infoWrapper.appendChild(statusIcon);
 
             container.appendChild(nameWrapper);
             container.appendChild(infoWrapper);
@@ -407,16 +359,10 @@
             }
         }
 
-        function extractCounts(data, subNode = null) {
+        function extractCounts(data) {
             if (!data) return { onlineCount: 0, inbattlesCount: 0 };
             
             if (data.nodes) {
-                if (subNode && data.nodes[subNode]) {
-                    return {
-                        onlineCount: data.nodes[subNode].online || 0,
-                        inbattlesCount: data.nodes[subNode].inbattles || 0
-                    };
-                }
                 const onlineCount = Object.values(data.nodes).reduce((sum, node) => sum + (node.online || 0), 0);
                 const inbattlesCount = Object.values(data.nodes).reduce((sum, node) => sum + (node.inbattles || 0), 0);
                 return { onlineCount, inbattlesCount };
@@ -429,8 +375,7 @@
             return { onlineCount: 0, inbattlesCount: 0 };
         }
 
-        // 修改：渲染时接收并动态更新版本号信息（无前缀）
-        function renderButton(containerId, elementId, label, targetUrl, counts, status, sortOrder, version) {
+        function renderButton(containerId, elementId, label, targetUrl, counts, sortOrder, version) {
             const container = document.getElementById(containerId);
             let element = document.getElementById(elementId);
 
@@ -446,7 +391,6 @@
             element.querySelector('.online-count').textContent = counts.onlineCount;
             element.querySelector('.inbattles-count').textContent = counts.inbattlesCount;
 
-            // 动态控制版本号的显示
             const versionEl = element.querySelector('.server-version');
             if (versionEl) {
                 if (version) {
@@ -455,18 +399,6 @@
                 } else {
                     versionEl.classList.add('hidden');
                 }
-            }
-
-            const statusIconEl = element.querySelector('.status-icon');
-            
-            if (status === 'Open') {
-                statusIconEl.innerHTML = svgs.open;
-            } else if (status === 'Offline' || status === 'Closed') {
-                statusIconEl.innerHTML = svgs.closed;
-            } else if (status === 'Error') {
-                statusIconEl.innerHTML = svgs.error;
-            } else {
-                statusIconEl.innerHTML = svgs.closed; 
             }
         }
 
@@ -487,73 +419,30 @@
             try {
                 if (isInitialLoad) {
                     loader.style.display = 'flex';
-                    await fetchServerStatus(); 
                 }
                 
                 let fetchTasks = [];
 
-                // 1. 获取部署(Deploy)服务器
+                // 1. 获取部署(Deploy)服务器 (只保留单一 Deploy 链接)
                 for (let i = 1; i <= 10; i++) {
                     const deployBalancer = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
                     const baseUrl = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
-                    
-                    fetchTasks.push(checkURL(deployBalancer).then(async isAccessible => {
-                        const idSingle = `deploy-${i}`;
-                        const idC1 = `deploy-${i}-c1`;
-                        const idC2 = `deploy-${i}-c2`;
+                    const id = `deploy-${i}`;
 
+                    fetchTasks.push(checkURL(deployBalancer).then(async isAccessible => {
                         if (isAccessible) {
                             const balancerData = await fetchBalancerData(deployBalancer);
-                            const serverInfo = serverStatusData[baseUrl];
-                            const version = balancerData ? balancerData.serverVersion : null; // 获取版本号
-                            
-                            if (serverInfo && serverInfo.type === 'deploy' && serverInfo.configs) {
-                                const c1 = serverInfo.configs['1'] || 'Offline';
-                                const c2 = serverInfo.configs['2'] || 'Offline';
-                                
-                                if (c1 === c2) {
-                                    removeButton(idC1);
-                                    removeButton(idC2);
-                                    const counts = extractCounts(balancerData); 
-                                    renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, c1, i * 10, version);
-                                } else {
-                                    removeButton(idSingle);
-                                    
-                                    const p1 = getPriority(c1);
-                                    const p2 = getPriority(c2);
-                                    
-                                    if (c1 !== 'Offline' && p1 >= p2) {
-                                        const t1 = `${baseUrl}?config-template=https://c1.public-deploy${i}.test-eu.tankionline.com/config.xml`;
-                                        const countsC1 = extractCounts(balancerData, 'c1');
-                                        renderButton('deploy-results', idC1, `Deploy ${i} (c1)`, t1, countsC1, c1, i * 10 + 1, version);
-                                    } else {
-                                        removeButton(idC1);
-                                    }
-                                    
-                                    if (c2 !== 'Offline' && p2 >= p1) {
-                                        const t2 = `${baseUrl}?config-template=https://c2.public-deploy${i}.test-eu.tankionline.com/config.xml`;
-                                        const countsC2 = extractCounts(balancerData, 'c2');
-                                        renderButton('deploy-results', idC2, `Deploy ${i} (c2)`, t2, countsC2, c2, i * 10 + 2, version);
-                                    } else {
-                                        removeButton(idC2);
-                                    }
-                                }
-                            } else {
-                                removeButton(idC1);
-                                removeButton(idC2);
-                                const counts = extractCounts(balancerData);
-                                renderButton('deploy-results', idSingle, `Deploy ${i}`, baseUrl, counts, 'Offline', i * 10, version);
-                            }
+                            const counts = extractCounts(balancerData);
+                            const version = balancerData ? balancerData.serverVersion : null;
+
+                            renderButton('deploy-results', id, `Deploy ${i}`, baseUrl, counts, i * 10, version);
                         } else {
-                            removeButton(idSingle);
-                            removeButton(idC1);
-                            removeButton(idC2);
+                            removeButton(id);
                         }
                     }));
                 }
 
-                // 2. 获取其他(Other)独立服务器: Classic / RU / China
-                // 调整 order 让 RU (Test) 排名在前 (101)，China 在后 (102)
+                // 2. 获取其他独立服务器: Classic / RU / China
                 const extraServers = [
                     {
                         id: 'classic-btn',
@@ -583,13 +472,9 @@
                         if (isAccessible) {
                             const balancerData = await fetchBalancerData(server.balancer);
                             const counts = extractCounts(balancerData);
-                            const serverInfo = serverStatusData[server.link];
-                            const status = (serverInfo && serverInfo.status) ? serverInfo.status : 'Offline';
-                            
-                            // 排除 Classic，RU 和 China 测试服正常获取版本号
                             const version = server.id === 'classic-btn' ? null : (balancerData ? balancerData.serverVersion : null);
                             
-                            renderButton('other-results', server.id, server.name, server.link, counts, status, server.order, version);
+                            renderButton('other-results', server.id, server.name, server.link, counts, server.order, version);
                         } else {
                             removeButton(server.id);
                         }
@@ -615,7 +500,7 @@
 
         checkURLs(true);
         setInterval(function() {
-            fetchServerStatus().then(() => checkURLs(false));
+            checkURLs(false);
         }, 5000);
 
     </script>
