@@ -289,9 +289,27 @@
         ];
 
         const shotEffectAugments = new Set(groupedAugments["射击颜色"] || []);
-        const excelsiorAugments = new Set(["卓越（炮塔）", "卓越（底盘）"]);
-        const originalFillAugments = new Set(["凤凰（炮塔）", "凤凰（底盘）", ...excelsiorAugments]);
-        const excelsiorOverlayStops = '<stop stop-color="#AAFF00"/>\n<stop offset="1" stop-color="#00FFAA" stop-opacity="0"/>';
+        const equipmentAugmentNames = [
+            ...(groupedAugments["炮塔"] || []),
+            ...(groupedAugments["底盘"] || [])
+        ];
+        const equipmentFillNames = new Set(groupedBackgroundColors["来自装备改造图标"] || []);
+        const fillTemplateCache = {};
+
+        function getRawAugmentBaseName(augmentName) {
+            return augmentName.replace(/（(?:炮塔|底盘)）$/, '');
+        }
+
+        const sourceAugmentByFillName = new Map();
+        equipmentAugmentNames.forEach(augmentName => {
+            const baseName = getRawAugmentBaseName(augmentName);
+            if (equipmentFillNames.has(baseName) && !sourceAugmentByFillName.has(baseName)) {
+                sourceAugmentByFillName.set(baseName, augmentName);
+            }
+        });
+        const originalFillAugments = new Set(
+            equipmentAugmentNames.filter(augmentName => sourceAugmentByFillName.has(getRawAugmentBaseName(augmentName)))
+        );
 
         function getRarity(value = document.getElementById('val-rarity').value) {
             return rarities.find(rarity => rarity.value === value);
@@ -393,20 +411,96 @@
             label.textContent = presentation.label;
         }
 
-        function renderGradientPreview(container, stops, overlayStops = null) {
+        function replaceGradientId(openingTag, id) {
+            return /\bid="[^"]+"/.test(openingTag)
+                ? openingTag.replace(/\bid="[^"]+"/, `id="${id}"`)
+                : openingTag.replace('<radialGradient', `<radialGradient id="${id}"`);
+        }
+
+        function getGradientConsumer(svgText, gradientId) {
+            const escapedId = escapeRegExp(gradientId);
+            const pattern = new RegExp(`<[A-Za-z][\\w:-]*\\b[^>]*\\bfill="url\\(#${escapedId}\\)"[^>]*/>`);
+            const match = svgText.match(pattern);
+            return match ? match[0] : null;
+        }
+
+        function getShapeSignature(element) {
+            return (element || '')
+                .replace(/\s+(?:fill|opacity|fill-opacity)="[^"]*"/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function analyzeFillTemplate(svgText) {
+            if (!svgText) return null;
+            const gradients = [...svgText.matchAll(/<radialGradient\b[^>]*>[\s\S]*?<\/radialGradient>/g)]
+                .map(match => {
+                    const full = match[0];
+                    const openingTag = full.match(/^<radialGradient\b[^>]*>/)[0];
+                    const idMatch = openingTag.match(/\bid="([^"]+)"/);
+                    if (!idMatch) return null;
+                    return {
+                        id: idMatch[1],
+                        openingTag,
+                        stops: full.slice(openingTag.length, -'</radialGradient>'.length).trim(),
+                        full
+                    };
+                })
+                .filter(Boolean);
+            if (!gradients.length) return null;
+
+            const primary = gradients[0];
+            primary.element = getGradientConsumer(svgText, primary.id);
+            if (!primary.element) return { primary, overlays: [] };
+
+            const primarySignature = getShapeSignature(primary.element);
+            const overlays = gradients.slice(1).filter(gradient => {
+                gradient.element = getGradientConsumer(svgText, gradient.id);
+                return gradient.element && getShapeSignature(gradient.element) === primarySignature;
+            });
+            return { primary, overlays };
+        }
+
+        async function getFillTemplateForBackground(fillName) {
+            if (!sourceAugmentByFillName.has(fillName)) return null;
+            if (!fillTemplateCache[fillName]) {
+                const sourceName = sourceAugmentByFillName.get(fillName);
+                fillTemplateCache[fillName] = fetchTextCached(`./augments/${encodeURIComponent(sourceName)}.svg`)
+                    .then(analyzeFillTemplate);
+            }
+            return fillTemplateCache[fillName];
+        }
+
+        async function getCurrentAugmentFillTemplate(includeOverlays = true) {
+            const augmentName = document.getElementById('val-augment').value;
+            if (!augmentName) return null;
+            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
+            const template = analyzeFillTemplate(svg);
+            if (!template || includeOverlays) return template;
+            return { primary: template.primary, overlays: [] };
+        }
+
+        function renderGradientPreview(container, stops, template = null) {
             const id = 'g' + Math.random().toString(36).slice(2, 11);
-            if (overlayStops) {
-                const overlayId = `${id}_overlay`;
-                container.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(50 95.8333) rotate(-90) scale(91.6667)">${stops || fallbackFillStops}</radialGradient><radialGradient id="${overlayId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(50 4.1667) rotate(90) scale(45.8333)">${overlayStops}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/><circle cx="50" cy="50" r="50" fill="url(#${overlayId})"/></svg>`;
+            if (template && template.primary) {
+                const definitions = [
+                    `${replaceGradientId(template.primary.openingTag, id)}${stops || fallbackFillStops}</radialGradient>`
+                ];
+                const layers = [`<circle cx="12" cy="12" r="12" fill="url(#${id})"/>`];
+                template.overlays.forEach((overlay, index) => {
+                    const overlayId = `${id}_layer_${index + 1}`;
+                    definitions.push(`${replaceGradientId(overlay.openingTag, overlayId)}${overlay.stops}</radialGradient>`);
+                    layers.push(`<circle cx="12" cy="12" r="12" fill="url(#${overlayId})"/>`);
+                });
+                container.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><defs>${definitions.join('')}</defs>${layers.join('')}</svg>`;
             } else {
                 container.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}">${stops || fallbackFillStops}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;
             }
         }
 
         function extractPrimaryGradientStops(svgText) {
-            if (!svgText) return null;
-            const match = svgText.match(/<radialGradient\b[^>]*>([\s\S]*?)<\/radialGradient>/);
-            return match ? match[1].trim() : null;
+            const template = analyzeFillTemplate(svgText);
+            return template && template.primary ? template.primary.stops : null;
         }
 
         async function getDefaultBackgroundPresentation() {
@@ -416,35 +510,35 @@
                 const rarityName = uiTexts.rarity_names[rarity.key];
                 return {
                     stops: automaticStops,
-                    overlayStops: null,
+                    template: await getCurrentAugmentFillTemplate(false),
                     label: `${uiTexts.val_follow_rarity} (${rarityName})`
                 };
             }
 
-            const augmentName = document.getElementById('val-augment').value;
-            if (augmentName) {
-                const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
-                const originalStops = extractPrimaryGradientStops(svg);
-                if (originalStops) {
-                    return {
-                        stops: originalStops,
-                        overlayStops: excelsiorAugments.has(augmentName) ? excelsiorOverlayStops : null,
-                        label: uiTexts.val_default
-                    };
-                }
+            const template = await getCurrentAugmentFillTemplate(true);
+            if (template && template.primary) {
+                return {
+                    stops: template.primary.stops,
+                    template,
+                    label: uiTexts.val_default
+                };
             }
 
-            return { stops: fallbackFillStops, overlayStops: null, label: uiTexts.val_default };
+            return { stops: fallbackFillStops, template: null, label: uiTexts.val_default };
         }
 
         async function getBackgroundPresentation() {
             const value = document.getElementById('val-background').value;
             if (value === 'default') return getDefaultBackgroundPresentation();
 
-            const stops = await fetchTextCached(`./colors/${encodeURIComponent(value)}.txt`);
+            const [stops, sourceTemplate, targetTemplate] = await Promise.all([
+                fetchTextCached(`./colors/${encodeURIComponent(value)}.txt`),
+                getFillTemplateForBackground(value),
+                getCurrentAugmentFillTemplate(false)
+            ]);
             return {
                 stops: stops || fallbackFillStops,
-                overlayStops: value === '卓越' ? excelsiorOverlayStops : null,
+                template: sourceTemplate || targetTemplate,
                 label: t(value)
             };
         }
@@ -456,7 +550,7 @@
             swatch.style.width = '18px';
             swatch.style.height = '18px';
             swatch.style.border = 'none';
-            renderGradientPreview(swatch, presentation.stops, presentation.overlayStops);
+            renderGradientPreview(swatch, presentation.stops, presentation.template);
             display.append(swatch, Object.assign(document.createElement('span'), { textContent: presentation.label }));
         }
 
@@ -469,7 +563,7 @@
 
         async function renderDefaultBackgroundOption(preview, label) {
             const presentation = await getDefaultBackgroundPresentation();
-            renderGradientPreview(preview, presentation.stops, presentation.overlayStops);
+            renderGradientPreview(preview, presentation.stops, presentation.template);
             label.textContent = presentation.label;
         }
         
@@ -612,8 +706,12 @@
         async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);if(!r.ok)return null;const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
         
         async function fetchBackgroundPreview(n, c) {
-            const stops = await fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`);
-            if (stops) renderGradientPreview(c, stops, n === '卓越' ? excelsiorOverlayStops : null);
+            const [stops, sourceTemplate, targetTemplate] = await Promise.all([
+                fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`),
+                getFillTemplateForBackground(n),
+                getCurrentAugmentFillTemplate(false)
+            ]);
+            if (stops) renderGradientPreview(c, stops, sourceTemplate || targetTemplate);
         }
         
         async function fetchEquipmentPreview(n, c) { 
@@ -637,43 +735,55 @@
             );
         }
 
-        function removeExcelsiorOverlay(svg) {
-            const radialIds = [...svg.matchAll(/<radialGradient\b[^>]*\bid="([^"]+)"[^>]*>/g)].map(match => match[1]);
-            if (radialIds.length < 2) return svg;
-
-            const overlayId = radialIds[1];
-            const escapedId = escapeRegExp(overlayId);
-            const overlayElementPattern = new RegExp(`<[A-Za-z][\\w:-]*\\b[^>]*\\bfill="url\\(#${escapedId}\\)"[^>]*/>`);
-            const overlayGradientPattern = new RegExp(`<radialGradient\\b(?=[^>]*\\bid="${escapedId}")[^>]*>[\\s\\S]*?<\\/radialGradient>`);
-            return svg.replace(overlayElementPattern, '').replace(overlayGradientPattern, '');
+        function removeAdditionalFillLayers(svg) {
+            const template = analyzeFillTemplate(svg);
+            if (!template || !template.overlays.length) return svg;
+            template.overlays.forEach(overlay => {
+                svg = svg.replace(overlay.element, '').replace(overlay.full, '');
+            });
+            return svg;
         }
 
-        function applyExcelsiorFill(svg, svgName, primaryStops) {
-            if (excelsiorAugments.has(svgName)) return svg;
-
-            const primaryMatch = svg.match(/<radialGradient\b[^>]*\bid="([^"]+)"[^>]*>/);
-            if (!primaryMatch) return svg;
-            const primaryId = primaryMatch[1];
-            const primaryOpeningTag = `<radialGradient id="${primaryId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(12 23) rotate(-90) scale(22)">`;
-            svg = replacePrimaryGradient(svg, primaryStops, primaryOpeningTag);
-
-            const escapedPrimaryId = escapeRegExp(primaryId);
-            const primaryElementPattern = new RegExp(`<[A-Za-z][\\w:-]*\\b[^>]*\\bfill="url\\(#${escapedPrimaryId}\\)"[^>]*/>`);
-            const primaryElementMatch = svg.match(primaryElementPattern);
-            if (!primaryElementMatch) return svg;
-
-            let overlayId = 'excelsior_fill_overlay';
+        function getUniqueGradientId(svg, baseName) {
+            let id = baseName;
             let suffix = 1;
-            while (svg.includes(`id="${overlayId}"`)) overlayId = `excelsior_fill_overlay_${suffix++}`;
+            while (svg.includes(`id="${id}"`)) id = `${baseName}_${suffix++}`;
+            return id;
+        }
 
-            const overlayGradient = `<radialGradient id="${overlayId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(12 1) rotate(90) scale(11)">\n${excelsiorOverlayStops}\n</radialGradient>`;
-            const overlayElement = primaryElementMatch[0].replace(
-                `fill="url(#${primaryId})"`,
-                `fill="url(#${overlayId})"`
-            );
+        function applyFillTemplate(svg, primaryStops, sourceTemplate = null) {
+            svg = removeAdditionalFillLayers(svg);
+            const targetTemplate = analyzeFillTemplate(svg);
+            if (!targetTemplate || !targetTemplate.primary) return svg;
 
-            svg = svg.replace(primaryElementMatch[0], `${primaryElementMatch[0]}\n${overlayElement}`);
-            return svg.replace('</defs>', `${overlayGradient}\n</defs>`);
+            const targetPrimaryId = targetTemplate.primary.id;
+            const sourcePrimaryOpening = sourceTemplate && sourceTemplate.primary
+                ? sourceTemplate.primary.openingTag
+                : targetTemplate.primary.openingTag;
+            const primaryOpening = replaceGradientId(sourcePrimaryOpening, targetPrimaryId);
+            svg = replacePrimaryGradient(svg, primaryStops, primaryOpening);
+
+            if (!sourceTemplate || !sourceTemplate.overlays.length) return svg;
+            const primaryElement = getGradientConsumer(svg, targetPrimaryId);
+            if (!primaryElement) return svg;
+
+            const overlayDefinitions = [];
+            const overlayElements = [];
+            sourceTemplate.overlays.forEach((overlay, index) => {
+                const overlayId = getUniqueGradientId(svg, `compound_fill_layer_${index + 1}`);
+                overlayDefinitions.push(
+                    `${replaceGradientId(overlay.openingTag, overlayId)}\n${overlay.stops}\n</radialGradient>`
+                );
+                overlayElements.push(
+                    primaryElement.replace(
+                        `fill="url(#${targetPrimaryId})"`,
+                        `fill="url(#${overlayId})"`
+                    )
+                );
+            });
+
+            svg = svg.replace(primaryElement, `${primaryElement}\n${overlayElements.join('\n')}`);
+            return svg.replace('</defs>', `${overlayDefinitions.join('\n')}\n</defs>`);
         }
 
         function checkAndGenerate() {
@@ -693,21 +803,17 @@
             Promise.all([
                 txtName === 'none' ? Promise.resolve('') : fetchTextCached('./equipments/'+encodeURIComponent(txtName)+'.txt'),
                 fetchTextCached('./augments/'+encodeURIComponent(svgName)+'.svg'),
-                background !== 'default' ? fetchTextCached('./colors/'+encodeURIComponent(background)+'.txt') : null
-            ]).then(([txt, svg, manuallySelectedFill]) => {
+                background !== 'default' ? fetchTextCached('./colors/'+encodeURIComponent(background)+'.txt') : null,
+                background !== 'default' ? getFillTemplateForBackground(background) : null
+            ]).then(([txt, svg, manuallySelectedFill, selectedFillTemplate]) => {
                 if (!svg) {
                     document.getElementById("loading").style.display = "none";
                     return;
                 }
                 if (manuallySelectedFill) {
-                    if (background === '卓越') {
-                        svg = applyExcelsiorFill(svg, svgName, manuallySelectedFill);
-                    } else {
-                        if (excelsiorAugments.has(svgName)) svg = removeExcelsiorOverlay(svg);
-                        svg = replacePrimaryGradient(svg, manuallySelectedFill);
-                    }
+                    svg = applyFillTemplate(svg, manuallySelectedFill, selectedFillTemplate);
                 } else if (automaticFill) {
-                    svg = replacePrimaryGradient(svg, automaticFill);
+                    svg = applyFillTemplate(svg, automaticFill);
                 }
                 const defs = svg.indexOf('<defs>');
                 let final = defs !== -1 ? svg.slice(0, defs) + (txt || '') + svg.slice(defs) : svg.replace('>', '>' + (txt || ''));
@@ -763,5 +869,5 @@
             img.src = url;
         }
     </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5c30cdc694627',t:'MTc4Njc3MTM1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
