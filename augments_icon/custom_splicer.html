@@ -570,10 +570,16 @@
         const fileCache = {};
         const modal = document.getElementById('selectionModal');
         const modalList = document.getElementById('modalList');
+        const optionNameCollator = new Intl.Collator(isZh ? 'zh-CN-u-co-pinyin' : 'en', {
+            sensitivity: 'base',
+            numeric: true
+        });
+        let menuRenderVersion = 0;
         updateRarityDisplay();
         updateBackgroundDisplay();
         
         function openMenu(type) {
+            const renderVersion = ++menuRenderVersion;
             modalList.innerHTML = ''; modal.classList.add('active');
             const titles = { 'equipment': uiTexts.modal_equip, 'augment': uiTexts.modal_aug, 'rarity': uiTexts.modal_rarity, 'background': uiTexts.modal_fill };
             document.getElementById('modalTitle').textContent = titles[type];
@@ -589,7 +595,7 @@
                 renderDefaultBackgroundOption(preview, label);
                 def.onclick = () => selectItem('background', 'default', null, uiTexts.val_default);
                 modalList.appendChild(def);
-                renderGroupedOptions(groupedBackgroundColors, type);
+                renderGroupedOptions(groupedBackgroundColors, type, renderVersion);
             }
             else if (type === 'equipment') {
                 const noneEl = document.createElement('div');
@@ -597,38 +603,72 @@
                 noneEl.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>${uiTexts.val_none}</span>`;
                 noneEl.onclick = () => selectItem('equipment', 'none', null, uiTexts.val_none);
                 modalList.appendChild(noneEl);
-                renderGroupedOptions(groupedEquipments, type);
+                renderGroupedOptions(groupedEquipments, type, renderVersion);
             }
-            else if (type === 'augment') renderGroupedOptions(groupedAugments, type);
+            else if (type === 'augment') {
+                const loading = document.createElement('div');
+                loading.className = 'option-group-title';
+                loading.textContent = uiTexts.loading;
+                modalList.appendChild(loading);
+                renderGroupedOptions(groupedAugments, type, renderVersion, loading);
+            }
             else if (type === 'rarity') renderRarityOptions();
         }
         
-        function closeMenu(e) { if (e) e.preventDefault(); modal.classList.remove('active'); }
+        function closeMenu(e) {
+            if (e) e.preventDefault();
+            menuRenderVersion++;
+            modal.classList.remove('active');
+        }
 
-        function renderGroupedOptions(dataObj, type) {
-            Object.keys(dataObj).forEach(group => {
-                const h = document.createElement('div'); h.className = 'option-group-title'; 
-                h.textContent = t(group); 
-                modalList.appendChild(h);
-                
-                const items = [...dataObj[group]];
+        function compareOptionNames(a, b, type) {
+            const aName = type === 'augment' ? getAugmentDisplayName(a) : t(a);
+            const bName = type === 'augment' ? getAugmentDisplayName(b) : t(b);
+            return optionNameCollator.compare(aName, bName) || a.localeCompare(b);
+        }
+
+        async function getAugmentRarityRank(augmentName) {
+            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
+            const outlineColor = extractOriginalOutlineColor(svg);
+            const rarity = getRarityFromOutlineColor(outlineColor);
+            const index = rarity ? rarities.indexOf(rarity) : -1;
+            return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
+        }
+
+        async function renderGroupedOptions(dataObj, type, renderVersion = menuRenderVersion, loadingElement = null) {
+            const preparedGroups = await Promise.all(Object.keys(dataObj).map(async group => {
+                let items = [...dataObj[group]];
                 const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
 
-                if (!keepDeclaredOrder) {
-                    items.sort((a, b) => {
-                        if (isZh) {
-                            return a.localeCompare(b, 'zh-CN');
-                        } else {
-                            return t(a).localeCompare(t(b));
-                        }
-                    });
+                if (type === 'augment') {
+                    const rankedItems = await Promise.all(items.map(async item => ({
+                        item,
+                        rarityRank: await getAugmentRarityRank(item)
+                    })));
+                    rankedItems.sort((a, b) =>
+                        a.rarityRank - b.rarityRank || compareOptionNames(a.item, b.item, type)
+                    );
+                    items = rankedItems.map(entry => entry.item);
+                } else if (!keepDeclaredOrder) {
+                    items.sort((a, b) => compareOptionNames(a, b, type));
                 }
+
+                return { group, items };
+            }));
+
+            if (renderVersion !== menuRenderVersion) return;
+            if (loadingElement && loadingElement.isConnected) loadingElement.remove();
+
+            preparedGroups.forEach(({ group, items }) => {
+                const h = document.createElement('div'); h.className = 'option-group-title';
+                h.textContent = t(group);
+                modalList.appendChild(h);
 
                 items.forEach(item => {
                     const displayName = type === 'augment' ? getAugmentDisplayName(item) : t(item);
-                    const el = document.createElement('div'); 
+                    const el = document.createElement('div');
                     el.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
-                    
+
                     const p = document.createElement('div'); p.className = 'option-preview';
                     if (type === 'augment') p.innerHTML = `<img src="./augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
                     else if (type === 'background') {
@@ -636,7 +676,7 @@
                         fetchBackgroundPreview(item, p);
                     }
                     else if (type === 'equipment') fetchEquipmentPreview(item, p);
-                    
+
                     el.append(p, Object.assign(document.createElement('span'), {textContent: displayName}));
                     el.onclick = () => selectItem(type, item, group, displayName);
                     modalList.appendChild(el);
@@ -869,5 +909,5 @@
             img.src = url;
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5c30cdc694627',t:'MTc4Njc3MTM1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5d7dd5df9eab1',t:'MTc4Njc3MjIwMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
