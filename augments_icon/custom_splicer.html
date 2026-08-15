@@ -9,7 +9,6 @@
     <title>Tanki Online Augment Icon Splicer</title>
     <style>
         :root {
-            var(--md-sys-color-background): #001926;
             --md-sys-color-background: #001926;
             --md-sys-color-on-background: #ffffff;
             --md-sys-color-surface: #001926;
@@ -32,8 +31,9 @@
             --elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
             --elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
         }
-        
+
         * { font-family: 'Rubik', 'M PLUS 1p', sans-serif; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html:not(.i18n-ready) body { visibility: hidden; }
         body { background-color: var(--md-sys-color-background); color: var(--md-sys-color-on-background); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
 
         header { width: 100%; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; background-color: var(--md-sys-color-surface); position: sticky; top: 0; z-index: 10; }
@@ -52,26 +52,41 @@
         .m3-select-trigger:hover { background-color: var(--md-sys-color-surface-container-high); }
         .m3-label { font-size: 12px; color: var(--md-sys-color-outline); position: absolute; top: 8px; left: 16px; }
         .m3-value { font-size: 16px; margin-top: 14px; display: flex; align-items: center; gap: 8px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
+
         .m3-details { width: 100%; background-color: transparent; border-radius: var(--radius-m); overflow: hidden; margin-top: 8px; }
         .m3-summary { padding: 12px 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; color: var(--md-sys-color-primary); font-weight: 500; font-size: 14px; user-select: none; border-radius: var(--radius-s); transition: background 0.2s; }
         .m3-summary:hover { background-color: rgba(128,128,128, 0.05); }
         .m3-summary::marker { display: none; }
+        .m3-summary::-webkit-details-marker { display: none; }
+        /* 展开/收起动画：details 常驻 open，expanded 类驱动行高+透明度过渡，每次开合都有动画 */
+        .m3-details-anim { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.3s ease-out, opacity 0.3s ease-out; pointer-events: none; }
+        .m3-details.expanded .m3-details-anim { grid-template-rows: 1fr; opacity: 1; pointer-events: auto; }
+        .m3-details-content { overflow: hidden; min-height: 0; display: grid; gap: 16px; padding-top: 0; transition: padding-top 0.3s ease-out; }
+        .m3-details.expanded .m3-details-content { padding-top: 16px; }
+
         .m3-summary-icon { transition: transform 0.3s; font-size: 20px; }
-        .m3-details[open] .m3-summary-icon { transform: rotate(180deg); }
-        .m3-details-content { padding-top: 16px; display: grid; gap: 16px; animation: fadeIn 0.3s ease-out; }
+        .m3-details.expanded .m3-summary-icon { transform: rotate(180deg); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .reset-action { display: none; padding: 4px; margin-left: 8px; border-radius: 50%; color: var(--md-sys-color-outline); transition: 0.2s; z-index: 2; }
+        /* visibility 控制显示：始终占位，切换按钮不会因重置按钮出现而移位 */
+        .reset-action { display: flex; visibility: hidden; width: 28px; height: 28px; padding: 4px; margin-left: 8px; border-radius: 50%; color: var(--md-sys-color-outline); transition: visibility 0.2s, background-color 0.2s; z-index: 2; align-items: center; justify-content: center; box-sizing: border-box; }
         .reset-action:hover { background-color: rgba(0,0,0,0.1); color: var(--md-sys-color-primary); }
-        .reset-action.visible { display: flex; }
+        .reset-action.visible { visibility: visible; }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 100; display: none; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(2px); }
-        .modal-overlay.active { display: flex; opacity: 1; }
+        /* 炮塔/底盘 形状切换（分段按钮） */
+        .shape-switch { display: flex; background-color: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 100px; overflow: hidden; margin-left: 12px; }
+        .shape-switch button { border: none; background: transparent; color: var(--md-sys-color-outline); padding: 8px 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .shape-switch button svg { display: block; }
+        .shape-switch button.active { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+        .shape-switch button:hover:not(.active) { color: var(--md-sys-color-on-background); background-color: var(--md-sys-color-surface-container-high); }
+
+        /* 常驻 flex，用 visibility/透明度过渡：打开、关闭都有动画 */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 100; display: flex; visibility: hidden; pointer-events: none; opacity: 0; transition: opacity 0.3s ease, visibility 0s linear 0.3s; backdrop-filter: blur(2px); }
+        .modal-overlay.active { visibility: visible; pointer-events: auto; opacity: 1; transition: opacity 0.3s ease, visibility 0s; }
         .modal-content { background-color: var(--md-sys-color-surface); width: 100%; max-width: 500px; max-height: 85vh; margin: auto; border-radius: var(--radius-l); display: flex; flex-direction: column; box-shadow: var(--elevation-3); transform: translateY(50px); transition: transform 0.3s cubic-bezier(0.2, 0.0, 0, 1.0); }
         .modal-overlay.active .modal-content { transform: translateY(0); }
         @media (max-width: 600px) { .modal-content { position: absolute; bottom: 0; margin: 0; width: 100%; max-width: 100%; border-bottom-left-radius: 0; border-bottom-right-radius: 0; } }
-        
+
         .modal-header { padding: 16px 24px; border-bottom: 1px solid var(--md-sys-color-outline-variant); display: flex; justify-content: space-between; align-items: center; }
         .modal-title { font-size: 20px; font-weight: 500; }
         .modal-body { overflow-y: auto; padding: 8px; flex: 1; }
@@ -91,10 +106,10 @@
 
         .btn-base { border: none; padding: 12px 24px; border-radius: 100px; font-size: 16px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; text-decoration: none; width: 100%; }
         .btn-base:active { transform: scale(0.98); }
-        
+
         .btn-primary { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
         .btn-primary:hover { box-shadow: var(--elevation-1); filter: brightness(1.1); }
-        
+
         .btn-secondary { background-color: transparent; border: 1px solid var(--md-sys-color-outline); color: var(--md-sys-color-primary); }
         .btn-secondary:hover { background-color: var(--md-sys-color-secondary-container); }
 
@@ -109,6 +124,7 @@
     </style>
 </head>
 <body>
+    <noscript><style>html:not(.i18n-ready) body { visibility: visible; }</style></noscript>
 
     <header>
         <h1 id="ui-header">Tanki Online Augment Icon Splicer</h1>
@@ -135,12 +151,26 @@
             </div>
         </div>
 
-        <details class="m3-details">
-            <summary class="m3-summary">
-                <span id="ui-opt-summary">Optional (Rarity / Fill)</span>
+        <details class="m3-details" id="optDetails" open>
+            <summary class="m3-summary" id="optSummary">
+                <span id="ui-opt-summary">Optional (Shape / Rarity / Fill)</span>
                 <span class="material-symbols-rounded m3-summary-icon">expand_more</span>
             </summary>
+            <div class="m3-details-anim">
             <div class="m3-details-content">
+                <!-- 炮塔/底盘形状：默认自动（跟随所选装备，无装备时跟随改造本身），可手动覆盖后点重置回到自动 -->
+                <div class="m3-select" id="shapeSwitchRow" style="display:none;cursor:default">
+                    <div class="m3-select-trigger" style="cursor:default">
+                        <div><span class="m3-label" id="ui-lbl-shape">Shape</span><div class="m3-value" id="ui-shape-value">Auto</div></div>
+                        <div style="display:flex;align-items:center">
+                            <div class="shape-switch" id="shapeSwitch">
+                                <button type="button" data-shape="turret" onclick="toggleShape('turret')" id="btn-shape-turret"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M5 0H7V12H9V0H11V6L14 9V13L11 16V16H9H7H5V16L2 13V9L5 6V0Z" fill="currentColor"/></svg></button>
+                                <button type="button" data-shape="hull" onclick="toggleShape('hull')" id="btn-shape-hull"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 3L3 2H7L8 3H16V5H6V6H10L12 8H15L16 9V11L14 13H2L0 11V8L2 6V3Z" fill="currentColor"/></svg></button>
+                            </div>
+                            <div class="reset-action" id="reset-shape" onclick="resetShape(event)" title="Reset"><span class="material-symbols-rounded" style="font-size:20px">restart_alt</span></div>
+                        </div>
+                    </div>
+                </div>
                 <div class="m3-select" onclick="openMenu('rarity')">
                     <div class="m3-select-trigger">
                         <div><span class="m3-label" id="ui-lbl-rarity">Rarity Color</span><div class="m3-value" id="display-rarity">Default</div></div>
@@ -159,6 +189,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </details>
 
@@ -184,15 +215,169 @@
     <input type="hidden" id="val-equipment" value=""><input type="hidden" id="val-augment" value="">
     <input type="hidden" id="val-rarity" value="default"><input type="hidden" id="val-background" value="default">
 
-    <!-- 从 JSON 加载数据后再初始化页面 -->
     <script type="module">
-        const dataResponse = await fetch('./data.json');
-        if (!dataResponse.ok) throw new Error(`Failed to load data.json: ${dataResponse.status}`);
-        const {
-            groupedEquipments,
-            groupedAugments,
-            groupedBackgroundColors
-        } = await dataResponse.json();
+        // ============================================================
+        // 形状模板（炮塔 / 底盘 装备改造图标骨架 + 射击颜色圆形骨架）
+        // 模板部件里的 sg_xxx / cg_xxx 是占位渐变 id，渲染时会替换成唯一 id
+        // outline_el / 圆形模板中的 {OUTLINE} 由稀有度描边色填充，{STOPS} 由填充渐变填充
+        // ============================================================
+        const SHAPES = {"turret": {"outline_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M24 19C24 21.7614 21.7614 24 19 24H10.2426C9.18177 24 8.16436 23.5786 7.41421 22.8284L1.17157 16.5858C0.421426 15.8356 0 14.8182 0 13.7574V10.2426C0 9.18177 0.421427 8.16436 1.17157 7.41421L7.41421 1.17157C8.16436 0.421426 9.18178 0 10.2426 0H13.7574C14.8182 0 15.8356 0.421427 16.5858 1.17157L22.8284 7.41421C23.5786 8.16436 24 9.18178 24 10.2426C24 11.2221 23.9938 12.1985 23.9877 13.1731C23.9754 15.1158 23.9631 17.0515 23.9999 18.9905L24 19ZM23.5 19C23.4631 17.0549 23.4754 15.1079 23.4877 13.1613C23.4939 12.1882 23.5 11.2152 23.5 10.2426C23.5 9.31438 23.1313 8.42414 22.4749 7.76777L16.2322 1.52513C15.5759 0.868749 14.6856 0.5 13.7574 0.5H10.2426C9.31438 0.5 8.42414 0.868748 7.76777 1.52513L1.52513 7.76777C0.868749 8.42414 0.5 9.31438 0.5 10.2426V13.7574C0.5 14.6856 0.868748 15.5759 1.52513 16.2322L7.76777 22.4749C8.42414 23.1313 9.31438 23.5 10.2426 23.5H19C21.4853 23.5 23.5 21.4853 23.5 19Z\" fill=\"{OUTLINE}\"/>", "bg_el": "<path d=\"M8.12109 1.87866L1.87891 8.12134C1.31592 8.68396 1 9.44702 1 10.2427V13.7573C1 14.553 1.31592 15.316 1.87891 15.8787L8.12109 22.1213C8.68408 22.684 9.44678 23 10.2427 23H13.7573C14.5532 23 15.3159 22.684 15.8789 22.1213L22.1211 15.8787C22.6841 15.316 23 14.553 23 13.7573V10.2427C23 9.44702 22.6841 8.68396 22.1211 8.12134L15.8789 1.87866C15.3159 1.31604 14.5532 1 13.7573 1H10.2427C9.44678 1 8.68408 1.31604 8.12109 1.87866Z\" fill=\"url(#sg_rad0)\"/>", "hatch_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M10 1V2.58579C10 2.91731 9.8683 3.23525 9.63388 3.46967L3.46967 9.63388C3.23525 9.8683 2.91731 10 2.58579 10H1V9.5H2.58579C2.7847 9.5 2.97546 9.42098 3.11612 9.28033L9.28033 3.11612C9.42098 2.97546 9.5 2.7847 9.5 2.58579V1H10ZM14 1V2.58579C14 2.91731 14.1317 3.23525 14.3661 3.46967L20.5303 9.63388C20.7648 9.8683 21.0827 10 21.4142 10H23V9.5H21.4142C21.2153 9.5 21.0245 9.42098 20.8839 9.28033L14.7197 3.11612C14.579 2.97546 14.5 2.7847 14.5 2.58579V1H14ZM10 21.4142V23H9.5V21.4142C9.5 21.2153 9.42098 21.0245 9.28033 20.8839L3.11612 14.7197C2.97546 14.579 2.7847 14.5 2.58579 14.5H1V14H2.58579C2.91731 14 3.23525 14.1317 3.46967 14.3661L9.63388 20.5303C9.8683 20.7647 10 21.0827 10 21.4142ZM11.25 1V2.67157C11.25 3.26831 11.0129 3.84061 10.591 4.26256L4.26256 10.591C3.84061 11.0129 3.26831 11.25 2.67157 11.25H1V10.75H2.67157C3.1357 10.75 3.58082 10.5656 3.90901 10.2374L10.2374 3.90901C10.5656 3.58082 10.75 3.1357 10.75 2.67157V1H11.25ZM12.75 2.67157V1H13.25V2.67157C13.25 3.1357 13.4344 3.58082 13.7626 3.90901L20.091 10.2374C20.4192 10.5656 20.8643 10.75 21.3284 10.75H23V11.25H21.3284C20.7317 11.25 20.1594 11.0129 19.7374 10.591L13.409 4.26256C12.9871 3.84061 12.75 3.26831 12.75 2.67157ZM11.25 23V21.3284C11.25 20.7317 11.0129 20.1594 10.591 19.7374L4.26256 13.409C3.84061 12.9871 3.26831 12.75 2.67157 12.75H1V13.25H2.67157C3.1357 13.25 3.58082 13.4344 3.90901 13.7626L10.2374 20.091C10.5656 20.4192 10.75 20.8643 10.75 21.3284V23H11.25ZM12.75 20V23H13.25V20C13.25 19.5858 13.5858 19.25 14 19.25H15V18.75H14C13.3096 18.75 12.75 19.3096 12.75 20ZM20 12.75C19.3096 12.75 18.75 13.3096 18.75 14V15H19.25V14C19.25 13.5858 19.5858 13.25 20 13.25H23V12.75H20Z\" fill=\"white\" fill-opacity=\"0.25\"/>", "shine_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M10.2426 2C9.71221 2 9.2035 2.21071 8.82843 2.58579L2.58579 8.82843C2.21071 9.2035 2 9.71221 2 10.2426V13.7574C2 14.2878 2.21071 14.7965 2.58579 15.1716L8.82843 21.4142C9.2035 21.7893 9.71221 22 10.2426 22H14V19C14 16.2386 16.2386 14 19 14H22V10.2426C22 9.71221 21.7893 9.2035 21.4142 8.82843L15.1716 2.58579C14.7965 2.21071 14.2878 2 13.7574 2H10.2426ZM10.2426 1.5C9.5796 1.5 8.94372 1.76339 8.47487 2.23223L2.23223 8.47487C1.76339 8.94371 1.5 9.5796 1.5 10.2426V13.7574C1.5 14.4204 1.76339 15.0563 2.23223 15.5251L8.47487 21.7678C8.94371 22.2366 9.5796 22.5 10.2426 22.5H14C14.2761 22.5 14.5 22.2761 14.5 22V19C14.5 16.5147 16.5147 14.5 19 14.5H22C22.2761 14.5 22.5 14.2761 22.5 14V10.2426C22.5 9.5796 22.2366 8.94372 21.7678 8.47487L15.5251 2.23223C15.0563 1.76339 14.4204 1.5 13.7574 1.5H10.2426Z\" fill=\"url(#sg_lin0)\"/>", "dark_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M10.2426 23.5C9.31438 23.5 8.42414 23.1313 7.76777 22.4749L1.52513 16.2322C0.868748 15.5759 0.5 14.6856 0.5 13.7574V10.2426C0.5 9.31438 0.868749 8.42414 1.52513 7.76777L7.76777 1.52513C8.42415 0.868748 9.31438 0.5 10.2426 0.5H13.7574C14.6856 0.5 15.5759 0.868749 16.2322 1.52513L22.4749 7.76777C23.1313 8.42415 23.5 9.31438 23.5 10.2426C23.5 13.1607 23.4447 16.0826 23.5 19C23.5 21.4853 21.4853 23.5 19 23.5C15.9795 23.5 13.2795 23.5 10.2426 23.5ZM8.47487 2.23223C8.94372 1.76339 9.5796 1.5 10.2426 1.5H13.7574C14.4204 1.5 15.0563 1.76339 15.5251 2.23223L21.7678 8.47487C22.2366 8.94372 22.5 9.5796 22.5 10.2426V14C22.5 14.2761 22.2761 14.5 22 14.5H19C16.5147 14.5 14.5 16.5147 14.5 19V22C14.5 22.2761 14.2761 22.5 14 22.5H10.2426C9.5796 22.5 8.94371 22.2366 8.47487 21.7678L2.23223 15.5251C1.76339 15.0563 1.5 14.4204 1.5 13.7574V10.2426C1.5 9.5796 1.76339 8.94371 2.23223 8.47487L8.47487 2.23223Z\" fill=\"#001926\"/>", "deco": "<rect x=\"10\" y=\"1.5\" width=\"4\" height=\"0.5\" rx=\"0.25\" fill=\"white\"/>", "primary_opening": "<radialGradient id=\"sg_rad0\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(12 23) rotate(-90) scale(22)\">", "shine_opening": "<linearGradient id=\"sg_lin0\" x1=\"12\" y1=\"1.5\" x2=\"12\" y2=\"22.5\" gradientUnits=\"userSpaceOnUse\">", "shine_stops": "<stop stop-color=\"white\" stop-opacity=\"0.75\"/>\n<stop offset=\"1\" stop-color=\"white\" stop-opacity=\"0.15\"/>"}, "hull": {"outline_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M24 19C24 21.7614 21.7614 24 19 24H7.24264C6.18177 24 5.16436 23.5786 4.41421 22.8284L1.17157 19.5858C0.421426 18.8356 0 17.8182 0 16.7574V7.24264C0 6.18177 0.421427 5.16436 1.17157 4.41421L4.41421 1.17157C5.16436 0.421426 6.18178 0 7.24264 0H16.7574C17.8182 0 18.8356 0.421427 19.5858 1.17157L22.8284 4.41421C23.5786 5.16436 24 6.18178 24 7.24264C24 8.22206 23.9938 12.1985 23.9877 13.1731C23.9754 15.1158 23.9631 17.0515 23.9999 18.9905L24 19ZM23.5 19C23.4631 17.0549 23.4754 15.1079 23.4877 13.1613C23.4939 12.1882 23.5 8.2152 23.5 7.24264C23.5 6.31438 23.1313 5.42415 22.4749 4.76777L19.2322 1.52513C18.5759 0.868749 17.6856 0.5 16.7574 0.5H7.24264C6.31438 0.5 5.42415 0.868748 4.76777 1.52513L1.52513 4.76777C0.868749 5.42414 0.5 6.31438 0.5 7.24264V16.7574C0.5 17.6856 0.868748 18.5759 1.52513 19.2322L4.76777 22.4749C5.42414 23.1313 6.31438 23.5 7.24264 23.5H19C21.4853 23.5 23.5 21.4853 23.5 19Z\" fill=\"{OUTLINE}\"/>", "bg_el": "<path d=\"M5.12109 1.87866L1.87891 5.12134C1.31592 5.68396 1 6.44702 1 7.24268V16.7573C1 17.553 1.31592 18.316 1.87891 18.8787L5.12109 22.1213C5.68408 22.684 6.44678 23 7.24268 23H16.7573C17.5532 23 18.3159 22.684 18.8789 22.1213L22.1211 18.8787C22.6841 18.316 23 17.553 23 16.7573V7.24268C23 6.44702 22.6841 5.68396 22.1211 5.12134L18.8789 1.87866C18.3159 1.31604 17.5532 1 16.7573 1H7.24268C6.44678 1 5.68408 1.31604 5.12109 1.87866Z\" fill=\"url(#sg_rad0)\"/>", "hatch_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M10 1V2.58579C10 2.91731 9.8683 3.23525 9.63388 3.46967L3.46967 9.63388C3.23525 9.8683 2.91731 10 2.58579 10H1V9.5H2.58579C2.7847 9.5 2.97546 9.42098 3.11612 9.28033L9.28033 3.11612C9.42098 2.97546 9.5 2.7847 9.5 2.58579V1H10ZM14 1V2.58579C14 2.91731 14.1317 3.23525 14.3661 3.46967L20.5303 9.63388C20.7648 9.8683 21.0827 10 21.4142 10H23V9.5H21.4142C21.2153 9.5 21.0245 9.42098 20.8839 9.28033L14.7197 3.11612C14.579 2.97546 14.5 2.7847 14.5 2.58579V1H14ZM10 21.4142V23H9.5V21.4142C9.5 21.2153 9.42098 21.0245 9.28033 20.8839L3.11612 14.7197C2.97546 14.579 2.7847 14.5 2.58579 14.5H1V14H2.58579C2.91731 14 3.23525 14.1317 3.46967 14.3661L9.63388 20.5303C9.8683 20.7647 10 21.0827 10 21.4142ZM11.25 1V2.67157C11.25 3.26831 11.0129 3.84061 10.591 4.26256L4.26256 10.591C3.84061 11.0129 3.26831 11.25 2.67157 11.25H1V10.75H2.67157C3.1357 10.75 3.58082 10.5656 3.90901 10.2374L10.2374 3.90901C10.5656 3.58082 10.75 3.1357 10.75 2.67157V1H11.25ZM12.75 2.67157V1H13.25V2.67157C13.25 3.1357 13.4344 3.58082 13.7626 3.90901L20.091 10.2374C20.4192 10.5656 20.8643 10.75 21.3284 10.75H23V11.25H21.3284C20.7317 11.25 20.1594 11.0129 19.7374 10.591L13.409 4.26256C12.9871 3.84061 12.75 3.26831 12.75 2.67157ZM11.25 23V21.3284C11.25 20.7317 11.0129 20.1594 10.591 19.7374L4.26256 13.409C3.84061 12.9871 3.26831 12.75 2.67157 12.75H1V13.25H2.67157C3.1357 13.25 3.58082 13.4344 3.90901 13.7626L10.2374 20.091C10.5656 20.4192 10.75 20.8643 10.75 21.3284V23H11.25ZM12.75 20V23H13.25V20C13.25 19.5858 13.5858 19.25 14 19.25H15V18.75H14C13.3096 18.75 12.75 19.3096 12.75 20ZM20 12.75C19.3096 12.75 18.75 13.3096 18.75 14V15H19.25V14C19.25 13.5858 19.5858 13.25 20 13.25H23V12.75H20Z\" fill=\"white\" fill-opacity=\"0.25\"/>", "shine_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.24264 2C6.71221 2 6.2035 2.21071 5.82843 2.58579L2.58579 5.82843C2.21071 6.2035 2 6.71221 2 7.24264V16.7574C2 17.2878 2.21071 17.7965 2.58579 18.1716L5.82843 21.4142C6.2035 21.7893 6.71221 22 7.24264 22H14V19C14 16.2386 16.2386 14 19 14H22V7.24264C22 6.71221 21.7893 6.2035 21.4142 5.82843L18.1716 2.58579C17.7965 2.21071 17.2878 2 16.7574 2H7.24264ZM7.24264 1.5C6.5796 1.5 5.94372 1.76339 5.47487 2.23223L2.23223 5.47487C1.76339 5.94371 1.5 6.5796 1.5 7.24264V16.7574C1.5 17.4204 1.76339 18.0563 2.23223 18.5251L5.47487 21.7678C5.94371 22.2366 6.5796 22.5 7.24264 22.5H14C14.2761 22.5 14.5 22.2761 14.5 22V19C14.5 16.5147 16.5147 14.5 19 14.5H22C22.2761 14.5 22.5 14.2761 22.5 14V7.24264C22.5 6.5796 22.2366 5.94372 21.7678 5.47487L18.5251 2.23223C18.0563 1.76339 17.4204 1.5 16.7574 1.5H7.24264Z\" fill=\"url(#sg_lin0)\"/>", "dark_el": "<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.24264 23.5C6.31438 23.5 5.42414 23.1313 4.76777 22.4749L1.52513 19.2322C0.868748 18.5759 0.5 17.6856 0.5 16.7574V7.24264C0.5 6.31438 0.868749 5.42414 1.52513 4.76777L4.76777 1.52513C5.42415 0.868748 6.31438 0.5 7.24264 0.5H16.7574C17.6856 0.5 18.5759 0.868749 19.2322 1.52513L22.4749 4.76777C23.1313 5.42415 23.5 6.31438 23.5 7.24264C23.5 10.1607 23.4447 16.0826 23.5 19C23.5 21.4853 21.4853 23.5 19 23.5C15.9795 23.5 10.2795 23.5 7.24264 23.5ZM5.47487 2.23223C5.94372 1.76339 6.5796 1.5 7.24264 1.5H16.7574C17.4204 1.5 18.0563 1.76339 18.5251 2.23223L21.7678 5.47487C22.2366 5.94372 22.5 6.5796 22.5 7.24264V14C22.5 14.2761 22.2761 14.5 22 14.5H19C16.5147 14.5 14.5 16.5147 14.5 19V22C14.5 22.2761 14.2761 22.5 14 22.5H7.24264C6.5796 22.5 5.94371 22.2366 5.47487 21.7678L2.23223 18.5251C1.76339 18.0563 1.5 17.4204 1.5 16.7574V7.24264C1.5 6.5796 1.76339 5.94371 2.23223 5.47487L5.47487 2.23223Z\" fill=\"#001926\"/>", "deco": "<path d=\"M7 1.75C7 1.61193 7.11193 1.5 7.25 1.5H16.75C16.8881 1.5 17 1.61193 17 1.75C17 1.88807 16.8881 2 16.75 2H7.25C7.11193 2 7 1.88807 7 1.75Z\" fill=\"white\"/>\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M3 17.5C3.27614 17.5 3.5 17.2761 3.5 17C3.5 16.7239 3.27614 16.5 3 16.5C2.72386 16.5 2.5 16.7239 2.5 17C2.5 17.2761 2.72386 17.5 3 17.5ZM7 21.5C7.27614 21.5 7.5 21.2761 7.5 21C7.5 20.7239 7.27614 20.5 7 20.5C6.72386 20.5 6.5 20.7239 6.5 21C6.5 21.2761 6.72386 21.5 7 21.5Z\" fill=\"white\" fill-opacity=\"0.25\"/>\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7 3.5C6.72386 3.5 6.5 3.27614 6.5 3C6.5 2.72386 6.72386 2.5 7 2.5C7.27614 2.5 7.5 2.72386 7.5 3C7.5 3.27614 7.27614 3.5 7 3.5ZM3 7.5C2.72386 7.5 2.5 7.27614 2.5 7C2.5 6.72386 2.72386 6.5 3 6.5C3.27614 6.5 3.5 6.72386 3.5 7C3.5 7.27614 3.27614 7.5 3 7.5Z\" fill=\"white\" fill-opacity=\"0.25\"/>\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M17 3.5C17.2761 3.5 17.5 3.27614 17.5 3C17.5 2.72386 17.2761 2.5 17 2.5C16.7239 2.5 16.5 2.72386 16.5 3C16.5 3.27614 16.7239 3.5 17 3.5ZM21 7.5C21.2761 7.5 21.5 7.27614 21.5 7C21.5 6.72386 21.2761 6.5 21 6.5C20.7239 6.5 20.5 6.72386 20.5 7C20.5 7.27614 20.7239 7.5 21 7.5Z\" fill=\"white\" fill-opacity=\"0.25\"/>", "primary_opening": "<radialGradient id=\"sg_rad0\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(12 23) rotate(-90) scale(22)\">", "shine_opening": "<linearGradient id=\"sg_lin0\" x1=\"12\" y1=\"1.5\" x2=\"12\" y2=\"22.5\" gradientUnits=\"userSpaceOnUse\">", "shine_stops": "<stop stop-color=\"white\" stop-opacity=\"0.75\"/>\n<stop offset=\"1\" stop-color=\"white\" stop-opacity=\"0.15\"/>"}};
+        const SHOT_TEMPLATE = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\">\n<path d=\"M23 12C23 5.92487 18.0751 1 12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23H18.6957C21.0729 23 23 21.0729 23 18.6957V12Z\" fill=\"url(#cg_rad0)\"/>\n<path opacity=\"0.5\" d=\"M18.7163 5.28361L11.9999 12L5.28125 5.28136C7.00032 3.56286 9.37486 2.5 11.9976 2.5C14.6216 2.5 16.997 3.56379 18.7163 5.28361Z\" fill=\"url(#cg_rad1)\"/>\n<path d=\"M20.7869 9.17152C21.5956 9.95252 22 10.9763 22 12V19C22 20.6569 20.6569 22 19 22H12C6.47715 22 2 17.5228 2 12C2 13.0237 2.40438 14.0475 3.21313 14.8285C4.83063 16.3905 7.45354 16.3905 9.07104 14.8285L14.929 9.17152C16.5465 7.60949 19.1694 7.60949 20.7869 9.17152Z\" fill=\"url(#cg_rad2)\"/>\n<path opacity=\"0.75\" fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M20.6132 9.35135C19.0926 7.88288 16.6232 7.88288 15.1026 9.35135L9.24471 15.0083C7.53033 16.6639 4.75385 16.6639 3.03946 15.0083C2.18092 14.1792 1.75 13.0901 1.75 12H2C2 13.0237 2.40438 14.0475 3.21313 14.8285C4.83063 16.3905 7.45354 16.3905 9.07104 14.8285L14.929 9.17152C16.5465 7.60949 19.1694 7.60949 20.7869 9.17152C21.5956 9.95252 22 10.9763 22 12H21.75C21.75 11.0427 21.3722 10.0843 20.6132 9.35135Z\" fill=\"url(#cg_rad3)\"/>\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M12 0C18.6274 2.68221e-07 24 5.37258 24 12V19C24 21.7614 21.7614 24 19 24H12C5.37258 24 -2.98023e-07 18.6274 0 12C2.68221e-07 5.37258 5.37258 -2.98023e-07 12 0ZM12 0.5C18.3513 0.5 23.5 5.64873 23.5 12V19C23.5 21.4853 21.4853 23.5 19 23.5H12C5.64873 23.5 0.5 18.3513 0.5 12C0.5 5.64873 5.64873 0.5 12 0.5Z\" fill=\"{OUTLINE}\"/>\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M12 22.5C6.20101 22.5 1.5 17.799 1.5 12C1.5 6.20101 6.20101 1.5 12 1.5C17.799 1.5 22.5 6.20101 22.5 12V14C22.5 14.2761 22.2761 14.5 22 14.5H19C16.5147 14.5 14.5 16.5147 14.5 19V22C14.5 22.2761 14.2761 22.5 14 22.5H12ZM2 12C2 17.5228 6.47715 22 12 22H14V19C14 16.2386 16.2386 14 19 14H22V12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12Z\" fill=\"url(#cg_lin0)\"/>\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M23.4774 17H23.5V12C23.5 5.64873 18.3513 0.5 12 0.5C5.64873 0.5 0.5 5.64872 0.5 12C0.5 18.3513 5.64872 23.5 12 23.5H19C21.4853 23.5 23.5 21.4853 23.5 19C23.4874 18.3335 23.4805 17.6668 23.4774 17ZM14 22.5C14.2761 22.5 14.5 22.2761 14.5 22V19C14.5 16.5147 16.5147 14.5 19 14.5H22C22.2761 14.5 22.5 14.2761 22.5 14V12C22.5 6.20101 17.799 1.5 12 1.5C6.20101 1.5 1.5 6.20101 1.5 12C1.5 17.799 6.20101 22.5 12 22.5H14Z\" fill=\"#001926\"/>\n<path d=\"M11.75 3C11.6119 3 11.5 3.11193 11.5 3.25C11.5 3.38807 11.6119 3.5 11.75 3.5H12.25C12.3881 3.5 12.5 3.38807 12.5 3.25C12.5 3.11193 12.3881 3 12.25 3H11.75Z\" fill=\"white\"/>\n<path opacity=\"0.5\" d=\"M11.75 20.5C11.6119 20.5 11.5 20.6119 11.5 20.75C11.5 20.8881 11.6119 21 11.75 21H12.25C12.3881 21 12.5 20.8881 12.5 20.75C12.5 20.6119 12.3881 20.5 12.25 20.5H11.75Z\" fill=\"white\"/>\n<path opacity=\"0.25\" d=\"M9.07104 14.8285C7.45354 16.3905 4.83063 16.3905 3.21313 14.8285C1.59562 13.2665 1.59562 10.7335 3.21313 9.17152C4.83063 7.60949 7.45354 7.60949 9.07104 9.17152L12 12L9.07104 14.8285Z\" fill=\"url(#cg_rad4)\"/>\n<defs>\n<radialGradient id=\"cg_rad0\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(12 12) rotate(90) scale(11)\">{STOPS}</radialGradient>\n<radialGradient id=\"cg_rad1\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(11.9978 2.5) rotate(90) scale(6.5)\">\n<stop stop-color=\"white\"/>\n<stop offset=\"1\" stop-color=\"white\" stop-opacity=\"0\"/>\n</radialGradient>\n<radialGradient id=\"cg_rad2\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(12 12) rotate(90) scale(9)\">\n<stop stop-color=\"white\" stop-opacity=\"0.75\"/>\n<stop offset=\"1\" stop-color=\"white\" stop-opacity=\"0.15\"/>\n</radialGradient>\n<radialGradient id=\"cg_rad3\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(12 12) scale(9 22.0909)\">\n<stop stop-color=\"white\"/>\n<stop offset=\"1\" stop-color=\"white\" stop-opacity=\"0\"/>\n</radialGradient>\n<linearGradient id=\"cg_lin0\" x1=\"12\" y1=\"1.5\" x2=\"12\" y2=\"22.5\" gradientUnits=\"userSpaceOnUse\">\n<stop stop-color=\"white\" stop-opacity=\"0.75\"/>\n<stop offset=\"1\" stop-color=\"white\" stop-opacity=\"0.15\"/>\n</linearGradient>\n<radialGradient id=\"cg_rad4\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(6 16) rotate(-90) scale(8)\">\n<stop stop-color=\"white\" stop-opacity=\"0\"/>\n<stop offset=\"1\" stop-color=\"white\"/>\n</radialGradient>\n</defs>\n</svg>";
+
+        // ============================================================
+// SVG 组装核心（页面内联使用；node 测试直接加载同一文件）：
+//   形状模板(SHAPES / SHOT_TEMPLATE) + 中间图标(augmentIcons.icon)
+//   + 右下角装备图标(equipmentIcons) + 稀有度描边 + 填充渐变
+// 每个渲染实例用 uid 区分渐变 id，避免同页多个内联 SVG 冲突
+// ============================================================
+const ComposeCore = (() => {
+
+    let uidCounter = 0;
+    function nextUid() { return 'u' + (++uidCounter).toString(36); }
+
+    function uniquify(str, uid) {
+        if (!str || str.indexOf('g_') === -1) return str;
+        return str
+            .replace(/id="([sacf]g_(?:rad|lin|clip)\d+)"/g, (_, id) => `id="${id}-${uid}"`)
+            .replace(/url\(#([sacf]g_(?:rad|lin|clip)\d+)\)/g, (_, id) => `url(#${id}-${uid})`);
+    }
+
+    // 将 bg 元素克隆为某渐变 id 的填充层（用于复合填充覆盖层）
+    function cloneWithGradient(el, gradientCanonicalId) {
+        return el.replace(/fill="url\(#[^"]+\)"/, `fill="url(#${gradientCanonicalId})"`);
+    }
+
+    function make(SHAPES, SHOT_TEMPLATE, DATA, shotEffectAugments) {
+        const DEFAULT_ROOT_OPEN = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">';
+        const SHOT_PRIMARY_OPENING = SHOT_TEMPLATE.match(/<radialGradient\b[^>]*>/)[0];
+        const SHOT_PRIMARY_ID = SHOT_PRIMARY_OPENING.match(/id="([^"]+)"/)[1];
+
+        /**
+         * 组装最终 SVG。
+         * options:
+         *   shape    'turret'|'hull'（默认取改造自身形状）
+         *   outline  描边色（默认改造自身描边色；'#' 表示无）
+         *   fill     { stops, opening?, overlays? } —— 手动填充/跟随稀有度时给定；
+         *            给定后：替换主渐变 stops、丢弃改造自身覆盖层、追加 fill.overlays
+         *   equipment 装备名（插入右下角小图标；'none'/空 = 不加）
+         *   uid      渐变 id 唯一后缀
+         */
+        function composeIcon(augmentName, options = {}) {
+            const uid = options.uid || nextUid();
+            if (shotEffectAugments.has(augmentName)) return composeShotIcon(augmentName, options);
+
+            const e = DATA.augmentIcons[augmentName];
+            const useShape = options.shape || e.shape;
+            const shapeChanged = useShape !== e.shape;
+            const sh = SHAPES[useShape];
+            const pick = (entryVal, shapeVal) => (!shapeChanged && entryVal) || shapeVal;
+
+            const fill = options.fill || null;
+            const outlineColor = options.outline != null ? options.outline : e.outline;
+
+            const bgEl = pick(e.bg, sh.bg_el);
+            const body = [];
+            body.push((shapeChanged ? sh.outline_el : (e.outlineEl || sh.outline_el)).replace('{OUTLINE}', outlineColor));
+
+            // 背景主渐变（可换 stops / opening；换 opening 时保持目标渐变 id，与原站一致）
+            body.push(bgEl);
+            let primaryOpening = pick(e.primaryOpening, sh.primary_opening);
+            if (fill && fill.opening) {
+                const targetId = primaryOpening.match(/id="([^"]+)"/)[1];
+                primaryOpening = fill.opening.replace(/\bid="[^"]+"/, `id="${targetId}"`);
+            }
+            const primaryStops = fill ? fill.stops : e.stops;
+
+            // 覆盖层（复合填充）
+            let extra = e.extraByShape
+                ? (e.extraByShape[useShape] || '')            // 合并改造（卓越）：按当前形状取叠加层，任何形状都有
+                : (shapeChanged ? '' : (e.extra || ''));
+            let overlayDefs = [];        // 追加到 defs 的完整 <radialGradient> 定义字符串
+            if (fill) {
+                if (fill.overlays && fill.overlays.length) {
+                    extra = fill.overlays
+                        .map(ov => cloneWithGradient(bgEl, ov.opening.match(/id="([^"]+)"/)[1]))
+                        .join('\n');
+                    fill.overlays.forEach(ov => overlayDefs.push(`${ov.opening}\n${ov.stops}\n</radialGradient>`));
+                } else {
+                    extra = '';   // 手动填充/跟随稀有度：去掉自身覆盖层
+                }
+            } else if (extra && e.overlayDefs) {
+                overlayDefs = e.overlayDefs;   // 改造自身复合填充（卓越，含合并后任意形状）
+            }
+            if (extra) body.push(extra);
+
+            body.push(e.hatch || sh.hatch_el);            // 网格层：两种形状共用同一 d，改造自身的网格（凤凰金色网格等）跨形状保留
+            body.push(pick(e.shine, sh.shine_el));
+            if (e.icon) body.push(e.icon);
+            body.push(pick(e.dark, sh.dark_el));
+            const deco = e.decoByShape
+                ? (e.decoByShape[useShape] || sh.deco)        // 合并改造（凤凰）：按当前形状取装饰件，缺省用形状默认
+                : pick(e.deco, sh.deco);
+            if (deco) body.push(deco);
+
+            const equipment = options.equipment;
+            if (equipment && equipment !== 'none' && DATA.equipmentIcons[equipment]) {
+                body.push(DATA.equipmentIcons[equipment]);
+            }
+
+            const defs = [`${primaryOpening}\n${primaryStops}\n</radialGradient>`];
+            if (!fill && extra && e.overlayDefs) overlayDefs.forEach(d => defs.push(d));   // 自身覆盖层：紧随主渐变
+            defs.push(`${sh.shine_opening}\n${e.shineStops || sh.shine_stops}\n</linearGradient>`);   // 高光 opening 两种形状相同；改造自身高光色（凤凰金色）跨形状保留
+            if (e.iconDefs) e.iconDefs.forEach(d => defs.push(d));
+            if (fill) overlayDefs.forEach(d => defs.push(d));   // 手动填充覆盖层：defs 末尾（与原站一致）
+
+            const rootOpen = shapeChanged ? DEFAULT_ROOT_OPEN : (e.root || DEFAULT_ROOT_OPEN);
+            const svg = rootOpen + '\n' + body.join('\n') + '\n<defs>\n' + defs.join('\n') + '\n</defs>\n</svg>';
+            return uniquify(svg, uid);
+        }
+
+        /**
+         * 射击颜色图标：圆形模板 + 每色 stops/描边；同样支持手动填充/稀有度
+         */
+        function composeShotIcon(augmentName, options = {}) {
+            const uid = options.uid || nextUid();
+            const info = DATA.shotColors[augmentName];
+            if (!info) return '';
+            const fill = options.fill || null;
+            const outlineColor = options.outline != null ? options.outline : info.outline;
+
+            let svg = SHOT_TEMPLATE
+                .replace('{OUTLINE}', outlineColor)
+                .replace('{STOPS}', fill ? fill.stops : info.stops);
+
+            // 手动填充带有模板：替换主渐变 opening 并追加覆盖层
+            if (fill && fill.opening) {
+                const targetOpening = svg.match(new RegExp(`<radialGradient\\b[^>]*\\bid="${SHOT_PRIMARY_ID}"[^>]*>`))[0];
+                svg = svg.replace(targetOpening, fill.opening.replace(/\bid="[^"]+"/, `id="${SHOT_PRIMARY_ID}"`));
+                if (fill.overlays && fill.overlays.length) {
+                    const circleEl = svg.match(new RegExp(`<path\\b[^>]*\\bfill="url\\(#${SHOT_PRIMARY_ID}\\)"[^>]*/>`))[0];
+                    const cloneEls = [];
+                    const newDefs = [];
+                    fill.overlays.forEach((ov, index) => {
+                        const ovId = `${SHOT_PRIMARY_ID}_ovl${index + 1}`;
+                        cloneEls.push(cloneWithGradient(circleEl, ovId));
+                        newDefs.push(`${ov.opening.replace(/\bid="[^"]+"/, `id="${ovId}"`)}\n${ov.stops}\n</radialGradient>`);
+                    });
+                    svg = svg.replace(circleEl, circleEl + '\n' + cloneEls.join('\n'));
+                    svg = svg.replace('</defs>', newDefs.join('\n') + '\n</defs>');
+                }
+            }
+
+            const equipment = options.equipment;
+            if (equipment && equipment !== 'none' && DATA.equipmentIcons[equipment]) {
+                svg = svg.replace('<defs>', DATA.equipmentIcons[equipment] + '\n<defs>');
+            }
+            return uniquify(svg, uid);
+        }
+
+        return { composeIcon, composeShotIcon, nextUid, SHOT_PRIMARY_OPENING };
+    }
+
+    return make;
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = ComposeCore;
+
 
         const isZh = navigator.language.toLowerCase().startsWith('zh');
 
@@ -202,11 +387,10 @@
 
         function findInlineEnglishName(groupedData, chineseName) {
             if (!groupedData || typeof groupedData !== 'object') return null;
-            if (
-                Object.prototype.hasOwnProperty.call(groupedData, chineseName) &&
-                typeof groupedData[chineseName] === 'string'
-            ) {
-                return groupedData[chineseName];
+            if (Object.prototype.hasOwnProperty.call(groupedData, chineseName)) {
+                const value = groupedData[chineseName];
+                if (typeof value === 'string') return value;                    // 旧结构：中文名 → 英文名
+                if (value && typeof value === 'object' && typeof value.en === 'string') return value.en;   // 新结构：内嵌在条目里
             }
             for (const value of Object.values(groupedData)) {
                 const match = findInlineEnglishName(value, chineseName);
@@ -216,7 +400,7 @@
         }
 
         function getInlineEnglishName(chineseName) {
-            for (const groupedData of [groupedEquipments, groupedAugments, groupedBackgroundColors]) {
+            for (const groupedData of [groupedEquipments, groupedAugments, groupedFillColors]) {
                 const match = findInlineEnglishName(groupedData, chineseName);
                 if (match) return match;
             }
@@ -226,37 +410,41 @@
         const uiTexts = {
             title: isZh ? "3D坦克装备改造图标拼接器" : "Tanki Online Augment Icon Splicer",
             header: isZh ? "3D坦克装备改造图标拼接器" : "Tanki Online Augment Icon Splicer",
-            
+
             lbl_equip: isZh ? "装备" : "Equipment",
             sel_equip: isZh ? "请选择装备" : "Select Equipment",
             lbl_aug: isZh ? "装备改造" : "Augment",
             sel_aug: isZh ? "请选择装备改造" : "Select Augment",
-            
-            opt_summary: isZh ? "可选参数 (稀有度/填充)" : "Optional (Rarity / Fill)",
+
+            lbl_shape: isZh ? "改造形状" : "Augment Shape",
+            shape_auto: isZh ? "自动" : "Auto",
+
+            opt_summary: isZh ? "可选参数 (形状/稀有度/填充)" : "Optional (Shape / Rarity / Fill)",
             lbl_rarity: isZh ? "稀有度颜色" : "Rarity Color",
             val_default: isZh ? "默认" : "Default",
             val_none: isZh ? "无" : "None",
             val_follow_rarity: isZh ? "跟随稀有度" : "Follow Rarity",
+            custom_made: isZh ? "（自制）" : " (Custom)",
             lbl_fill: isZh ? "填充颜色" : "Fill Color",
-            
+
             btn_reset: isZh ? "全部重置" : "Reset All",
             preview_txt: isZh ? "预览区域" : "Preview Area",
             loading: isZh ? "加载中..." : "Loading...",
             note: isZh ? "注：生成的图标仅供参考" : "Note: Generated icons are for reference only.",
-            
+
             dl_size: isZh ? "尺寸:" : "Size:",
             dl_png: isZh ? "保存 PNG" : "Save PNG",
             dl_svg: isZh ? "保存 SVG (矢量图)" : "Save SVG (Vector)",
-            
+
             modal_equip: isZh ? "选择装备" : "Select Equipment",
             modal_aug: isZh ? "选择装备改造" : "Select Augment",
             modal_rarity: isZh ? "选择稀有度颜色" : "Select Rarity Color",
             modal_fill: isZh ? "选择填充颜色" : "Select Fill Color",
-            
+
             rarity_names: {
-                "Default": isZh ? "默认" : "Default", "None": isZh ? "无" : "None", 
-                "Common": isZh ? "普通" : "Common", "Uncommon": isZh ? "罕见" : "Uncommon", 
-                "Rare": isZh ? "稀有" : "Rare", "Epic": isZh ? "史诗" : "Epic", 
+                "Default": isZh ? "默认" : "Default", "None": isZh ? "无" : "None",
+                "Common": isZh ? "普通" : "Common", "Uncommon": isZh ? "罕见" : "Uncommon",
+                "Rare": isZh ? "稀有" : "Rare", "Epic": isZh ? "史诗" : "Epic",
                 "Legendary": isZh ? "传奇" : "Legendary", "Exotic": isZh ? "异国情调" : "Exotic"
             }
         };
@@ -267,18 +455,76 @@
         document.getElementById('display-equipment').textContent = uiTexts.sel_equip;
         document.getElementById('ui-lbl-aug').textContent = uiTexts.lbl_aug;
         document.getElementById('display-augment').textContent = uiTexts.sel_aug;
+        document.getElementById('ui-lbl-shape').textContent = uiTexts.lbl_shape;
+        document.getElementById('btn-shape-turret').title = t('炮塔');
+        document.getElementById('btn-shape-hull').title = t('底盘');
         document.getElementById('ui-opt-summary').textContent = uiTexts.opt_summary;
+
+        // 可选参数展开/收起：手动切换 expanded 类（阻止原生 open 切换），保证每次开合都播动画
+        const optDetails = document.getElementById('optDetails');
+        document.getElementById('optSummary').addEventListener('click', (e) => {
+            e.preventDefault();
+            optDetails.classList.toggle('expanded');
+        });
         document.getElementById('ui-lbl-rarity').textContent = uiTexts.lbl_rarity;
         document.getElementById('display-rarity').textContent = uiTexts.val_default;
         document.getElementById('ui-lbl-fill').textContent = uiTexts.lbl_fill;
         document.getElementById('display-background').textContent = uiTexts.val_default;
-        document.getElementById('ui-btn-reset').childNodes[2].textContent = " " + uiTexts.btn_reset; 
+        document.getElementById('ui-btn-reset').childNodes[2].textContent = " " + uiTexts.btn_reset;
         document.getElementById('ui-preview-txt').textContent = uiTexts.preview_txt;
         document.getElementById('loading').textContent = uiTexts.loading;
         document.getElementById('ui-note').textContent = uiTexts.note;
 
+        // 界面文字已按浏览器语言写好，此处才解除隐藏（避免首帧闪现静态英文占位文本）
+        document.documentElement.classList.add('i18n-ready');
+
+        // 单文件版本会把数据直接嵌在下面（不需要 data.json，双击 html 即可用）；
+        // 两文件版本这里保持 null，走 fetch('./data.json')
+        const EMBEDDED_DATA = null;
+        let DATA = null;
+        try {
+            if (EMBEDDED_DATA) {
+                DATA = EMBEDDED_DATA;
+            } else {
+                const dataResponse = await fetch('./data.json');
+                if (!dataResponse.ok) throw new Error(`Failed to load data.json: ${dataResponse.status}`);
+                DATA = await dataResponse.json();
+            }
+        } catch (e) {
+            document.getElementById('ui-preview-txt').textContent = isZh ? '数据加载失败' : 'Failed to load data';
+            document.documentElement.classList.add('i18n-ready');   // 出错也要显示界面
+            throw e;
+        }
+        const groupedEquipments = DATA.groupedEquipments;
+        const groupedAugments = DATA.groupedAugments;
+        const groupedFillColors = DATA.groupedFillColors;
+
+        // groupedEquipments 里每个装备条目内嵌了右下角图标（en/icon），建平铺索引（值直接存图标字符串）
+        DATA.equipmentIcons = {};
+        Object.values(groupedEquipments).forEach(items =>
+            Object.entries(items).forEach(([name, entry]) => { DATA.equipmentIcons[name] = entry.icon; }));
+
+        // groupedFillColors 里每个填充颜色条目内嵌了渐变数据（en/stops，凤凰/卓越另有 opening/overlays）。
+        // 平铺索引（共享引用）
+        DATA.fillColors = {};
+        Object.values(groupedFillColors).forEach(items => Object.assign(DATA.fillColors, items));
+
+        // groupedAugments 里每个改造/射击颜色条目内嵌了图标数据（en/形状/描边/stops/中间图标）。
+        // 这里建两张平铺索引（共享字符串引用，无额外内存），供 compose 等快速按键名查找
+        DATA.augmentIcons = {};
+        DATA.shotColors = {};
+        Object.entries(groupedAugments).forEach(([group, items]) => {
+            const target = group === '射击颜色' ? DATA.shotColors : DATA.augmentIcons;
+            const pairs = group === '射击颜色'
+                ? Object.entries(items)
+                : Object.values(items).flatMap(byRarity => Object.entries(byRarity));
+            pairs.forEach(([name, entry]) => { target[name] = entry; });
+        });
+
+
         function getFixedEnglishName(chineseKey) {
             switch (chineseKey) {
+                case "空": return "Empty";
                 case "炮塔": return "Turret";
                 case "底盘": return "Hull";
                 case "射击颜色": return "Shot Effect";
@@ -300,9 +546,10 @@
         }
 
         function getAugmentDisplayName(augmentName) {
-            return t(augmentName)
+            const base = t(augmentName)
                 .replace(/（(?:炮塔|底盘)）$/, '')
                 .replace(/\s*\((?:Turret|Hull)\)$/i, '');
+            return base === t('空') ? base + uiTexts.custom_made : base;   // 空 不是官方图标
         }
 
         const rarities = [
@@ -342,8 +589,10 @@
 
         const equipmentAugmentGroups = ["炮塔", "底盘"];
         const shotEffectAugments = new Set(getGroupedItemNames(groupedAugments["射击颜色"]));
+        const { composeIcon, composeShotIcon, nextUid, SHOT_PRIMARY_OPENING } =
+            ComposeCore(SHAPES, SHOT_TEMPLATE, DATA, shotEffectAugments);
         const equipmentAugmentRarityKeyByName = new Map();
-        equipmentAugmentGroups.forEach(group => {
+        [...equipmentAugmentGroups, '通用'].forEach(group => {
             Object.entries(groupedAugments[group] || {}).forEach(([rarityKey, augmentItems]) => {
                 getGroupedItemNames(augmentItems).forEach(augmentName => {
                     equipmentAugmentRarityKeyByName.set(augmentName, rarityKey);
@@ -351,30 +600,59 @@
             });
         });
         const equipmentAugmentNames = [...equipmentAugmentRarityKeyByName.keys()];
-        const equipmentFillNames = new Set(getGroupedItemNames(groupedBackgroundColors["来自装备改造图标"]));
-        const fillTemplateCache = {};
+
+        // ============================================================
+        // 空/卓越/凤凰：菜单中合并为通用项（不分炮塔/底盘），
+        // 实际生成时按当前生效形状（装备 → 手动切换 → 默认炮塔）解析到具体变体
+        // ============================================================
+        // 空（自制）不写入 data.json：由 普通 稀有度参数合成两个形状的条目
+        const commonRaritySpec = rarities.find(r => r.key === 'Common');
+        ['炮塔', '底盘'].forEach(cnShape => {
+            const name = `空（${cnShape}）`;
+            DATA.augmentIcons[name] = {
+                shape: cnShape === '炮塔' ? 'turret' : 'hull',
+                outline: commonRaritySpec.value,
+                stops: commonRaritySpec.fillStops,
+                icon: ''
+            };
+            equipmentAugmentRarityKeyByName.set(name, 'Common');
+        });
+
+        const GENERIC_TWIN_AUGMENTS = ["空", "卓越", "凤凰"];   // 顺序即菜单中的显示顺序
+        const genericTwinSet = new Set(GENERIC_TWIN_AUGMENTS);
+        function isGenericTwinAugment(augmentName) { return genericTwinSet.has(augmentName); }
+        function resolveAugmentName(augmentName = document.getElementById('val-augment').value) {
+            if (!isGenericTwinAugment(augmentName)) return augmentName;
+            if (DATA.augmentIcons[augmentName]) return augmentName;   // 卓越/凤凰：data.json 里已是合并单条
+            return augmentName + (getEffectiveShape(augmentName) === 'hull' ? '（底盘）' : '（炮塔）');   // 空：运行时合成的两个形状条目
+        }
 
         function getRawAugmentBaseName(augmentName) {
             return augmentName.replace(/（(?:炮塔|底盘)）$/, '');
         }
 
-        const sourceAugmentByFillName = new Map();
-        equipmentAugmentNames.forEach(augmentName => {
-            const baseName = getRawAugmentBaseName(augmentName);
-            if (equipmentFillNames.has(baseName) && !sourceAugmentByFillName.has(baseName)) {
-                sourceAugmentByFillName.set(baseName, augmentName);
-            }
-        });
+        // 与原版逻辑一致：基础名与填充色名相同的改造（凤凰/卓越）用自身填充，不跟随稀有度
         const originalFillAugments = new Set(
-            equipmentAugmentNames.filter(augmentName => sourceAugmentByFillName.has(getRawAugmentBaseName(augmentName)))
+            equipmentAugmentNames.filter(augmentName => {
+                const fill = DATA.fillColors[getRawAugmentBaseName(augmentName)];
+                return Boolean(fill && fill.opening);
+            })
         );
+
+        function hasOriginalAugmentFill(augmentName) {
+            if (isGenericTwinAugment(augmentName)) {
+                const fill = DATA.fillColors[augmentName];
+                return Boolean(fill && fill.opening);   // 卓越/凤凰 用自身填充；空 无自身填充 → 跟随稀有度
+            }
+            return originalFillAugments.has(augmentName);
+        }
 
         function getRarity(value = document.getElementById('val-rarity').value) {
             return rarities.find(rarity => rarity.value === value);
         }
 
         function usesAutomaticRarityFill(augmentName = document.getElementById('val-augment').value) {
-            return Boolean(augmentName) && !shotEffectAugments.has(augmentName) && !originalFillAugments.has(augmentName);
+            return Boolean(augmentName) && !shotEffectAugments.has(augmentName) && !hasOriginalAugmentFill(augmentName);
         }
 
         function getAutomaticFillStops() {
@@ -385,8 +663,6 @@
 
         const fallbackOutlineColor = '#AAAAAA';
         const fallbackFillStops = '<stop stop-color="#AAAAAA"/>\n<stop offset="1" stop-color="#666666"/>';
-        let rarityDisplayVersion = 0;
-        let backgroundDisplayVersion = 0;
 
         function getRarityByKey(rarityKey) {
             return rarities.find(rarity => rarity.key === rarityKey) || null;
@@ -397,12 +673,6 @@
             return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
         }
 
-        function extractOriginalOutlineColor(svgText) {
-            if (!svgText) return null;
-            const match = svgText.match(/fill="(#[A-Fa-f0-9]+)"/);
-            return match ? match[1].toUpperCase() : null;
-        }
-
         function getRarityFromOutlineColor(color) {
             const normalizedColor = (color || '').toUpperCase();
             return rarities.find(rarity =>
@@ -411,20 +681,19 @@
         }
 
         function getDeclaredEquipmentAugmentRarity(augmentName) {
-            return getRarityByKey(equipmentAugmentRarityKeyByName.get(augmentName));
+            return getRarityByKey(equipmentAugmentRarityKeyByName.get(resolveAugmentName(augmentName)));
         }
 
-        async function getOriginalAugmentRarity(augmentName = document.getElementById('val-augment').value) {
+        // 常规改造的原始稀有度：data.json 分组声明；射击颜色：存储的描边色反查
+        function getOriginalAugmentRarity(augmentName = document.getElementById('val-augment').value) {
             const declaredRarity = getDeclaredEquipmentAugmentRarity(augmentName);
             if (declaredRarity || !augmentName) return declaredRarity;
-
-            // 射击颜色不在 data.json 的稀有度数据中，仍然通过下载 SVG 检测。
-            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
-            return getRarityFromOutlineColor(extractOriginalOutlineColor(svg));
+            const info = DATA.shotColors[augmentName];
+            return info ? getRarityFromOutlineColor(info.outline) : null;
         }
 
-        async function getOriginalRarityPresentation() {
-            const detectedRarity = await getOriginalAugmentRarity();
+        function getOriginalRarityPresentation() {
+            const detectedRarity = getOriginalAugmentRarity();
             return {
                 color: detectedRarity ? detectedRarity.color : fallbackOutlineColor,
                 label: detectedRarity
@@ -454,21 +723,19 @@
             display.append(swatch, Object.assign(document.createElement('span'), { textContent: label }));
         }
 
-        async function updateRarityDisplay() {
-            const version = ++rarityDisplayVersion;
+        function updateRarityDisplay() {
             const value = document.getElementById('val-rarity').value;
             const rarity = getRarity(value) || rarities[0];
             const transparent = value === '#';
             const originalPresentation = value === 'default'
-                ? await getOriginalRarityPresentation()
+                ? getOriginalRarityPresentation()
                 : null;
             const color = originalPresentation
                 ? originalPresentation.color
                 : (transparent ? 'transparent' : rarity.color);
             const label = originalPresentation
                 ? originalPresentation.label
-                : uiTexts.rarity_names[rarity.key];
-            if (version !== rarityDisplayVersion) return;
+                : uiTexts.rarity_names[rarity.key] + ((rarity.key === 'Common' || rarity.key === 'Uncommon') ? uiTexts.custom_made : '');
             renderRarityValue(
                 document.getElementById('display-rarity'),
                 color,
@@ -477,10 +744,67 @@
             );
         }
 
-        async function renderDefaultRarityOption(swatch, label) {
-            const presentation = await getOriginalRarityPresentation();
+        function renderDefaultRarityOption(swatch, label) {
+            const presentation = getOriginalRarityPresentation();
             setRaritySwatch(swatch, presentation.color);
             label.textContent = presentation.label;
+        }
+
+        // ============================================================
+        // 渐变模板（颜色选择器圆形预览用），等价于原站 analyzeFillTemplate
+        // { primary: { openingTag, stops }, overlays: [{ openingTag, stops }] }
+        // ============================================================
+        function defToTemplateParts(def) {
+            const idx = def.indexOf('>');
+            const end = def.lastIndexOf('</');
+            return { openingTag: def.slice(0, idx + 1), stops: def.slice(idx + 1, end).trim() };
+        }
+
+        function getRegularAugmentTemplate(augmentName, includeOverlays = true) {
+            const e = DATA.augmentIcons[resolveAugmentName(augmentName)];
+            if (!e) return null;
+            const opening = e.primaryOpening || SHAPES[e.shape].primary_opening;
+            const overlays = includeOverlays && e.overlayDefs
+                ? e.overlayDefs.map(defToTemplateParts)
+                : [];
+            return { primary: { openingTag: opening, stops: e.stops }, overlays };
+        }
+
+        function getShotTemplateForAugment(augmentName) {
+            const info = DATA.shotColors[augmentName];
+            if (!info) return null;
+            return { primary: { openingTag: SHOT_PRIMARY_OPENING, stops: info.stops }, overlays: [] };
+        }
+
+        // 当前选中改造自身的渐变模板
+        function getCurrentAugmentFillTemplate(includeOverlays = true) {
+            const augmentName = document.getElementById('val-augment').value;
+            if (!augmentName) return null;
+            if (shotEffectAugments.has(augmentName)) return getShotTemplateForAugment(augmentName);
+            return getRegularAugmentTemplate(augmentName, includeOverlays);
+        }
+
+        // 填充色自带的渐变模板（仅凤凰/卓越带有）—— 用于圆形预览 rw {openingTag}
+        function getFillTemplateForBackground(fillName) {
+            const fill = DATA.fillColors[fillName];
+            if (!fill || !fill.opening) return null;
+            return {
+                primary: { openingTag: fill.opening, stops: fill.stops },
+                overlays: (fill.overlays || []).map(ov => ({ openingTag: ov.opening, stops: ov.stops }))
+            };
+        }
+
+        // 填充色的合成参数 —— 用于 composeIcon {opening}
+        function getFillComposeSpec(fillName) {
+            const fill = DATA.fillColors[fillName];
+            if (!fill || !fill.opening) return null;
+            return { stops: fill.stops, opening: fill.opening, overlays: fill.overlays || [] };
+        }
+
+        function getFillStops(fillName) {
+            const fill = DATA.fillColors[fillName];
+            if (!fill) return null;
+            return fill.stops;
         }
 
         function replaceGradientId(openingTag, id) {
@@ -489,71 +813,8 @@
                 : openingTag.replace('<radialGradient', `<radialGradient id="${id}"`);
         }
 
-        function getGradientConsumer(svgText, gradientId) {
-            const escapedId = escapeRegExp(gradientId);
-            const pattern = new RegExp(`<[A-Za-z][\\w:-]*\\b[^>]*\\bfill="url\\(#${escapedId}\\)"[^>]*/>`);
-            const match = svgText.match(pattern);
-            return match ? match[0] : null;
-        }
-
-        function getShapeSignature(element) {
-            return (element || '')
-                .replace(/\s+(?:fill|opacity|fill-opacity)="[^"]*"/g, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-        }
-
-        function analyzeFillTemplate(svgText) {
-            if (!svgText) return null;
-            const gradients = [...svgText.matchAll(/<radialGradient\b[^>]*>[\s\S]*?<\/radialGradient>/g)]
-                .map(match => {
-                    const full = match[0];
-                    const openingTag = full.match(/^<radialGradient\b[^>]*>/)[0];
-                    const idMatch = openingTag.match(/\bid="([^"]+)"/);
-                    if (!idMatch) return null;
-                    return {
-                        id: idMatch[1],
-                        openingTag,
-                        stops: full.slice(openingTag.length, -'</radialGradient>'.length).trim(),
-                        full
-                    };
-                })
-                .filter(Boolean);
-            if (!gradients.length) return null;
-
-            const primary = gradients[0];
-            primary.element = getGradientConsumer(svgText, primary.id);
-            if (!primary.element) return { primary, overlays: [] };
-
-            const primarySignature = getShapeSignature(primary.element);
-            const overlays = gradients.slice(1).filter(gradient => {
-                gradient.element = getGradientConsumer(svgText, gradient.id);
-                return gradient.element && getShapeSignature(gradient.element) === primarySignature;
-            });
-            return { primary, overlays };
-        }
-
-        async function getFillTemplateForBackground(fillName) {
-            if (!sourceAugmentByFillName.has(fillName)) return null;
-            if (!fillTemplateCache[fillName]) {
-                const sourceName = sourceAugmentByFillName.get(fillName);
-                fillTemplateCache[fillName] = fetchTextCached(`./augments/${encodeURIComponent(sourceName)}.svg`)
-                    .then(analyzeFillTemplate);
-            }
-            return fillTemplateCache[fillName];
-        }
-
-        async function getCurrentAugmentFillTemplate(includeOverlays = true) {
-            const augmentName = document.getElementById('val-augment').value;
-            if (!augmentName) return null;
-            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
-            const template = analyzeFillTemplate(svg);
-            if (!template || includeOverlays) return template;
-            return { primary: template.primary, overlays: [] };
-        }
-
         function renderGradientPreview(container, stops, template = null) {
-            const id = 'g' + Math.random().toString(36).slice(2, 11);
+            const id = 'sw' + Math.random().toString(36).slice(2, 11);
             if (template && template.primary) {
                 const definitions = [
                     `${replaceGradientId(template.primary.openingTag, id)}${stops || fallbackFillStops}</radialGradient>`
@@ -570,24 +831,19 @@
             }
         }
 
-        function extractPrimaryGradientStops(svgText) {
-            const template = analyzeFillTemplate(svgText);
-            return template && template.primary ? template.primary.stops : null;
-        }
-
-        async function getDefaultBackgroundPresentation() {
+        function getDefaultBackgroundPresentation() {
             const automaticStops = getAutomaticFillStops();
             if (automaticStops) {
                 const rarity = getRarity();
                 const rarityName = uiTexts.rarity_names[rarity.key];
                 return {
                     stops: automaticStops,
-                    template: await getCurrentAugmentFillTemplate(false),
+                    template: getCurrentAugmentFillTemplate(false),
                     label: `${uiTexts.val_follow_rarity} (${rarityName})`
                 };
             }
 
-            const template = await getCurrentAugmentFillTemplate(true);
+            const template = getCurrentAugmentFillTemplate(true);
             if (template && template.primary) {
                 return {
                     stops: template.primary.stops,
@@ -599,19 +855,14 @@
             return { stops: fallbackFillStops, template: null, label: uiTexts.val_default };
         }
 
-        async function getBackgroundPresentation() {
+        function getBackgroundPresentation() {
             const value = document.getElementById('val-background').value;
             if (value === 'default') return getDefaultBackgroundPresentation();
 
-            const [stops, sourceTemplate, targetTemplate] = await Promise.all([
-                fetchTextCached(`./colors/${encodeURIComponent(value)}.txt`),
-                getFillTemplateForBackground(value),
-                getCurrentAugmentFillTemplate(false)
-            ]);
             return {
-                stops: stops || fallbackFillStops,
-                template: sourceTemplate || targetTemplate,
-                label: t(value)
+                stops: getFillStops(value) || fallbackFillStops,
+                template: getFillTemplateForBackground(value) || getCurrentAugmentFillTemplate(false),
+                label: getOptionDisplayName('background', value)
             };
         }
 
@@ -626,20 +877,71 @@
             display.append(swatch, Object.assign(document.createElement('span'), { textContent: presentation.label }));
         }
 
-        async function updateBackgroundDisplay() {
-            const version = ++backgroundDisplayVersion;
-            const presentation = await getBackgroundPresentation();
-            if (version !== backgroundDisplayVersion) return;
+        function updateBackgroundDisplay() {
+            const presentation = getBackgroundPresentation();
             renderBackgroundValue(document.getElementById('display-background'), presentation);
         }
 
-        async function renderDefaultBackgroundOption(preview, label) {
-            const presentation = await getDefaultBackgroundPresentation();
+        function renderDefaultBackgroundOption(preview, label) {
+            const presentation = getDefaultBackgroundPresentation();
             renderGradientPreview(preview, presentation.stops, presentation.template);
             label.textContent = presentation.label;
         }
-        
-        const fileCache = {};
+
+        // ============================================================
+        // 形状检测与切换：装备类型决定形状（炮塔装备 → 炮塔形状），可手动覆盖
+        // ============================================================
+        let shapeMode = null;   // null=自动, 'turret', 'hull'
+
+        function getEquipmentShape(equipmentName) {
+            if (!equipmentName || equipmentName === 'none') return null;
+            if (groupedEquipments['炮塔'] && groupedEquipments['炮塔'][equipmentName]) return 'turret';
+            if (groupedEquipments['底盘'] && groupedEquipments['底盘'][equipmentName]) return 'hull';
+            return null;
+        }
+
+        function getEffectiveShape(augmentName = document.getElementById('val-augment').value,
+                                   equipmentName = document.getElementById('val-equipment').value) {
+            if (!augmentName || shotEffectAugments.has(augmentName)) return null;
+            if (shapeMode) return shapeMode;
+            const equipmentShape = getEquipmentShape(equipmentName);
+            if (equipmentShape) return equipmentShape;
+            const entry = DATA.augmentIcons[augmentName];
+            return entry ? entry.shape : 'turret';   // 合并项（空/卓越/凤凰）未选装备时默认炮塔形态
+        }
+
+        function updateShapeSwitch() {
+            const augmentName = document.getElementById('val-augment').value;
+            const row = document.getElementById('shapeSwitchRow');
+            if (!augmentName || shotEffectAugments.has(augmentName)) {
+                row.style.display = 'none';
+                return;
+            }
+            row.style.display = 'block';
+            const effective = getEffectiveShape(augmentName);
+            document.querySelectorAll('#shapeSwitch button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.shape === effective);
+            });
+            const shapeName = t(effective === 'turret' ? '炮塔' : '底盘');
+            document.getElementById('ui-shape-value').textContent =
+                shapeMode ? shapeName : `${uiTexts.shape_auto} (${shapeName})`;
+            document.getElementById('reset-shape').classList.toggle('visible', Boolean(shapeMode));
+        }
+
+        function toggleShape(shape) {
+            shapeMode = (shapeMode === shape) ? null : shape;   // 再点同一按钮回到自动
+            updateShapeSwitch();
+            checkAndGenerate();
+        }
+
+        // 重置回自动（跟随所选装备 / 改造本身）
+        function resetShape(event) {
+            if (event) event.stopPropagation();
+            shapeMode = null;
+            updateShapeSwitch();
+            checkAndGenerate();
+        }
+
         const modal = document.getElementById('selectionModal');
         const modalList = document.getElementById('modalList');
         const optionNameCollator = new Intl.Collator(isZh ? 'zh-CN-u-co-pinyin' : 'en', {
@@ -649,16 +951,28 @@
         let menuRenderVersion = 0;
         updateRarityDisplay();
         updateBackgroundDisplay();
-        
+
+        // 改造菜单小图标缓存
+        const menuIconCache = {};
+        function getMenuIconSVG(item) {
+            const generic = isGenericTwinAugment(item);
+            const shapeKey = generic ? `@${getEffectiveShape(item) || 'turret'}` : '';
+            if (!menuIconCache[item + shapeKey]) {
+                menuIconCache[item + shapeKey] = composeIcon(resolveAugmentName(item),
+                    generic ? { shape: getEffectiveShape(item) || 'turret', uid: nextUid() } : { uid: nextUid() });
+            }
+            return menuIconCache[item + shapeKey];
+        }
+
         function openMenu(type) {
-            const renderVersion = ++menuRenderVersion;
+            menuRenderVersion++;
             modalList.innerHTML = ''; modal.classList.add('active');
             const titles = { 'equipment': uiTexts.modal_equip, 'augment': uiTexts.modal_aug, 'rarity': uiTexts.modal_rarity, 'background': uiTexts.modal_fill };
             document.getElementById('modalTitle').textContent = titles[type];
-            
+
             if (type === 'background') {
                 const def = document.createElement('div');
-                def.className = `option-item ${document.getElementById('val-background').value==='default'?'selected':''}`;
+                def.className = `option-item ${document.getElementById('val-background').value === 'default' ? 'selected' : ''}`;
                 const preview = document.createElement('div');
                 preview.className = 'option-preview';
                 preview.style.backgroundColor = 'transparent';
@@ -667,22 +981,22 @@
                 renderDefaultBackgroundOption(preview, label);
                 def.onclick = () => selectItem('background', 'default', null, uiTexts.val_default);
                 modalList.appendChild(def);
-                renderGroupedOptions(groupedBackgroundColors, type, renderVersion);
+                renderGroupedOptions(groupedFillColors, type);
             }
             else if (type === 'equipment') {
                 const noneEl = document.createElement('div');
-                noneEl.className = `option-item ${document.getElementById('val-equipment').value==='none'?'selected':''}`;
+                noneEl.className = `option-item ${document.getElementById('val-equipment').value === 'none' ? 'selected' : ''}`;
                 noneEl.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>${uiTexts.val_none}</span>`;
                 noneEl.onclick = () => selectItem('equipment', 'none', null, uiTexts.val_none);
                 modalList.appendChild(noneEl);
-                renderGroupedOptions(groupedEquipments, type, renderVersion);
+                renderGroupedOptions(groupedEquipments, type);
             }
             else if (type === 'augment') {
-                renderAugmentOptions(renderVersion);
+                renderAugmentOptions();
             }
             else if (type === 'rarity') renderRarityOptions();
         }
-        
+
         function closeMenu(e) {
             if (e) e.preventDefault();
             menuRenderVersion++;
@@ -772,8 +1086,9 @@
             return { hue, saturation, lightness };
         }
 
-        async function getFillColorSortKey(augmentName) {
-            const stops = await fetchTextCached(`./colors/${encodeURIComponent(augmentName)}.txt`);
+        // 与原版排序逻辑一致：改为直接从 data.json 的 stops 计算
+        function getFillColorSortKey(fillName) {
+            const stops = getFillStops(fillName) || '';
             const { hue, saturation, lightness } = rgbToHsl(getAverageGradientColor(stops));
             const isNeutral = saturation < 0.25;
             const hueOrder = hue >= 23 / 24 ? hue - 1 : hue;
@@ -794,9 +1109,9 @@
             return getRarityRankByKey(equipmentAugmentRarityKeyByName.get(augmentName));
         }
 
-        async function getDetectedAugmentRarityRank(augmentName) {
-            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
-            const rarity = getRarityFromOutlineColor(extractOriginalOutlineColor(svg));
+        function getDetectedAugmentRarityRank(augmentName) {
+            const info = DATA.shotColors[augmentName];
+            const rarity = info && getRarityFromOutlineColor(info.outline);
             return getRarityRankByKey(rarity && rarity.key);
         }
 
@@ -807,20 +1122,36 @@
             return title;
         }
 
+        function getEquipmentPreviewSVG(name) {
+            const content = DATA.equipmentIcons[name] || '';
+            return `<svg viewBox="${calculateMultiPathViewBox(content)}" style="fill:currentColor">${content}</svg>`;
+        }
+
+        // 填充颜色里的 普通/罕见 不是官方的，标注（自制）；改造里的 空 同理（见 getAugmentDisplayName）
+        function getOptionDisplayName(type, item) {
+            if (type === 'augment') return getAugmentDisplayName(item);
+            const name = t(item);
+            if (type === 'background' && (item === '普通' || item === '罕见')) return name + uiTexts.custom_made;
+            return name;
+        }
+
         function appendOptionItem(type, item, group, parent = modalList) {
-            const displayName = type === 'augment' ? getAugmentDisplayName(item) : t(item);
+            const displayName = getOptionDisplayName(type, item);
             const element = document.createElement('div');
-            element.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
+            element.className = `option-item ${document.getElementById(`val-${type}`).value === item ? 'selected' : ''}`;
 
             const preview = document.createElement('div');
             preview.className = 'option-preview';
             if (type === 'augment') {
-                preview.innerHTML = `<img src="./augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
+                preview.innerHTML = getMenuIconSVG(item);
             } else if (type === 'background') {
                 preview.style.backgroundColor = 'transparent';
-                fetchBackgroundPreview(item, preview);
+                const stops = getFillStops(item);
+                if (stops) {
+                    renderGradientPreview(preview, stops, getFillTemplateForBackground(item) || getCurrentAugmentFillTemplate(false));
+                }
             } else if (type === 'equipment') {
-                fetchEquipmentPreview(item, preview);
+                preview.innerHTML = getEquipmentPreviewSVG(item);
             }
 
             element.append(preview, Object.assign(document.createElement('span'), { textContent: displayName }));
@@ -830,20 +1161,21 @@
 
         function getSortedEquipmentAugments(group) {
             const items = Object.values(groupedAugments[group] || {})
-                .flatMap(rarityItems => getGroupedItemNames(rarityItems));
+                .flatMap(rarityItems => getGroupedItemNames(rarityItems))
+                .filter(name => !isGenericTwinAugment(getRawAugmentBaseName(name)));
             return items.sort((a, b) =>
                 getEquipmentAugmentRarityRank(a) - getEquipmentAugmentRarityRank(b) ||
                 compareOptionNames(a, b, 'augment')
             );
         }
 
-        async function getSortedShotEffectAugments() {
+        function getSortedShotEffectAugments() {
             const items = getGroupedItemNames(groupedAugments["射击颜色"]);
-            const preparedItems = await Promise.all(items.map(async item => ({
+            const preparedItems = items.map(item => ({
                 item,
-                rarityRank: await getDetectedAugmentRarityRank(item),
-                colorKey: await getFillColorSortKey(item)
-            })));
+                rarityRank: getDetectedAugmentRarityRank(item),
+                colorKey: getFillColorSortKey(item)
+            }));
             preparedItems.sort((a, b) =>
                 a.rarityRank - b.rarityRank ||
                 compareColorSortKeys(a.colorKey, b.colorKey) ||
@@ -852,7 +1184,8 @@
             return preparedItems.map(entry => entry.item);
         }
 
-        function renderAugmentOptions(renderVersion) {
+        function renderAugmentOptions() {
+            GENERIC_TWIN_AUGMENTS.forEach(item => appendOptionItem('augment', item, null));
             equipmentAugmentGroups.forEach(group => {
                 const items = getSortedEquipmentAugments(group);
                 if (!items.length) return;
@@ -860,64 +1193,42 @@
                 items.forEach(item => appendOptionItem('augment', item, group));
             });
 
-            const shotEffectItems = getGroupedItemNames(groupedAugments["射击颜色"]);
+            const shotEffectItems = getSortedShotEffectAugments();
             if (!shotEffectItems.length) return;
-
-            const shotEffectGroup = "射击颜色";
-            modalList.appendChild(createOptionGroupTitle(shotEffectGroup));
-            const loading = document.createElement('div');
-            loading.className = 'option-item option-loading';
-            loading.innerHTML = `<div class="option-preview"><span class="material-symbols-rounded">progress_activity</span></div><span>${uiTexts.loading}</span>`;
-            const loadingLabel = loading.lastElementChild;
-            modalList.appendChild(loading);
-
-            getSortedShotEffectAugments().then(items => {
-                if (renderVersion !== menuRenderVersion) return;
-                loading.remove();
-                items.forEach(item => appendOptionItem('augment', item, shotEffectGroup));
-            }).catch(error => {
-                console.error(error);
-                if (renderVersion !== menuRenderVersion) return;
-                loadingLabel.textContent = uiTexts.loading;
-            });
+            modalList.appendChild(createOptionGroupTitle('射击颜色'));
+            shotEffectItems.forEach(item => appendOptionItem('augment', item, '射击颜色'));
         }
 
-        async function renderGroupedOptions(dataObj, type, renderVersion = menuRenderVersion) {
+        function renderGroupedOptions(dataObj, type) {
             const groupNames = Object.keys(dataObj).filter(group => getGroupedItemNames(dataObj[group]).length > 0);
-            const preparedGroups = await Promise.all(groupNames.map(async group => {
+            const preparedGroups = groupNames.map(group => {
                 let items = getGroupedItemNames(dataObj[group]);
                 const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
                 const containsOnlyShotEffects = items.length > 0 && items.every(item => shotEffectAugments.has(item));
 
                 if (type === 'background' && containsOnlyShotEffects) {
-                    const coloredItems = await Promise.all(items.map(async item => ({
-                        item,
-                        colorKey: await getFillColorSortKey(item)
-                    })));
-                    coloredItems.sort((a, b) =>
-                        compareColorSortKeys(a.colorKey, b.colorKey) || compareOptionNames(a.item, b.item, type)
-                    );
-                    items = coloredItems.map(entry => entry.item);
+                    items = items.map(item => ({ item, colorKey: getFillColorSortKey(item) }))
+                        .sort((a, b) =>
+                            compareColorSortKeys(a.colorKey, b.colorKey) || compareOptionNames(a.item, b.item, type))
+                        .map(entry => entry.item);
                 } else if (!keepDeclaredOrder) {
                     items.sort((a, b) => compareOptionNames(a, b, type));
                 }
-
                 return { group, items };
-            }));
+            });
 
-            if (renderVersion !== menuRenderVersion) return;
             preparedGroups.forEach(({ group, items }) => {
                 modalList.appendChild(createOptionGroupTitle(group));
                 items.forEach(item => appendOptionItem(type, item, group));
             });
         }
-        
+
         function renderRarityOptions() {
             const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = uiTexts.lbl_rarity; modalList.appendChild(h);
             rarities.forEach(r => {
-                const name = uiTexts.rarity_names[r.key];
+                const name = uiTexts.rarity_names[r.key] + ((r.key === 'Common' || r.key === 'Uncommon') ? uiTexts.custom_made : '');
                 const el = document.createElement('div');
-                el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
+                el.className = `option-item ${document.getElementById('val-rarity').value === r.value ? 'selected' : ''}`;
 
                 const swatch = document.createElement('div');
                 swatch.className = 'color-circle';
@@ -939,24 +1250,25 @@
 
             if (type === 'rarity') {
                 updateRarityDisplay();
-                if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
+                if (btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
                 updateBackgroundDisplay();
             } else if (type === 'background') {
                 updateBackgroundDisplay();
-                if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
+                if (btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
             } else {
                 disp.textContent = showText;
                 if (type === 'augment') {
                     updateRarityDisplay();
                     updateBackgroundDisplay();
                 }
+                updateShapeSwitch();
             }
             closeMenu();
             checkAndGenerate();
         }
 
         function resetSelection(type, event) {
-            if(event) event.stopPropagation();
+            if (event) event.stopPropagation();
             selectItem(type, 'default', null, uiTexts.val_default, '#aaaaaa');
         }
 
@@ -965,94 +1277,15 @@
             document.getElementById('display-equipment').textContent = uiTexts.sel_equip;
             document.getElementById('val-augment').value = "";
             document.getElementById('display-augment').textContent = uiTexts.sel_aug;
+            shapeMode = null;
             resetSelection('rarity');
             resetSelection('background');
+            updateShapeSwitch();
             document.getElementById('svgPreview').innerHTML = `<div style="color: var(--md-sys-color-outline);">${uiTexts.preview_txt}</div>`;
             document.getElementById('downloadSection').innerHTML = '';
         }
 
-        async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);if(!r.ok)return null;const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
-        
-        async function fetchBackgroundPreview(n, c) {
-            const [stops, sourceTemplate, targetTemplate] = await Promise.all([
-                fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`),
-                getFillTemplateForBackground(n),
-                getCurrentAugmentFillTemplate(false)
-            ]);
-            if (stops) renderGradientPreview(c, stops, sourceTemplate || targetTemplate);
-        }
-        
-        async function fetchEquipmentPreview(n, c) { 
-            const t=await fetchTextCached(`./equipments/${encodeURIComponent(n)}.txt`); 
-            if(t) c.innerHTML=`<svg viewBox="${calculateMultiPathViewBox(t)}" style="fill:currentColor">${t}</svg>`; 
-        }
-        
-        function calculateMultiPathViewBox(s) { const n="http://www.w3.org/2000/svg",v=document.createElementNS(n,"svg");v.style.position="absolute";v.style.visibility="hidden";v.style.width="0";v.style.height="0";document.body.appendChild(v);const g=document.createElementNS(n,"g");g.innerHTML=s;v.appendChild(g);try{const b=g.getBBox();document.body.removeChild(v);if(b.width===0)return"0 0 256 256";const p=Math.max(b.width,b.height)*0.1;return`${b.x-p} ${b.y-p} ${b.width+p*2} ${b.height+p*2}`;}catch{if(document.body.contains(v))document.body.removeChild(v);return"0 0 256 256";}}
-
-        function escapeRegExp(value) {
-            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        }
-
-        function replacePrimaryGradient(svg, stops, openingTag = null) {
-            return svg.replace(
-                /<radialGradient\b[^>]*>[\s\S]*?<\/radialGradient>/,
-                match => {
-                    const originalOpeningTag = match.match(/^<radialGradient\b[^>]*>/)[0];
-                    return `${openingTag || originalOpeningTag}\n${stops}\n</radialGradient>`;
-                }
-            );
-        }
-
-        function removeAdditionalFillLayers(svg) {
-            const template = analyzeFillTemplate(svg);
-            if (!template || !template.overlays.length) return svg;
-            template.overlays.forEach(overlay => {
-                svg = svg.replace(overlay.element, '').replace(overlay.full, '');
-            });
-            return svg;
-        }
-
-        function getUniqueGradientId(svg, baseName) {
-            let id = baseName;
-            let suffix = 1;
-            while (svg.includes(`id="${id}"`)) id = `${baseName}_${suffix++}`;
-            return id;
-        }
-
-        function applyFillTemplate(svg, primaryStops, sourceTemplate = null) {
-            svg = removeAdditionalFillLayers(svg);
-            const targetTemplate = analyzeFillTemplate(svg);
-            if (!targetTemplate || !targetTemplate.primary) return svg;
-
-            const targetPrimaryId = targetTemplate.primary.id;
-            const sourcePrimaryOpening = sourceTemplate && sourceTemplate.primary
-                ? sourceTemplate.primary.openingTag
-                : targetTemplate.primary.openingTag;
-            const primaryOpening = replaceGradientId(sourcePrimaryOpening, targetPrimaryId);
-            svg = replacePrimaryGradient(svg, primaryStops, primaryOpening);
-
-            if (!sourceTemplate || !sourceTemplate.overlays.length) return svg;
-            const primaryElement = getGradientConsumer(svg, targetPrimaryId);
-            if (!primaryElement) return svg;
-
-            const overlayDefinitions = [];
-            const overlayElements = [];
-            sourceTemplate.overlays.forEach((overlay, index) => {
-                const overlayId = getUniqueGradientId(svg, `compound_fill_layer_${index + 1}`);
-                overlayDefinitions.push(
-                    `${replaceGradientId(overlay.openingTag, overlayId)}\n${overlay.stops}\n</radialGradient>`
-                );
-                overlayElements.push(
-                    primaryElement.replace(
-                        `fill="url(#${targetPrimaryId})"`,
-                        `fill="url(#${overlayId})"`
-                    )
-                );
-            });
-
-            svg = svg.replace(primaryElement, `${primaryElement}\n${overlayElements.join('\n')}`);
-            return svg.replace('</defs>', `${overlayDefinitions.join('\n')}\n</defs>`);
-        }
+        function calculateMultiPathViewBox(s) { const n = "http://www.w3.org/2000/svg", v = document.createElementNS(n, "svg"); v.style.position = "absolute"; v.style.visibility = "hidden"; v.style.width = "0"; v.style.height = "0"; document.body.appendChild(v); const g = document.createElementNS(n, "g"); g.innerHTML = s; v.appendChild(g); try { const b = g.getBBox(); document.body.removeChild(v); if (b.width === 0) return "0 0 256 256"; const p = Math.max(b.width, b.height) * 0.1; return `${b.x - p} ${b.y - p} ${b.width + p * 2} ${b.height + p * 2}`; } catch { if (document.body.contains(v)) document.body.removeChild(v); return "0 0 256 256"; } }
 
         function checkAndGenerate() {
             const e = document.getElementById('val-equipment').value;
@@ -1060,47 +1293,53 @@
             if (e && a) generateSVG();
         }
 
+        // 当前填充状态：null=用改造自身填充；否则 {stops, opening, overlays}
+        function resolveCurrentFill() {
+            const background = document.getElementById('val-background').value;
+            if (background !== 'default') {
+                const spec = getFillComposeSpec(background);
+                return {
+                    stops: getFillStops(background) || fallbackFillStops,
+                    opening: spec ? spec.opening : null,
+                    overlays: spec ? spec.overlays : []
+                };
+            }
+            const automaticStops = getAutomaticFillStops();
+            if (automaticStops) return { stops: automaticStops, opening: null, overlays: [] };
+            return null;
+        }
+
         function generateSVG() {
-            const txtName = document.getElementById("val-equipment").value; 
-            const svgName = document.getElementById("val-augment").value; 
+            const txtName = document.getElementById("val-equipment").value;
+            const svgName = document.getElementById("val-augment").value;
             const quality = document.getElementById("val-rarity").value;
-            const background = document.getElementById("val-background").value;
-            const automaticFill = background === 'default' ? getAutomaticFillStops() : null;
 
-            document.getElementById("loading").style.display = "block";
-            Promise.all([
-                txtName === 'none' ? Promise.resolve('') : fetchTextCached('./equipments/'+encodeURIComponent(txtName)+'.txt'),
-                fetchTextCached('./augments/'+encodeURIComponent(svgName)+'.svg'),
-                background !== 'default' ? fetchTextCached('./colors/'+encodeURIComponent(background)+'.txt') : null,
-                background !== 'default' ? getFillTemplateForBackground(background) : null
-            ]).then(([txt, svg, manuallySelectedFill, selectedFillTemplate]) => {
-                if (!svg) {
-                    document.getElementById("loading").style.display = "none";
-                    return;
-                }
-                if (manuallySelectedFill) {
-                    svg = applyFillTemplate(svg, manuallySelectedFill, selectedFillTemplate);
-                } else if (automaticFill) {
-                    svg = applyFillTemplate(svg, automaticFill);
-                }
-                const defs = svg.indexOf('<defs>');
-                let final = defs !== -1 ? svg.slice(0, defs) + (txt || '') + svg.slice(defs) : svg.replace('>', '>' + (txt || ''));
-                if (quality !== 'default') final = final.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
+            const fill = resolveCurrentFill();
+            const outline = quality !== 'default' ? quality : null;
+            const shape = getEffectiveShape(svgName, txtName);
 
-                const preview = document.getElementById("svgPreview");
-                preview.innerHTML = final;
-                const svgEl = preview.querySelector("svg");
-                if (svgEl) {
-                    svgEl.setAttribute("width", "256"); svgEl.removeAttribute("height");
-                    
-                    const blob = new Blob([final], { type: 'image/svg+xml' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const downloadName = txtName === 'none' ? t(svgName) : `${t(txtName)}-${t(svgName)}`;
+            const final = composeIcon(resolveAugmentName(svgName), {
+                shape,
+                outline,
+                fill,
+                equipment: txtName === 'none' ? null : txtName,
+                uid: 'preview'
+            });
 
-                    const dlSection = document.getElementById("downloadSection");
-                    dlSection.className = "results-container";
-                    dlSection.innerHTML = `
+            const preview = document.getElementById("svgPreview");
+            preview.innerHTML = final;
+            const svgEl = preview.querySelector("svg");
+            if (svgEl) {
+                svgEl.setAttribute("width", "256"); svgEl.removeAttribute("height");
+
+                const blob = new Blob([final], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(blob);
+
+                const downloadName = txtName === 'none' ? t(svgName) : `${t(txtName)}-${t(svgName)}`;
+
+                const dlSection = document.getElementById("downloadSection");
+                dlSection.className = "results-container";
+                dlSection.innerHTML = `
                         <div class="png-controls">
                             <span style="white-space:nowrap">${uiTexts.dl_size}</span>
                             <input type="number" id="pngSize" class="m3-input" placeholder="1024" value="1024">
@@ -1112,22 +1351,20 @@
                             <span class="material-symbols-rounded">code</span> ${uiTexts.dl_svg}
                         </a>
                     `;
-                }
-                document.getElementById("loading").style.display = "none";
-            }).catch(e => { console.error(e); document.getElementById("loading").style.display = "none"; });
+            }
         }
 
         function convertToPNG(filename) {
             const svg = document.querySelector('#svgPreview svg');
-            if(!svg) return;
+            if (!svg) return;
             const canvas = document.createElement('canvas');
             const w = parseInt(document.getElementById("pngSize").value) || 1024;
             const vb = svg.viewBox.baseVal;
-            canvas.width = w; canvas.height = w * ((vb&&vb.width>0)?(vb.height/vb.width):1);
+            canvas.width = w; canvas.height = w * ((vb && vb.width > 0) ? (vb.height / vb.width) : 1);
             const img = new Image();
-            const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], {type:'image/svg+xml;charset=utf-8'}));
+            const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' }));
             img.onload = () => {
-                canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
                 URL.revokeObjectURL(url);
                 const a = document.createElement('a');
                 a.download = `${filename || 'icon'}.png`;
@@ -1137,14 +1374,15 @@
             img.src = url;
         }
 
-        // 模块内函数需要挂到 window，供页面现有的内联点击事件调用。
         Object.assign(window, {
             openMenu,
             closeMenu,
             resetSelection,
             resetAll,
-            convertToPNG
+            convertToPNG,
+            toggleShape,
+            resetShape
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b9f6603a99834c',t:'MTc4NjgxNTM5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2bb32afabef3077',t:'MTc4NjgyODM1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
