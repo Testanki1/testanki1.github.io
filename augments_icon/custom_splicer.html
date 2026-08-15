@@ -283,7 +283,9 @@
         ];
 
         const shotEffectAugments = new Set(groupedAugments["射击颜色"] || []);
-        const originalFillAugments = new Set(["凤凰（炮塔）", "凤凰（底盘）", "卓越（炮塔）", "卓越（底盘）"]);
+        const excelsiorAugments = new Set(["卓越（炮塔）", "卓越（底盘）"]);
+        const originalFillAugments = new Set(["凤凰（炮塔）", "凤凰（底盘）", ...excelsiorAugments]);
+        const excelsiorOverlayStops = '<stop stop-color="#AAFF00"/>\n<stop offset="1" stop-color="#00FFAA" stop-opacity="0"/>';
 
         function getRarity(value = document.getElementById('val-rarity').value) {
             return rarities.find(rarity => rarity.value === value);
@@ -385,9 +387,14 @@
             label.textContent = presentation.label;
         }
 
-        function renderGradientPreview(container, stops) {
+        function renderGradientPreview(container, stops, overlayStops = null) {
             const id = 'g' + Math.random().toString(36).slice(2, 11);
-            container.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}">${stops || fallbackFillStops}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;
+            if (overlayStops) {
+                const overlayId = `${id}_overlay`;
+                container.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(50 95.8333) rotate(-90) scale(91.6667)">${stops || fallbackFillStops}</radialGradient><radialGradient id="${overlayId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(50 4.1667) rotate(90) scale(45.8333)">${overlayStops}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/><circle cx="50" cy="50" r="50" fill="url(#${overlayId})"/></svg>`;
+            } else {
+                container.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}">${stops || fallbackFillStops}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;
+            }
         }
 
         function extractPrimaryGradientStops(svgText) {
@@ -403,6 +410,7 @@
                 const rarityName = uiTexts.rarity_names[rarity.key];
                 return {
                     stops: automaticStops,
+                    overlayStops: null,
                     label: `${uiTexts.val_follow_rarity} (${rarityName})`
                 };
             }
@@ -411,10 +419,16 @@
             if (augmentName) {
                 const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
                 const originalStops = extractPrimaryGradientStops(svg);
-                if (originalStops) return { stops: originalStops, label: uiTexts.val_default };
+                if (originalStops) {
+                    return {
+                        stops: originalStops,
+                        overlayStops: excelsiorAugments.has(augmentName) ? excelsiorOverlayStops : null,
+                        label: uiTexts.val_default
+                    };
+                }
             }
 
-            return { stops: fallbackFillStops, label: uiTexts.val_default };
+            return { stops: fallbackFillStops, overlayStops: null, label: uiTexts.val_default };
         }
 
         async function getBackgroundPresentation() {
@@ -422,7 +436,11 @@
             if (value === 'default') return getDefaultBackgroundPresentation();
 
             const stops = await fetchTextCached(`./colors/${encodeURIComponent(value)}.txt`);
-            return { stops: stops || fallbackFillStops, label: t(value) };
+            return {
+                stops: stops || fallbackFillStops,
+                overlayStops: value === '卓越' ? excelsiorOverlayStops : null,
+                label: t(value)
+            };
         }
 
         function renderBackgroundValue(display, presentation) {
@@ -432,7 +450,7 @@
             swatch.style.width = '18px';
             swatch.style.height = '18px';
             swatch.style.border = 'none';
-            renderGradientPreview(swatch, presentation.stops);
+            renderGradientPreview(swatch, presentation.stops, presentation.overlayStops);
             display.append(swatch, Object.assign(document.createElement('span'), { textContent: presentation.label }));
         }
 
@@ -445,7 +463,7 @@
 
         async function renderDefaultBackgroundOption(preview, label) {
             const presentation = await getDefaultBackgroundPresentation();
-            renderGradientPreview(preview, presentation.stops);
+            renderGradientPreview(preview, presentation.stops, presentation.overlayStops);
             label.textContent = presentation.label;
         }
         
@@ -589,7 +607,7 @@
         
         async function fetchBackgroundPreview(n, c) {
             const stops = await fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`);
-            if (stops) renderGradientPreview(c, stops);
+            if (stops) renderGradientPreview(c, stops, n === '卓越' ? excelsiorOverlayStops : null);
         }
         
         async function fetchEquipmentPreview(n, c) { 
@@ -598,6 +616,59 @@
         }
         
         function calculateMultiPathViewBox(s) { const n="http://www.w3.org/2000/svg",v=document.createElementNS(n,"svg");v.style.position="absolute";v.style.visibility="hidden";v.style.width="0";v.style.height="0";document.body.appendChild(v);const g=document.createElementNS(n,"g");g.innerHTML=s;v.appendChild(g);try{const b=g.getBBox();document.body.removeChild(v);if(b.width===0)return"0 0 256 256";const p=Math.max(b.width,b.height)*0.1;return`${b.x-p} ${b.y-p} ${b.width+p*2} ${b.height+p*2}`;}catch{if(document.body.contains(v))document.body.removeChild(v);return"0 0 256 256";}}
+
+        function escapeRegExp(value) {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function replacePrimaryGradient(svg, stops, openingTag = null) {
+            return svg.replace(
+                /<radialGradient\b[^>]*>[\s\S]*?<\/radialGradient>/,
+                match => {
+                    const originalOpeningTag = match.match(/^<radialGradient\b[^>]*>/)[0];
+                    return `${openingTag || originalOpeningTag}\n${stops}\n</radialGradient>`;
+                }
+            );
+        }
+
+        function removeExcelsiorOverlay(svg) {
+            const radialIds = [...svg.matchAll(/<radialGradient\b[^>]*\bid="([^"]+)"[^>]*>/g)].map(match => match[1]);
+            if (radialIds.length < 2) return svg;
+
+            const overlayId = radialIds[1];
+            const escapedId = escapeRegExp(overlayId);
+            const overlayElementPattern = new RegExp(`<[A-Za-z][\\w:-]*\\b[^>]*\\bfill="url\\(#${escapedId}\\)"[^>]*/>`);
+            const overlayGradientPattern = new RegExp(`<radialGradient\\b(?=[^>]*\\bid="${escapedId}")[^>]*>[\\s\\S]*?<\\/radialGradient>`);
+            return svg.replace(overlayElementPattern, '').replace(overlayGradientPattern, '');
+        }
+
+        function applyExcelsiorFill(svg, svgName, primaryStops) {
+            if (excelsiorAugments.has(svgName)) return svg;
+
+            const primaryMatch = svg.match(/<radialGradient\b[^>]*\bid="([^"]+)"[^>]*>/);
+            if (!primaryMatch) return svg;
+            const primaryId = primaryMatch[1];
+            const primaryOpeningTag = `<radialGradient id="${primaryId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(12 23) rotate(-90) scale(22)">`;
+            svg = replacePrimaryGradient(svg, primaryStops, primaryOpeningTag);
+
+            const escapedPrimaryId = escapeRegExp(primaryId);
+            const primaryElementPattern = new RegExp(`<[A-Za-z][\\w:-]*\\b[^>]*\\bfill="url\\(#${escapedPrimaryId}\\)"[^>]*/>`);
+            const primaryElementMatch = svg.match(primaryElementPattern);
+            if (!primaryElementMatch) return svg;
+
+            let overlayId = 'excelsior_fill_overlay';
+            let suffix = 1;
+            while (svg.includes(`id="${overlayId}"`)) overlayId = `excelsior_fill_overlay_${suffix++}`;
+
+            const overlayGradient = `<radialGradient id="${overlayId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(12 1) rotate(90) scale(11)">\n${excelsiorOverlayStops}\n</radialGradient>`;
+            const overlayElement = primaryElementMatch[0].replace(
+                `fill="url(#${primaryId})"`,
+                `fill="url(#${overlayId})"`
+            );
+
+            svg = svg.replace(primaryElementMatch[0], `${primaryElementMatch[0]}\n${overlayElement}`);
+            return svg.replace('</defs>', `${overlayGradient}\n</defs>`);
+        }
 
         function checkAndGenerate() {
             const e = document.getElementById('val-equipment').value;
@@ -622,8 +693,16 @@
                     document.getElementById("loading").style.display = "none";
                     return;
                 }
-                const effectiveFill = manuallySelectedFill || automaticFill;
-                if (effectiveFill) svg = svg.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${effectiveFill}</radialGradient>`);
+                if (manuallySelectedFill) {
+                    if (background === '卓越') {
+                        svg = applyExcelsiorFill(svg, svgName, manuallySelectedFill);
+                    } else {
+                        if (excelsiorAugments.has(svgName)) svg = removeExcelsiorOverlay(svg);
+                        svg = replacePrimaryGradient(svg, manuallySelectedFill);
+                    }
+                } else if (automaticFill) {
+                    svg = replacePrimaryGradient(svg, automaticFill);
+                }
                 const defs = svg.indexOf('<defs>');
                 let final = defs !== -1 ? svg.slice(0, defs) + (txt || '') + svg.slice(defs) : svg.replace('>', '>' + (txt || ''));
                 if (quality !== 'default') final = final.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
@@ -678,5 +757,5 @@
             img.src = url;
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b598d6fee52916',t:'MTc4Njc2OTYyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5a5320fda3158',t:'MTc4Njc3MDEyNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
