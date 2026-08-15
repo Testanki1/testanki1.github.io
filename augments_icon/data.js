@@ -16,7 +16,7 @@ const groupedBackgroundColors = {
 
 const rawTranslationMap = {
     "炮塔": "Turret", "底盘": "Hull", "射击颜色": "Shot Effect",
-    "来自装备改造图标": "From Special Augment Icons", "来自射击颜色图标": "From Shot Effect Icons",
+    "来自装备改造图标": "From Augment Icons", "来自射击颜色图标": "From Shot Effect Icons",
     "凤凰": "Phoenix", "卓越": "Excelsior",
     "滑膛炮": "Hammer", "冰风暴": "Freeze", "火焰炮": "Firebird", "蝎子": "Scorpion", "镭射炮": "Shaft", "火龙珠": "Ricochet", "激光炮": "Railgun", "磁力炮": "Isida", "雷暴炮": "Thunder", "海啸": "Tsunami", "火箭炮": "Striker", "轰天炮": "Smoky", "极速炮": "Vulcan", "离子炮": "Twins", "马格南": "Magnum", "电磁炮": "Gauss", "特斯拉": "Tesla",
     "泰坦": "Titan", "圣骑士": "Paladin", "猛犸象": "Mammoth", "猎人中甲": "Hunter", "蜂王": "Hornet", "霍珀": "Hopper", "独裁者": "Dictator", "阿瑞斯": "Ares", "十字军": "Crusader", "维京": "Viking", "黄蜂轻甲": "Wasp",
