@@ -82,7 +82,8 @@
         .option-item.selected { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
         .option-preview { width: 48px; height: 48px; border-radius: 8px; background-color: rgba(128,128,128,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
         .option-preview svg, .option-preview img { width: 100%; height: 100%; object-fit: contain; }
-        .color-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); }
+        .color-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+        .color-circle svg { width: 100%; height: 100%; display: block; }
 
         .btn-base { border: none; padding: 12px 24px; border-radius: 100px; font-size: 16px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; text-decoration: none; width: 100%; }
         .btn-base:active { transform: scale(0.98); }
@@ -247,8 +248,8 @@
         }
 
         const rarities = [
-            { key: "Default", value: "default", color: "#aaaaaa" },
-            { key: "None", value: "#", color: "#333333" },
+            { key: "Default", value: "default", color: "#AAAAAA" },
+            { key: "None", value: "#", color: "transparent" },
             {
                 key: "Common", value: "#BFD5FF", color: "#BFD5FF",
                 fillPreview: "linear-gradient(135deg, #80AAFF, #202B40)",
@@ -298,23 +299,134 @@
             return rarity && rarity.fillStops ? rarity.fillStops : null;
         }
 
-        function updateBackgroundDisplay() {
-            const value = document.getElementById('val-background').value;
-            if (value !== 'default') return;
+        const fallbackOutlineColor = '#AAAAAA';
+        const fallbackFillStops = '<stop stop-color="#AAAAAA"/>\n<stop offset="1" stop-color="#666666"/>';
+        let rarityDisplayVersion = 0;
+        let backgroundDisplayVersion = 0;
 
-            const display = document.getElementById('display-background');
-            const rarity = getRarity();
-            if (getAutomaticFillStops()) {
+        function extractOriginalOutlineColor(svgText) {
+            if (!svgText) return null;
+            const match = svgText.match(/fill="(#[A-Fa-f0-9]+)"/);
+            return match ? match[1].toUpperCase() : null;
+        }
+
+        async function getOriginalOutlineColor() {
+            const augmentName = document.getElementById('val-augment').value;
+            if (!augmentName) return fallbackOutlineColor;
+            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
+            return extractOriginalOutlineColor(svg) || fallbackOutlineColor;
+        }
+
+        function setRaritySwatch(swatch, color, transparent = false) {
+            swatch.innerHTML = '';
+            swatch.style.background = transparent ? 'transparent' : color;
+            swatch.style.backgroundImage = 'none';
+            swatch.style.border = transparent
+                ? '1px dashed var(--md-sys-color-outline)'
+                : '1px solid var(--md-sys-color-outline-variant)';
+        }
+
+        function renderRarityValue(display, color, label, transparent = false) {
+            display.textContent = '';
+            const swatch = document.createElement('div');
+            swatch.className = 'color-circle';
+            swatch.style.width = '18px';
+            swatch.style.height = '18px';
+            setRaritySwatch(swatch, color, transparent);
+            if (!transparent) swatch.style.border = 'none';
+            display.append(swatch, Object.assign(document.createElement('span'), { textContent: label }));
+        }
+
+        async function updateRarityDisplay() {
+            const version = ++rarityDisplayVersion;
+            const value = document.getElementById('val-rarity').value;
+            const rarity = getRarity(value) || rarities[0];
+            const transparent = value === '#';
+            const color = value === 'default'
+                ? await getOriginalOutlineColor()
+                : (transparent ? 'transparent' : rarity.color);
+            if (version !== rarityDisplayVersion) return;
+            renderRarityValue(
+                document.getElementById('display-rarity'),
+                color,
+                uiTexts.rarity_names[rarity.key],
+                transparent
+            );
+        }
+
+        async function renderDefaultRaritySwatch(swatch) {
+            setRaritySwatch(swatch, await getOriginalOutlineColor());
+        }
+
+        function renderGradientPreview(container, stops) {
+            const id = 'g' + Math.random().toString(36).slice(2, 11);
+            container.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}">${stops || fallbackFillStops}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;
+        }
+
+        function extractPrimaryGradientStops(svgText) {
+            if (!svgText) return null;
+            const match = svgText.match(/<radialGradient\b[^>]*>([\s\S]*?)<\/radialGradient>/);
+            return match ? match[1].trim() : null;
+        }
+
+        async function getDefaultBackgroundPresentation() {
+            const automaticStops = getAutomaticFillStops();
+            if (automaticStops) {
+                const rarity = getRarity();
                 const rarityName = uiTexts.rarity_names[rarity.key];
-                display.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${rarity.fillPreview};border:none"></div> ${uiTexts.val_follow_rarity} (${rarityName})`;
-            } else {
-                display.textContent = uiTexts.val_default;
+                return {
+                    stops: automaticStops,
+                    label: `${uiTexts.val_follow_rarity} (${rarityName})`
+                };
             }
+
+            const augmentName = document.getElementById('val-augment').value;
+            if (augmentName) {
+                const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
+                const originalStops = extractPrimaryGradientStops(svg);
+                if (originalStops) return { stops: originalStops, label: uiTexts.val_default };
+            }
+
+            return { stops: fallbackFillStops, label: uiTexts.val_default };
+        }
+
+        async function getBackgroundPresentation() {
+            const value = document.getElementById('val-background').value;
+            if (value === 'default') return getDefaultBackgroundPresentation();
+
+            const stops = await fetchTextCached(`./colors/${encodeURIComponent(value)}.txt`);
+            return { stops: stops || fallbackFillStops, label: t(value) };
+        }
+
+        function renderBackgroundValue(display, presentation) {
+            display.textContent = '';
+            const swatch = document.createElement('div');
+            swatch.className = 'color-circle';
+            swatch.style.width = '18px';
+            swatch.style.height = '18px';
+            swatch.style.border = 'none';
+            renderGradientPreview(swatch, presentation.stops);
+            display.append(swatch, Object.assign(document.createElement('span'), { textContent: presentation.label }));
+        }
+
+        async function updateBackgroundDisplay() {
+            const version = ++backgroundDisplayVersion;
+            const presentation = await getBackgroundPresentation();
+            if (version !== backgroundDisplayVersion) return;
+            renderBackgroundValue(document.getElementById('display-background'), presentation);
+        }
+
+        async function renderDefaultBackgroundOption(preview, label) {
+            const presentation = await getDefaultBackgroundPresentation();
+            renderGradientPreview(preview, presentation.stops);
+            label.textContent = presentation.label;
         }
         
         const fileCache = {};
         const modal = document.getElementById('selectionModal');
         const modalList = document.getElementById('modalList');
+        updateRarityDisplay();
+        updateBackgroundDisplay();
         
         function openMenu(type) {
             modalList.innerHTML = ''; modal.classList.add('active');
@@ -322,9 +434,14 @@
             document.getElementById('modalTitle').textContent = titles[type];
             
             if (type === 'background') {
-                const def = document.createElement('div'); 
+                const def = document.createElement('div');
                 def.className = `option-item ${document.getElementById('val-background').value==='default'?'selected':''}`;
-                def.innerHTML = `<div class="option-preview" style="border:1px dashed var(--md-sys-color-outline)"></div><span>${uiTexts.val_default}</span>`;
+                const preview = document.createElement('div');
+                preview.className = 'option-preview';
+                preview.style.backgroundColor = 'transparent';
+                const label = Object.assign(document.createElement('span'), { textContent: uiTexts.val_default });
+                def.append(preview, label);
+                renderDefaultBackgroundOption(preview, label);
                 def.onclick = () => selectItem('background', 'default', null, uiTexts.val_default);
                 modalList.appendChild(def);
                 renderGroupedOptions(groupedBackgroundColors, type);
@@ -350,14 +467,17 @@
                 modalList.appendChild(h);
                 
                 const items = [...dataObj[group]];
-                
-                items.sort((a, b) => {
-                    if (isZh) {
-                        return a.localeCompare(b, 'zh-CN');
-                    } else {
-                        return t(a).localeCompare(t(b));
-                    }
-                });
+                const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
+
+                if (!keepDeclaredOrder) {
+                    items.sort((a, b) => {
+                        if (isZh) {
+                            return a.localeCompare(b, 'zh-CN');
+                        } else {
+                            return t(a).localeCompare(t(b));
+                        }
+                    });
+                }
 
                 items.forEach(item => {
                     const displayName = t(item);
@@ -366,7 +486,10 @@
                     
                     const p = document.createElement('div'); p.className = 'option-preview';
                     if (type === 'augment') p.innerHTML = `<img src="./augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
-                    else if (type === 'background') fetchBackgroundPreview(item, p);
+                    else if (type === 'background') {
+                        p.style.backgroundColor = 'transparent';
+                        fetchBackgroundPreview(item, p);
+                    }
                     else if (type === 'equipment') fetchEquipmentPreview(item, p);
                     
                     el.append(p, Object.assign(document.createElement('span'), {textContent: displayName}));
@@ -379,9 +502,16 @@
         function renderRarityOptions() {
             const h = document.createElement('div'); h.className = 'option-group-title'; h.textContent = uiTexts.lbl_rarity; modalList.appendChild(h);
             rarities.forEach(r => {
-                const name = uiTexts.rarity_names[r.key]; 
-                const el = document.createElement('div'); el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
-                el.innerHTML = `<div class="color-circle" style="background:${r.fillPreview || r.color}"></div><span>${name}</span>`;
+                const name = uiTexts.rarity_names[r.key];
+                const el = document.createElement('div');
+                el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
+
+                const swatch = document.createElement('div');
+                swatch.className = 'color-circle';
+                if (r.value === 'default') renderDefaultRaritySwatch(swatch);
+                else setRaritySwatch(swatch, r.color, r.value === '#');
+
+                el.append(swatch, Object.assign(document.createElement('span'), { textContent: name }));
                 el.onclick = () => selectItem('rarity', r.value, null, name, r.color);
                 modalList.appendChild(el);
             });
@@ -394,16 +524,18 @@
             const showText = displayOverride || t(value);
 
             if (type === 'rarity') {
-                disp.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${colorOverride};border:none"></div> ${showText}`;
+                updateRarityDisplay();
                 if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
                 updateBackgroundDisplay();
             } else if (type === 'background') {
-                if (value === 'default') updateBackgroundDisplay();
-                else disp.textContent = showText;
+                updateBackgroundDisplay();
                 if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
             } else {
                 disp.textContent = showText;
-                if (type === 'augment') updateBackgroundDisplay();
+                if (type === 'augment') {
+                    updateRarityDisplay();
+                    updateBackgroundDisplay();
+                }
             }
             closeMenu();
             checkAndGenerate();
@@ -427,9 +559,9 @@
 
         async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);if(!r.ok)return null;const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
         
-        async function fetchBackgroundPreview(n, c) { 
-            const t=await fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`); 
-            if(t){ const id='g'+Math.random().toString(36).substr(2,9); c.innerHTML=`<svg viewBox="0 0 100 100"><defs><radialGradient id="${id}">${t}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;}
+        async function fetchBackgroundPreview(n, c) {
+            const stops = await fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`);
+            if (stops) renderGradientPreview(c, stops);
         }
         
         async function fetchEquipmentPreview(n, c) { 
@@ -518,5 +650,5 @@
             img.src = url;
         }
     </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b59072fa4cde6f',t:'MTc4Njc2OTI3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
