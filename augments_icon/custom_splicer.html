@@ -317,6 +317,25 @@
             return extractOriginalOutlineColor(svg) || fallbackOutlineColor;
         }
 
+        function getRarityFromOutlineColor(color) {
+            const normalizedColor = (color || '').toUpperCase();
+            return rarities.find(rarity =>
+                rarity.fillStops && rarity.value.toUpperCase() === normalizedColor
+            ) || null;
+        }
+
+        async function getOriginalRarityPresentation() {
+            const color = await getOriginalOutlineColor();
+            const detectedRarity = getRarityFromOutlineColor(color);
+            return {
+                color,
+                label: detectedRarity
+                    ? `${uiTexts.val_default} (${uiTexts.rarity_names[detectedRarity.key]})`
+                    : uiTexts.val_default,
+                detectedRarity
+            };
+        }
+
         function setRaritySwatch(swatch, color, transparent = false) {
             swatch.innerHTML = '';
             swatch.style.background = transparent ? 'transparent' : color;
@@ -342,20 +361,28 @@
             const value = document.getElementById('val-rarity').value;
             const rarity = getRarity(value) || rarities[0];
             const transparent = value === '#';
-            const color = value === 'default'
-                ? await getOriginalOutlineColor()
+            const originalPresentation = value === 'default'
+                ? await getOriginalRarityPresentation()
+                : null;
+            const color = originalPresentation
+                ? originalPresentation.color
                 : (transparent ? 'transparent' : rarity.color);
+            const label = originalPresentation
+                ? originalPresentation.label
+                : uiTexts.rarity_names[rarity.key];
             if (version !== rarityDisplayVersion) return;
             renderRarityValue(
                 document.getElementById('display-rarity'),
                 color,
-                uiTexts.rarity_names[rarity.key],
+                label,
                 transparent
             );
         }
 
-        async function renderDefaultRaritySwatch(swatch) {
-            setRaritySwatch(swatch, await getOriginalOutlineColor());
+        async function renderDefaultRarityOption(swatch, label) {
+            const presentation = await getOriginalRarityPresentation();
+            setRaritySwatch(swatch, presentation.color);
+            label.textContent = presentation.label;
         }
 
         function renderGradientPreview(container, stops) {
@@ -508,10 +535,11 @@
 
                 const swatch = document.createElement('div');
                 swatch.className = 'color-circle';
-                if (r.value === 'default') renderDefaultRaritySwatch(swatch);
+                const label = Object.assign(document.createElement('span'), { textContent: name });
+                if (r.value === 'default') renderDefaultRarityOption(swatch, label);
                 else setRaritySwatch(swatch, r.color, r.value === '#');
 
-                el.append(swatch, Object.assign(document.createElement('span'), { textContent: name }));
+                el.append(swatch, label);
                 el.onclick = () => selectItem('rarity', r.value, null, name, r.color);
                 modalList.appendChild(el);
             });
@@ -650,5 +678,5 @@
             img.src = url;
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b59072fa4cde6f',t:'MTc4Njc2OTI3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b598d6fee52916',t:'MTc4Njc2OTYyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
