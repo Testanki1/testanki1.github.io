@@ -80,6 +80,10 @@
         .option-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 4px; border-radius: var(--radius-s); cursor: pointer; gap: 16px; transition: background-color 0.2s; }
         .option-item:hover { background-color: var(--md-sys-color-surface-container-high); }
         .option-item.selected { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+        .option-loading { cursor: default; color: var(--md-sys-color-outline); }
+        .option-loading:hover { background-color: transparent; }
+        .option-loading .material-symbols-rounded { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .option-preview { width: 48px; height: 48px; border-radius: 8px; background-color: rgba(128,128,128,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
         .option-preview svg, .option-preview img { width: 100%; height: 100%; object-fit: contain; }
         .color-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
@@ -196,13 +200,25 @@
             return Array.isArray(groupItems) ? [...groupItems] : Object.keys(groupItems || {});
         }
 
+        function findInlineEnglishName(groupedData, chineseName) {
+            if (!groupedData || typeof groupedData !== 'object') return null;
+            if (
+                Object.prototype.hasOwnProperty.call(groupedData, chineseName) &&
+                typeof groupedData[chineseName] === 'string'
+            ) {
+                return groupedData[chineseName];
+            }
+            for (const value of Object.values(groupedData)) {
+                const match = findInlineEnglishName(value, chineseName);
+                if (match) return match;
+            }
+            return null;
+        }
+
         function getInlineEnglishName(chineseName) {
             for (const groupedData of [groupedEquipments, groupedAugments, groupedBackgroundColors]) {
-                for (const groupItems of Object.values(groupedData)) {
-                    if (Object.prototype.hasOwnProperty.call(groupItems, chineseName)) {
-                        return groupItems[chineseName];
-                    }
-                }
+                const match = findInlineEnglishName(groupedData, chineseName);
+                if (match) return match;
             }
             return null;
         }
@@ -324,12 +340,14 @@
             }
         ];
 
+        const equipmentAugmentGroups = ["炮塔", "底盘"];
         const shotEffectAugments = new Set(getGroupedItemNames(groupedAugments["射击颜色"]));
         const equipmentAugmentRarityKeyByName = new Map();
-        Object.entries(groupedAugments).forEach(([rarityKey, augmentItems]) => {
-            if (!rarities.some(rarity => rarity.key === rarityKey)) return;
-            getGroupedItemNames(augmentItems).forEach(augmentName => {
-                equipmentAugmentRarityKeyByName.set(augmentName, rarityKey);
+        equipmentAugmentGroups.forEach(group => {
+            Object.entries(groupedAugments[group] || {}).forEach(([rarityKey, augmentItems]) => {
+                getGroupedItemNames(augmentItems).forEach(augmentName => {
+                    equipmentAugmentRarityKeyByName.set(augmentName, rarityKey);
+                });
             });
         });
         const equipmentAugmentNames = [...equipmentAugmentRarityKeyByName.keys()];
@@ -660,11 +678,7 @@
                 renderGroupedOptions(groupedEquipments, type, renderVersion);
             }
             else if (type === 'augment') {
-                const loading = document.createElement('div');
-                loading.className = 'option-group-title';
-                loading.textContent = uiTexts.loading;
-                modalList.appendChild(loading);
-                renderGroupedOptions(groupedAugments, type, renderVersion, loading);
+                renderAugmentOptions(renderVersion);
             }
             else if (type === 'rarity') renderRarityOptions();
         }
@@ -786,41 +800,96 @@
             return getRarityRankByKey(rarity && rarity.key);
         }
 
-        async function renderGroupedOptions(dataObj, type, renderVersion = menuRenderVersion, loadingElement = null) {
-            const groupNames = Object.keys(dataObj).filter(group => getGroupedItemNames(dataObj[group]).length > 0);
+        function createOptionGroupTitle(group) {
+            const title = document.createElement('div');
+            title.className = 'option-group-title';
+            title.textContent = t(group);
+            return title;
+        }
+
+        function appendOptionItem(type, item, group, parent = modalList) {
+            const displayName = type === 'augment' ? getAugmentDisplayName(item) : t(item);
+            const element = document.createElement('div');
+            element.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
+
+            const preview = document.createElement('div');
+            preview.className = 'option-preview';
             if (type === 'augment') {
-                groupNames.sort((a, b) => {
-                    if (a === '射击颜色') return 1;
-                    if (b === '射击颜色') return -1;
-                    return getRarityRankByKey(a) - getRarityRankByKey(b);
-                });
+                preview.innerHTML = `<img src="./augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
+            } else if (type === 'background') {
+                preview.style.backgroundColor = 'transparent';
+                fetchBackgroundPreview(item, preview);
+            } else if (type === 'equipment') {
+                fetchEquipmentPreview(item, preview);
             }
 
+            element.append(preview, Object.assign(document.createElement('span'), { textContent: displayName }));
+            element.onclick = () => selectItem(type, item, group, displayName);
+            parent.appendChild(element);
+        }
+
+        function getSortedEquipmentAugments(group) {
+            const items = Object.values(groupedAugments[group] || {})
+                .flatMap(rarityItems => getGroupedItemNames(rarityItems));
+            return items.sort((a, b) =>
+                getEquipmentAugmentRarityRank(a) - getEquipmentAugmentRarityRank(b) ||
+                compareOptionNames(a, b, 'augment')
+            );
+        }
+
+        async function getSortedShotEffectAugments() {
+            const items = getGroupedItemNames(groupedAugments["射击颜色"]);
+            const preparedItems = await Promise.all(items.map(async item => ({
+                item,
+                rarityRank: await getDetectedAugmentRarityRank(item),
+                colorKey: await getFillColorSortKey(item)
+            })));
+            preparedItems.sort((a, b) =>
+                a.rarityRank - b.rarityRank ||
+                compareColorSortKeys(a.colorKey, b.colorKey) ||
+                compareOptionNames(a.item, b.item, 'augment')
+            );
+            return preparedItems.map(entry => entry.item);
+        }
+
+        function renderAugmentOptions(renderVersion) {
+            equipmentAugmentGroups.forEach(group => {
+                const items = getSortedEquipmentAugments(group);
+                if (!items.length) return;
+                modalList.appendChild(createOptionGroupTitle(group));
+                items.forEach(item => appendOptionItem('augment', item, group));
+            });
+
+            const shotEffectItems = getGroupedItemNames(groupedAugments["射击颜色"]);
+            if (!shotEffectItems.length) return;
+
+            const shotEffectGroup = "射击颜色";
+            modalList.appendChild(createOptionGroupTitle(shotEffectGroup));
+            const loading = document.createElement('div');
+            loading.className = 'option-item option-loading';
+            loading.innerHTML = `<div class="option-preview"><span class="material-symbols-rounded">progress_activity</span></div><span>${uiTexts.loading}</span>`;
+            const loadingLabel = loading.lastElementChild;
+            modalList.appendChild(loading);
+
+            getSortedShotEffectAugments().then(items => {
+                if (renderVersion !== menuRenderVersion) return;
+                loading.remove();
+                items.forEach(item => appendOptionItem('augment', item, shotEffectGroup));
+            }).catch(error => {
+                console.error(error);
+                if (renderVersion !== menuRenderVersion) return;
+                loadingLabel.textContent = uiTexts.loading;
+            });
+        }
+
+        async function renderGroupedOptions(dataObj, type, renderVersion = menuRenderVersion) {
+            const groupNames = Object.keys(dataObj).filter(group => getGroupedItemNames(dataObj[group]).length > 0);
             const preparedGroups = await Promise.all(groupNames.map(async group => {
                 let items = getGroupedItemNames(dataObj[group]);
                 const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
-
                 const containsOnlyShotEffects = items.length > 0 && items.every(item => shotEffectAugments.has(item));
-                if (type === 'augment') {
-                    if (containsOnlyShotEffects) {
-                        const coloredItems = await Promise.all(items.map(async item => ({
-                            item,
-                            rarityRank: await getDetectedAugmentRarityRank(item),
-                            colorKey: await getFillColorSortKey(item)
-                        })));
-                        coloredItems.sort((a, b) =>
-                            a.rarityRank - b.rarityRank ||
-                            compareColorSortKeys(a.colorKey, b.colorKey) ||
-                            compareOptionNames(a.item, b.item, type)
-                        );
-                        items = coloredItems.map(entry => entry.item);
-                    } else {
-                        items.sort((a, b) =>
-                            getEquipmentAugmentRarityRank(a) - getEquipmentAugmentRarityRank(b) ||
-                            compareOptionNames(a, b, type)
-                        );
-                    }
-                } else if (type === 'background' && containsOnlyShotEffects) {
+
+                if (type === 'background' && containsOnlyShotEffects) {
                     const coloredItems = await Promise.all(items.map(async item => ({
                         item,
                         colorKey: await getFillColorSortKey(item)
@@ -837,32 +906,9 @@
             }));
 
             if (renderVersion !== menuRenderVersion) return;
-            if (loadingElement && loadingElement.isConnected) loadingElement.remove();
-
             preparedGroups.forEach(({ group, items }) => {
-                const h = document.createElement('div'); h.className = 'option-group-title';
-                h.textContent = type === 'augment' && uiTexts.rarity_names[group]
-                    ? uiTexts.rarity_names[group]
-                    : t(group);
-                modalList.appendChild(h);
-
-                items.forEach(item => {
-                    const displayName = type === 'augment' ? getAugmentDisplayName(item) : t(item);
-                    const el = document.createElement('div');
-                    el.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
-
-                    const p = document.createElement('div'); p.className = 'option-preview';
-                    if (type === 'augment') p.innerHTML = `<img src="./augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
-                    else if (type === 'background') {
-                        p.style.backgroundColor = 'transparent';
-                        fetchBackgroundPreview(item, p);
-                    }
-                    else if (type === 'equipment') fetchEquipmentPreview(item, p);
-
-                    el.append(p, Object.assign(document.createElement('span'), {textContent: displayName}));
-                    el.onclick = () => selectItem(type, item, group, displayName);
-                    modalList.appendChild(el);
-                });
+                modalList.appendChild(createOptionGroupTitle(group));
+                items.forEach(item => appendOptionItem(type, item, group));
             });
         }
         
@@ -1100,5 +1146,5 @@
             convertToPNG
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b9e5a53d22d1dd',t:'MTc4NjgxNDcxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b9f6603a99834c',t:'MTc4NjgxNTM5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
