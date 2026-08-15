@@ -180,12 +180,32 @@
     <input type="hidden" id="val-equipment" value=""><input type="hidden" id="val-augment" value="">
     <input type="hidden" id="val-rarity" value="default"><input type="hidden" id="val-background" value="default">
 
-    <!-- 1. 在这里引入外部数据文件 -->
-    <script src="./data.js"></script>
+    <!-- 从 JSON 加载数据后再初始化页面 -->
+    <script type="module">
+        const dataResponse = await fetch('./data.json');
+        if (!dataResponse.ok) throw new Error(`Failed to load data.json: ${dataResponse.status}`);
+        const {
+            groupedEquipments,
+            groupedAugments,
+            groupedBackgroundColors
+        } = await dataResponse.json();
 
-    <!-- 2. 主脚本：直接调用外部数据并处理稀有度联动 -->
-    <script>
         const isZh = navigator.language.toLowerCase().startsWith('zh');
+
+        function getGroupedItemNames(groupItems) {
+            return Array.isArray(groupItems) ? [...groupItems] : Object.keys(groupItems || {});
+        }
+
+        function getInlineEnglishName(chineseName) {
+            for (const groupedData of [groupedEquipments, groupedAugments, groupedBackgroundColors]) {
+                for (const groupItems of Object.values(groupedData)) {
+                    if (Object.prototype.hasOwnProperty.call(groupItems, chineseName)) {
+                        return groupItems[chineseName];
+                    }
+                }
+            }
+            return null;
+        }
 
         const uiTexts = {
             title: isZh ? "3D坦克装备改造图标拼接器" : "Tanki Online Augment Icon Splicer",
@@ -241,10 +261,26 @@
         document.getElementById('loading').textContent = uiTexts.loading;
         document.getElementById('ui-note').textContent = uiTexts.note;
 
-        // 这里的 rawTranslationMap 已经由外部 data.js 文件提供
+        function getFixedEnglishName(chineseKey) {
+            switch (chineseKey) {
+                case "炮塔": return "Turret";
+                case "底盘": return "Hull";
+                case "射击颜色": return "Shot Effect";
+                case "来自装备改造图标": return "From Augment Icons";
+                case "来自射击颜色图标": return "From Shot Effect Icons";
+                case "普通": return "Common";
+                case "罕见": return "Uncommon";
+                case "稀有": return "Rare";
+                case "史诗": return "Epic";
+                case "传奇": return "Legendary";
+                case "异国情调": return "Exotic";
+                default: return null;
+            }
+        }
+
         function t(chineseKey) {
             if (isZh) return chineseKey;
-            return rawTranslationMap[chineseKey] || chineseKey;
+            return getFixedEnglishName(chineseKey) || getInlineEnglishName(chineseKey) || chineseKey;
         }
 
         function getAugmentDisplayName(augmentName) {
@@ -288,12 +324,16 @@
             }
         ];
 
-        const shotEffectAugments = new Set(groupedAugments["射击颜色"] || []);
-        const equipmentAugmentNames = [
-            ...(groupedAugments["炮塔"] || []),
-            ...(groupedAugments["底盘"] || [])
-        ];
-        const equipmentFillNames = new Set(groupedBackgroundColors["来自装备改造图标"] || []);
+        const shotEffectAugments = new Set(getGroupedItemNames(groupedAugments["射击颜色"]));
+        const equipmentAugmentRarityKeyByName = new Map();
+        Object.entries(groupedAugments).forEach(([rarityKey, augmentItems]) => {
+            if (!rarities.some(rarity => rarity.key === rarityKey)) return;
+            getGroupedItemNames(augmentItems).forEach(augmentName => {
+                equipmentAugmentRarityKeyByName.set(augmentName, rarityKey);
+            });
+        });
+        const equipmentAugmentNames = [...equipmentAugmentRarityKeyByName.keys()];
+        const equipmentFillNames = new Set(getGroupedItemNames(groupedBackgroundColors["来自装备改造图标"]));
         const fillTemplateCache = {};
 
         function getRawAugmentBaseName(augmentName) {
@@ -330,17 +370,19 @@
         let rarityDisplayVersion = 0;
         let backgroundDisplayVersion = 0;
 
+        function getRarityByKey(rarityKey) {
+            return rarities.find(rarity => rarity.key === rarityKey) || null;
+        }
+
+        function getRarityRankByKey(rarityKey) {
+            const index = rarities.findIndex(rarity => rarity.key === rarityKey);
+            return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
+        }
+
         function extractOriginalOutlineColor(svgText) {
             if (!svgText) return null;
             const match = svgText.match(/fill="(#[A-Fa-f0-9]+)"/);
             return match ? match[1].toUpperCase() : null;
-        }
-
-        async function getOriginalOutlineColor() {
-            const augmentName = document.getElementById('val-augment').value;
-            if (!augmentName) return fallbackOutlineColor;
-            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
-            return extractOriginalOutlineColor(svg) || fallbackOutlineColor;
         }
 
         function getRarityFromOutlineColor(color) {
@@ -350,11 +392,23 @@
             ) || null;
         }
 
+        function getDeclaredEquipmentAugmentRarity(augmentName) {
+            return getRarityByKey(equipmentAugmentRarityKeyByName.get(augmentName));
+        }
+
+        async function getOriginalAugmentRarity(augmentName = document.getElementById('val-augment').value) {
+            const declaredRarity = getDeclaredEquipmentAugmentRarity(augmentName);
+            if (declaredRarity || !augmentName) return declaredRarity;
+
+            // 射击颜色不在 data.json 的稀有度数据中，仍然通过下载 SVG 检测。
+            const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
+            return getRarityFromOutlineColor(extractOriginalOutlineColor(svg));
+        }
+
         async function getOriginalRarityPresentation() {
-            const color = await getOriginalOutlineColor();
-            const detectedRarity = getRarityFromOutlineColor(color);
+            const detectedRarity = await getOriginalAugmentRarity();
             return {
-                color,
+                color: detectedRarity ? detectedRarity.color : fallbackOutlineColor,
                 label: detectedRarity
                     ? `${uiTexts.val_default} (${uiTexts.rarity_names[detectedRarity.key]})`
                     : uiTexts.val_default,
@@ -722,17 +776,28 @@
             return 0;
         }
 
-        async function getAugmentRarityRank(augmentName) {
+        function getEquipmentAugmentRarityRank(augmentName) {
+            return getRarityRankByKey(equipmentAugmentRarityKeyByName.get(augmentName));
+        }
+
+        async function getDetectedAugmentRarityRank(augmentName) {
             const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
-            const outlineColor = extractOriginalOutlineColor(svg);
-            const rarity = getRarityFromOutlineColor(outlineColor);
-            const index = rarity ? rarities.indexOf(rarity) : -1;
-            return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
+            const rarity = getRarityFromOutlineColor(extractOriginalOutlineColor(svg));
+            return getRarityRankByKey(rarity && rarity.key);
         }
 
         async function renderGroupedOptions(dataObj, type, renderVersion = menuRenderVersion, loadingElement = null) {
-            const preparedGroups = await Promise.all(Object.keys(dataObj).map(async group => {
-                let items = [...dataObj[group]];
+            const groupNames = Object.keys(dataObj).filter(group => getGroupedItemNames(dataObj[group]).length > 0);
+            if (type === 'augment') {
+                groupNames.sort((a, b) => {
+                    if (a === '射击颜色') return 1;
+                    if (b === '射击颜色') return -1;
+                    return getRarityRankByKey(a) - getRarityRankByKey(b);
+                });
+            }
+
+            const preparedGroups = await Promise.all(groupNames.map(async group => {
+                let items = getGroupedItemNames(dataObj[group]);
                 const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
 
                 const containsOnlyShotEffects = items.length > 0 && items.every(item => shotEffectAugments.has(item));
@@ -740,7 +805,7 @@
                     if (containsOnlyShotEffects) {
                         const coloredItems = await Promise.all(items.map(async item => ({
                             item,
-                            rarityRank: await getAugmentRarityRank(item),
+                            rarityRank: await getDetectedAugmentRarityRank(item),
                             colorKey: await getFillColorSortKey(item)
                         })));
                         coloredItems.sort((a, b) =>
@@ -750,14 +815,10 @@
                         );
                         items = coloredItems.map(entry => entry.item);
                     } else {
-                        const rankedItems = await Promise.all(items.map(async item => ({
-                            item,
-                            rarityRank: await getAugmentRarityRank(item)
-                        })));
-                        rankedItems.sort((a, b) =>
-                            a.rarityRank - b.rarityRank || compareOptionNames(a.item, b.item, type)
+                        items.sort((a, b) =>
+                            getEquipmentAugmentRarityRank(a) - getEquipmentAugmentRarityRank(b) ||
+                            compareOptionNames(a, b, type)
                         );
-                        items = rankedItems.map(entry => entry.item);
                     }
                 } else if (type === 'background' && containsOnlyShotEffects) {
                     const coloredItems = await Promise.all(items.map(async item => ({
@@ -780,7 +841,9 @@
 
             preparedGroups.forEach(({ group, items }) => {
                 const h = document.createElement('div'); h.className = 'option-group-title';
-                h.textContent = t(group);
+                h.textContent = type === 'augment' && uiTexts.rarity_names[group]
+                    ? uiTexts.rarity_names[group]
+                    : t(group);
                 modalList.appendChild(h);
 
                 items.forEach(item => {
@@ -1027,6 +1090,15 @@
             };
             img.src = url;
         }
+
+        // 模块内函数需要挂到 window，供页面现有的内联点击事件调用。
+        Object.assign(window, {
+            openMenu,
+            closeMenu,
+            resetSelection,
+            resetAll,
+            convertToPNG
+        });
     </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b9e5a53d22d1dd',t:'MTc4NjgxNDcxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
