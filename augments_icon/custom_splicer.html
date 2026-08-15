@@ -735,9 +735,9 @@
                 let items = [...dataObj[group]];
                 const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
 
+                const containsOnlyShotEffects = items.length > 0 && items.every(item => shotEffectAugments.has(item));
                 if (type === 'augment') {
-                    const sortByFillColor = items.length > 0 && items.every(item => shotEffectAugments.has(item));
-                    if (sortByFillColor) {
+                    if (containsOnlyShotEffects) {
                         const coloredItems = await Promise.all(items.map(async item => ({
                             item,
                             rarityRank: await getAugmentRarityRank(item),
@@ -759,6 +759,15 @@
                         );
                         items = rankedItems.map(entry => entry.item);
                     }
+                } else if (type === 'background' && containsOnlyShotEffects) {
+                    const coloredItems = await Promise.all(items.map(async item => ({
+                        item,
+                        colorKey: await getFillColorSortKey(item)
+                    })));
+                    coloredItems.sort((a, b) =>
+                        compareColorSortKeys(a.colorKey, b.colorKey) || compareOptionNames(a.item, b.item, type)
+                    );
+                    items = coloredItems.map(entry => entry.item);
                 } else if (!keepDeclaredOrder) {
                     items.sort((a, b) => compareOptionNames(a, b, type));
                 }
@@ -1019,5 +1028,5 @@
             img.src = url;
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5e7425e67aa6e',t:'MTc4Njc3MjgzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
