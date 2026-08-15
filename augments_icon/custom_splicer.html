@@ -180,9 +180,9 @@
     <input type="hidden" id="val-rarity" value="default"><input type="hidden" id="val-background" value="default">
 
     <!-- 1. 在这里引入外部数据文件 -->
-    <script src="https://testanki1.github.io/augments_icon/data.js"></script>
+    <script src="./data.js"></script>
 
-    <!-- 2. 主脚本维持不变，直接调用引入的数据 -->
+    <!-- 2. 主脚本：直接调用外部数据并处理稀有度联动 -->
     <script>
         const isZh = navigator.language.toLowerCase().startsWith('zh');
 
@@ -199,6 +199,7 @@
             lbl_rarity: isZh ? "稀有度颜色" : "Rarity Color",
             val_default: isZh ? "默认" : "Default",
             val_none: isZh ? "无" : "None",
+            val_follow_rarity: isZh ? "跟随稀有度" : "Follow Rarity",
             lbl_fill: isZh ? "填充颜色" : "Fill Color",
             
             btn_reset: isZh ? "全部重置" : "Reset All",
@@ -245,16 +246,71 @@
             return rawTranslationMap[chineseKey] || chineseKey;
         }
 
-        const rarities = [ 
-            { key: "Default", value: "default", color: "#aaaaaa" }, 
-            { key: "None", value: "#", color: "#333333" }, 
-            { key: "Common", value: "#BFD5FF", color: "#BFD5FF" }, 
-            { key: "Uncommon", value: "#76FF33", color: "#76FF33" }, 
-            { key: "Rare", value: "#00D4FF", color: "#00D4FF" }, 
-            { key: "Epic", value: "#D580FF", color: "#D580FF" }, 
-            { key: "Legendary", value: "#FFEE00", color: "#FFEE00" }, 
-            { key: "Exotic", value: "#FF6666", color: "#FF6666" } 
+        const rarities = [
+            { key: "Default", value: "default", color: "#aaaaaa" },
+            { key: "None", value: "#", color: "#333333" },
+            {
+                key: "Common", value: "#BFD5FF", color: "#BFD5FF",
+                fillPreview: "linear-gradient(135deg, #80AAFF, #202B40)",
+                fillStops: '<stop stop-color="#80AAFF"/>\n<stop offset="1" stop-color="#202B40"/>'
+            },
+            {
+                key: "Uncommon", value: "#76FF33", color: "#76FF33",
+                fillPreview: "linear-gradient(135deg, #66CC00, #004020)",
+                fillStops: '<stop stop-color="#66CC00"/>\n<stop offset="1" stop-color="#004020"/>'
+            },
+            {
+                key: "Rare", value: "#00D4FF", color: "#00D4FF",
+                fillPreview: "linear-gradient(135deg, #00D4FF, #001580)",
+                fillStops: '<stop stop-color="#00D4FF"/>\n<stop offset="1" stop-color="#001580"/>'
+            },
+            {
+                key: "Epic", value: "#D580FF", color: "#D580FF",
+                fillPreview: "linear-gradient(135deg, #9999FF, #2B0080)",
+                fillStops: '<stop stop-color="#9999FF"/>\n<stop offset="1" stop-color="#2B0080"/>'
+            },
+            {
+                key: "Legendary", value: "#FFEE00", color: "#FFEE00",
+                fillPreview: "linear-gradient(135deg, #FFCC00, #FF6600 50%, #800000)",
+                fillStops: '<stop stop-color="#FFCC00"/>\n<stop offset="0.5" stop-color="#FF6600"/>\n<stop offset="1" stop-color="#800000"/>'
+            },
+            {
+                key: "Exotic", value: "#FF6666", color: "#FF6666",
+                fillPreview: "linear-gradient(135deg, #FF8080, #FF3333 49.6286%, #800000)",
+                fillStops: '<stop stop-color="#FF8080"/>\n<stop offset="0.496286" stop-color="#FF3333"/>\n<stop offset="1" stop-color="#800000"/>'
+            }
         ];
+
+        const shotEffectAugments = new Set(groupedAugments["射击颜色"] || []);
+        const originalFillAugments = new Set(["凤凰（炮塔）", "凤凰（底盘）", "卓越（炮塔）", "卓越（底盘）"]);
+
+        function getRarity(value = document.getElementById('val-rarity').value) {
+            return rarities.find(rarity => rarity.value === value);
+        }
+
+        function usesAutomaticRarityFill(augmentName = document.getElementById('val-augment').value) {
+            return Boolean(augmentName) && !shotEffectAugments.has(augmentName) && !originalFillAugments.has(augmentName);
+        }
+
+        function getAutomaticFillStops() {
+            if (!usesAutomaticRarityFill()) return null;
+            const rarity = getRarity();
+            return rarity && rarity.fillStops ? rarity.fillStops : null;
+        }
+
+        function updateBackgroundDisplay() {
+            const value = document.getElementById('val-background').value;
+            if (value !== 'default') return;
+
+            const display = document.getElementById('display-background');
+            const rarity = getRarity();
+            if (getAutomaticFillStops()) {
+                const rarityName = uiTexts.rarity_names[rarity.key];
+                display.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${rarity.fillPreview};border:none"></div> ${uiTexts.val_follow_rarity} (${rarityName})`;
+            } else {
+                display.textContent = uiTexts.val_default;
+            }
+        }
         
         const fileCache = {};
         const modal = document.getElementById('selectionModal');
@@ -309,7 +365,7 @@
                     el.className = `option-item ${document.getElementById(`val-${type}`).value===item?'selected':''}`;
                     
                     const p = document.createElement('div'); p.className = 'option-preview';
-                    if (type === 'augment') p.innerHTML = `<img src="https://testanki1.github.io/augments_icon/augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
+                    if (type === 'augment') p.innerHTML = `<img src="./augments/${encodeURIComponent(item)}.svg" loading="lazy">`;
                     else if (type === 'background') fetchBackgroundPreview(item, p);
                     else if (type === 'equipment') fetchEquipmentPreview(item, p);
                     
@@ -325,7 +381,7 @@
             rarities.forEach(r => {
                 const name = uiTexts.rarity_names[r.key]; 
                 const el = document.createElement('div'); el.className = `option-item ${document.getElementById('val-rarity').value===r.value?'selected':''}`;
-                el.innerHTML = `<div class="color-circle" style="background:${r.color}"></div><span>${name}</span>`;
+                el.innerHTML = `<div class="color-circle" style="background:${r.fillPreview || r.color}"></div><span>${name}</span>`;
                 el.onclick = () => selectItem('rarity', r.value, null, name, r.color);
                 modalList.appendChild(el);
             });
@@ -340,11 +396,14 @@
             if (type === 'rarity') {
                 disp.innerHTML = `<div class="color-circle" style="width:16px;height:16px;background:${colorOverride};border:none"></div> ${showText}`;
                 if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
+                updateBackgroundDisplay();
             } else if (type === 'background') {
-                disp.textContent = value === 'default' ? uiTexts.val_default : showText;
+                if (value === 'default') updateBackgroundDisplay();
+                else disp.textContent = showText;
                 if(btn) value !== 'default' ? btn.classList.add('visible') : btn.classList.remove('visible');
             } else {
                 disp.textContent = showText;
+                if (type === 'augment') updateBackgroundDisplay();
             }
             closeMenu();
             checkAndGenerate();
@@ -366,15 +425,15 @@
             document.getElementById('downloadSection').innerHTML = '';
         }
 
-        async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
+        async function fetchTextCached(url) { if(fileCache[url])return fileCache[url]; try{const r=await fetch(url);if(!r.ok)return null;const t=await r.text();fileCache[url]=t;return t;}catch(e){return null;} }
         
         async function fetchBackgroundPreview(n, c) { 
-            const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/colors/${encodeURIComponent(n)}.txt`); 
+            const t=await fetchTextCached(`./colors/${encodeURIComponent(n)}.txt`); 
             if(t){ const id='g'+Math.random().toString(36).substr(2,9); c.innerHTML=`<svg viewBox="0 0 100 100"><defs><radialGradient id="${id}">${t}</radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#${id})"/></svg>`;}
         }
         
         async function fetchEquipmentPreview(n, c) { 
-            const t=await fetchTextCached(`https://testanki1.github.io/augments_icon/equipments/${encodeURIComponent(n)}.txt`); 
+            const t=await fetchTextCached(`./equipments/${encodeURIComponent(n)}.txt`); 
             if(t) c.innerHTML=`<svg viewBox="${calculateMultiPathViewBox(t)}" style="fill:currentColor">${t}</svg>`; 
         }
         
@@ -391,18 +450,20 @@
             const svgName = document.getElementById("val-augment").value; 
             const quality = document.getElementById("val-rarity").value;
             const background = document.getElementById("val-background").value;
+            const automaticFill = background === 'default' ? getAutomaticFillStops() : null;
 
             document.getElementById("loading").style.display = "block";
             Promise.all([
-                txtName === 'none' ? Promise.resolve('') : fetchTextCached('https://testanki1.github.io/augments_icon/equipments/'+encodeURIComponent(txtName)+'.txt'),
-                fetchTextCached('https://testanki1.github.io/augments_icon/augments/'+encodeURIComponent(svgName)+'.svg'),
-                background!=='default' ? fetchTextCached('https://testanki1.github.io/augments_icon/colors/'+encodeURIComponent(background)+'.txt') : null
-            ]).then(([txt, svg, bg]) => {
+                txtName === 'none' ? Promise.resolve('') : fetchTextCached('./equipments/'+encodeURIComponent(txtName)+'.txt'),
+                fetchTextCached('./augments/'+encodeURIComponent(svgName)+'.svg'),
+                background !== 'default' ? fetchTextCached('./colors/'+encodeURIComponent(background)+'.txt') : null
+            ]).then(([txt, svg, manuallySelectedFill]) => {
                 if (!svg) {
                     document.getElementById("loading").style.display = "none";
                     return;
                 }
-                if (bg) svg = svg.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${bg}</radialGradient>`);
+                const effectiveFill = manuallySelectedFill || automaticFill;
+                if (effectiveFill) svg = svg.replace(/(<radialGradient[^>]*>)([\s\S]*?<\/radialGradient>)/, `$1${effectiveFill}</radialGradient>`);
                 const defs = svg.indexOf('<defs>');
                 let final = defs !== -1 ? svg.slice(0, defs) + (txt || '') + svg.slice(defs) : svg.replace('>', '>' + (txt || ''));
                 if (quality !== 'default') final = final.replace(/fill="#[A-Za-z0-9]+"/, 'fill="' + quality + '"');
