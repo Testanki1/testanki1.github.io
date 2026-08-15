@@ -627,6 +627,101 @@
             return optionNameCollator.compare(aName, bName) || a.localeCompare(b);
         }
 
+        function parsePreviewColor(value) {
+            const color = (value || '').trim().toLowerCase();
+            const namedColors = { white: '#ffffff', black: '#000000' };
+            const normalized = namedColors[color] || color;
+            const shortHex = normalized.match(/^#([0-9a-f]{3})$/i);
+            const fullHex = normalized.match(/^#([0-9a-f]{6})$/i);
+            if (shortHex) {
+                return [...shortHex[1]].map(channel => parseInt(channel + channel, 16));
+            }
+            if (fullHex) {
+                return [0, 2, 4].map(index => parseInt(fullHex[1].slice(index, index + 2), 16));
+            }
+            return [0, 0, 0];
+        }
+
+        function getAverageGradientColor(stopsMarkup) {
+            const stops = [...(stopsMarkup || '').matchAll(/<stop\b[^>]*\/?\s*>/g)].map((match, index, all) => {
+                const tag = match[0];
+                const colorMatch = tag.match(/\bstop-color="([^"]+)"/);
+                const offsetMatch = tag.match(/\boffset="([^"]+)"/);
+                let offset = offsetMatch ? parseFloat(offsetMatch[1]) : null;
+                if (offsetMatch && offsetMatch[1].includes('%')) offset /= 100;
+                if (offset === null && index === 0) offset = 0;
+                if (offset === null && index === all.length - 1) offset = 1;
+                return { color: parsePreviewColor(colorMatch ? colorMatch[1] : 'black'), offset };
+            });
+            if (!stops.length) return [0, 0, 0];
+
+            let previousKnown = 0;
+            for (let i = 0; i < stops.length; i++) {
+                if (stops[i].offset === null) continue;
+                const startOffset = stops[previousKnown].offset;
+                const gap = i - previousKnown;
+                if (gap > 1) {
+                    for (let j = 1; j < gap; j++) {
+                        stops[previousKnown + j].offset = startOffset + (stops[i].offset - startOffset) * (j / gap);
+                    }
+                }
+                previousKnown = i;
+            }
+
+            const total = [0, 0, 0];
+            let totalWeight = 0;
+            if (stops[0].offset > 0) {
+                stops[0].color.forEach((value, index) => total[index] += value * stops[0].offset);
+                totalWeight += stops[0].offset;
+            }
+            for (let i = 0; i < stops.length - 1; i++) {
+                const weight = Math.max(0, stops[i + 1].offset - stops[i].offset);
+                for (let channel = 0; channel < 3; channel++) {
+                    total[channel] += ((stops[i].color[channel] + stops[i + 1].color[channel]) / 2) * weight;
+                }
+                totalWeight += weight;
+            }
+            const lastStop = stops[stops.length - 1];
+            if (lastStop.offset < 1) {
+                const weight = 1 - lastStop.offset;
+                lastStop.color.forEach((value, index) => total[index] += value * weight);
+                totalWeight += weight;
+            }
+            return totalWeight > 0 ? total.map(value => value / totalWeight) : stops[0].color;
+        }
+
+        function rgbToHsl([red, green, blue]) {
+            const r = red / 255, g = green / 255, b = blue / 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const lightness = (max + min) / 2;
+            if (max === min) return { hue: 0, saturation: 0, lightness };
+            const delta = max - min;
+            const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+            let hue;
+            if (max === r) hue = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+            else if (max === g) hue = ((b - r) / delta + 2) / 6;
+            else hue = ((r - g) / delta + 4) / 6;
+            return { hue, saturation, lightness };
+        }
+
+        async function getFillColorSortKey(augmentName) {
+            const stops = await fetchTextCached(`./colors/${encodeURIComponent(augmentName)}.txt`);
+            const { hue, saturation, lightness } = rgbToHsl(getAverageGradientColor(stops));
+            const isNeutral = saturation < 0.25;
+            const hueOrder = hue >= 23 / 24 ? hue - 1 : hue;
+            return isNeutral
+                ? [1, 1 - lightness, 0, 0]
+                : [0, hueOrder, 1 - saturation, lightness];
+        }
+
+        function compareColorSortKeys(a, b) {
+            for (let index = 0; index < Math.max(a.length, b.length); index++) {
+                const difference = (a[index] || 0) - (b[index] || 0);
+                if (Math.abs(difference) > 1e-9) return difference;
+            }
+            return 0;
+        }
+
         async function getAugmentRarityRank(augmentName) {
             const svg = await fetchTextCached(`./augments/${encodeURIComponent(augmentName)}.svg`);
             const outlineColor = extractOriginalOutlineColor(svg);
@@ -641,14 +736,29 @@
                 const keepDeclaredOrder = type === 'background' && group === '来自装备改造图标';
 
                 if (type === 'augment') {
-                    const rankedItems = await Promise.all(items.map(async item => ({
-                        item,
-                        rarityRank: await getAugmentRarityRank(item)
-                    })));
-                    rankedItems.sort((a, b) =>
-                        a.rarityRank - b.rarityRank || compareOptionNames(a.item, b.item, type)
-                    );
-                    items = rankedItems.map(entry => entry.item);
+                    const sortByFillColor = items.length > 0 && items.every(item => shotEffectAugments.has(item));
+                    if (sortByFillColor) {
+                        const coloredItems = await Promise.all(items.map(async item => ({
+                            item,
+                            rarityRank: await getAugmentRarityRank(item),
+                            colorKey: await getFillColorSortKey(item)
+                        })));
+                        coloredItems.sort((a, b) =>
+                            a.rarityRank - b.rarityRank ||
+                            compareColorSortKeys(a.colorKey, b.colorKey) ||
+                            compareOptionNames(a.item, b.item, type)
+                        );
+                        items = coloredItems.map(entry => entry.item);
+                    } else {
+                        const rankedItems = await Promise.all(items.map(async item => ({
+                            item,
+                            rarityRank: await getAugmentRarityRank(item)
+                        })));
+                        rankedItems.sort((a, b) =>
+                            a.rarityRank - b.rarityRank || compareOptionNames(a.item, b.item, type)
+                        );
+                        items = rankedItems.map(entry => entry.item);
+                    }
                 } else if (!keepDeclaredOrder) {
                     items.sort((a, b) => compareOptionNames(a, b, type));
                 }
@@ -909,5 +1019,5 @@
             img.src = url;
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5d7dd5df9eab1',t:'MTc4Njc3MjIwMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2b5e7425e67aa6e',t:'MTc4Njc3MjgzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
