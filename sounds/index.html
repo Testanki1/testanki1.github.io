@@ -34,27 +34,37 @@
     --radius-pill: 9999px;
   }
 
-  * {
+  /* 全局统一字体继承：第一字体 Rubik，第二字体 M PLUS 1p */
+  *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
     -webkit-tap-highlight-color: transparent;
+    font-family: 'Rubik', 'M PLUS 1p', sans-serif;
+  }
+
+  html {
+    background-color: var(--tk-bg-dark);
+    min-height: 100%;
   }
 
   body {
-    background: radial-gradient(circle at 50% 0%, #082d42 0%, var(--tk-bg-dark) 70%, var(--tk-bg-deep) 100%);
+    /* 核心修复：添加 fixed 与 100vw 100vh 确保背景光效在任何高度下完全恒定不变 */
+    background: radial-gradient(circle at 50% 0%, #082d42 0%, var(--tk-bg-dark) 70%, var(--tk-bg-deep) 100%) no-repeat center top fixed;
+    background-attachment: fixed;
+    background-size: 100vw 100vh;
     color: var(--tk-btn-ice);
-    font-family: 'M PLUS 1p', sans-serif;
     min-height: 100vh;
     padding: 30px 20px 80px;
+    font-family: 'Rubik', 'M PLUS 1p', sans-serif;
   }
 
-  /* 第一字体统一使用 Rubik */
-  h1, h2, h3, h4, .rubik-font, .id-title, .m3-custom-dropdown, .order-btn, .filter-chip, .badge-title {
-    font-family: 'Rubik', sans-serif;
+  input, button, select, textarea {
+    font-family: inherit;
   }
 
   .material-symbols-rounded {
+    font-family: 'Material Symbols Rounded' !important;
     font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
     display: inline-block;
     vertical-align: middle;
@@ -158,7 +168,6 @@
     border-radius: var(--radius-pill);
     padding: 9px 16px 9px 42px;
     color: #ffffff;
-    font-family: 'M PLUS 1p', sans-serif;
     font-size: 0.9rem;
     outline: none;
     transition: all 0.25s ease;
@@ -438,7 +447,6 @@
     justify-content: space-between;
     font-size: 0.75rem;
     margin-bottom: 5px;
-    font-family: 'M PLUS 1p', sans-serif;
   }
 
   .tooltip-row:last-child {
@@ -667,7 +675,6 @@
   }
 
   .m3-btn {
-    font-family: 'Rubik', sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
     padding: 10px 20px;
@@ -933,7 +940,7 @@
   let assetSetVersion = 7;
   let items = [];
   let currentSortKey = 'creationDate';
-  let currentFormatFilter = 'all'; // 格式筛选：all / mp3 / wav
+  let currentFormatFilter = 'all';
   let isDescending = true;
   let searchQuery = '';
 
@@ -1053,7 +1060,6 @@
       }
     }
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    // 预拉取完成后按当前条件刷新一次（确保格式与大小排序完全同步）
     applySortAndRender();
   }
 
@@ -1247,13 +1253,11 @@
   function applySortAndRender() {
     const query = searchQuery.trim().toLowerCase();
     let list = items.filter(it => {
-      // 1. WAV / MP3 格式筛选
       if (currentFormatFilter !== 'all') {
         if (it.format.toLowerCase() !== currentFormatFilter.toLowerCase()) {
           return false;
         }
       }
-      // 2. 搜索过滤
       if (!query) return true;
       return it.id.includes(query) || it.creationDateStr.includes(query) || it.updateDateTimeStr.includes(query);
     });
