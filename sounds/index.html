@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3D坦克音效展示</title>
 
-<!-- 引入官方规范字体: Rubik (第一字体) 与 M PLUS 1p (第二字体) -->
+<!-- 官方规范字体: Rubik 与 M PLUS 1p -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:ital,wght@0,400;0,500;0,700;0,900;1,700&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
 
 <style>
   /* ==========================================================================
-     Tanki Online 品牌官方色彩规范 (Brand Guidelines Palette)
+     3D坦克品牌配色
      ========================================================================== */
   :root {
     --tk-neon-green: #76FF33;    /* 核心主色 Neon Green */
@@ -28,10 +28,21 @@
     --tk-border: rgba(191, 213, 255, 0.18);
     --tk-border-glow: rgba(118, 255, 51, 0.45);
 
-    --radius-s: 8px;
-    --radius-m: 14px;
-    --radius-l: 20px;
+    /* 标准圆角 Token */
+    --radius-xs: 6px;
+    --radius-s: 10px;
+    --radius-m: 16px;
+    --radius-l: 24px;
     --radius-pill: 9999px;
+
+    /* 标准动效与弹簧曲线 (Spring Motion Physics) */
+    --m3-motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --m3-motion-standard: cubic-bezier(0.2, 0, 0, 1);
+    --m3-motion-enter: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+    --m3-motion-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+    --m3-duration-short: 180ms;
+    --m3-duration-medium: 300ms;
+    --m3-duration-long: 450ms;
   }
 
   *, *::before, *::after {
@@ -81,7 +92,7 @@
     flex-direction: column;
     gap: 16px;
     margin-bottom: 20px;
-    padding-bottom: 16px;
+    padding-bottom: 18px;
     border-bottom: 1.5px solid var(--tk-border);
   }
 
@@ -100,8 +111,8 @@
   }
 
   .logo-mark {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
     background-color: var(--tk-neon-green);
     color: var(--tk-bg-dark);
     border-radius: var(--radius-m);
@@ -143,32 +154,24 @@
   }
 
   /* ==========================================================================
-     响应式工具栏 (移动端整齐 2 行，桌面端单行)
+     工具栏 (Toolbar)
      ========================================================================== */
   .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
 
   @media (min-width: 900px) {
     .toolbar {
       flex-direction: row;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
   }
 
-  /* 行 1: 搜索框 + 格式筛选胶囊 */
-  .toolbar-row-top {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-  }
-
-  /* 行 2: 排序下拉 + 升降序切换 */
-  .toolbar-row-bottom {
+  /* 移动端 2 行紧凑结构 */
+  .toolbar-row-top, .toolbar-row-bottom {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -181,10 +184,13 @@
     }
   }
 
+  /* 1. 标准搜索栏 (带 Trailing Clear Icon) */
   .search-wrapper {
     position: relative;
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: center;
   }
 
   @media (min-width: 900px) {
@@ -193,26 +199,26 @@
     }
   }
 
-  .search-wrapper .material-symbols-rounded {
+  .search-wrapper .leading-icon {
     position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 14px;
     color: var(--tk-btn-ice);
     opacity: 0.6;
     font-size: 18px;
+    pointer-events: none;
   }
 
   .search-input {
     width: 100%;
+    height: 42px;
     background-color: var(--tk-bg-deep);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-pill);
-    padding: 8px 14px 8px 36px;
+    padding: 0 40px 0 38px;
     color: #ffffff;
     font-size: 0.85rem;
     outline: none;
-    transition: all 0.25s ease;
+    transition: border-color var(--m3-duration-short) var(--m3-motion-standard), box-shadow var(--m3-duration-short) var(--m3-motion-standard);
   }
 
   .search-input:focus {
@@ -220,44 +226,119 @@
     box-shadow: 0 0 12px rgba(118, 255, 51, 0.3);
   }
 
-  /* 格式筛选胶囊 */
-  .filter-chips-group {
-    display: inline-flex;
-    align-items: center;
-    background-color: var(--tk-surface);
-    border: 1.5px solid var(--tk-border);
+  .search-clear-btn {
+    position: absolute;
+    right: 8px;
+    width: 28px;
+    height: 28px;
     border-radius: var(--radius-pill);
-    padding: 2px;
-    gap: 2px;
-    flex-shrink: 0;
-  }
-
-  .filter-chip {
     background: transparent;
     border: none;
     color: var(--tk-btn-ice);
-    font-size: 0.76rem;
-    font-weight: 700;
-    padding: 6px 11px;
-    border-radius: var(--radius-pill);
+    display: none;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform var(--m3-duration-short) var(--m3-motion-spring), color 0.15s;
+  }
+
+  /* 48px 触控垫 */
+  .search-clear-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .search-clear-btn.visible {
+    display: flex;
+    animation: scalePop var(--m3-duration-short) var(--m3-motion-spring);
+  }
+
+  .search-clear-btn:hover {
+    color: #ffffff;
+  }
+
+  .search-clear-btn:active {
+    transform: scale(0.85);
+  }
+
+  @keyframes scalePop {
+    from { transform: scale(0.4); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* 2. 标准 Segmented Button (单选分段控制器) */
+  .m3-segmented-group {
+    display: inline-flex;
+    align-items: center;
+    height: 42px;
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-pill);
+    padding: 0;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .m3-segmented-btn {
+    position: relative;
+    height: 100%;
+    background: transparent;
+    border: none;
+    color: var(--tk-btn-ice);
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
     user-select: none;
     white-space: nowrap;
+    transition: background-color var(--m3-duration-short) var(--m3-motion-standard), color var(--m3-duration-short) var(--m3-motion-standard);
   }
 
-  .filter-chip:hover {
-    color: #ffffff;
+  .m3-segmented-btn:not(:last-child) {
+    border-right: 1.5px solid var(--tk-border);
+  }
+
+  /* 48px 触控无障碍 */
+  .m3-segmented-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .m3-segmented-btn:hover {
     background-color: rgba(191, 213, 255, 0.08);
+    color: #ffffff;
   }
 
-  .filter-chip.active {
+  .m3-segmented-btn.active {
     background-color: var(--tk-neon-green);
     color: var(--tk-bg-dark);
-    box-shadow: 0 2px 8px rgba(118, 255, 51, 0.35);
   }
 
-  /* 下拉菜单 & 排序 */
+  .m3-segmented-btn .seg-icon {
+    font-size: 15px;
+    display: none;
+  }
+
+  .m3-segmented-btn.active .seg-icon {
+    display: inline-block;
+    animation: scalePop var(--m3-duration-short) var(--m3-motion-spring);
+  }
+
+  /* 3. 下拉菜单与升降序按钮 */
   .m3-dropdown-wrapper {
     position: relative;
     flex: 1.2;
@@ -271,10 +352,11 @@
 
   .m3-dropdown-btn {
     width: 100%;
+    height: 42px;
     background-color: var(--tk-surface);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-pill);
-    padding: 8px 12px;
+    padding: 0 14px;
     color: var(--tk-btn-ice);
     font-size: 0.82rem;
     font-weight: 700;
@@ -283,14 +365,18 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    transition: all 0.2s ease;
     user-select: none;
     white-space: nowrap;
+    transition: border-color var(--m3-duration-short) var(--m3-motion-standard), transform var(--m3-duration-short) var(--m3-motion-spring);
   }
 
   .m3-dropdown-btn:hover {
     border-color: var(--tk-neon-green);
     color: #ffffff;
+  }
+
+  .m3-dropdown-btn:active {
+    transform: scale(0.97);
   }
 
   .m3-dropdown-btn .selected-text {
@@ -302,7 +388,7 @@
     top: calc(100% + 6px);
     right: 0;
     width: 100%;
-    min-width: 150px;
+    min-width: 160px;
     background-color: var(--tk-bg-deep);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-m);
@@ -311,28 +397,30 @@
     z-index: 200;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-6px);
-    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    transform: translateY(-8px) scale(0.95);
+    transition: opacity var(--m3-duration-short) var(--m3-motion-enter), transform var(--m3-duration-short) var(--m3-motion-spring), visibility var(--m3-duration-short);
+    transform-origin: top center;
   }
 
   .m3-dropdown-wrapper.open .m3-dropdown-menu {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     border-color: var(--tk-neon-green);
   }
 
   .m3-dropdown-item {
-    padding: 8px 10px;
+    position: relative;
+    padding: 10px 12px;
     border-radius: var(--radius-s);
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--tk-btn-ice);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: all 0.15s ease;
+    transition: background-color 0.15s, color 0.15s;
   }
 
   .m3-dropdown-item:hover {
@@ -347,10 +435,11 @@
 
   .order-btn {
     flex: 0.8;
+    height: 42px;
     background-color: var(--tk-surface);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-pill);
-    padding: 8px 12px;
+    padding: 0 14px;
     color: var(--tk-btn-ice);
     font-size: 0.82rem;
     font-weight: 700;
@@ -358,10 +447,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    transition: all 0.2s ease;
+    gap: 6px;
     user-select: none;
     white-space: nowrap;
+    transition: border-color var(--m3-duration-short) var(--m3-motion-standard), transform var(--m3-duration-short) var(--m3-motion-spring), color 0.15s;
   }
 
   @media (min-width: 900px) {
@@ -375,8 +464,12 @@
     color: var(--tk-neon-green);
   }
 
+  .order-btn:active {
+    transform: scale(0.96);
+  }
+
   /* ==========================================================================
-     音效网格与卡片
+     音效卡片与网格
      ========================================================================== */
   .sfx-grid {
     display: grid;
@@ -394,7 +487,7 @@
     justify-content: space-between;
     gap: 12px;
     position: relative;
-    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
+    transition: transform var(--m3-duration-short) var(--m3-motion-spring), border-color var(--m3-duration-short), box-shadow var(--m3-duration-short);
   }
 
   .sfx-card:hover {
@@ -412,7 +505,7 @@
   .card-left {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
     min-width: 0;
     flex: 1;
     padding-right: 4px;
@@ -422,7 +515,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    flex-wrap: nowrap;
   }
 
   .id-title {
@@ -447,7 +539,7 @@
     background-color: rgba(0, 212, 255, 0.15);
     color: var(--tk-crystals);
     border: 1px solid rgba(0, 212, 255, 0.4);
-    border-radius: var(--radius-s);
+    border-radius: var(--radius-xs);
     padding: 1px 5px;
     font-size: 0.65rem;
     font-weight: 800;
@@ -456,6 +548,7 @@
     flex-shrink: 0;
   }
 
+  /* 混合 Tooltip Badge（桌面 Hover，移动端 Tap 切换） */
   .date-badge {
     position: relative;
     display: inline-flex;
@@ -465,9 +558,14 @@
     border-radius: var(--radius-pill);
     font-size: 0.72rem;
     font-weight: 700;
-    cursor: default;
+    cursor: pointer;
     width: fit-content;
     user-select: none;
+    transition: transform var(--m3-duration-short) var(--m3-motion-spring);
+  }
+
+  .date-badge:active {
+    transform: scale(0.96);
   }
 
   .date-badge.legacy {
@@ -495,15 +593,24 @@
     z-index: 100;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(6px);
-    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    transform: translateY(6px) scale(0.95);
+    transition: opacity var(--m3-duration-short) var(--m3-motion-enter), transform var(--m3-duration-short) var(--m3-motion-spring), visibility var(--m3-duration-short);
     pointer-events: none;
   }
 
-  .date-badge:hover .badge-tooltip {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
+  /* 桌面端 Hover 或 移动端 Active 激活 */
+  @media (hover: hover) {
+    .date-badge:hover .badge-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .date-badge.tooltip-active .badge-tooltip {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) scale(1) !important;
   }
 
   .tooltip-row {
@@ -532,7 +639,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    margin-top: 3px;
+    margin-top: 2px;
     font-size: 0.72rem;
   }
 
@@ -549,10 +656,11 @@
   .action-buttons {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
   }
 
   .icon-btn {
+    position: relative;
     background: transparent;
     border: none;
     color: var(--tk-btn-ice);
@@ -563,8 +671,19 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
     text-decoration: none;
+    transition: background-color 0.15s, color 0.15s, transform var(--m3-duration-short) var(--m3-motion-spring);
+  }
+
+  /* 48px 无障碍触控热区垫 */
+  .icon-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 48px;
+    min-height: 48px;
   }
 
   .icon-btn:hover {
@@ -572,12 +691,16 @@
     color: var(--tk-neon-green);
   }
 
+  .icon-btn:active {
+    transform: scale(0.88);
+  }
+
   .icon-btn .material-symbols-rounded {
-    font-size: 16px;
+    font-size: 17px;
   }
 
   /* ==========================================================================
-     右侧播放区 & 绝对定位悬浮停止按钮 (彻底消除布局挤压抖动)
+     右侧控制区 & 零抖动 停止按钮 (Zero CLS + 48px Target)
      ========================================================================== */
   .card-controls-right {
     position: relative;
@@ -587,14 +710,13 @@
     flex-shrink: 0;
   }
 
-  /* 悬浮于播放圈左侧的红色停止按钮 (不影响任何元素排版) */
   .btn-stop-sfx {
     position: absolute;
     right: calc(100% + 8px);
     top: 50%;
-    transform: translateY(-50%) scale(0.6);
-    width: 34px;
-    height: 34px;
+    transform: translateY(-50%) scale(0.5);
+    width: 36px;
+    height: 36px;
     border-radius: var(--radius-pill);
     background-color: rgba(255, 51, 51, 0.15);
     border: 1.5px solid var(--tk-alert);
@@ -606,15 +728,28 @@
     opacity: 0;
     pointer-events: none;
     z-index: 10;
-    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    transition: opacity var(--m3-duration-short) var(--m3-motion-enter), 
+                transform var(--m3-duration-short) var(--m3-motion-spring), 
+                background-color 0.15s;
+  }
+
+  /* 48px 触控垫 */
+  .btn-stop-sfx::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 48px;
+    min-height: 48px;
   }
 
   .sfx-card.is-playing .btn-stop-sfx {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(-50%) scale(1);
-    box-shadow: 0 0 12px rgba(255, 51, 51, 0.4);
+    box-shadow: 0 0 14px rgba(255, 51, 51, 0.45);
   }
 
   .btn-stop-sfx:hover {
@@ -631,7 +766,7 @@
     font-size: 18px;
   }
 
-  /* 环形轨道播放按钮 */
+  /* 环形轨道与多点播放器 */
   .sfx-trigger-wrapper {
     position: relative;
     width: 52px;
@@ -665,7 +800,7 @@
     stroke-width: 2.5;
     stroke-dasharray: 40 120;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--m3-duration-short) var(--m3-motion-standard);
   }
 
   .sfx-trigger-wrapper.loading .loading-spinner-circle {
@@ -678,6 +813,7 @@
   }
 
   .sfx-btn {
+    position: relative;
     width: 38px;
     height: 38px;
     border-radius: var(--radius-pill);
@@ -689,9 +825,20 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 4px 10px rgba(118, 255, 51, 0.35);
-    transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s, opacity 0.2s;
     user-select: none;
     z-index: 2;
+    transition: transform var(--m3-duration-short) var(--m3-motion-spring), filter 0.15s, opacity var(--m3-duration-short);
+  }
+
+  /* 48px 触控垫 */
+  .sfx-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 48px;
+    min-height: 48px;
   }
 
   .sfx-btn:hover {
@@ -737,7 +884,7 @@
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.25s ease;
+    transition: opacity var(--m3-duration-short) var(--m3-motion-standard), visibility var(--m3-duration-short);
   }
 
   .modal-overlay.show {
@@ -753,8 +900,8 @@
     max-width: 400px;
     width: calc(100% - 32px);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(118, 255, 51, 0.2);
-    transform: scale(0.9);
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(0.92);
+    transition: transform var(--m3-duration-medium) var(--m3-motion-spring);
   }
 
   .modal-overlay.show .modal-card {
@@ -785,13 +932,24 @@
   }
 
   .m3-btn {
+    position: relative;
     font-weight: 700;
     font-size: 0.82rem;
-    padding: 8px 16px;
+    padding: 10px 18px;
     border-radius: var(--radius-pill);
     border: none;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform var(--m3-duration-short) var(--m3-motion-spring), background-color 0.15s;
+  }
+
+  .m3-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    min-height: 48px;
   }
 
   .m3-btn-cancel {
@@ -806,22 +964,26 @@
     box-shadow: 0 4px 14px rgba(118, 255, 51, 0.3);
   }
 
+  .m3-btn:active {
+    transform: scale(0.96);
+  }
+
   .toast-box {
     position: fixed;
     bottom: 30px;
     left: 50%;
-    transform: translateX(-50%) translateY(40px);
+    transform: translateX(-50%) translateY(40px) scale(0.9);
     background-color: var(--tk-surface);
     border: 1.5px solid var(--tk-neon-green);
     color: #ffffff;
-    padding: 9px 18px;
+    padding: 10px 20px;
     border-radius: var(--radius-pill);
     font-size: 0.82rem;
     font-weight: 700;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
     opacity: 0;
     visibility: hidden;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity var(--m3-duration-short) var(--m3-motion-standard), transform var(--m3-duration-medium) var(--m3-motion-spring), visibility var(--m3-duration-short);
     z-index: 1200;
     white-space: nowrap;
   }
@@ -829,14 +991,14 @@
   .toast-box.show {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(0) scale(1);
   }
 </style>
 </head>
 <body>
 
 <div class="container">
-  <!-- 顶部标题与工具栏 -->
+  <!-- 顶部标题栏 -->
   <header class="header-bar">
     <div class="title-group">
       <div class="logo-mark">
@@ -851,19 +1013,31 @@
       </div>
     </div>
 
-    <!-- 优化后的双行紧凑工具栏 -->
+    <!-- 标准工具栏 -->
     <div class="toolbar">
-      <!-- 第一行：搜索框 + 格式筛选胶囊 -->
+      <!-- 第一行：搜索栏 (带 Clear 按钮) + Segmented Button -->
       <div class="toolbar-row-top">
         <div class="search-wrapper">
-          <span class="material-symbols-rounded">search</span>
+          <span class="material-symbols-rounded leading-icon">search</span>
           <input type="text" id="searchInput" class="search-input" placeholder="搜索 ID 或日期...">
+          <button type="button" id="searchClearBtn" class="search-clear-btn" aria-label="清空搜索">
+            <span class="material-symbols-rounded" style="font-size: 16px;">close</span>
+          </button>
         </div>
 
-        <div class="filter-chips-group" id="filterChipsGroup">
-          <button class="filter-chip active" data-format="all" id="chipAll" data-i18n="filterAll">全部</button>
-          <button class="filter-chip" data-format="mp3">MP3</button>
-          <button class="filter-chip" data-format="wav">WAV</button>
+        <div class="m3-segmented-group" id="filterChipsGroup">
+          <button class="m3-segmented-btn active" data-format="all">
+            <span class="material-symbols-rounded seg-icon">check</span>
+            <span data-i18n="filterAll">全部</span>
+          </button>
+          <button class="m3-segmented-btn" data-format="mp3">
+            <span class="material-symbols-rounded seg-icon">check</span>
+            <span>MP3</span>
+          </button>
+          <button class="m3-segmented-btn" data-format="wav">
+            <span class="material-symbols-rounded seg-icon">check</span>
+            <span>WAV</span>
+          </button>
         </div>
       </div>
 
@@ -1057,6 +1231,7 @@
   const elBundleBadge = document.getElementById('bundleVerBadge');
   const elTotalBadge = document.getElementById('totalCountBadge');
   const elSearchInput = document.getElementById('searchInput');
+  const elSearchClearBtn = document.getElementById('searchClearBtn');
   const elGrid = document.getElementById('sfxGrid');
   const elToast = document.getElementById('toastBox');
 
@@ -1397,8 +1572,8 @@
             <span class="format-tag">${item.format}</span>
           </div>
 
-          <!-- 早期遗产 / 日期 Badge -->
-          <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}">
+          <!-- 日期 Badge（支持移动端轻触展开 Tooltip） -->
+          <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}" data-badge-id="${item.id}">
             <span class="material-symbols-rounded" style="font-size:13px;">
               ${item.isLegacy ? 'history_edu' : 'calendar_today'}
             </span>
@@ -1416,7 +1591,7 @@
             </div>
           </div>
 
-          <!-- 底部文件大小、时长与操作 -->
+          <!-- 底部文件大小与操作 -->
           <div class="card-footer-line">
             <div class="meta-stats">
               ${formatBytes(item.size)}${item.duration ? ` • ${formatSeconds(item.duration)}` : ''}
@@ -1432,7 +1607,7 @@
           </div>
         </div>
 
-        <!-- 右侧专属控制区域 (绝对定位停止按钮，零排版干扰) -->
+        <!-- 右侧专属控制区 (绝对定位停止按钮 + 48px 无障碍触控) -->
         <div class="card-controls-right">
           <button class="btn-stop-sfx" data-id="${item.id}" title="${currentLang.stopSfx}">
             <span class="material-symbols-rounded">stop</span>
@@ -1452,19 +1627,20 @@
       </div>
     `).join('');
 
-    // 绑定事件
+    // 事件绑定
     list.forEach(item => {
       const cardEl = document.getElementById(`card-${item.id}`);
       const wrapperEl = document.getElementById(`wrapper-${item.id}`);
       const btnPlay = wrapperEl.querySelector('.sfx-btn');
       const btnStop = cardEl.querySelector('.btn-stop-sfx');
+      const dateBadge = cardEl.querySelector('.date-badge');
 
-      // 1. 点击播放
+      // 1. 播放
       btnPlay.addEventListener('click', () => {
         triggerSfx(item, wrapperEl, cardEl);
       });
 
-      // 2. 悬浮停止按钮
+      // 2. 停止
       btnStop.addEventListener('click', (e) => {
         e.stopPropagation();
         stopAndClearSfx(item);
@@ -1477,20 +1653,33 @@
         navigator.clipboard.writeText(item.audioUrl);
         showToast(currentLang.copied);
       });
+
+      // 4. 移动端轻触 Tooltip 切换
+      dateBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isActive = dateBadge.classList.contains('tooltip-active');
+        document.querySelectorAll('.date-badge.tooltip-active').forEach(b => b.classList.remove('tooltip-active'));
+        if (!isActive) dateBadge.classList.add('tooltip-active');
+      });
     });
   }
 
-  // 11. 格式筛选切换
-  document.querySelectorAll('.filter-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      currentFormatFilter = chip.getAttribute('data-format');
+  // 点击空白处关闭移动端 Tooltip
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.date-badge.tooltip-active').forEach(b => b.classList.remove('tooltip-active'));
+  });
+
+  // 11. Segmented Button 切换事件
+  document.querySelectorAll('.m3-segmented-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.m3-segmented-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFormatFilter = btn.getAttribute('data-format');
       applySortAndRender();
     });
   });
 
-  // 12. 自定义下拉与升降序
+  // 12. 自定义下拉菜单与排序
   elDropdownBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     elDropdownWrapper.classList.toggle('open');
@@ -1529,7 +1718,6 @@
     applySortAndRender();
   }
 
-  // 升序/降序切换
   elBtnToggleOrder.addEventListener('click', () => {
     isDescending = !isDescending;
     elOrderIcon.textContent = isDescending ? 'arrow_downward' : 'arrow_upward';
@@ -1537,7 +1725,6 @@
     applySortAndRender();
   });
 
-  // 时长模态确认
   elBtnModalCancel.addEventListener('click', () => {
     elModal.classList.remove('show');
   });
@@ -1560,9 +1747,22 @@
     applySortAndRender();
   });
 
-  // 13. 搜索过滤与 Toast
+  // 13. 搜索与 Trailing Clear Button
   elSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
+    if (searchQuery.length > 0) {
+      elSearchClearBtn.classList.add('visible');
+    } else {
+      elSearchClearBtn.classList.remove('visible');
+    }
+    applySortAndRender();
+  });
+
+  elSearchClearBtn.addEventListener('click', () => {
+    elSearchInput.value = '';
+    searchQuery = '';
+    elSearchClearBtn.classList.remove('visible');
+    elSearchInput.focus();
     applySortAndRender();
   });
 
