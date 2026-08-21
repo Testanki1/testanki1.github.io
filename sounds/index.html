@@ -288,6 +288,9 @@
     gap: 12px;
     position: relative;
     transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
   .sfx-card:hover {
@@ -370,7 +373,7 @@
     border: 1px solid rgba(191, 213, 255, 0.3);
   }
 
-  /* 悬停日期卡片 (统一使用“早期遗产”) */
+  /* 悬停日期卡片 */
   .badge-tooltip {
     position: absolute;
     bottom: calc(100% + 10px);
@@ -477,6 +480,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
   .orbital-svg {
@@ -528,6 +534,8 @@
     box-shadow: 0 4px 12px rgba(118, 255, 51, 0.35);
     transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s, opacity 0.2s;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     z-index: 2;
   }
 
@@ -793,7 +801,8 @@
       modalDesc: '按时长排序需要向服务器请求解析音频流数据，是否确定继续加载？',
       modalCancel: '取消',
       modalConfirm: '确定加载',
-      copied: '已复制音频直链'
+      copied: '已复制音频直链',
+      stopped: '已停止播放并清除进度'
     },
     en: {
       title: 'Tanki Online Audio Showcase',
@@ -815,7 +824,8 @@
       modalDesc: 'Sorting by duration requires requesting audio stream metadata from the server. Proceed?',
       modalCancel: 'Cancel',
       modalConfirm: 'Confirm',
-      copied: 'Audio link copied'
+      copied: 'Audio link copied',
+      stopped: 'Playback stopped & cleared'
     }
   };
 
@@ -908,7 +918,6 @@
 
   // 5. 初始化加载
   async function initApp() {
-    // 渲染文案
     elAppTitle.textContent = currentLang.title;
     elSearchInput.placeholder = currentLang.searchPlaceholder;
     elSortPrefixText.textContent = currentLang.sortPrefix;
@@ -981,7 +990,6 @@
     item.audioUrl = `https://${serverDomain}/${item.path}/${name}`;
     item.metaLoaded = true;
 
-    // 实时更新卡片 DOM
     updateCardMetaDisplay(item);
   }
 
@@ -1044,7 +1052,6 @@
           } else {
             activeCount++;
             const progress = inst.duration > 0 ? Math.min(inst.audio.currentTime / inst.duration, 1) : 0;
-            // 环形半径 R=24, 中心 (30,30)
             const angle = progress * 2 * Math.PI;
             const cx = 30 + 24 * Math.cos(angle);
             const cy = 30 + 24 * Math.sin(angle);
@@ -1064,17 +1071,44 @@
     requestAnimationFrame(frame);
   }
 
-  // 8. 触发播放（点击时缓冲加载动画 + 加载期间防重锁定 + 就绪后极速重叠音效）
-  async function triggerSfx(item, wrapperEl, cardEl) {
-    if (item.isBuffering) return; // 音频正在从网络加载缓冲时禁止重复点击
+  // 8. 停止播放并清除进度 (右键/长按专用)
+  function stopAndClearSfx(item) {
+    const instances = activePlayInstances.get(item.id);
+    if (instances && instances.size > 0) {
+      instances.forEach(inst => {
+        try {
+          inst.audio.pause();
+          inst.audio.currentTime = 0;
+        } catch (e) {}
+        if (inst.dotEl && inst.dotEl.parentNode) {
+          inst.dotEl.parentNode.removeChild(inst.dotEl);
+        }
+      });
+      instances.clear();
+    }
 
-    // 卡片边框高亮
+    const cardEl = document.getElementById(`card-${item.id}`);
+    if (cardEl) {
+      cardEl.classList.remove('active-play');
+    }
+    const wrapperEl = document.getElementById(`wrapper-${item.id}`);
+    if (wrapperEl) {
+      wrapperEl.classList.remove('loading');
+      item.isBuffering = false;
+    }
+
+    showToast(currentLang.stopped);
+  }
+
+  // 9. 触发播放（点击缓冲加载 + 加载期间防重 + 就绪重叠播放）
+  async function triggerSfx(item, wrapperEl, cardEl) {
+    if (item.isBuffering) return;
+
     cardEl.classList.remove('active-play');
     void cardEl.offsetWidth;
     cardEl.classList.add('active-play');
     setTimeout(() => cardEl.classList.remove('active-play'), 300);
 
-    // 如果该音效尚未创建直链，则先拉取元数据
     if (!item.audioUrl) {
       try {
         item.isBuffering = true;
@@ -1088,12 +1122,10 @@
       }
     }
 
-    // 实例化独立 Audio 对象
     const audio = new Audio();
     audio.src = item.audioUrl;
     audio.preload = 'auto';
 
-    // 轨道上的微光粒子
     const dotsLayer = document.getElementById(`dots-${item.id}`);
     const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     dot.setAttribute('class', 'play-dot');
@@ -1107,7 +1139,6 @@
       duration: item.duration || 0
     };
 
-    // 播放就绪处理（解除缓冲锁定，正式开始播放并启动粒子追踪）
     let isReady = false;
     const onPlayReady = () => {
       if (isReady) return;
@@ -1125,7 +1156,6 @@
       startOrbitalLoop();
     };
 
-    // 监听网络加载与缓冲状态
     if (audio.readyState >= 3) {
       onPlayReady();
     } else {
@@ -1165,7 +1195,7 @@
     }
   }
 
-  // 9. 排序逻辑与渲染
+  // 10. 排序逻辑与渲染
   function applySortAndRender() {
     const query = searchQuery.trim().toLowerCase();
     let list = items.filter(it => {
@@ -1241,28 +1271,70 @@
           </div>
         </div>
 
-        <!-- 环形多点轨道播放器按钮 -->
+        <!-- 环形多点轨道播放器按钮 (支持右键/长按停止) -->
         <div class="sfx-trigger-wrapper" id="wrapper-${item.id}">
           <svg class="orbital-svg" viewBox="0 0 60 60">
             <circle class="track-circle" cx="30" cy="30" r="24"></circle>
             <circle class="loading-spinner-circle" cx="30" cy="30" r="24"></circle>
             <g id="dots-${item.id}"></g>
           </svg>
-          <button class="sfx-btn" data-id="${item.id}" title="播放音效">
+          <button class="sfx-btn" data-id="${item.id}" title="左键播放 / 右键(长按)停止">
             <span class="material-symbols-rounded">play_arrow</span>
           </button>
         </div>
       </div>
     `).join('');
 
-    // 绑定事件
+    // 绑定事件（点击播放、右键/长按停止、复制直链）
     list.forEach(item => {
       const cardEl = document.getElementById(`card-${item.id}`);
       const wrapperEl = document.getElementById(`wrapper-${item.id}`);
       const btnPlay = wrapperEl.querySelector('.sfx-btn');
 
-      btnPlay.addEventListener('click', () => triggerSfx(item, wrapperEl, cardEl));
+      // 1. 桌面端右键停止
+      btnPlay.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        stopAndClearSfx(item);
+      });
 
+      // 2. 移动端长按检测 (Pointer Events)
+      let longPressTimer = null;
+      let isLongPressTriggered = false;
+
+      btnPlay.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        isLongPressTriggered = false;
+        longPressTimer = setTimeout(() => {
+          isLongPressTriggered = true;
+          stopAndClearSfx(item);
+          if (navigator.vibrate) navigator.vibrate(40);
+        }, 450);
+      });
+
+      const clearLongPressTimer = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      };
+
+      btnPlay.addEventListener('pointerup', clearLongPressTimer);
+      btnPlay.addEventListener('pointercancel', clearLongPressTimer);
+      btnPlay.addEventListener('pointerleave', clearLongPressTimer);
+
+      // 3. 普通左键/轻触播放
+      btnPlay.addEventListener('click', (e) => {
+        if (isLongPressTriggered) {
+          isLongPressTriggered = false;
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        triggerSfx(item, wrapperEl, cardEl);
+      });
+
+      // 4. 复制直链
       const btnCopy = cardEl.querySelector('.btn-copy-url');
       btnCopy.addEventListener('click', async () => {
         if (!item.audioUrl) await ensureMetaLoaded(item);
@@ -1272,7 +1344,7 @@
     });
   }
 
-  // 10. M3 自定义下拉菜单交互与升降序切换
+  // 11. M3 自定义下拉菜单交互与升降序切换
   elDropdownBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     elDropdownWrapper.classList.toggle('open');
@@ -1342,7 +1414,7 @@
     applySortAndRender();
   });
 
-  // 11. 搜索过滤与 Toast
+  // 12. 搜索过滤与 Toast
   elSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     applySortAndRender();
