@@ -49,7 +49,6 @@
   }
 
   body {
-    /* 核心修复：添加 fixed 与 100vw 100vh 确保背景光效在任何高度下完全恒定不变 */
     background: radial-gradient(circle at 50% 0%, #082d42 0%, var(--tk-bg-dark) 70%, var(--tk-bg-deep) 100%) no-repeat center top fixed;
     background-attachment: fixed;
     background-size: 100vw 100vh;
@@ -178,7 +177,7 @@
     box-shadow: 0 0 12px rgba(118, 255, 51, 0.3);
   }
 
-  /* 格式筛选胶囊分段组件 (Format Filter Chips) */
+  /* 格式筛选胶囊分段组件 */
   .filter-chips-group {
     display: inline-flex;
     align-items: center;
@@ -332,9 +331,6 @@
     gap: 12px;
     position: relative;
     transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
   }
 
   .sfx-card:hover {
@@ -512,6 +508,28 @@
     font-size: 18px;
   }
 
+  /* 核心新增：正在播放时动态显示的独立停止按钮 */
+  .btn-stop-sfx {
+    display: none;
+    color: var(--tk-alert) !important;
+  }
+
+  .sfx-card.is-playing .btn-stop-sfx {
+    display: inline-flex;
+    animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .btn-stop-sfx:hover {
+    background-color: rgba(255, 51, 51, 0.15) !important;
+    color: #ff6666 !important;
+    transform: scale(1.1);
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
   /* ==========================================================================
      环形进度与重叠播放按钮 (Orbital Multi-Dot SFX Trigger)
      ========================================================================== */
@@ -524,8 +542,6 @@
     align-items: center;
     justify-content: center;
     user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
   }
 
   .orbital-svg {
@@ -553,7 +569,6 @@
     transition: opacity 0.2s ease;
   }
 
-  /* 加载时旋转动画与点击锁定 */
   .sfx-trigger-wrapper.loading .loading-spinner-circle {
     opacity: 1;
     animation: spinTrack 0.8s linear infinite;
@@ -577,8 +592,6 @@
     box-shadow: 0 4px 12px rgba(118, 255, 51, 0.35);
     transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s, opacity 0.2s;
     user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
     z-index: 2;
   }
 
@@ -854,7 +867,8 @@
       modalCancel: '取消',
       modalConfirm: '确定加载',
       copied: '已复制音效直链',
-      playSfx: '播放音效'
+      playSfx: '播放音效',
+      stopSfx: '停止播放'
     },
     en: {
       title: 'Tanki Online SFX Showcase',
@@ -878,7 +892,8 @@
       modalCancel: 'Cancel',
       modalConfirm: 'Confirm',
       copied: 'SFX link copied',
-      playSfx: 'Play SFX'
+      playSfx: 'Play SFX',
+      stopSfx: 'Stop'
     }
   };
 
@@ -1111,6 +1126,12 @@
             inst.dotEl.setAttribute('cy', cy.toFixed(2));
           }
         });
+
+        // 如果当前音效的所有重叠实例均已播放完毕，移除 is-playing 状态使停止按钮隐藏
+        if (instances.size === 0) {
+          const cardEl = document.getElementById(`card-${itemId}`);
+          if (cardEl) cardEl.classList.remove('is-playing');
+        }
       });
 
       if (activeCount > 0) {
@@ -1123,14 +1144,10 @@
     requestAnimationFrame(frame);
   }
 
-  // 8. 停止播放并清除进度 (仅在正在播放或缓冲时静默执行)
+  // 8. 停止播放并清除进度 (点击专属停止按钮时触发)
   function stopAndClearSfx(item) {
     const instances = activePlayInstances.get(item.id);
-    const isPlaying = instances && instances.size > 0;
-
-    if (!isPlaying && !item.isBuffering) return;
-
-    if (isPlaying) {
+    if (instances) {
       instances.forEach(inst => {
         try {
           inst.audio.pause();
@@ -1145,7 +1162,7 @@
 
     const cardEl = document.getElementById(`card-${item.id}`);
     if (cardEl) {
-      cardEl.classList.remove('active-play');
+      cardEl.classList.remove('is-playing', 'active-play');
     }
     const wrapperEl = document.getElementById(`wrapper-${item.id}`);
     if (wrapperEl) {
@@ -1205,6 +1222,9 @@
         activePlayInstances.set(item.id, new Set());
       }
       activePlayInstances.get(item.id).add(instance);
+
+      // 进入播放状态，使停止按钮出现
+      cardEl.classList.add('is-playing');
 
       audio.play().catch(() => {});
       startOrbitalLoop();
@@ -1285,7 +1305,7 @@
 
   function renderGrid(list) {
     elGrid.innerHTML = list.map(item => `
-      <div class="sfx-card" id="card-${item.id}">
+      <div class="sfx-card ${activePlayInstances.get(item.id)?.size ? 'is-playing' : ''}" id="card-${item.id}">
         <div class="card-left">
           <div class="id-header-line">
             <div class="id-title">
@@ -1320,6 +1340,10 @@
               ${formatBytes(item.size)}${item.duration ? ` • ${formatSeconds(item.duration)}` : ''}
             </div>
             <div class="action-buttons">
+              <!-- 播放时动态浮现的专属停止按钮 -->
+              <button class="icon-btn btn-stop-sfx" data-id="${item.id}" title="${currentLang.stopSfx}">
+                <span class="material-symbols-rounded">stop_circle</span>
+              </button>
               <button class="icon-btn btn-copy-url" data-id="${item.id}" title="复制直链">
                 <span class="material-symbols-rounded">link</span>
               </button>
@@ -1330,7 +1354,7 @@
           </div>
         </div>
 
-        <!-- 环形多点轨道播放器按钮 (支持右键/长按静默停止) -->
+        <!-- 环形多点轨道播放器按钮 -->
         <div class="sfx-trigger-wrapper" id="wrapper-${item.id}">
           <svg class="orbital-svg" viewBox="0 0 60 60">
             <circle class="track-circle" cx="30" cy="30" r="24"></circle>
@@ -1344,56 +1368,25 @@
       </div>
     `).join('');
 
-    // 绑定事件（点击播放、右键/长按静默停止、复制直链）
+    // 绑定事件（点击播放、专属停止按钮、复制直链）
     list.forEach(item => {
       const cardEl = document.getElementById(`card-${item.id}`);
       const wrapperEl = document.getElementById(`wrapper-${item.id}`);
       const btnPlay = wrapperEl.querySelector('.sfx-btn');
+      const btnStop = cardEl.querySelector('.btn-stop-sfx');
 
-      // 1. 桌面端右键静默停止
-      btnPlay.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
+      // 1. 普通左键/轻触播放
+      btnPlay.addEventListener('click', () => {
+        triggerSfx(item, wrapperEl, cardEl);
+      });
+
+      // 2. 专属停止按钮
+      btnStop.addEventListener('click', (e) => {
         e.stopPropagation();
         stopAndClearSfx(item);
       });
 
-      // 2. 移动端长按静默停止 (Pointer Events)
-      let longPressTimer = null;
-      let isLongPressTriggered = false;
-
-      btnPlay.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0 && e.pointerType === 'mouse') return;
-        isLongPressTriggered = false;
-        longPressTimer = setTimeout(() => {
-          isLongPressTriggered = true;
-          stopAndClearSfx(item);
-          if (navigator.vibrate) navigator.vibrate(40);
-        }, 450);
-      });
-
-      const clearLongPressTimer = () => {
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
-      };
-
-      btnPlay.addEventListener('pointerup', clearLongPressTimer);
-      btnPlay.addEventListener('pointercancel', clearLongPressTimer);
-      btnPlay.addEventListener('pointerleave', clearLongPressTimer);
-
-      // 3. 普通左键/轻触播放
-      btnPlay.addEventListener('click', (e) => {
-        if (isLongPressTriggered) {
-          isLongPressTriggered = false;
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        triggerSfx(item, wrapperEl, cardEl);
-      });
-
-      // 4. 复制直链
+      // 3. 复制直链
       const btnCopy = cardEl.querySelector('.btn-copy-url');
       btnCopy.addEventListener('click', async () => {
         if (!item.audioUrl) await ensureMetaLoaded(item);
