@@ -13,7 +13,7 @@
 
 <style>
   /* ==========================================================================
-     Tanki Online 官方品牌视觉规范色彩 (Brand Guidelines Palette)
+     Tanki Online 品牌官方色彩规范 (Brand Guidelines Palette)
      ========================================================================== */
   :root {
     --tk-neon-green: #76FF33;    /* 核心主色 Neon Green */
@@ -25,7 +25,6 @@
     --tk-crystals: #00D4FF;      /* 水晶蓝 Crystals */
     --tk-tankoins: #FFCC00;      /* 金币黄 Tankoins (早期遗产标识) */
     --tk-alert: #FF3333;         /* 警告红 Alert */
-    --tk-contracts: #D580FF;     /* 紫色 Contracts */
     --tk-border: rgba(191, 213, 255, 0.18);
     --tk-border-glow: rgba(118, 255, 51, 0.45);
 
@@ -170,7 +169,7 @@
     box-shadow: 0 0 12px rgba(118, 255, 51, 0.3);
   }
 
-  /* M3 自定义下拉菜单容器 */
+  /* M3 自定义下拉菜单 */
   .m3-dropdown-wrapper {
     position: relative;
   }
@@ -344,7 +343,7 @@
     letter-spacing: 0.5px;
   }
 
-  /* 创建/更新日期 Badge */
+  /* 早期遗产 / 时间戳 Badge */
   .date-badge {
     position: relative;
     display: inline-flex;
@@ -371,7 +370,7 @@
     border: 1px solid rgba(191, 213, 255, 0.3);
   }
 
-  /* 悬停日期卡片 */
+  /* 悬停日期卡片 (统一使用“早期遗产”) */
   .badge-tooltip {
     position: absolute;
     bottom: calc(100% + 10px);
@@ -418,7 +417,7 @@
     font-weight: 700;
   }
 
-  /* 底部操作与元信息 */
+  /* 底部大小、时长与操作按钮 */
   .card-footer-line {
     display: flex;
     align-items: center;
@@ -487,7 +486,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    transform: rotate(-90deg); /* 从顶部 12 点钟方向开始 */
+    transform: rotate(-90deg); /* 顶部 12 点钟方向作为起点 */
   }
 
   .track-circle {
@@ -505,6 +504,7 @@
     transition: opacity 0.2s ease;
   }
 
+  /* 加载时旋转动画与点击锁定 */
   .sfx-trigger-wrapper.loading .loading-spinner-circle {
     opacity: 1;
     animation: spinTrack 0.8s linear infinite;
@@ -540,11 +540,12 @@
     transform: scale(0.9);
   }
 
+  /* 音频缓冲/加载中禁止再次点击 */
   .sfx-trigger-wrapper.loading .sfx-btn {
-    pointer-events: none;
-    filter: grayscale(0.5);
-    opacity: 0.7;
-    cursor: not-allowed;
+    pointer-events: none !important;
+    filter: grayscale(0.4);
+    opacity: 0.65;
+    cursor: wait !important;
   }
 
   .sfx-btn .material-symbols-rounded {
@@ -746,7 +747,7 @@
   </main>
 </div>
 
-<!-- 确认加载模态窗口 (仅在选择时长排序时使用) -->
+<!-- 确认加载模态窗口 (仅在按时长排序时使用) -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-card">
     <div class="modal-title">
@@ -754,7 +755,7 @@
       <span id="modalTitleText">需要加载音频数据</span>
     </div>
     <div class="modal-desc" id="modalDescText">
-      按时长排序需要向服务器发起请求以解析音频流时长，是否确定继续加载？
+      按时长排序需要向服务器请求解析音频流数据，是否确定继续加载？
     </div>
     <div class="modal-actions">
       <button class="m3-btn m3-btn-cancel" id="btnModalCancel">取消</button>
@@ -785,8 +786,7 @@
       descending: '降序',
       ascending: '升序',
       legacyBadge: '早期遗产',
-      legacyTooltip: '很老的文件 (遗产)',
-      creationAttr: '创建属性:',
+      legacyTooltip: '早期遗产',
       creationDateLabel: '创建日期:',
       updateDateLabel: '更新日期:',
       modalTitle: '需要加载音频数据',
@@ -808,8 +808,7 @@
       descending: 'Descending',
       ascending: 'Ascending',
       legacyBadge: 'Legacy',
-      legacyTooltip: 'Old Resource (Legacy)',
-      creationAttr: 'Creation Type:',
+      legacyTooltip: 'Legacy',
       creationDateLabel: 'Creation Date:',
       updateDateLabel: 'Update Date:',
       modalTitle: 'Audio Stream Required',
@@ -862,7 +861,7 @@
   }
 
   function formatBytes(bytes) {
-    if (!bytes || isNaN(bytes)) return '-- KB';
+    if (!bytes || isNaN(bytes)) return '加载中...';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -870,7 +869,7 @@
   }
 
   function formatSeconds(sec) {
-    if (!sec || isNaN(sec)) return '--';
+    if (!sec || isNaN(sec)) return '';
     return sec < 10 ? `${sec.toFixed(1)}s` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
   }
 
@@ -881,7 +880,7 @@
   let isDescending = true;
   let searchQuery = '';
 
-  // 环形轨道活跃实例追踪 Map: itemId -> Set<{ audio, dotEl, startTime, duration }>
+  // 环形轨道活跃实例追踪 Map: itemId -> Set<{ audio, dotEl, duration }>
   const activePlayInstances = new Map();
   let isAnimationFrameActive = false;
 
@@ -946,7 +945,7 @@
         size: 0,
         format: 'MP3',
         metaLoaded: false,
-        isLoading: false
+        isBuffering: false
       };
     });
 
@@ -954,6 +953,9 @@
     elTotalBadge.textContent = `${items.length}${currentLang.sfxSuffix}`;
 
     applySortAndRender();
+
+    // 初始高并发拉取全部 meta.info（立即加载文件大小与真实格式）
+    preloadAllMetaInfo();
   }
 
   // 6. 异步读取 meta.info (自动处理 swf -> mp3 并直接解析 size)
@@ -978,11 +980,32 @@
     item.format = format;
     item.audioUrl = `https://${serverDomain}/${item.path}/${name}`;
     item.metaLoaded = true;
+
+    // 实时更新卡片 DOM
+    updateCardMetaDisplay(item);
+  }
+
+  // 初始后台并发拉取
+  async function preloadAllMetaInfo() {
+    const concurrency = 12;
+    let idx = 0;
+    async function worker() {
+      while (idx < items.length) {
+        const it = items[idx++];
+        try {
+          await ensureMetaLoaded(it);
+        } catch (e) {}
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    if (currentSortKey === 'fileSize') {
+      applySortAndRender();
+    }
   }
 
   // 预解码获取时长
   function loadAudioDuration(item) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       if (item.duration > 0) return resolve(item.duration);
       if (!item.audioUrl) await ensureMetaLoaded(item);
 
@@ -1014,7 +1037,6 @@
 
         instances.forEach(inst => {
           if (inst.audio.paused && inst.audio.currentTime >= (inst.duration || 0.1)) {
-            // 已结束
             if (inst.dotEl && inst.dotEl.parentNode) {
               inst.dotEl.parentNode.removeChild(inst.dotEl);
             }
@@ -1042,44 +1064,42 @@
     requestAnimationFrame(frame);
   }
 
-  // 8. 触发播放 (重叠播放 + 环形轨道点移动 + 加载禁用保护)
+  // 8. 触发播放（点击时缓冲加载动画 + 加载期间防重锁定 + 就绪后极速重叠音效）
   async function triggerSfx(item, wrapperEl, cardEl) {
-    if (item.isLoading) return; // 加载中禁止重复点击
+    if (item.isBuffering) return; // 音频正在从网络加载缓冲时禁止重复点击
 
-    // 高亮卡片边框
+    // 卡片边框高亮
     cardEl.classList.remove('active-play');
     void cardEl.offsetWidth;
     cardEl.classList.add('active-play');
     setTimeout(() => cardEl.classList.remove('active-play'), 300);
 
+    // 如果该音效尚未创建直链，则先拉取元数据
     if (!item.audioUrl) {
       try {
-        item.isLoading = true;
+        item.isBuffering = true;
         wrapperEl.classList.add('loading');
         await ensureMetaLoaded(item);
-        // 动态更新卡片上刚加载的信息
-        updateCardMetaDisplay(item);
       } catch (e) {
+        item.isBuffering = false;
+        wrapperEl.classList.remove('loading');
         showToast('加载失败: ' + e.message);
         return;
-      } finally {
-        item.isLoading = false;
-        wrapperEl.classList.remove('loading');
       }
     }
 
-    // 创建独立 Audio 实例实现重叠播放
-    const audio = new Audio(item.audioUrl);
-    audio.currentTime = 0;
+    // 实例化独立 Audio 对象
+    const audio = new Audio();
+    audio.src = item.audioUrl;
+    audio.preload = 'auto';
 
-    // 创建轨道微光粒子
+    // 轨道上的微光粒子
     const dotsLayer = document.getElementById(`dots-${item.id}`);
     const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     dot.setAttribute('class', 'play-dot');
     dot.setAttribute('r', '3.5');
     dot.setAttribute('cx', '30');
     dot.setAttribute('cy', '6');
-    if (dotsLayer) dotsLayer.appendChild(dot);
 
     const instance = {
       audio: audio,
@@ -1087,19 +1107,45 @@
       duration: item.duration || 0
     };
 
-    if (!activePlayInstances.has(item.id)) {
-      activePlayInstances.set(item.id, new Set());
+    // 播放就绪处理（解除缓冲锁定，正式开始播放并启动粒子追踪）
+    let isReady = false;
+    const onPlayReady = () => {
+      if (isReady) return;
+      isReady = true;
+      item.isBuffering = false;
+      wrapperEl.classList.remove('loading');
+
+      if (dotsLayer) dotsLayer.appendChild(dot);
+      if (!activePlayInstances.has(item.id)) {
+        activePlayInstances.set(item.id, new Set());
+      }
+      activePlayInstances.get(item.id).add(instance);
+
+      audio.play().catch(() => {});
+      startOrbitalLoop();
+    };
+
+    // 监听网络加载与缓冲状态
+    if (audio.readyState >= 3) {
+      onPlayReady();
+    } else {
+      item.isBuffering = true;
+      wrapperEl.classList.add('loading');
+      audio.addEventListener('canplay', onPlayReady, { once: true });
+      audio.addEventListener('playing', onPlayReady, { once: true });
+      audio.addEventListener('error', () => {
+        item.isBuffering = false;
+        wrapperEl.classList.remove('loading');
+        showToast('音频加载失败');
+      }, { once: true });
+      audio.load();
     }
-    activePlayInstances.get(item.id).add(instance);
 
     audio.onloadedmetadata = () => {
       instance.duration = audio.duration;
       item.duration = audio.duration;
       updateCardMetaDisplay(item);
     };
-
-    audio.play().catch(() => {});
-    startOrbitalLoop();
   }
 
   function updateCardMetaDisplay(item) {
@@ -1109,7 +1155,8 @@
     if (formatEl) formatEl.textContent = item.format;
     const statsEl = card.querySelector('.meta-stats');
     if (statsEl) {
-      statsEl.textContent = `${formatBytes(item.size)} • ${formatSeconds(item.duration)}`;
+      const durText = item.duration ? ` • ${formatSeconds(item.duration)}` : '';
+      statsEl.textContent = `${formatBytes(item.size)}${durText}`;
     }
     const downloadEl = card.querySelector('.btn-download');
     if (downloadEl && item.audioUrl) {
@@ -1159,7 +1206,7 @@
             <span class="format-tag">${item.format}</span>
           </div>
 
-          <!-- 悬停显示完整创建与更新日期 -->
+          <!-- 悬停显示纯粹的“早期遗产”与更新日期 -->
           <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}">
             <span class="material-symbols-rounded" style="font-size:14px;">
               ${item.isLegacy ? 'history_edu' : 'calendar_today'}
@@ -1168,14 +1215,9 @@
 
             <div class="badge-tooltip">
               <div class="tooltip-row">
-                <span class="tooltip-label">${currentLang.creationAttr}</span>
-                <span class="tooltip-val">${item.isLegacy ? currentLang.legacyTooltip : currentLang.creationDate}</span>
-              </div>
-              ${!item.isLegacy ? `
-              <div class="tooltip-row">
                 <span class="tooltip-label">${currentLang.creationDateLabel}</span>
-                <span class="tooltip-val">${formatFullDateTime(item.creationTime)}</span>
-              </div>` : ''}
+                <span class="tooltip-val">${item.isLegacy ? currentLang.legacyTooltip : formatFullDateTime(item.creationTime)}</span>
+              </div>
               <div class="tooltip-row">
                 <span class="tooltip-label">${currentLang.updateDateLabel}</span>
                 <span class="tooltip-val">${item.updateDateTimeStr}</span>
@@ -1186,7 +1228,7 @@
           <!-- 底部大小、时长与操作按钮 -->
           <div class="card-footer-line">
             <div class="meta-stats">
-              ${formatBytes(item.size)} • ${formatSeconds(item.duration)}
+              ${formatBytes(item.size)}${item.duration ? ` • ${formatSeconds(item.duration)}` : ''}
             </div>
             <div class="action-buttons">
               <button class="icon-btn btn-copy-url" data-id="${item.id}" title="复制直链">
@@ -1266,10 +1308,6 @@
     });
     elDropdownWrapper.classList.remove('open');
 
-    // 若按大小排序，确保已加载的直接排序，未加载则后台预取
-    if (key === 'fileSize') {
-      items.forEach(it => { if (!it.metaLoaded) ensureMetaLoaded(it).then(applySortAndRender); });
-    }
     applySortAndRender();
   }
 
