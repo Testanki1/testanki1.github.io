@@ -248,7 +248,7 @@
   .search-clear-btn:hover { color: #ffffff; }
   .search-clear-btn:active { transform: scale(0.85); }
 
-  /* 行 2：控制栏组 (格式分段 + 宽裕下拉 + 纯符号升降序) */
+  /* 行 2：控制栏组 (精简 MP3/WAV 分段 + 宽裕下拉 + 纯符号升降序) */
   .toolbar-controls-row {
     display: flex;
     align-items: center;
@@ -262,7 +262,7 @@
     }
   }
 
-  /* 格式分段按钮 (定宽防抖) */
+  /* 精简 MP3 / WAV 分段按钮 (支持再次点击反选恢复全部) */
   .m3-segmented-group {
     display: inline-flex;
     align-items: center;
@@ -282,7 +282,7 @@
     color: var(--tk-btn-ice);
     font-size: 0.78rem;
     font-weight: 700;
-    padding: 0 12px;
+    padding: 0 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -407,7 +407,7 @@
     color: var(--tk-neon-green);
   }
 
-  /* 纯符号升降序独立按钮 (极简精致，带 48px 热区与弹簧旋转) */
+  /* 纯符号升降序独立按钮 */
   .order-icon-btn {
     position: relative;
     width: 42px;
@@ -961,10 +961,10 @@
         </div>
       </div>
 
-      <!-- 第 2 行：格式分段 + 排序下拉 + 纯符号升降序按钮 -->
+      <!-- 第 2 行：精简 MP3/WAV 分段 + 排序下拉 + 纯符号升降序按钮 -->
       <div class="toolbar-controls-row">
+        <!-- 仅保留 MP3 与 WAV，支持再次点击反选恢复全部 -->
         <div class="m3-segmented-group" id="filterChipsGroup">
-          <button class="m3-segmented-btn active" data-format="all" data-i18n="filterAll">全部</button>
           <button class="m3-segmented-btn" data-format="mp3">MP3</button>
           <button class="m3-segmented-btn" data-format="wav">WAV</button>
         </div>
@@ -982,20 +982,20 @@
             </div>
             <div class="m3-dropdown-item" data-value="updateDate">
               <span class="item-label" data-i18n="updateDate">更新日期</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px; opacity: 0;">check</span>
+              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
             </div>
             <div class="m3-dropdown-item" data-value="duration">
               <span class="item-label" data-i18n="duration">时长</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px; opacity: 0;">check</span>
+              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
             </div>
             <div class="m3-dropdown-item" data-value="fileSize">
               <span class="item-label" data-i18n="fileSize">文件大小</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px; opacity: 0;">check</span>
+              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
             </div>
           </div>
         </div>
 
-        <!-- 纯符号升降序独立切换按钮 (省空间，自带 48px 热区) -->
+        <!-- 纯符号升降序独立切换按钮 -->
         <button class="order-icon-btn" id="btnToggleOrder" title="切换升降序" aria-label="切换升降序">
           <span class="material-symbols-rounded" id="orderIcon">arrow_downward</span>
         </button>
@@ -1040,7 +1040,6 @@
       setPrefix: '资源集 v',
       sfxSuffix: ' 个音效',
       searchPlaceholder: '搜索 ID 或日期...',
-      filterAll: '全部',
       sortPrefix: '排序:',
       creationDate: '创建日期',
       updateDate: '更新日期',
@@ -1065,7 +1064,6 @@
       setPrefix: 'Asset Set v',
       sfxSuffix: ' SFX',
       searchPlaceholder: 'Search ID or date...',
-      filterAll: 'All',
       sortPrefix: 'Sort:',
       creationDate: 'Creation Date',
       updateDate: 'Update Date',
@@ -1145,7 +1143,7 @@
   let assetSetVersion = 7;
   let items = [];
   let currentSortKey = 'creationDate';
-  let currentFormatFilter = 'all';
+  let currentFormatFilter = 'all'; // 'all' | 'mp3' | 'wav'
   let isDescending = true;
   let searchQuery = '';
 
@@ -1594,12 +1592,22 @@
     document.querySelectorAll('.date-badge.tooltip-active').forEach(b => b.classList.remove('tooltip-active'));
   });
 
-  // 11. Segmented Button 切换事件
+  // 11. Segmented Button 切换与反选逻辑 (Toggle to 'all')
   document.querySelectorAll('.m3-segmented-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.m3-segmented-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFormatFilter = btn.getAttribute('data-format');
+      const targetFormat = btn.getAttribute('data-format');
+      
+      // 如果点击的是已经处于激活状态的按钮，则取消激活并还原为 'all'
+      if (currentFormatFilter === targetFormat) {
+        currentFormatFilter = 'all';
+        btn.classList.remove('active');
+      } else {
+        // 否则激活当前选中的格式
+        document.querySelectorAll('.m3-segmented-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFormatFilter = targetFormat;
+      }
+      
       applySortAndRender();
     });
   });
@@ -1642,7 +1650,7 @@
     applySortAndRender();
   }
 
-  // 纯符号升降序切换（带顺滑图标切换）
+  // 纯符号升降序切换
   elBtnToggleOrder.addEventListener('click', () => {
     isDescending = !isDescending;
     elOrderIcon.textContent = isDescending ? 'arrow_downward' : 'arrow_upward';
