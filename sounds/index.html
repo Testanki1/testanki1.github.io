@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3D坦克音频展示 - Tanki Online Audio Showcase</title>
+<title>3D坦克音频展示</title>
 
-<!-- 引入品牌规范字体: Rubik (第一字体) 与 M PLUS 1p (第二字体) -->
+<!-- 引入官方规范字体: Rubik (第一字体) 与 M PLUS 1p (第二字体) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:ital,wght@0,400;0,500;0,700;0,900;1,700&display=swap" rel="stylesheet">
@@ -13,20 +13,21 @@
 
 <style>
   /* ==========================================================================
-     Tanki Online 品牌官方色彩规范 (Brand Guidelines Palette)
+     Tanki Online 官方品牌视觉规范色彩 (Brand Guidelines Palette)
      ========================================================================== */
   :root {
     --tk-neon-green: #76FF33;    /* 核心主色 Neon Green */
-    --tk-bg-dark: #001926;       /* 背景深色 Background / Dark Text */
-    --tk-bg-deep: #00111a;       /* 极深背景 */
+    --tk-bg-dark: #001926;       /* 背景深色 Background */
+    --tk-bg-deep: #00111a;       /* 极深底色 */
     --tk-surface: #0a2536;       /* 卡片底色 */
-    --tk-surface-hover: #0f344c; /* 卡片悬停底色 */
-    --tk-btn-ice: #BFD5FF;       /* 按钮与次要文字 Buttons */
+    --tk-surface-hover: #0f344c; /* 卡片悬停色 */
+    --tk-btn-ice: #BFD5FF;       /* 冰蓝文字与按钮 Buttons */
     --tk-crystals: #00D4FF;      /* 水晶蓝 Crystals */
     --tk-tankoins: #FFCC00;      /* 金币黄 Tankoins (早期遗产标识) */
     --tk-alert: #FF3333;         /* 警告红 Alert */
+    --tk-contracts: #D580FF;     /* 紫色 Contracts */
     --tk-border: rgba(191, 213, 255, 0.18);
-    --tk-border-glow: rgba(118, 255, 51, 0.5);
+    --tk-border-glow: rgba(118, 255, 51, 0.45);
 
     --radius-s: 8px;
     --radius-m: 14px;
@@ -50,7 +51,7 @@
   }
 
   /* 第一字体统一使用 Rubik */
-  h1, h2, h3, h4, .rubik-font, .sfx-btn, .id-title, .sort-select, .badge-title {
+  h1, h2, h3, h4, .rubik-font, .id-title, .m3-custom-dropdown, .order-btn, .badge-title {
     font-family: 'Rubik', sans-serif;
   }
 
@@ -122,17 +123,17 @@
     background: rgba(118, 255, 51, 0.12);
     border: 1px solid var(--tk-neon-green);
     color: var(--tk-neon-green);
-    padding: 2px 8px;
+    padding: 2px 10px;
     border-radius: var(--radius-pill);
     font-size: 0.75rem;
     font-weight: 700;
   }
 
-  /* 工具栏：搜索与排序 */
+  /* 工具栏：搜索、M3 自定义下拉、升降序切换 */
   .toolbar {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     flex-wrap: wrap;
   }
 
@@ -169,35 +170,103 @@
     box-shadow: 0 0 12px rgba(118, 255, 51, 0.3);
   }
 
-  .sort-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  /* M3 自定义下拉菜单容器 */
+  .m3-dropdown-wrapper {
+    position: relative;
+  }
+
+  .m3-dropdown-btn {
     background-color: var(--tk-surface);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-pill);
-    padding: 4px 14px;
-  }
-
-  .sort-label {
-    font-size: 0.8rem;
-    font-weight: 700;
+    padding: 8px 16px;
     color: var(--tk-btn-ice);
-  }
-
-  .sort-select {
-    background: transparent;
-    border: none;
-    color: var(--tk-neon-green);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
     cursor: pointer;
-    outline: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    user-select: none;
   }
 
-  .sort-select option {
-    background-color: var(--tk-bg-dark);
+  .m3-dropdown-btn:hover {
+    border-color: var(--tk-neon-green);
+    color: #ffffff;
+  }
+
+  .m3-dropdown-btn .selected-text {
+    color: var(--tk-neon-green);
+  }
+
+  .m3-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 160px;
+    background-color: var(--tk-bg-deep);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-m);
+    padding: 6px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .m3-dropdown-wrapper.open .m3-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    border-color: var(--tk-neon-green);
+  }
+
+  .m3-dropdown-item {
+    padding: 8px 12px;
+    border-radius: var(--radius-s);
+    font-size: 0.85rem;
+    font-weight: 600;
     color: var(--tk-btn-ice);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.15s ease;
+  }
+
+  .m3-dropdown-item:hover {
+    background-color: var(--tk-surface-hover);
+    color: #ffffff;
+  }
+
+  .m3-dropdown-item.active {
+    background-color: rgba(118, 255, 51, 0.15);
+    color: var(--tk-neon-green);
+  }
+
+  /* 升序/降序独立切换按钮 */
+  .order-btn {
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-pill);
+    padding: 8px 14px;
+    color: var(--tk-btn-ice);
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+
+  .order-btn:hover {
+    border-color: var(--tk-neon-green);
+    color: var(--tk-neon-green);
   }
 
   /* ==========================================================================
@@ -205,7 +274,7 @@
      ========================================================================== */
   .sfx-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
   }
 
@@ -217,7 +286,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
+    gap: 12px;
     position: relative;
     transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
   }
@@ -232,7 +301,6 @@
   .sfx-card.active-play {
     border-color: var(--tk-neon-green);
     box-shadow: 0 0 22px var(--tk-border-glow);
-    background: linear-gradient(135deg, #0e3b52 0%, var(--tk-surface) 100%);
   }
 
   .card-left {
@@ -240,6 +308,13 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+    flex: 1;
+  }
+
+  .id-header-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .id-title {
@@ -257,7 +332,19 @@
     font-size: 0.85em;
   }
 
-  /* 上传/更新日期 & 遗产标识 Badge */
+  .format-tag {
+    background-color: rgba(0, 212, 255, 0.15);
+    color: var(--tk-crystals);
+    border: 1px solid rgba(0, 212, 255, 0.4);
+    border-radius: var(--radius-s);
+    padding: 1px 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* 创建/更新日期 Badge */
   .date-badge {
     position: relative;
     display: inline-flex;
@@ -279,12 +366,12 @@
   }
 
   .date-badge.timestamp {
-    background-color: rgba(0, 212, 255, 0.12);
-    color: var(--tk-crystals);
-    border: 1px solid rgba(0, 212, 255, 0.35);
+    background-color: rgba(191, 213, 255, 0.12);
+    color: var(--tk-btn-ice);
+    border: 1px solid rgba(191, 213, 255, 0.3);
   }
 
-  /* 悬停日期卡片 (M3 Expressive Popover) */
+  /* 悬停日期卡片 */
   .badge-tooltip {
     position: absolute;
     bottom: calc(100% + 10px);
@@ -294,7 +381,7 @@
     border: 1.5px solid var(--tk-neon-green);
     border-radius: var(--radius-m);
     padding: 12px 14px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.85);
     z-index: 100;
     opacity: 0;
     visibility: hidden;
@@ -331,18 +418,105 @@
     font-weight: 700;
   }
 
-  .meta-tag-line {
-    font-size: 0.72rem;
-    color: var(--tk-btn-ice);
-    opacity: 0.6;
+  /* 底部操作与元信息 */
+  .card-footer-line {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
+    margin-top: 4px;
+    font-size: 0.75rem;
   }
 
-  /* 点一次响一次的音效播放按钮 (Sound Trigger Button) */
+  .meta-stats {
+    color: var(--tk-btn-ice);
+    opacity: 0.75;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--tk-btn-ice);
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-pill);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .icon-btn:hover {
+    background-color: var(--tk-surface-hover);
+    color: var(--tk-neon-green);
+  }
+
+  .icon-btn .material-symbols-rounded {
+    font-size: 18px;
+  }
+
+  /* ==========================================================================
+     环形进度与重叠播放按钮 (Orbital Multi-Dot SFX Trigger)
+     ========================================================================== */
+  .sfx-trigger-wrapper {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .orbital-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    transform: rotate(-90deg); /* 从顶部 12 点钟方向开始 */
+  }
+
+  .track-circle {
+    fill: none;
+    stroke: rgba(191, 213, 255, 0.12);
+    stroke-width: 2.5;
+  }
+
+  .loading-spinner-circle {
+    fill: none;
+    stroke: var(--tk-crystals);
+    stroke-width: 2.5;
+    stroke-dasharray: 40 120;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .sfx-trigger-wrapper.loading .loading-spinner-circle {
+    opacity: 1;
+    animation: spinTrack 0.8s linear infinite;
+  }
+
+  @keyframes spinTrack {
+    to { transform: rotate(360deg); transform-origin: 30px 30px; }
+  }
+
   .sfx-btn {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: var(--radius-pill);
     background-color: var(--tk-neon-green);
     color: var(--tk-bg-dark);
@@ -351,29 +525,41 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
     box-shadow: 0 4px 12px rgba(118, 255, 51, 0.35);
-    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s;
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s, opacity 0.2s;
     user-select: none;
+    z-index: 2;
   }
 
   .sfx-btn:hover {
     filter: brightness(1.1);
-    transform: scale(1.08);
+    transform: scale(1.06);
   }
 
   .sfx-btn:active {
-    transform: scale(0.88);
-    filter: brightness(0.9);
+    transform: scale(0.9);
+  }
+
+  .sfx-trigger-wrapper.loading .sfx-btn {
+    pointer-events: none;
+    filter: grayscale(0.5);
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 
   .sfx-btn .material-symbols-rounded {
-    font-size: 26px;
+    font-size: 24px;
     pointer-events: none;
   }
 
+  /* 轨道上的微光粒子点 */
+  .play-dot {
+    fill: var(--tk-neon-green);
+    filter: drop-shadow(0 0 4px var(--tk-neon-green));
+  }
+
   /* ==========================================================================
-     M3 确认模态弹窗 (用于时长/大小排序提示)
+     M3 模态弹窗 & Toast
      ========================================================================== */
   .modal-overlay {
     position: fixed;
@@ -453,25 +639,44 @@
     border: 1px solid var(--tk-border);
   }
 
-  .m3-btn-cancel:hover {
-    background: rgba(191, 213, 255, 0.1);
-  }
-
   .m3-btn-confirm {
     background-color: var(--tk-neon-green);
     color: var(--tk-bg-dark);
     box-shadow: 0 4px 14px rgba(118, 255, 51, 0.3);
   }
 
-  .m3-btn-confirm:hover {
-    filter: brightness(1.1);
+  .toast-box {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(40px);
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-neon-green);
+    color: #ffffff;
+    padding: 10px 22px;
+    border-radius: var(--radius-pill);
+    font-size: 0.85rem;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 1200;
+  }
+
+  .toast-box.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
   }
 
   @media (max-width: 640px) {
     .header-bar { flex-direction: column; align-items: stretch; }
     .toolbar { flex-direction: column; align-items: stretch; }
     .search-wrapper { width: 100%; }
-    .sort-wrapper { justify-content: space-between; }
+    .m3-dropdown-wrapper, .order-btn { width: 100%; }
+    .m3-dropdown-btn { justify-content: space-between; }
+    .m3-dropdown-menu { width: 100%; }
   }
 </style>
 </head>
@@ -485,33 +690,53 @@
         <span class="material-symbols-rounded">volume_up</span>
       </div>
       <div>
-        <h1>3D坦克音频展示</h1>
+        <h1 id="appTitle">3D坦克音频展示</h1>
         <div class="subtitle">
-          <span>Tanki Online Audio Showcase</span>
-          <span class="auto-meta-badge" id="bundleVerBadge">Set v7</span>
-          <span class="auto-meta-badge" id="totalCountBadge">0 SFX</span>
+          <span class="auto-meta-badge" id="bundleVerBadge">资源集 v7</span>
+          <span class="auto-meta-badge" id="totalCountBadge">0 个音效</span>
         </div>
       </div>
     </div>
 
-    <!-- 搜索与排序工具栏 -->
+    <!-- 搜索与自定义排序工具栏 -->
     <div class="toolbar">
       <div class="search-wrapper">
         <span class="material-symbols-rounded">search</span>
-        <input type="text" id="searchInput" class="search-input" placeholder="按 ID 或日期搜索...">
+        <input type="text" id="searchInput" class="search-input" placeholder="搜索 ID 或日期...">
       </div>
 
-      <div class="sort-wrapper">
-        <span class="sort-label">排序方式:</span>
-        <select id="sortSelect" class="sort-select">
-          <option value="uploadDate">上传日期 (默认)</option>
-          <option value="updateDate">更新日期</option>
-          <option value="duration">时长 (需加载)</option>
-          <option value="fileSize">文件大小 (需加载)</option>
-          <option value="idAsc">ID 升序</option>
-          <option value="idDesc">ID 降序</option>
-        </select>
+      <!-- M3 自定义排序下拉菜单 -->
+      <div class="m3-dropdown-wrapper" id="dropdownWrapper">
+        <div class="m3-dropdown-btn" id="dropdownBtn">
+          <span id="sortPrefixText">排序:</span>
+          <span class="selected-text" id="currentSortText">创建日期</span>
+          <span class="material-symbols-rounded" style="font-size: 18px;">expand_more</span>
+        </div>
+        <div class="m3-dropdown-menu" id="dropdownMenu">
+          <div class="m3-dropdown-item active" data-value="creationDate">
+            <span class="item-label" data-i18n="creationDate">创建日期</span>
+            <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
+          </div>
+          <div class="m3-dropdown-item" data-value="updateDate">
+            <span class="item-label" data-i18n="updateDate">更新日期</span>
+            <span class="material-symbols-rounded check-icon" style="font-size: 16px; opacity: 0;">check</span>
+          </div>
+          <div class="m3-dropdown-item" data-value="duration">
+            <span class="item-label" data-i18n="duration">时长</span>
+            <span class="material-symbols-rounded check-icon" style="font-size: 16px; opacity: 0;">check</span>
+          </div>
+          <div class="m3-dropdown-item" data-value="fileSize">
+            <span class="item-label" data-i18n="fileSize">文件大小</span>
+            <span class="material-symbols-rounded check-icon" style="font-size: 16px; opacity: 0;">check</span>
+          </div>
+        </div>
       </div>
+
+      <!-- 升序 / 降序独立切换胶囊按钮 -->
+      <button class="order-btn" id="btnToggleOrder" title="切换升降序">
+        <span class="material-symbols-rounded" id="orderIcon">arrow_downward</span>
+        <span id="orderText">降序</span>
+      </button>
     </div>
   </header>
 
@@ -521,15 +746,15 @@
   </main>
 </div>
 
-<!-- 确认加载模态窗口 -->
+<!-- 确认加载模态窗口 (仅在选择时长排序时使用) -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-card">
     <div class="modal-title">
       <span class="material-symbols-rounded">info</span>
-      <span>需要加载音频数据</span>
+      <span id="modalTitleText">需要加载音频数据</span>
     </div>
-    <div class="modal-desc" id="modalDesc">
-      按时长或文件大小排序需要向服务器发起请求以解析音频元数据，是否确定继续加载？
+    <div class="modal-desc" id="modalDescText">
+      按时长排序需要向服务器发起请求以解析音频流时长，是否确定继续加载？
     </div>
     <div class="modal-actions">
       <button class="m3-btn m3-btn-cancel" id="btnModalCancel">取消</button>
@@ -538,12 +763,66 @@
   </div>
 </div>
 
+<!-- 提示气泡 -->
+<div class="toast-box" id="toastBox">提示信息</div>
+
 <script>
-  // 1. 语言与域名检测策略
+  // 1. 语言与中英文彻底分离策略
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
   const serverDomain = isZh ? 'res.3dtank.com' : 's.eu.tankionline.com';
 
-  // 2. 5 级八进制路径生成函数 (ID + Version -> Octal Path)
+  const i18n = {
+    zh: {
+      title: '3D坦克音频展示',
+      setPrefix: '资源集 v',
+      sfxSuffix: ' 个音效',
+      searchPlaceholder: '搜索 ID 或日期...',
+      sortPrefix: '排序:',
+      creationDate: '创建日期',
+      updateDate: '更新日期',
+      duration: '时长',
+      fileSize: '文件大小',
+      descending: '降序',
+      ascending: '升序',
+      legacyBadge: '早期遗产',
+      legacyTooltip: '很老的文件 (遗产)',
+      creationAttr: '创建属性:',
+      creationDateLabel: '创建日期:',
+      updateDateLabel: '更新日期:',
+      modalTitle: '需要加载音频数据',
+      modalDesc: '按时长排序需要向服务器请求解析音频流数据，是否确定继续加载？',
+      modalCancel: '取消',
+      modalConfirm: '确定加载',
+      copied: '已复制音频直链'
+    },
+    en: {
+      title: 'Tanki Online Audio Showcase',
+      setPrefix: 'Asset Set v',
+      sfxSuffix: ' SFX',
+      searchPlaceholder: 'Search ID or date...',
+      sortPrefix: 'Sort:',
+      creationDate: 'Creation Date',
+      updateDate: 'Update Date',
+      duration: 'Duration',
+      fileSize: 'File Size',
+      descending: 'Descending',
+      ascending: 'Ascending',
+      legacyBadge: 'Legacy',
+      legacyTooltip: 'Old Resource (Legacy)',
+      creationAttr: 'Creation Type:',
+      creationDateLabel: 'Creation Date:',
+      updateDateLabel: 'Update Date:',
+      modalTitle: 'Audio Stream Required',
+      modalDesc: 'Sorting by duration requires requesting audio stream metadata from the server. Proceed?',
+      modalCancel: 'Cancel',
+      modalConfirm: 'Confirm',
+      copied: 'Audio link copied'
+    }
+  };
+
+  const currentLang = isZh ? i18n.zh : i18n.en;
+
+  // 2. 5 级八进制路径生成 (ID + Version -> Octal Path)
   function getHighInt(longValBigInt) {
     return Number(longValBigInt >> 32n);
   }
@@ -565,7 +844,7 @@
     ].join("/");
   }
 
-  // 3. 日期格式化工具
+  // 3. 辅助格式化
   function formatDateOnly(ts) {
     const d = new Date(Number(ts));
     if (isNaN(d.getTime())) return '未知';
@@ -583,7 +862,7 @@
   }
 
   function formatBytes(bytes) {
-    if (!bytes || isNaN(bytes)) return '未知大小';
+    if (!bytes || isNaN(bytes)) return '-- KB';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -591,44 +870,65 @@
   }
 
   function formatSeconds(sec) {
-    if (!sec || isNaN(sec)) return '--:--';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    if (!sec || isNaN(sec)) return '--';
+    return sec < 10 ? `${sec.toFixed(1)}s` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
   }
 
-  // 4. 数据模型与状态
+  // 4. 数据与状态
   let assetSetVersion = 7;
   let items = [];
-  let currentSort = 'uploadDate';
+  let currentSortKey = 'creationDate';
+  let isDescending = true;
   let searchQuery = '';
 
+  // 环形轨道活跃实例追踪 Map: itemId -> Set<{ audio, dotEl, startTime, duration }>
+  const activePlayInstances = new Map();
+  let isAnimationFrameActive = false;
+
   // DOM 节点
-  const elGrid = document.getElementById('sfxGrid');
-  const elSearch = document.getElementById('searchInput');
-  const elSort = document.getElementById('sortSelect');
+  const elAppTitle = document.getElementById('appTitle');
   const elBundleBadge = document.getElementById('bundleVerBadge');
   const elTotalBadge = document.getElementById('totalCountBadge');
+  const elSearchInput = document.getElementById('searchInput');
+  const elGrid = document.getElementById('sfxGrid');
+  const elToast = document.getElementById('toastBox');
+
+  const elDropdownWrapper = document.getElementById('dropdownWrapper');
+  const elDropdownBtn = document.getElementById('dropdownBtn');
+  const elCurrentSortText = document.getElementById('currentSortText');
+  const elDropdownMenu = document.getElementById('dropdownMenu');
+  const elSortPrefixText = document.getElementById('sortPrefixText');
+
+  const elBtnToggleOrder = document.getElementById('btnToggleOrder');
+  const elOrderIcon = document.getElementById('orderIcon');
+  const elOrderText = document.getElementById('orderText');
+
   const elModal = document.getElementById('confirmModal');
   const elBtnModalCancel = document.getElementById('btnModalCancel');
   const elBtnModalConfirm = document.getElementById('btnModalConfirm');
 
-  // 5. 初始化：完全从 assets.json 加载
+  // 5. 初始化加载
   async function initApp() {
+    // 渲染文案
+    elAppTitle.textContent = currentLang.title;
+    elSearchInput.placeholder = currentLang.searchPlaceholder;
+    elSortPrefixText.textContent = currentLang.sortPrefix;
+    elCurrentSortText.textContent = currentLang.creationDate;
+    elOrderText.textContent = isDescending ? currentLang.descending : currentLang.ascending;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.getAttribute('data-i18n');
+      if (currentLang[k]) el.textContent = currentLang[k];
+    });
+
     const resp = await fetch('assets.json');
-    if (!resp.ok) {
-      throw new Error(`加载 assets.json 失败: HTTP ${resp.status}`);
-    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     assetSetVersion = data.assetSetVersion || 7;
-    processRawList(data.assets || []);
-  }
 
-  function processRawList(rawList) {
-    items = rawList.map((entry, idx) => {
+    items = (data.assets || []).map((entry, idx) => {
       const idBigInt = BigInt(entry.id);
-      const isTimestampId = idBigInt >= 1000000000000n; // 13 位时间戳判定
-      const uploadTime = isTimestampId ? Number(entry.id) : 0;
+      const isTimestampId = idBigInt >= 1000000000000n;
+      const creationTime = isTimestampId ? Number(entry.id) : 0;
       const updateTime = Number(entry.version);
 
       return {
@@ -637,228 +937,386 @@
         version: entry.version,
         path: toPath_v(entry.id, entry.version),
         isLegacy: !isTimestampId,
-        uploadTime: uploadTime,
+        creationTime: creationTime,
         updateTime: updateTime,
-        uploadDateStr: isTimestampId ? formatDateOnly(uploadTime) : '早期遗产',
+        creationDateStr: isTimestampId ? formatDateOnly(creationTime) : currentLang.legacyBadge,
         updateDateTimeStr: formatFullDateTime(updateTime),
         audioUrl: null,
         duration: 0,
         size: 0,
+        format: 'MP3',
         metaLoaded: false,
         isLoading: false
       };
     });
 
-    // 自动检测并显示总量与资源集版本
-    elBundleBadge.textContent = `Set v${assetSetVersion}`;
-    elTotalBadge.textContent = `${items.length} SFX`;
+    elBundleBadge.textContent = `${currentLang.setPrefix}${assetSetVersion}`;
+    elTotalBadge.textContent = `${items.length}${currentLang.sfxSuffix}`;
 
     applySortAndRender();
   }
 
-  // 6. 异步读取 meta.info（如果为 .swf 则自动转换为 .mp3）
+  // 6. 异步读取 meta.info (自动处理 swf -> mp3 并直接解析 size)
   async function ensureMetaLoaded(item) {
-    if (item.metaLoaded || item.isLoading) return;
-    item.isLoading = true;
-
+    if (item.metaLoaded) return;
     const metaUrl = `https://${serverDomain}/${item.path}/meta.info`;
     const resp = await fetch(metaUrl, { mode: 'cors' });
-    if (!resp.ok) {
-      item.isLoading = false;
-      throw new Error(`加载 meta.info 失败: HTTP ${resp.status}`);
-    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
     let targetFile = Array.isArray(data) ? data[0] : (data && data.name ? data : null);
-    if (!targetFile || !targetFile.name) {
-      item.isLoading = false;
-      throw new Error('meta.info 中未找到有效文件');
-    }
+    if (!targetFile || !targetFile.name) throw new Error('meta.info missing file');
 
     let name = targetFile.name;
-    if (name.toLowerCase().endsWith('.swf')) {
+    let format = name.split('.').pop().toUpperCase();
+    if (format === 'SWF') {
       name = name.replace(/\.swf$/i, '.mp3');
+      format = 'MP3';
     }
 
     item.size = targetFile.size || 0;
+    item.format = format;
     item.audioUrl = `https://${serverDomain}/${item.path}/${name}`;
     item.metaLoaded = true;
-    item.isLoading = false;
   }
 
-  // 获取时长
+  // 预解码获取时长
   function loadAudioDuration(item) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       if (item.duration > 0) return resolve(item.duration);
-      const tempAudio = new Audio();
-      tempAudio.preload = 'metadata';
-      tempAudio.src = item.audioUrl;
-      tempAudio.onloadedmetadata = () => {
-        item.duration = tempAudio.duration;
+      if (!item.audioUrl) await ensureMetaLoaded(item);
+
+      const temp = new Audio();
+      temp.preload = 'metadata';
+      temp.src = item.audioUrl;
+      temp.onloadedmetadata = () => {
+        item.duration = temp.duration;
         resolve(item.duration);
       };
-      tempAudio.onerror = (e) => reject(e);
+      temp.onerror = () => {
+        item.duration = 0.1;
+        resolve(0.1);
+      };
     });
   }
 
-  // 7. 点一次播放一次（SFX 可重复连击触发）
-  async function triggerSfx(item, cardEl) {
+  // 7. 环形轨道粒子动画引擎 (支持多次点击重叠播放)
+  function startOrbitalLoop() {
+    if (isAnimationFrameActive) return;
+    isAnimationFrameActive = true;
+
+    function frame() {
+      let activeCount = 0;
+
+      activePlayInstances.forEach((instances, itemId) => {
+        const dotsContainer = document.getElementById(`dots-${itemId}`);
+        if (!dotsContainer) return;
+
+        instances.forEach(inst => {
+          if (inst.audio.paused && inst.audio.currentTime >= (inst.duration || 0.1)) {
+            // 已结束
+            if (inst.dotEl && inst.dotEl.parentNode) {
+              inst.dotEl.parentNode.removeChild(inst.dotEl);
+            }
+            instances.delete(inst);
+          } else {
+            activeCount++;
+            const progress = inst.duration > 0 ? Math.min(inst.audio.currentTime / inst.duration, 1) : 0;
+            // 环形半径 R=24, 中心 (30,30)
+            const angle = progress * 2 * Math.PI;
+            const cx = 30 + 24 * Math.cos(angle);
+            const cy = 30 + 24 * Math.sin(angle);
+            inst.dotEl.setAttribute('cx', cx.toFixed(2));
+            inst.dotEl.setAttribute('cy', cy.toFixed(2));
+          }
+        });
+      });
+
+      if (activeCount > 0) {
+        requestAnimationFrame(frame);
+      } else {
+        isAnimationFrameActive = false;
+      }
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // 8. 触发播放 (重叠播放 + 环形轨道点移动 + 加载禁用保护)
+  async function triggerSfx(item, wrapperEl, cardEl) {
+    if (item.isLoading) return; // 加载中禁止重复点击
+
+    // 高亮卡片边框
     cardEl.classList.remove('active-play');
     void cardEl.offsetWidth;
     cardEl.classList.add('active-play');
     setTimeout(() => cardEl.classList.remove('active-play'), 300);
 
     if (!item.audioUrl) {
-      await ensureMetaLoaded(item);
+      try {
+        item.isLoading = true;
+        wrapperEl.classList.add('loading');
+        await ensureMetaLoaded(item);
+        // 动态更新卡片上刚加载的信息
+        updateCardMetaDisplay(item);
+      } catch (e) {
+        showToast('加载失败: ' + e.message);
+        return;
+      } finally {
+        item.isLoading = false;
+        wrapperEl.classList.remove('loading');
+      }
     }
 
-    const sound = new Audio(item.audioUrl);
-    sound.currentTime = 0;
-    sound.play();
+    // 创建独立 Audio 实例实现重叠播放
+    const audio = new Audio(item.audioUrl);
+    audio.currentTime = 0;
+
+    // 创建轨道微光粒子
+    const dotsLayer = document.getElementById(`dots-${item.id}`);
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('class', 'play-dot');
+    dot.setAttribute('r', '3.5');
+    dot.setAttribute('cx', '30');
+    dot.setAttribute('cy', '6');
+    if (dotsLayer) dotsLayer.appendChild(dot);
+
+    const instance = {
+      audio: audio,
+      dotEl: dot,
+      duration: item.duration || 0
+    };
+
+    if (!activePlayInstances.has(item.id)) {
+      activePlayInstances.set(item.id, new Set());
+    }
+    activePlayInstances.get(item.id).add(instance);
+
+    audio.onloadedmetadata = () => {
+      instance.duration = audio.duration;
+      item.duration = audio.duration;
+      updateCardMetaDisplay(item);
+    };
+
+    audio.play().catch(() => {});
+    startOrbitalLoop();
   }
 
-  // 8. 排序与渲染
+  function updateCardMetaDisplay(item) {
+    const card = document.getElementById(`card-${item.id}`);
+    if (!card) return;
+    const formatEl = card.querySelector('.format-tag');
+    if (formatEl) formatEl.textContent = item.format;
+    const statsEl = card.querySelector('.meta-stats');
+    if (statsEl) {
+      statsEl.textContent = `${formatBytes(item.size)} • ${formatSeconds(item.duration)}`;
+    }
+    const downloadEl = card.querySelector('.btn-download');
+    if (downloadEl && item.audioUrl) {
+      downloadEl.href = item.audioUrl;
+      downloadEl.setAttribute('download', `${item.id}.${item.format.toLowerCase()}`);
+    }
+  }
+
+  // 9. 排序逻辑与渲染
   function applySortAndRender() {
     const query = searchQuery.trim().toLowerCase();
-    let displayList = items.filter(it => {
+    let list = items.filter(it => {
       if (!query) return true;
-      return it.id.includes(query) || it.uploadDateStr.includes(query) || it.updateDateTimeStr.includes(query);
+      return it.id.includes(query) || it.creationDateStr.includes(query) || it.updateDateTimeStr.includes(query);
     });
 
-    displayList.sort((a, b) => {
-      if (currentSort === 'uploadDate') {
-        if (a.isLegacy && !b.isLegacy) return 1;
-        if (!a.isLegacy && b.isLegacy) return -1;
-        if (a.isLegacy && b.isLegacy) return Number(BigInt(b.id) - BigInt(a.id));
-        return b.uploadTime - a.uploadTime;
+    list.sort((a, b) => {
+      let diff = 0;
+      if (currentSortKey === 'creationDate') {
+        if (a.isLegacy && !b.isLegacy) diff = -1;
+        else if (!a.isLegacy && b.isLegacy) diff = 1;
+        else if (a.isLegacy && b.isLegacy) diff = Number(BigInt(a.id) - BigInt(b.id));
+        else diff = a.creationTime - b.creationTime;
+      } else if (currentSortKey === 'updateDate') {
+        diff = a.updateTime - b.updateTime;
+      } else if (currentSortKey === 'duration') {
+        diff = a.duration - b.duration;
+      } else if (currentSortKey === 'fileSize') {
+        diff = a.size - b.size;
       }
-      if (currentSort === 'updateDate') {
-        return b.updateTime - a.updateTime;
-      }
-      if (currentSort === 'duration') {
-        return b.duration - a.duration;
-      }
-      if (currentSort === 'fileSize') {
-        return b.size - a.size;
-      }
-      if (currentSort === 'idAsc') {
-        return BigInt(a.id) > BigInt(b.id) ? 1 : -1;
-      }
-      if (currentSort === 'idDesc') {
-        return BigInt(b.id) > BigInt(a.id) ? 1 : -1;
-      }
-      return 0;
+
+      return isDescending ? -diff : diff;
     });
 
-    renderGrid(displayList);
+    renderGrid(list);
   }
 
   function renderGrid(list) {
-    elGrid.innerHTML = list.map(item => {
-      return `
-        <div class="sfx-card" id="card-${item.id}">
-          <div class="card-left">
+    elGrid.innerHTML = list.map(item => `
+      <div class="sfx-card" id="card-${item.id}">
+        <div class="card-left">
+          <div class="id-header-line">
             <div class="id-title">
               <span class="id-prefix">ID:</span>
               <span>${item.id}</span>
             </div>
-
-            <!-- 悬停显示完整上传/更新日期 -->
-            <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}">
-              <span class="material-symbols-rounded" style="font-size:14px;">
-                ${item.isLegacy ? 'history_edu' : 'calendar_today'}
-              </span>
-              <span>${item.uploadDateStr}</span>
-
-              <div class="badge-tooltip">
-                <div class="tooltip-row">
-                  <span class="tooltip-label">上传属性:</span>
-                  <span class="tooltip-val">${item.isLegacy ? '很老的文件 (遗产)' : '时间戳资源'}</span>
-                </div>
-                ${!item.isLegacy ? `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">上传日期:</span>
-                  <span class="tooltip-val">${formatFullDateTime(item.uploadTime)}</span>
-                </div>` : ''}
-                <div class="tooltip-row">
-                  <span class="tooltip-label">服务器更新时间:</span>
-                  <span class="tooltip-val">${item.updateDateTimeStr}</span>
-                </div>
-              </div>
-            </div>
-
-            ${item.metaLoaded ? `
-            <div class="meta-tag-line">
-              <span>${formatBytes(item.size)}</span>
-              ${item.duration ? `<span>${formatSeconds(item.duration)}</span>` : ''}
-            </div>` : ''}
+            <span class="format-tag">${item.format}</span>
           </div>
 
-          <!-- 音效点击播放按钮 -->
-          <button class="sfx-btn" data-id="${item.id}" title="点击播放音效">
+          <!-- 悬停显示完整创建与更新日期 -->
+          <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}">
+            <span class="material-symbols-rounded" style="font-size:14px;">
+              ${item.isLegacy ? 'history_edu' : 'calendar_today'}
+            </span>
+            <span>${item.creationDateStr}</span>
+
+            <div class="badge-tooltip">
+              <div class="tooltip-row">
+                <span class="tooltip-label">${currentLang.creationAttr}</span>
+                <span class="tooltip-val">${item.isLegacy ? currentLang.legacyTooltip : currentLang.creationDate}</span>
+              </div>
+              ${!item.isLegacy ? `
+              <div class="tooltip-row">
+                <span class="tooltip-label">${currentLang.creationDateLabel}</span>
+                <span class="tooltip-val">${formatFullDateTime(item.creationTime)}</span>
+              </div>` : ''}
+              <div class="tooltip-row">
+                <span class="tooltip-label">${currentLang.updateDateLabel}</span>
+                <span class="tooltip-val">${item.updateDateTimeStr}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部大小、时长与操作按钮 -->
+          <div class="card-footer-line">
+            <div class="meta-stats">
+              ${formatBytes(item.size)} • ${formatSeconds(item.duration)}
+            </div>
+            <div class="action-buttons">
+              <button class="icon-btn btn-copy-url" data-id="${item.id}" title="复制直链">
+                <span class="material-symbols-rounded">link</span>
+              </button>
+              <a class="icon-btn btn-download" href="${item.audioUrl || '#'}" download="${item.id}.${item.format.toLowerCase()}" target="_blank" title="下载音频">
+                <span class="material-symbols-rounded">download</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 环形多点轨道播放器按钮 -->
+        <div class="sfx-trigger-wrapper" id="wrapper-${item.id}">
+          <svg class="orbital-svg" viewBox="0 0 60 60">
+            <circle class="track-circle" cx="30" cy="30" r="24"></circle>
+            <circle class="loading-spinner-circle" cx="30" cy="30" r="24"></circle>
+            <g id="dots-${item.id}"></g>
+          </svg>
+          <button class="sfx-btn" data-id="${item.id}" title="播放音效">
             <span class="material-symbols-rounded">play_arrow</span>
           </button>
         </div>
-      `;
-    }).join('');
+      </div>
+    `).join('');
 
     // 绑定事件
     list.forEach(item => {
       const cardEl = document.getElementById(`card-${item.id}`);
-      const btn = cardEl.querySelector('.sfx-btn');
-      btn.addEventListener('click', () => triggerSfx(item, cardEl));
+      const wrapperEl = document.getElementById(`wrapper-${item.id}`);
+      const btnPlay = wrapperEl.querySelector('.sfx-btn');
+
+      btnPlay.addEventListener('click', () => triggerSfx(item, wrapperEl, cardEl));
+
+      const btnCopy = cardEl.querySelector('.btn-copy-url');
+      btnCopy.addEventListener('click', async () => {
+        if (!item.audioUrl) await ensureMetaLoaded(item);
+        navigator.clipboard.writeText(item.audioUrl);
+        showToast(currentLang.copied);
+      });
     });
   }
 
-  // 9. 排序切换与模态确认逻辑
-  let targetPendingSort = null;
-
-  elSort.addEventListener('change', async (e) => {
-    const val = e.target.value;
-    if (val === 'duration' || val === 'fileSize') {
-      targetPendingSort = val;
-      elModal.classList.add('show');
-    } else {
-      currentSort = val;
-      applySortAndRender();
-    }
+  // 10. M3 自定义下拉菜单交互与升降序切换
+  elDropdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    elDropdownWrapper.classList.toggle('open');
   });
 
+  document.addEventListener('click', () => {
+    elDropdownWrapper.classList.remove('open');
+  });
+
+  document.querySelectorAll('.m3-dropdown-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = item.getAttribute('data-value');
+      const text = item.querySelector('.item-label').textContent;
+
+      if (val === 'duration') {
+        elDropdownWrapper.classList.remove('open');
+        elModal.classList.add('show');
+        return;
+      }
+
+      setSortKey(val, text);
+    });
+  });
+
+  function setSortKey(key, text) {
+    currentSortKey = key;
+    elCurrentSortText.textContent = text;
+    document.querySelectorAll('.m3-dropdown-item').forEach(it => {
+      const isMatch = it.getAttribute('data-value') === key;
+      it.classList.toggle('active', isMatch);
+      it.querySelector('.check-icon').style.opacity = isMatch ? '1' : '0';
+    });
+    elDropdownWrapper.classList.remove('open');
+
+    // 若按大小排序，确保已加载的直接排序，未加载则后台预取
+    if (key === 'fileSize') {
+      items.forEach(it => { if (!it.metaLoaded) ensureMetaLoaded(it).then(applySortAndRender); });
+    }
+    applySortAndRender();
+  }
+
+  // 升序/降序切换
+  elBtnToggleOrder.addEventListener('click', () => {
+    isDescending = !isDescending;
+    elOrderIcon.textContent = isDescending ? 'arrow_downward' : 'arrow_upward';
+    elOrderText.textContent = isDescending ? currentLang.descending : currentLang.ascending;
+    applySortAndRender();
+  });
+
+  // 时长模态确认
   elBtnModalCancel.addEventListener('click', () => {
     elModal.classList.remove('show');
-    elSort.value = currentSort;
-    targetPendingSort = null;
   });
 
   elBtnModalConfirm.addEventListener('click', async () => {
     elModal.classList.remove('show');
-    currentSort = targetPendingSort;
+    setSortKey('duration', currentLang.duration);
 
-    // 批量并发加载所有音频元数据和时长
-    elSort.disabled = true;
+    showToast('正在并发加载音频流时长...');
     const concurrency = 8;
     let idx = 0;
 
     async function worker() {
       while (idx < items.length) {
-        const item = items[idx++];
-        await ensureMetaLoaded(item);
-        if (currentSort === 'duration') {
-          await loadAudioDuration(item);
-        }
+        const it = items[idx++];
+        await loadAudioDuration(it);
       }
     }
-
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    elSort.disabled = false;
     applySortAndRender();
   });
 
-  // 10. 搜索过滤
-  elSearch.addEventListener('input', (e) => {
+  // 11. 搜索过滤与 Toast
+  elSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     applySortAndRender();
   });
+
+  let toastTimer = null;
+  function showToast(msg) {
+    elToast.textContent = msg;
+    elToast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => elToast.classList.remove('show'), 2200);
+  }
 
   // 启动
   window.addEventListener('DOMContentLoaded', initApp);
