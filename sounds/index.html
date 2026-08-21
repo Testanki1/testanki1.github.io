@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D坦克音频展示 - Tanki Online Audio Showcase</title>
+
+<!-- 引入品牌规范字体: Rubik (第一字体) 与 M PLUS 1p (第二字体) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=Rubik:ital,wght@0,400;0,500;0,700;0,900;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+<style>
+  /* ==========================================================================
+     Tanki Online 品牌官方色彩规范 (Brand Guidelines Palette)
+     ========================================================================== */
+  :root {
+    --tk-neon-green: #76FF33;    /* 核心主色 Neon Green */
+    --tk-bg-dark: #001926;       /* 背景深色 Background / Dark Text */
+    --tk-bg-deep: #00111a;       /* 极深背景 */
+    --tk-surface: #0a2536;       /* 卡片底色 */
+    --tk-surface-hover: #0f344c; /* 卡片悬停底色 */
+    --tk-btn-ice: #BFD5FF;       /* 按钮与次要文字 Buttons */
+    --tk-crystals: #00D4FF;      /* 水晶蓝 Crystals */
+    --tk-tankoins: #FFCC00;      /* 金币黄 Tankoins (早期遗产标识) */
+    --tk-alert: #FF3333;         /* 警告红 Alert */
+    --tk-border: rgba(191, 213, 255, 0.18);
+    --tk-border-glow: rgba(118, 255, 51, 0.5);
+
+    --radius-s: 8px;
+    --radius-m: 14px;
+    --radius-l: 22px;
+    --radius-pill: 9999px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: radial-gradient(circle at 50% 0%, #082d42 0%, var(--tk-bg-dark) 70%, var(--tk-bg-deep) 100%);
+    color: var(--tk-btn-ice);
+    font-family: 'M PLUS 1p', sans-serif;
+    min-height: 100vh;
+    padding: 30px 20px 80px;
+  }
+
+  /* 第一字体统一使用 Rubik */
+  h1, h2, h3, h4, .rubik-font, .sfx-btn, .id-title, .sort-select, .badge-title {
+    font-family: 'Rubik', sans-serif;
+  }
+
+  .material-symbols-rounded {
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1;
+  }
+
+  .container {
+    max-width: 1380px;
+    margin: 0 auto;
+  }
+
+  /* ==========================================================================
+     Header & Title Bar
+     ========================================================================== */
+  .header-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 26px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--tk-border);
+  }
+
+  .title-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-mark {
+    width: 48px;
+    height: 48px;
+    background-color: var(--tk-neon-green);
+    color: var(--tk-bg-dark);
+    border-radius: var(--radius-m);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(118, 255, 51, 0.4);
+  }
+
+  .title-group h1 {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--tk-neon-green);
+    letter-spacing: -0.5px;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+
+  .title-group .subtitle {
+    font-size: 0.85rem;
+    color: var(--tk-btn-ice);
+    font-weight: 500;
+    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .auto-meta-badge {
+    background: rgba(118, 255, 51, 0.12);
+    border: 1px solid var(--tk-neon-green);
+    color: var(--tk-neon-green);
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  /* 工具栏：搜索与排序 */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .search-wrapper {
+    position: relative;
+    min-width: 240px;
+  }
+
+  .search-wrapper .material-symbols-rounded {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--tk-btn-ice);
+    opacity: 0.6;
+    font-size: 20px;
+  }
+
+  .search-input {
+    width: 100%;
+    background-color: var(--tk-bg-deep);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-pill);
+    padding: 10px 16px 10px 42px;
+    color: #ffffff;
+    font-family: 'M PLUS 1p', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.25s ease;
+  }
+
+  .search-input:focus {
+    border-color: var(--tk-neon-green);
+    box-shadow: 0 0 12px rgba(118, 255, 51, 0.3);
+  }
+
+  .sort-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-pill);
+    padding: 4px 14px;
+  }
+
+  .sort-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--tk-btn-ice);
+  }
+
+  .sort-select {
+    background: transparent;
+    border: none;
+    color: var(--tk-neon-green);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .sort-select option {
+    background-color: var(--tk-bg-dark);
+    color: var(--tk-btn-ice);
+  }
+
+  /* ==========================================================================
+     音效网格 (SFX Soundboard Grid)
+     ========================================================================== */
+  .sfx-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .sfx-card {
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-l);
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    position: relative;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .sfx-card:hover {
+    transform: translateY(-3px);
+    background-color: var(--tk-surface-hover);
+    border-color: var(--tk-btn-ice);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .sfx-card.active-play {
+    border-color: var(--tk-neon-green);
+    box-shadow: 0 0 22px var(--tk-border-glow);
+    background: linear-gradient(135deg, #0e3b52 0%, var(--tk-surface) 100%);
+  }
+
+  .card-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .id-title {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .id-prefix {
+    color: var(--tk-neon-green);
+    font-size: 0.85em;
+  }
+
+  /* 上传/更新日期 & 遗产标识 Badge */
+  .date-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: default;
+    width: fit-content;
+    user-select: none;
+  }
+
+  .date-badge.legacy {
+    background-color: rgba(255, 204, 0, 0.15);
+    color: var(--tk-tankoins);
+    border: 1px solid rgba(255, 204, 0, 0.4);
+  }
+
+  .date-badge.timestamp {
+    background-color: rgba(0, 212, 255, 0.12);
+    color: var(--tk-crystals);
+    border: 1px solid rgba(0, 212, 255, 0.35);
+  }
+
+  /* 悬停日期卡片 (M3 Expressive Popover) */
+  .badge-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 0;
+    width: 250px;
+    background-color: var(--tk-bg-deep);
+    border: 1.5px solid var(--tk-neon-green);
+    border-radius: var(--radius-m);
+    padding: 12px 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px);
+    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    pointer-events: none;
+  }
+
+  .date-badge:hover .badge-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    margin-bottom: 5px;
+    font-family: 'M PLUS 1p', sans-serif;
+  }
+
+  .tooltip-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .tooltip-label {
+    color: var(--tk-btn-ice);
+    opacity: 0.8;
+  }
+
+  .tooltip-val {
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .meta-tag-line {
+    font-size: 0.72rem;
+    color: var(--tk-btn-ice);
+    opacity: 0.6;
+    display: flex;
+    gap: 8px;
+  }
+
+  /* 点一次响一次的音效播放按钮 (Sound Trigger Button) */
+  .sfx-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-pill);
+    background-color: var(--tk-neon-green);
+    color: var(--tk-bg-dark);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(118, 255, 51, 0.35);
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s;
+    user-select: none;
+  }
+
+  .sfx-btn:hover {
+    filter: brightness(1.1);
+    transform: scale(1.08);
+  }
+
+  .sfx-btn:active {
+    transform: scale(0.88);
+    filter: brightness(0.9);
+  }
+
+  .sfx-btn .material-symbols-rounded {
+    font-size: 26px;
+    pointer-events: none;
+  }
+
+  /* ==========================================================================
+     M3 确认模态弹窗 (用于时长/大小排序提示)
+     ========================================================================== */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 17, 26, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s ease;
+  }
+
+  .modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .modal-card {
+    background-color: var(--tk-surface);
+    border: 2px solid var(--tk-neon-green);
+    border-radius: var(--radius-l);
+    padding: 24px 28px;
+    max-width: 440px;
+    width: calc(100% - 40px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(118, 255, 51, 0.2);
+    transform: scale(0.9);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .modal-overlay.show .modal-card {
+    transform: scale(1);
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 900;
+    color: var(--tk-neon-green);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .modal-desc {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--tk-btn-ice);
+    margin-bottom: 22px;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .m3-btn {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 10px 20px;
+    border-radius: var(--radius-pill);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .m3-btn-cancel {
+    background: transparent;
+    color: var(--tk-btn-ice);
+    border: 1px solid var(--tk-border);
+  }
+
+  .m3-btn-cancel:hover {
+    background: rgba(191, 213, 255, 0.1);
+  }
+
+  .m3-btn-confirm {
+    background-color: var(--tk-neon-green);
+    color: var(--tk-bg-dark);
+    box-shadow: 0 4px 14px rgba(118, 255, 51, 0.3);
+  }
+
+  .m3-btn-confirm:hover {
+    filter: brightness(1.1);
+  }
+
+  @media (max-width: 640px) {
+    .header-bar { flex-direction: column; align-items: stretch; }
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .search-wrapper { width: 100%; }
+    .sort-wrapper { justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 顶部标题栏 -->
+  <header class="header-bar">
+    <div class="title-group">
+      <div class="logo-mark">
+        <span class="material-symbols-rounded">volume_up</span>
+      </div>
+      <div>
+        <h1>3D坦克音频展示</h1>
+        <div class="subtitle">
+          <span>Tanki Online Audio Showcase</span>
+          <span class="auto-meta-badge" id="bundleVerBadge">Set v7</span>
+          <span class="auto-meta-badge" id="totalCountBadge">0 SFX</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 搜索与排序工具栏 -->
+    <div class="toolbar">
+      <div class="search-wrapper">
+        <span class="material-symbols-rounded">search</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="按 ID 或日期搜索...">
+      </div>
+
+      <div class="sort-wrapper">
+        <span class="sort-label">排序方式:</span>
+        <select id="sortSelect" class="sort-select">
+          <option value="uploadDate">上传日期 (默认)</option>
+          <option value="updateDate">更新日期</option>
+          <option value="duration">时长 (需加载)</option>
+          <option value="fileSize">文件大小 (需加载)</option>
+          <option value="idAsc">ID 升序</option>
+          <option value="idDesc">ID 降序</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- 音效展示网格 -->
+  <main class="sfx-grid" id="sfxGrid">
+    <!-- 动态渲染卡片 -->
+  </main>
+</div>
+
+<!-- 确认加载模态窗口 -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-card">
+    <div class="modal-title">
+      <span class="material-symbols-rounded">info</span>
+      <span>需要加载音频数据</span>
+    </div>
+    <div class="modal-desc" id="modalDesc">
+      按时长或文件大小排序需要向服务器发起请求以解析音频元数据，是否确定继续加载？
+    </div>
+    <div class="modal-actions">
+      <button class="m3-btn m3-btn-cancel" id="btnModalCancel">取消</button>
+      <button class="m3-btn m3-btn-confirm" id="btnModalConfirm">确定加载</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 1. 语言与域名检测策略
+  const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
+  const serverDomain = isZh ? 'res.3dtank.com' : 's.eu.tankionline.com';
+
+  // 2. 5 级八进制路径生成函数 (ID + Version -> Octal Path)
+  function getHighInt(longValBigInt) {
+    return Number(longValBigInt >> 32n);
+  }
+  function getLowInt(longValBigInt) {
+    return Number(longValBigInt & 0xFFFFFFFFn);
+  }
+  function toPath_v(id, version) {
+    const idBigInt = BigInt(id);
+    const versionBigInt = BigInt(version);
+    const highId = getHighInt(idBigInt);
+    const lowId = getLowInt(idBigInt);
+
+    return [
+      highId.toString(8),
+      ((lowId >>> 16) & 0xFFFF).toString(8),
+      ((lowId >>> 8) & 0xFF).toString(8),
+      (lowId & 0xFF).toString(8),
+      versionBigInt.toString(8)
+    ].join("/");
+  }
+
+  // 3. 日期格式化工具
+  function formatDateOnly(ts) {
+    const d = new Date(Number(ts));
+    if (isNaN(d.getTime())) return '未知';
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    return `${Y}-${M}-${D}`;
+  }
+
+  function formatFullDateTime(ts) {
+    const d = new Date(Number(ts));
+    if (isNaN(d.getTime())) return '未知';
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes || isNaN(bytes)) return '未知大小';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function formatSeconds(sec) {
+    if (!sec || isNaN(sec)) return '--:--';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  // 4. 数据模型与状态
+  let assetSetVersion = 7;
+  let items = [];
+  let currentSort = 'uploadDate';
+  let searchQuery = '';
+
+  // DOM 节点
+  const elGrid = document.getElementById('sfxGrid');
+  const elSearch = document.getElementById('searchInput');
+  const elSort = document.getElementById('sortSelect');
+  const elBundleBadge = document.getElementById('bundleVerBadge');
+  const elTotalBadge = document.getElementById('totalCountBadge');
+  const elModal = document.getElementById('confirmModal');
+  const elBtnModalCancel = document.getElementById('btnModalCancel');
+  const elBtnModalConfirm = document.getElementById('btnModalConfirm');
+
+  // 5. 初始化：完全从 assets.json 加载
+  async function initApp() {
+    const resp = await fetch('assets.json');
+    if (!resp.ok) {
+      throw new Error(`加载 assets.json 失败: HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    assetSetVersion = data.assetSetVersion || 7;
+    processRawList(data.assets || []);
+  }
+
+  function processRawList(rawList) {
+    items = rawList.map((entry, idx) => {
+      const idBigInt = BigInt(entry.id);
+      const isTimestampId = idBigInt >= 1000000000000n; // 13 位时间戳判定
+      const uploadTime = isTimestampId ? Number(entry.id) : 0;
+      const updateTime = Number(entry.version);
+
+      return {
+        index: idx,
+        id: entry.id,
+        version: entry.version,
+        path: toPath_v(entry.id, entry.version),
+        isLegacy: !isTimestampId,
+        uploadTime: uploadTime,
+        updateTime: updateTime,
+        uploadDateStr: isTimestampId ? formatDateOnly(uploadTime) : '早期遗产',
+        updateDateTimeStr: formatFullDateTime(updateTime),
+        audioUrl: null,
+        duration: 0,
+        size: 0,
+        metaLoaded: false,
+        isLoading: false
+      };
+    });
+
+    // 自动检测并显示总量与资源集版本
+    elBundleBadge.textContent = `Set v${assetSetVersion}`;
+    elTotalBadge.textContent = `${items.length} SFX`;
+
+    applySortAndRender();
+  }
+
+  // 6. 异步读取 meta.info（如果为 .swf 则自动转换为 .mp3）
+  async function ensureMetaLoaded(item) {
+    if (item.metaLoaded || item.isLoading) return;
+    item.isLoading = true;
+
+    const metaUrl = `https://${serverDomain}/${item.path}/meta.info`;
+    const resp = await fetch(metaUrl, { mode: 'cors' });
+    if (!resp.ok) {
+      item.isLoading = false;
+      throw new Error(`加载 meta.info 失败: HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+
+    let targetFile = Array.isArray(data) ? data[0] : (data && data.name ? data : null);
+    if (!targetFile || !targetFile.name) {
+      item.isLoading = false;
+      throw new Error('meta.info 中未找到有效文件');
+    }
+
+    let name = targetFile.name;
+    if (name.toLowerCase().endsWith('.swf')) {
+      name = name.replace(/\.swf$/i, '.mp3');
+    }
+
+    item.size = targetFile.size || 0;
+    item.audioUrl = `https://${serverDomain}/${item.path}/${name}`;
+    item.metaLoaded = true;
+    item.isLoading = false;
+  }
+
+  // 获取时长
+  function loadAudioDuration(item) {
+    return new Promise((resolve, reject) => {
+      if (item.duration > 0) return resolve(item.duration);
+      const tempAudio = new Audio();
+      tempAudio.preload = 'metadata';
+      tempAudio.src = item.audioUrl;
+      tempAudio.onloadedmetadata = () => {
+        item.duration = tempAudio.duration;
+        resolve(item.duration);
+      };
+      tempAudio.onerror = (e) => reject(e);
+    });
+  }
+
+  // 7. 点一次播放一次（SFX 可重复连击触发）
+  async function triggerSfx(item, cardEl) {
+    cardEl.classList.remove('active-play');
+    void cardEl.offsetWidth;
+    cardEl.classList.add('active-play');
+    setTimeout(() => cardEl.classList.remove('active-play'), 300);
+
+    if (!item.audioUrl) {
+      await ensureMetaLoaded(item);
+    }
+
+    const sound = new Audio(item.audioUrl);
+    sound.currentTime = 0;
+    sound.play();
+  }
+
+  // 8. 排序与渲染
+  function applySortAndRender() {
+    const query = searchQuery.trim().toLowerCase();
+    let displayList = items.filter(it => {
+      if (!query) return true;
+      return it.id.includes(query) || it.uploadDateStr.includes(query) || it.updateDateTimeStr.includes(query);
+    });
+
+    displayList.sort((a, b) => {
+      if (currentSort === 'uploadDate') {
+        if (a.isLegacy && !b.isLegacy) return 1;
+        if (!a.isLegacy && b.isLegacy) return -1;
+        if (a.isLegacy && b.isLegacy) return Number(BigInt(b.id) - BigInt(a.id));
+        return b.uploadTime - a.uploadTime;
+      }
+      if (currentSort === 'updateDate') {
+        return b.updateTime - a.updateTime;
+      }
+      if (currentSort === 'duration') {
+        return b.duration - a.duration;
+      }
+      if (currentSort === 'fileSize') {
+        return b.size - a.size;
+      }
+      if (currentSort === 'idAsc') {
+        return BigInt(a.id) > BigInt(b.id) ? 1 : -1;
+      }
+      if (currentSort === 'idDesc') {
+        return BigInt(b.id) > BigInt(a.id) ? 1 : -1;
+      }
+      return 0;
+    });
+
+    renderGrid(displayList);
+  }
+
+  function renderGrid(list) {
+    elGrid.innerHTML = list.map(item => {
+      return `
+        <div class="sfx-card" id="card-${item.id}">
+          <div class="card-left">
+            <div class="id-title">
+              <span class="id-prefix">ID:</span>
+              <span>${item.id}</span>
+            </div>
+
+            <!-- 悬停显示完整上传/更新日期 -->
+            <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}">
+              <span class="material-symbols-rounded" style="font-size:14px;">
+                ${item.isLegacy ? 'history_edu' : 'calendar_today'}
+              </span>
+              <span>${item.uploadDateStr}</span>
+
+              <div class="badge-tooltip">
+                <div class="tooltip-row">
+                  <span class="tooltip-label">上传属性:</span>
+                  <span class="tooltip-val">${item.isLegacy ? '很老的文件 (遗产)' : '时间戳资源'}</span>
+                </div>
+                ${!item.isLegacy ? `
+                <div class="tooltip-row">
+                  <span class="tooltip-label">上传日期:</span>
+                  <span class="tooltip-val">${formatFullDateTime(item.uploadTime)}</span>
+                </div>` : ''}
+                <div class="tooltip-row">
+                  <span class="tooltip-label">服务器更新时间:</span>
+                  <span class="tooltip-val">${item.updateDateTimeStr}</span>
+                </div>
+              </div>
+            </div>
+
+            ${item.metaLoaded ? `
+            <div class="meta-tag-line">
+              <span>${formatBytes(item.size)}</span>
+              ${item.duration ? `<span>${formatSeconds(item.duration)}</span>` : ''}
+            </div>` : ''}
+          </div>
+
+          <!-- 音效点击播放按钮 -->
+          <button class="sfx-btn" data-id="${item.id}" title="点击播放音效">
+            <span class="material-symbols-rounded">play_arrow</span>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    // 绑定事件
+    list.forEach(item => {
+      const cardEl = document.getElementById(`card-${item.id}`);
+      const btn = cardEl.querySelector('.sfx-btn');
+      btn.addEventListener('click', () => triggerSfx(item, cardEl));
+    });
+  }
+
+  // 9. 排序切换与模态确认逻辑
+  let targetPendingSort = null;
+
+  elSort.addEventListener('change', async (e) => {
+    const val = e.target.value;
+    if (val === 'duration' || val === 'fileSize') {
+      targetPendingSort = val;
+      elModal.classList.add('show');
+    } else {
+      currentSort = val;
+      applySortAndRender();
+    }
+  });
+
+  elBtnModalCancel.addEventListener('click', () => {
+    elModal.classList.remove('show');
+    elSort.value = currentSort;
+    targetPendingSort = null;
+  });
+
+  elBtnModalConfirm.addEventListener('click', async () => {
+    elModal.classList.remove('show');
+    currentSort = targetPendingSort;
+
+    // 批量并发加载所有音频元数据和时长
+    elSort.disabled = true;
+    const concurrency = 8;
+    let idx = 0;
+
+    async function worker() {
+      while (idx < items.length) {
+        const item = items[idx++];
+        await ensureMetaLoaded(item);
+        if (currentSort === 'duration') {
+          await loadAudioDuration(item);
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    elSort.disabled = false;
+    applySortAndRender();
+  });
+
+  // 10. 搜索过滤
+  elSearch.addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    applySortAndRender();
+  });
+
+  // 启动
+  window.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>
