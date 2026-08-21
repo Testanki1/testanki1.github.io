@@ -50,7 +50,7 @@
   }
 
   /* 第一字体统一使用 Rubik */
-  h1, h2, h3, h4, .rubik-font, .id-title, .m3-custom-dropdown, .order-btn, .badge-title {
+  h1, h2, h3, h4, .rubik-font, .id-title, .m3-custom-dropdown, .order-btn, .filter-chip, .badge-title {
     font-family: 'Rubik', sans-serif;
   }
 
@@ -128,7 +128,7 @@
     font-weight: 700;
   }
 
-  /* 工具栏：搜索、M3 自定义下拉、升降序切换 */
+  /* 工具栏：搜索、格式筛选、M3 自定义下拉、升降序切换 */
   .toolbar {
     display: flex;
     align-items: center;
@@ -138,7 +138,7 @@
 
   .search-wrapper {
     position: relative;
-    min-width: 240px;
+    min-width: 220px;
   }
 
   .search-wrapper .material-symbols-rounded {
@@ -156,7 +156,7 @@
     background-color: var(--tk-bg-deep);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-pill);
-    padding: 10px 16px 10px 42px;
+    padding: 9px 16px 9px 42px;
     color: #ffffff;
     font-family: 'M PLUS 1p', sans-serif;
     font-size: 0.9rem;
@@ -167,6 +167,41 @@
   .search-input:focus {
     border-color: var(--tk-neon-green);
     box-shadow: 0 0 12px rgba(118, 255, 51, 0.3);
+  }
+
+  /* 格式筛选胶囊分段组件 (Format Filter Chips) */
+  .filter-chips-group {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-pill);
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .filter-chip {
+    background: transparent;
+    border: none;
+    color: var(--tk-btn-ice);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    user-select: none;
+  }
+
+  .filter-chip:hover {
+    color: #ffffff;
+    background-color: rgba(191, 213, 255, 0.08);
+  }
+
+  .filter-chip.active {
+    background-color: var(--tk-neon-green);
+    color: var(--tk-bg-dark);
+    box-shadow: 0 2px 10px rgba(118, 255, 51, 0.35);
   }
 
   /* M3 自定义下拉菜单 */
@@ -492,7 +527,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    transform: rotate(-90deg); /* 顶部 12 点钟方向作为起点 */
+    transform: rotate(-90deg);
   }
 
   .track-circle {
@@ -683,6 +718,8 @@
     .header-bar { flex-direction: column; align-items: stretch; }
     .toolbar { flex-direction: column; align-items: stretch; }
     .search-wrapper { width: 100%; }
+    .filter-chips-group { justify-content: center; width: 100%; }
+    .filter-chip { flex: 1; text-align: center; }
     .m3-dropdown-wrapper, .order-btn { width: 100%; }
     .m3-dropdown-btn { justify-content: space-between; }
     .m3-dropdown-menu { width: 100%; }
@@ -707,11 +744,18 @@
       </div>
     </div>
 
-    <!-- 搜索与自定义排序工具栏 -->
+    <!-- 搜索、格式筛选与自定义排序工具栏 -->
     <div class="toolbar">
       <div class="search-wrapper">
         <span class="material-symbols-rounded">search</span>
         <input type="text" id="searchInput" class="search-input" placeholder="搜索 ID 或日期...">
+      </div>
+
+      <!-- WAV / MP3 格式筛选胶囊分段组 -->
+      <div class="filter-chips-group" id="filterChipsGroup">
+        <button class="filter-chip active" data-format="all" id="chipAll" data-i18n="filterAll">全部</button>
+        <button class="filter-chip" data-format="mp3">MP3</button>
+        <button class="filter-chip" data-format="wav">WAV</button>
       </div>
 
       <!-- M3 自定义排序下拉菜单 -->
@@ -786,6 +830,7 @@
       setPrefix: '资源集 v',
       sfxSuffix: ' 个音效',
       searchPlaceholder: '搜索 ID 或日期...',
+      filterAll: '全部',
       sortPrefix: '排序:',
       creationDate: '创建日期',
       updateDate: '更新日期',
@@ -809,6 +854,7 @@
       setPrefix: 'Asset Set v',
       sfxSuffix: ' SFX',
       searchPlaceholder: 'Search ID or date...',
+      filterAll: 'All',
       sortPrefix: 'Sort:',
       creationDate: 'Creation Date',
       updateDate: 'Update Date',
@@ -887,6 +933,7 @@
   let assetSetVersion = 7;
   let items = [];
   let currentSortKey = 'creationDate';
+  let currentFormatFilter = 'all'; // 格式筛选：all / mp3 / wav
   let isDescending = true;
   let searchQuery = '';
 
@@ -967,7 +1014,7 @@
     preloadAllMetaInfo();
   }
 
-  // 6. 异步读取 meta.info (自动处理 swf -> mp3 并直接解析 size)
+  // 6. 异步读取 meta.info (自动处理 swf -> mp3 并直接解析 size 与 format)
   async function ensureMetaLoaded(item) {
     if (item.metaLoaded) return;
     const metaUrl = `https://${serverDomain}/${item.path}/meta.info`;
@@ -1006,9 +1053,8 @@
       }
     }
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    if (currentSortKey === 'fileSize') {
-      applySortAndRender();
-    }
+    // 预拉取完成后按当前条件刷新一次（确保格式与大小排序完全同步）
+    applySortAndRender();
   }
 
   // 预解码获取时长
@@ -1197,10 +1243,17 @@
     }
   }
 
-  // 10. 排序逻辑与渲染
+  // 10. 格式筛选、排序与渲染
   function applySortAndRender() {
     const query = searchQuery.trim().toLowerCase();
     let list = items.filter(it => {
+      // 1. WAV / MP3 格式筛选
+      if (currentFormatFilter !== 'all') {
+        if (it.format.toLowerCase() !== currentFormatFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      // 2. 搜索过滤
       if (!query) return true;
       return it.id.includes(query) || it.creationDateStr.includes(query) || it.updateDateTimeStr.includes(query);
     });
@@ -1346,7 +1399,17 @@
     });
   }
 
-  // 11. M3 自定义下拉菜单交互与升降序切换
+  // 11. 格式筛选胶囊切换事件
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFormatFilter = chip.getAttribute('data-format');
+      applySortAndRender();
+    });
+  });
+
+  // 12. M3 自定义下拉菜单交互与升降序切换
   elDropdownBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     elDropdownWrapper.classList.toggle('open');
@@ -1416,7 +1479,7 @@
     applySortAndRender();
   });
 
-  // 12. 搜索过滤与 Toast (仅用于直链复制)
+  // 13. 搜索过滤与 Toast (仅用于直链复制)
   elSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     applySortAndRender();
