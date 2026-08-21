@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3D坦克音频展示</title>
+<title>3D坦克音效展示</title>
 
 <!-- 引入官方规范字体: Rubik (第一字体) 与 M PLUS 1p (第二字体) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -548,7 +548,7 @@
     transform: scale(0.9);
   }
 
-  /* 音频缓冲/加载中禁止再次点击 */
+  /* 音效缓冲/加载中禁止再次点击 */
   .sfx-trigger-wrapper.loading .sfx-btn {
     pointer-events: none !important;
     filter: grayscale(0.4);
@@ -699,7 +699,7 @@
         <span class="material-symbols-rounded">volume_up</span>
       </div>
       <div>
-        <h1 id="appTitle">3D坦克音频展示</h1>
+        <h1 id="appTitle">3D坦克音效展示</h1>
         <div class="subtitle">
           <span class="auto-meta-badge" id="bundleVerBadge">资源集 v7</span>
           <span class="auto-meta-badge" id="totalCountBadge">0 个音效</span>
@@ -760,10 +760,10 @@
   <div class="modal-card">
     <div class="modal-title">
       <span class="material-symbols-rounded">info</span>
-      <span id="modalTitleText">需要加载音频数据</span>
+      <span id="modalTitleText">需要加载音效数据</span>
     </div>
     <div class="modal-desc" id="modalDescText">
-      按时长排序需要向服务器请求解析音频流数据，是否确定继续加载？
+      按时长排序需要向服务器请求解析音效流数据，是否确定继续加载？
     </div>
     <div class="modal-actions">
       <button class="m3-btn m3-btn-cancel" id="btnModalCancel">取消</button>
@@ -772,7 +772,7 @@
   </div>
 </div>
 
-<!-- 提示气泡 -->
+<!-- 提示气泡 (仅用于直链复制) -->
 <div class="toast-box" id="toastBox">提示信息</div>
 
 <script>
@@ -782,7 +782,7 @@
 
   const i18n = {
     zh: {
-      title: '3D坦克音频展示',
+      title: '3D坦克音效展示',
       setPrefix: '资源集 v',
       sfxSuffix: ' 个音效',
       searchPlaceholder: '搜索 ID 或日期...',
@@ -797,15 +797,15 @@
       legacyTooltip: '早期遗产',
       creationDateLabel: '创建日期:',
       updateDateLabel: '更新日期:',
-      modalTitle: '需要加载音频数据',
-      modalDesc: '按时长排序需要向服务器请求解析音频流数据，是否确定继续加载？',
+      modalTitle: '需要加载音效数据',
+      modalDesc: '按时长排序需要向服务器请求解析音效流数据，是否确定继续加载？',
       modalCancel: '取消',
       modalConfirm: '确定加载',
-      copied: '已复制音频直链',
-      stopped: '已停止播放并清除进度'
+      copied: '已复制音效直链',
+      playSfx: '播放音效'
     },
     en: {
-      title: 'Tanki Online Audio Showcase',
+      title: 'Tanki Online SFX Showcase',
       setPrefix: 'Asset Set v',
       sfxSuffix: ' SFX',
       searchPlaceholder: 'Search ID or date...',
@@ -820,12 +820,12 @@
       legacyTooltip: 'Legacy',
       creationDateLabel: 'Creation Date:',
       updateDateLabel: 'Update Date:',
-      modalTitle: 'Audio Stream Required',
-      modalDesc: 'Sorting by duration requires requesting audio stream metadata from the server. Proceed?',
+      modalTitle: 'SFX Stream Required',
+      modalDesc: 'Sorting by duration requires requesting sound stream metadata from the server. Proceed?',
       modalCancel: 'Cancel',
       modalConfirm: 'Confirm',
-      copied: 'Audio link copied',
-      stopped: 'Playback stopped & cleared'
+      copied: 'SFX link copied',
+      playSfx: 'Play SFX'
     }
   };
 
@@ -1071,10 +1071,14 @@
     requestAnimationFrame(frame);
   }
 
-  // 8. 停止播放并清除进度 (右键/长按专用)
+  // 8. 停止播放并清除进度 (仅在正在播放或缓冲时静默执行)
   function stopAndClearSfx(item) {
     const instances = activePlayInstances.get(item.id);
-    if (instances && instances.size > 0) {
+    const isPlaying = instances && instances.size > 0;
+
+    if (!isPlaying && !item.isBuffering) return;
+
+    if (isPlaying) {
       instances.forEach(inst => {
         try {
           inst.audio.pause();
@@ -1096,8 +1100,6 @@
       wrapperEl.classList.remove('loading');
       item.isBuffering = false;
     }
-
-    showToast(currentLang.stopped);
   }
 
   // 9. 触发播放（点击缓冲加载 + 加载期间防重 + 就绪重叠播放）
@@ -1166,7 +1168,7 @@
       audio.addEventListener('error', () => {
         item.isBuffering = false;
         wrapperEl.classList.remove('loading');
-        showToast('音频加载失败');
+        showToast('音效加载失败');
       }, { once: true });
       audio.load();
     }
@@ -1264,41 +1266,41 @@
               <button class="icon-btn btn-copy-url" data-id="${item.id}" title="复制直链">
                 <span class="material-symbols-rounded">link</span>
               </button>
-              <a class="icon-btn btn-download" href="${item.audioUrl || '#'}" download="${item.id}.${item.format.toLowerCase()}" target="_blank" title="下载音频">
+              <a class="icon-btn btn-download" href="${item.audioUrl || '#'}" download="${item.id}.${item.format.toLowerCase()}" target="_blank" title="下载音效">
                 <span class="material-symbols-rounded">download</span>
               </a>
             </div>
           </div>
         </div>
 
-        <!-- 环形多点轨道播放器按钮 (支持右键/长按停止) -->
+        <!-- 环形多点轨道播放器按钮 (支持右键/长按静默停止) -->
         <div class="sfx-trigger-wrapper" id="wrapper-${item.id}">
           <svg class="orbital-svg" viewBox="0 0 60 60">
             <circle class="track-circle" cx="30" cy="30" r="24"></circle>
             <circle class="loading-spinner-circle" cx="30" cy="30" r="24"></circle>
             <g id="dots-${item.id}"></g>
           </svg>
-          <button class="sfx-btn" data-id="${item.id}" title="左键播放 / 右键(长按)停止">
+          <button class="sfx-btn" data-id="${item.id}" title="${currentLang.playSfx}">
             <span class="material-symbols-rounded">play_arrow</span>
           </button>
         </div>
       </div>
     `).join('');
 
-    // 绑定事件（点击播放、右键/长按停止、复制直链）
+    // 绑定事件（点击播放、右键/长按静默停止、复制直链）
     list.forEach(item => {
       const cardEl = document.getElementById(`card-${item.id}`);
       const wrapperEl = document.getElementById(`wrapper-${item.id}`);
       const btnPlay = wrapperEl.querySelector('.sfx-btn');
 
-      // 1. 桌面端右键停止
+      // 1. 桌面端右键静默停止
       btnPlay.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
         stopAndClearSfx(item);
       });
 
-      // 2. 移动端长按检测 (Pointer Events)
+      // 2. 移动端长按静默停止 (Pointer Events)
       let longPressTimer = null;
       let isLongPressTriggered = false;
 
@@ -1400,7 +1402,7 @@
     elModal.classList.remove('show');
     setSortKey('duration', currentLang.duration);
 
-    showToast('正在并发加载音频流时长...');
+    showToast('正在并发加载音效流时长...');
     const concurrency = 8;
     let idx = 0;
 
@@ -1414,7 +1416,7 @@
     applySortAndRender();
   });
 
-  // 12. 搜索过滤与 Toast
+  // 12. 搜索过滤与 Toast (仅用于直链复制)
   elSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     applySortAndRender();
