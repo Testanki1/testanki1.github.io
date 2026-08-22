@@ -33,22 +33,19 @@
     --tk-border: rgba(191, 213, 255, 0.18);
     --tk-border-glow: rgba(118, 255, 51, 0.45);
 
-    /* 标准圆角 Token */
-    --radius-xs: 6px;
-    --radius-s: 10px;
-    --radius-m: 16px;
-    --radius-l: 22px;
+    /* 标准圆角 Token (全面采用 Rounded 规格) */
+    --radius-xs: 8px;
+    --radius-s: 12px;
+    --radius-m: 18px;
+    --radius-l: 24px;
     --radius-pill: 9999px;
 
     /* 弹簧物理动效曲线 */
     --m3-motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --m3-motion-spring-subtle: cubic-bezier(0.25, 1.2, 0.5, 1);
     --m3-motion-standard: cubic-bezier(0.2, 0, 0, 1);
     --m3-motion-enter: cubic-bezier(0.05, 0.7, 0.1, 1.0);
-    --m3-motion-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
     --m3-duration-short: 180ms;
     --m3-duration-medium: 280ms;
-    --m3-duration-long: 400ms;
   }
 
   *, *::before, *::after {
@@ -91,7 +88,7 @@
   }
 
   /* ==========================================================================
-     Header & Title Bar
+     Header & Title Bar (重构图标与微标)
      ========================================================================== */
   .header-bar {
     display: flex;
@@ -113,27 +110,33 @@
   .title-group {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
 
+  /* 精致圆润的声波均衡器图标 (取代原来的突兀大绿块) */
   .logo-mark {
     width: 44px;
     height: 44px;
-    background-color: var(--tk-neon-green);
-    color: var(--tk-bg-dark);
+    background: linear-gradient(145deg, rgba(118, 255, 51, 0.16) 0%, rgba(10, 37, 54, 0.85) 100%);
+    border: 1.5px solid var(--tk-neon-green);
+    color: var(--tk-neon-green);
     border-radius: var(--radius-m);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 20px rgba(118, 255, 51, 0.4);
+    box-shadow: 0 4px 18px rgba(118, 255, 51, 0.25), inset 0 0 8px rgba(118, 255, 51, 0.15);
     flex-shrink: 0;
   }
 
+  .logo-mark .material-symbols-rounded {
+    font-size: 26px;
+  }
+
   .title-group h1 {
-    font-size: 1.65rem;
+    font-size: 1.6rem;
     font-weight: 900;
     color: var(--tk-neon-green);
-    letter-spacing: -0.5px;
+    letter-spacing: -0.4px;
     text-transform: uppercase;
     line-height: 1.15;
   }
@@ -153,18 +156,17 @@
     background: rgba(118, 255, 51, 0.12);
     border: 1px solid var(--tk-neon-green);
     color: var(--tk-neon-green);
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: var(--radius-pill);
     font-size: 0.72rem;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     transition: opacity var(--m3-duration-short);
   }
 
-  .badge-pulse {
-    display: inline-block;
+  .badge-pulse-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -173,7 +175,7 @@
   }
 
   @keyframes dotPulse {
-    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    0%, 100% { opacity: 0.3; transform: scale(0.7); }
     50% { opacity: 1; transform: scale(1.3); }
   }
 
@@ -492,8 +494,88 @@
   }
 
   /* ==========================================================================
-     页面加载状态与空状态 (Loading & Empty State)
+     圆润骨架屏加载动效 (Material 3 Rounded Skeletons)
      ========================================================================== */
+  .skeleton-card {
+    background-color: var(--tk-surface);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-l);
+    padding: 14px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    background: rgba(191, 213, 255, 0.06);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(118, 255, 51, 0.08) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    animation: skeletonShimmer 1.6s infinite ease-in-out;
+  }
+
+  @keyframes skeletonShimmer {
+    100% { transform: translateX(100%); }
+  }
+
+  .skeleton-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .skeleton-title-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .skeleton-title {
+    width: 60%;
+    height: 18px;
+  }
+
+  .skeleton-tag {
+    width: 38px;
+    height: 16px;
+    border-radius: var(--radius-xs);
+  }
+
+  .skeleton-badge {
+    width: 80px;
+    height: 20px;
+  }
+
+  .skeleton-footer {
+    width: 45%;
+    height: 14px;
+  }
+
+  .skeleton-circle-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-pill);
+    flex-shrink: 0;
+  }
+
+  /* 提示状态容器 (Empty State) */
   .state-container {
     grid-column: 1 / -1;
     display: flex;
@@ -501,55 +583,19 @@
     align-items: center;
     justify-content: center;
     min-height: 360px;
-    gap: 16px;
+    gap: 14px;
     text-align: center;
     padding: 40px 20px;
   }
 
-  .loading-spinner-box {
-    position: relative;
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .loading-glow-ring {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 3px solid rgba(118, 255, 51, 0.15);
-    border-top-color: var(--tk-neon-green);
-    animation: spinTrack 0.85s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
-    box-shadow: 0 0 16px rgba(118, 255, 51, 0.3);
-  }
-
-  .loading-inner-core {
-    width: 20px;
-    height: 20px;
-    background-color: var(--tk-neon-green);
-    border-radius: 50%;
-    opacity: 0.8;
-    animation: corePulse 1.4s ease-in-out infinite alternate;
-    box-shadow: 0 0 12px var(--tk-neon-green);
-  }
-
-  @keyframes corePulse {
-    0% { transform: scale(0.65); opacity: 0.4; }
-    100% { transform: scale(1.1); opacity: 0.95; }
-  }
-
   .state-title {
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: #ffffff;
-    letter-spacing: -0.2px;
   }
 
   .state-desc {
-    font-size: 0.82rem;
+    font-size: 0.84rem;
     color: var(--tk-btn-ice);
     opacity: 0.75;
     max-width: 320px;
@@ -557,10 +603,9 @@
   }
 
   .empty-icon {
-    font-size: 48px;
+    font-size: 46px;
     color: var(--tk-btn-ice);
-    opacity: 0.4;
-    margin-bottom: 4px;
+    opacity: 0.45;
   }
 
   /* ==========================================================================
@@ -895,6 +940,7 @@
     fill: none;
     stroke: var(--tk-crystals);
     stroke-width: 2.5;
+    stroke-linecap: round;
     stroke-dasharray: 40 120;
     opacity: 0;
     transition: opacity var(--m3-duration-short) var(--m3-motion-standard);
@@ -1076,14 +1122,15 @@
 <div class="container">
   <header class="header-bar">
     <div class="title-group">
+      <!-- 优化后的均衡器声波图标 -->
       <div class="logo-mark">
-        <span class="material-symbols-rounded">volume_up</span>
+        <span class="material-symbols-rounded">graphic_eq</span>
       </div>
       <div>
         <h1 id="appTitle">3D坦克音效展示</h1>
         <div class="subtitle">
           <span class="auto-meta-badge" id="bundleVerBadge">资源集 ···</span>
-          <span class="auto-meta-badge" id="totalCountBadge"><span class="badge-pulse"></span> 正在加载...</span>
+          <span class="auto-meta-badge" id="totalCountBadge"><span class="badge-pulse-dot"></span> 正在准备音效...</span>
         </div>
       </div>
     </div>
@@ -1139,15 +1186,73 @@
     </div>
   </header>
 
-  <!-- 主内容区：预设炫酷科技加载动画 -->
+  <!-- 主内容区：预设 6 个全 Rounded 骨架屏卡片流光动画 -->
   <main class="sfx-grid" id="sfxGrid">
-    <div class="state-container" id="gridLoadingState">
-      <div class="loading-spinner-box">
-        <div class="loading-glow-ring"></div>
-        <div class="loading-inner-core"></div>
+    <div class="skeleton-card">
+      <div class="skeleton-left">
+        <div class="skeleton-title-bar">
+          <div class="skeleton-shimmer skeleton-title"></div>
+          <div class="skeleton-shimmer skeleton-tag"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-badge"></div>
+        <div class="skeleton-shimmer skeleton-footer"></div>
       </div>
-      <div class="state-title" id="loadingTextTitle">正在加载音效资产...</div>
-      <div class="state-desc" id="loadingTextDesc">正在连接资源服务器同步音效元数据与索引表</div>
+      <div class="skeleton-shimmer skeleton-circle-btn"></div>
+    </div>
+    <div class="skeleton-card">
+      <div class="skeleton-left">
+        <div class="skeleton-title-bar">
+          <div class="skeleton-shimmer skeleton-title" style="width: 50%;"></div>
+          <div class="skeleton-shimmer skeleton-tag"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-badge"></div>
+        <div class="skeleton-shimmer skeleton-footer"></div>
+      </div>
+      <div class="skeleton-shimmer skeleton-circle-btn"></div>
+    </div>
+    <div class="skeleton-card">
+      <div class="skeleton-left">
+        <div class="skeleton-title-bar">
+          <div class="skeleton-shimmer skeleton-title" style="width: 70%;"></div>
+          <div class="skeleton-shimmer skeleton-tag"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-badge"></div>
+        <div class="skeleton-shimmer skeleton-footer"></div>
+      </div>
+      <div class="skeleton-shimmer skeleton-circle-btn"></div>
+    </div>
+    <div class="skeleton-card">
+      <div class="skeleton-left">
+        <div class="skeleton-title-bar">
+          <div class="skeleton-shimmer skeleton-title" style="width: 55%;"></div>
+          <div class="skeleton-shimmer skeleton-tag"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-badge"></div>
+        <div class="skeleton-shimmer skeleton-footer"></div>
+      </div>
+      <div class="skeleton-shimmer skeleton-circle-btn"></div>
+    </div>
+    <div class="skeleton-card">
+      <div class="skeleton-left">
+        <div class="skeleton-title-bar">
+          <div class="skeleton-shimmer skeleton-title" style="width: 65%;"></div>
+          <div class="skeleton-shimmer skeleton-tag"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-badge"></div>
+        <div class="skeleton-shimmer skeleton-footer"></div>
+      </div>
+      <div class="skeleton-shimmer skeleton-circle-btn"></div>
+    </div>
+    <div class="skeleton-card">
+      <div class="skeleton-left">
+        <div class="skeleton-title-bar">
+          <div class="skeleton-shimmer skeleton-title" style="width: 45%;"></div>
+          <div class="skeleton-shimmer skeleton-tag"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-badge"></div>
+        <div class="skeleton-shimmer skeleton-footer"></div>
+      </div>
+      <div class="skeleton-shimmer skeleton-circle-btn"></div>
     </div>
   </main>
 </div>
@@ -1160,11 +1265,11 @@
       <span id="modalTitleText">需要加载音效数据</span>
     </div>
     <div class="modal-desc" id="modalDescText">
-      按时长排序需要向服务器请求解析音效流数据，是否确定继续加载？
+      按时长排序需要解析全部音效流，是否确定继续？
     </div>
     <div class="modal-actions">
       <button class="m3-btn m3-btn-cancel" id="btnModalCancel">取消</button>
-      <button class="m3-btn m3-btn-confirm" id="btnModalConfirm">确定加载</button>
+      <button class="m3-btn m3-btn-confirm" id="btnModalConfirm">确定</button>
     </div>
   </div>
 </div>
@@ -1200,9 +1305,7 @@
       title: '3D坦克音效展示',
       setPrefix: '资源集 v',
       sfxSuffix: ' 个音效',
-      loading: '正在加载...',
-      loadingTitle: '正在加载音效资产...',
-      loadingDesc: '正在连接资源服务器同步音效元数据与索引表',
+      loadingText: '正在准备音效...',
       noResults: '未找到匹配的音效',
       noResultsDesc: '尝试更换搜索关键词或重置筛选条件',
       searchPlaceholder: '搜索 ID、名称或日期...',
@@ -1217,10 +1320,10 @@
       legacyTooltip: '早期遗产',
       creationDateLabel: '创建日期:',
       updateDateLabel: '更新日期:',
-      modalTitle: '需要加载音效数据',
-      modalDesc: '按时长排序需要向服务器请求解析音效流数据，是否确定继续加载？',
+      modalTitle: '需要加载音效时长',
+      modalDesc: '按时长排序需要解析全部音效流，是否确定继续？',
       modalCancel: '取消',
-      modalConfirm: '确定加载',
+      modalConfirm: '确定',
       copied: '已复制音效直链',
       playSfx: '播放音效',
       stopSfx: '停止播放',
@@ -1231,9 +1334,7 @@
       title: 'Tanki Online SFX Showcase',
       setPrefix: 'Asset Set v',
       sfxSuffix: ' SFX',
-      loading: 'Loading...',
-      loadingTitle: 'Loading SFX Assets...',
-      loadingDesc: 'Connecting to server and fetching metadata catalog...',
+      loadingText: 'Getting sounds ready...',
       noResults: 'No Sound Effects Found',
       noResultsDesc: 'Try adjusting your search query or format filters',
       searchPlaceholder: 'Search ID, custom name or date...',
@@ -1248,8 +1349,8 @@
       legacyTooltip: 'Legacy',
       creationDateLabel: 'Creation Date:',
       updateDateLabel: 'Update Date:',
-      modalTitle: 'SFX Stream Required',
-      modalDesc: 'Sorting by duration requires requesting sound stream metadata from the server. Proceed?',
+      modalTitle: 'Duration Scan Required',
+      modalDesc: 'Sorting by duration requires loading audio streams. Proceed?',
       modalCancel: 'Cancel',
       modalConfirm: 'Confirm',
       copied: 'SFX link copied',
@@ -1478,12 +1579,6 @@
     elSortPrefixText.textContent = currentLang.sortPrefix;
     elCurrentSortText.textContent = currentLang.creationDate;
 
-    // 语言初始化时配置加载文本
-    const loadingTitleEl = document.getElementById('loadingTextTitle');
-    const loadingDescEl = document.getElementById('loadingTextDesc');
-    if (loadingTitleEl) loadingTitleEl.textContent = currentLang.loadingTitle;
-    if (loadingDescEl) loadingDescEl.textContent = currentLang.loadingDesc;
-
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');
       if (currentLang[k]) el.textContent = currentLang[k];
@@ -1535,7 +1630,7 @@
       elGrid.innerHTML = `
         <div class="state-container">
           <span class="material-symbols-rounded empty-icon" style="color: var(--tk-alert);">error</span>
-          <div class="state-title" style="color: var(--tk-alert);">数据加载失败</div>
+          <div class="state-title" style="color: var(--tk-alert);">加载失败</div>
           <div class="state-desc">${e.message}</div>
         </div>
       `;
@@ -2023,7 +2118,7 @@
     elModal.classList.remove('show');
     setSortKey('duration', currentLang.duration);
 
-    showToast('正在并发加载音效流时长...');
+    showToast('正在解析音效时长...');
     const concurrency = 8;
     let idx = 0;
 
