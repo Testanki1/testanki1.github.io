@@ -1,4 +1,5 @@
 // functions/api/sfx-names.js
+import { broadcastRename } from './sfx-events.js';
 
 // 1. 获取音效自定义名称
 export async function onRequestGet(context) {
@@ -23,7 +24,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// 2. 保存音效自定义名称
+// 2. 保存音效自定义名称并实时广播
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
@@ -41,6 +42,14 @@ export async function onRequestPost(context) {
     } else {
       await env.SFX_NAMES.delete(id);
     }
+
+    // 🚀 核心：成功修改后即刻触发广播
+    try {
+      broadcastRename(id, trimmedName);
+    } catch (e) {
+      console.warn('实时广播发送异常:', e);
+    }
+
     return new Response(JSON.stringify({ success: true, id, name: trimmedName }), {
       headers: { 'Content-Type': 'application/json' },
     });
