@@ -25,9 +25,10 @@
     --tk-bg-deep: #00111a;       /* 极深底色 */
     --tk-surface: #0a2536;       /* 卡片底色 */
     --tk-surface-hover: #0f344c; /* 卡片悬停色 */
+    --tk-surface-elevated: rgba(10, 37, 54, 0.85); /* 浮层毛玻璃 */
     --tk-btn-ice: #BFD5FF;       /* 冰蓝文字与按钮 Buttons */
     --tk-crystals: #00D4FF;      /* 水晶蓝 Crystals */
-    --tk-tankoins: #FFCC00;      /* 金币黄 Tankoins (早期遗产标识) */
+    --tk-tankoins: #FFCC00;      /* 金币黄 Tankoins */
     --tk-alert: #FF6666;         /* 警告红 Alert */
     --tk-border: rgba(191, 213, 255, 0.18);
     --tk-border-glow: rgba(118, 255, 51, 0.45);
@@ -41,11 +42,13 @@
 
     /* 弹簧物理动效曲线 */
     --m3-motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --m3-motion-spring-subtle: cubic-bezier(0.25, 1.2, 0.5, 1);
     --m3-motion-standard: cubic-bezier(0.2, 0, 0, 1);
     --m3-motion-enter: cubic-bezier(0.05, 0.7, 0.1, 1.0);
     --m3-motion-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
     --m3-duration-short: 180ms;
-    --m3-duration-medium: 300ms;
+    --m3-duration-medium: 280ms;
+    --m3-duration-long: 400ms;
   }
 
   *, *::before, *::after {
@@ -157,7 +160,7 @@
   }
 
   /* ==========================================================================
-     工具栏 (Toolbar)
+     工具栏 (Toolbar & Controls)
      ========================================================================== */
   .toolbar {
     display: flex;
@@ -233,16 +236,6 @@
     transition: transform var(--m3-duration-short) var(--m3-motion-spring), color 0.15s;
   }
 
-  .search-clear-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 48px;
-    min-height: 48px;
-  }
-
   .search-clear-btn.visible {
     display: flex;
     animation: popIn var(--m3-duration-short) var(--m3-motion-spring);
@@ -290,21 +283,13 @@
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
-    transition: background-color var(--m3-duration-short) var(--m3-motion-standard), color var(--m3-duration-short) var(--m3-motion-standard);
+    transition: background-color var(--m3-duration-short) var(--m3-motion-standard), 
+                color var(--m3-duration-short) var(--m3-motion-standard),
+                transform var(--m3-duration-short) var(--m3-motion-spring);
   }
 
   .m3-segmented-btn:not(:last-child) {
     border-right: 1.5px solid var(--tk-border);
-  }
-
-  .m3-segmented-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%;
-    min-height: 48px;
   }
 
   .m3-segmented-btn:hover {
@@ -312,11 +297,18 @@
     color: #ffffff;
   }
 
+  .m3-segmented-btn:active {
+    transform: scale(0.94);
+  }
+
   .m3-segmented-btn.active {
     background-color: var(--tk-neon-green);
     color: var(--tk-bg-dark);
   }
 
+  /* ==========================================================================
+     下拉选择器 (Dropdown & Checkmark Physics)
+     ========================================================================== */
   .m3-dropdown-wrapper {
     position: relative;
     flex: 1;
@@ -329,7 +321,7 @@
     background-color: var(--tk-surface);
     border: 1.5px solid var(--tk-border);
     border-radius: var(--radius-pill);
-    padding: 0 12px;
+    padding: 0 14px;
     color: var(--tk-btn-ice);
     font-size: 0.82rem;
     font-weight: 700;
@@ -337,10 +329,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
+    gap: 6px;
     user-select: none;
     white-space: nowrap;
-    transition: border-color var(--m3-duration-short) var(--m3-motion-standard), transform var(--m3-duration-short) var(--m3-motion-spring);
+    transition: border-color var(--m3-duration-short) var(--m3-motion-standard), 
+                box-shadow var(--m3-duration-short) var(--m3-motion-standard),
+                transform var(--m3-duration-short) var(--m3-motion-spring);
   }
 
   .m3-dropdown-btn:hover {
@@ -352,49 +346,73 @@
     transform: scale(0.97);
   }
 
+  .m3-dropdown-wrapper.open .m3-dropdown-btn {
+    border-color: var(--tk-neon-green);
+    box-shadow: 0 0 12px rgba(118, 255, 51, 0.25);
+  }
+
   .m3-dropdown-btn .selected-text {
     color: var(--tk-neon-green);
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
+  /* 下拉箭头 180° 旋转弹簧动效 */
+  .m3-dropdown-btn .dropdown-arrow {
+    font-size: 20px;
+    transition: transform var(--m3-duration-medium) var(--m3-motion-spring);
+    color: var(--tk-btn-ice);
+  }
+
+  .m3-dropdown-wrapper.open .dropdown-arrow {
+    transform: rotate(180deg);
+    color: var(--tk-neon-green);
+  }
+
+  /* 下拉菜单面板 (毛玻璃 & 弹簧展开) */
   .m3-dropdown-menu {
     position: absolute;
-    top: calc(100% + 6px);
+    top: calc(100% + 8px);
     right: 0;
     width: 100%;
-    min-width: 150px;
-    background-color: var(--tk-bg-deep);
-    border: 1.5px solid var(--tk-border);
+    min-width: 165px;
+    background-color: var(--tk-surface-elevated);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1.5px solid var(--tk-neon-green);
     border-radius: var(--radius-m);
     padding: 6px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 16px rgba(118, 255, 51, 0.15);
     z-index: 200;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-8px) scale(0.95);
-    transition: opacity var(--m3-duration-short) var(--m3-motion-enter), transform var(--m3-duration-short) var(--m3-motion-spring), visibility var(--m3-duration-short);
+    transform: translateY(-8px) scale(0.92);
     transform-origin: top center;
+    transition: opacity var(--m3-duration-short) var(--m3-motion-enter), 
+                transform var(--m3-duration-medium) var(--m3-motion-spring), 
+                visibility var(--m3-duration-short);
+    pointer-events: none;
   }
 
   .m3-dropdown-wrapper.open .m3-dropdown-menu {
     opacity: 1;
     visibility: visible;
     transform: translateY(0) scale(1);
-    border-color: var(--tk-neon-green);
+    pointer-events: auto;
   }
 
   .m3-dropdown-item {
-    padding: 9px 10px;
+    position: relative;
+    padding: 10px 12px;
     border-radius: var(--radius-s);
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--tk-btn-ice);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: background-color 0.15s, color 0.15s;
+    transition: background-color 0.15s, color 0.15s, transform var(--m3-duration-short) var(--m3-motion-spring);
   }
 
   .m3-dropdown-item:hover {
@@ -402,9 +420,29 @@
     color: #ffffff;
   }
 
+  .m3-dropdown-item:active {
+    transform: scale(0.96);
+  }
+
   .m3-dropdown-item.active {
-    background-color: rgba(118, 255, 51, 0.15);
+    background-color: rgba(118, 255, 51, 0.16);
     color: var(--tk-neon-green);
+    font-weight: 700;
+  }
+
+  /* 核心修复与动效：默认隐藏 check 图标，仅在 active 时弹簧放大浮现 */
+  .m3-dropdown-item .check-icon {
+    font-size: 17px;
+    opacity: 0;
+    transform: scale(0.3) rotate(-15deg);
+    transition: opacity var(--m3-duration-short) var(--m3-motion-standard), 
+                transform var(--m3-duration-medium) var(--m3-motion-spring);
+    color: var(--tk-neon-green);
+  }
+
+  .m3-dropdown-item.active .check-icon {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
   }
 
   .order-icon-btn {
@@ -424,16 +462,6 @@
     transition: border-color var(--m3-duration-short) var(--m3-motion-standard), 
                 transform var(--m3-duration-short) var(--m3-motion-spring), 
                 background-color 0.15s;
-  }
-
-  .order-icon-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 48px;
-    min-height: 48px;
   }
 
   .order-icon-btn:hover {
@@ -653,16 +681,6 @@
     transition: background-color 0.15s, color 0.15s, transform var(--m3-duration-short) var(--m3-motion-spring);
   }
 
-  .icon-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 48px;
-    min-height: 48px;
-  }
-
   .icon-btn:hover { background-color: var(--tk-surface-hover); color: var(--tk-neon-green); }
   .icon-btn:active { transform: scale(0.88); }
   .icon-btn .material-symbols-rounded { font-size: 17px; }
@@ -697,16 +715,6 @@
     transition: opacity var(--m3-duration-short) var(--m3-motion-enter), 
                 transform var(--m3-duration-short) var(--m3-motion-spring), 
                 background-color 0.15s;
-  }
-
-  .btn-stop-sfx::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 48px;
-    min-height: 48px;
   }
 
   .sfx-card.is-playing .btn-stop-sfx {
@@ -786,16 +794,6 @@
     user-select: none;
     z-index: 2;
     transition: transform var(--m3-duration-short) var(--m3-motion-spring), filter 0.15s, opacity var(--m3-duration-short);
-  }
-
-  .sfx-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 48px;
-    min-height: 48px;
   }
 
   .sfx-btn:hover { filter: brightness(1.1); transform: scale(1.06); }
@@ -896,16 +894,6 @@
     transition: transform var(--m3-duration-short) var(--m3-motion-spring), background-color 0.15s;
   }
 
-  .m3-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%;
-    min-height: 48px;
-  }
-
   .m3-btn-cancel {
     background: transparent;
     color: var(--tk-btn-ice);
@@ -991,24 +979,24 @@
           <div class="m3-dropdown-btn" id="dropdownBtn">
             <span id="sortPrefixText">排序:</span>
             <span class="selected-text" id="currentSortText">创建日期</span>
-            <span class="material-symbols-rounded" style="font-size: 18px;">expand_more</span>
+            <span class="material-symbols-rounded dropdown-arrow">expand_more</span>
           </div>
           <div class="m3-dropdown-menu" id="dropdownMenu">
             <div class="m3-dropdown-item active" data-value="creationDate">
               <span class="item-label" data-i18n="creationDate">创建日期</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
+              <span class="material-symbols-rounded check-icon">check</span>
             </div>
             <div class="m3-dropdown-item" data-value="updateDate">
               <span class="item-label" data-i18n="updateDate">更新日期</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
+              <span class="material-symbols-rounded check-icon">check</span>
             </div>
             <div class="m3-dropdown-item" data-value="duration">
               <span class="item-label" data-i18n="duration">时长</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
+              <span class="material-symbols-rounded check-icon">check</span>
             </div>
             <div class="m3-dropdown-item" data-value="fileSize">
               <span class="item-label" data-i18n="fileSize">文件大小</span>
-              <span class="material-symbols-rounded check-icon" style="font-size: 16px;">check</span>
+              <span class="material-symbols-rounded check-icon">check</span>
             </div>
           </div>
         </div>
@@ -1061,7 +1049,6 @@
 <div class="toast-box" id="toastBox">提示信息</div>
 
 <script>
-  // 留空即可：直接走 Cloudflare Pages 内置的 /api/names 同源相对路径
   const WORKER_API_BASE = '';
 
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
@@ -1211,7 +1198,6 @@
   const elBtnRenameCancel = document.getElementById('btnRenameCancel');
   const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
 
-  // 1. 读取名称
   async function loadCustomNames() {
     try {
       const url = WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-names` : '/api/sfx-names';
@@ -1239,10 +1225,8 @@
       if (currentLang[k]) el.textContent = currentLang[k];
     });
 
-    // 1. 读取自定义名称
     await loadCustomNames();
 
-    // 2. 加载音效数据
     try {
       const resp = await fetch('assets.json');
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -1584,7 +1568,6 @@
               ${formatBytes(item.size)}${item.duration ? ` • ${formatSeconds(item.duration)}` : ''}
             </div>
             <div class="action-buttons">
-              <!-- 重命名按钮 -->
               <button class="icon-btn btn-rename" data-id="${item.id}" title="自定义名称">
                 <span class="material-symbols-rounded">edit</span>
               </button>
@@ -1658,7 +1641,6 @@
     });
   }
 
-  // 保存自定义名称
   elBtnRenameConfirm.addEventListener('click', async () => {
     if (!activeRenameItemId) return;
     const newName = elRenameInput.value.trim();
@@ -1740,7 +1722,6 @@
     document.querySelectorAll('.m3-dropdown-item').forEach(it => {
       const isMatch = it.getAttribute('data-value') === key;
       it.classList.toggle('active', isMatch);
-      it.querySelector('.check-icon').style.opacity = isMatch ? '1' : '0';
     });
     elDropdownWrapper.classList.remove('open');
     applySortAndRender();
