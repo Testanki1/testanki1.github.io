@@ -357,7 +357,6 @@
     text-overflow: ellipsis;
   }
 
-  /* 下拉箭头 180° 旋转弹簧动效 */
   .m3-dropdown-btn .dropdown-arrow {
     font-size: 20px;
     transition: transform var(--m3-duration-medium) var(--m3-motion-spring);
@@ -369,7 +368,6 @@
     color: var(--tk-neon-green);
   }
 
-  /* 下拉菜单面板 (毛玻璃 & 弹簧展开) */
   .m3-dropdown-menu {
     position: absolute;
     top: calc(100% + 8px);
@@ -430,7 +428,6 @@
     font-weight: 700;
   }
 
-  /* 核心修复与动效：默认隐藏 check 图标，仅在 active 时弹簧放大浮现 */
   .m3-dropdown-item .check-icon {
     font-size: 17px;
     opacity: 0;
@@ -479,7 +476,7 @@
   }
 
   /* ==========================================================================
-     音效卡片网格
+     音效卡片网格与标题自适应样式
      ========================================================================== */
   .sfx-grid {
     display: grid;
@@ -520,11 +517,14 @@
     flex: 1;
   }
 
+  /* 核心：卡片标题行自适应布局 */
   .id-header-line {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     min-width: 0;
+    width: 100%;
   }
 
   .id-title {
@@ -536,18 +536,19 @@
     align-items: center;
     gap: 4px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     min-width: 0;
+    flex: 1;
+    overflow: hidden;
   }
 
+  /* 自适应名称文本：移除了固定的 max-width: 140px */
   .custom-name-text {
     color: #ffffff;
     font-weight: 800;
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+    display: inline-block;
+    transform-origin: left center;
+    transition: font-size 0.15s ease-out;
   }
 
   .id-prefix {
@@ -1198,6 +1199,103 @@
   const elBtnRenameCancel = document.getElementById('btnRenameCancel');
   const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
 
+  /* ==========================================================================
+     核心算法：标题字号根据容器尺寸自适应缩放（防止换行或被截断）
+     ========================================================================== */
+  function autoFitCardTitles() {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.sfx-card').forEach(card => {
+        const headerLine = card.querySelector('.id-header-line');
+        if (!headerLine) return;
+
+        const customNameEl = headerLine.querySelector('.custom-name-text');
+        const idTitleEl = headerLine.querySelector('.id-title');
+        const targetText = customNameEl || idTitleEl;
+        if (!targetText) return;
+
+        // 1. 先重置字体大小以便精确获取实际文本宽度
+        targetText.style.fontSize = '';
+
+        const formatTag = headerLine.querySelector('.format-tag');
+        const tagWidth = formatTag ? (formatTag.offsetWidth + 10) : 0;
+        // 计算当前设备、当前卡片 headerLine 可用的最大像素宽度
+        const maxAvailableWidth = headerLine.clientWidth - tagWidth;
+
+        if (maxAvailableWidth <= 0) return;
+
+        const currentTextWidth = targetText.scrollWidth;
+
+        // 2. 如果文本超出可用宽度，按比例计算最佳字号
+        if (currentTextWidth > maxAvailableWidth) {
+          const computedStyle = window.getComputedStyle(targetText);
+          const currentFontSize = parseFloat(computedStyle.fontSize);
+          const scaleRatio = maxAvailableWidth / currentTextWidth;
+          
+          // 允许缩小的最低极限字号（如 9.5px）
+          const minFontSize = 9.5; 
+          const idealFontSize = Math.max(minFontSize, currentFontSize * scaleRatio * 0.96);
+          
+          targetText.style.fontSize = `${idealFontSize.toFixed(1)}px`;
+        }
+      });
+    });
+  }
+
+  // 监听屏幕窗口缩放，自动适配各种设备（手机横竖屏、电脑等）
+  window.addEventListener('resize', autoFitCardTitles);
+
+  /* ==========================================================================
+     实时推送：局部无感更新卡片名称
+     ========================================================================== */
+  function updateSingleCardTitle(id, newName) {
+    if (newName) {
+      customNames[id] = newName;
+    } else {
+      delete customNames[id];
+    }
+
+    const card = document.getElementById(`card-${id}`);
+    if (!card) return;
+
+    const titleWrapper = card.querySelector('.id-title');
+    if (titleWrapper) {
+      titleWrapper.title = newName ? `${newName} (ID: ${id})` : id;
+      titleWrapper.innerHTML = newName 
+        ? `<span class="custom-name-text">${newName}</span>` 
+        : `<span class="id-prefix">ID:</span><span>${id}</span>`;
+    }
+
+    // 针对被更新的卡片重新计算一次字号缩放
+    autoFitCardTitles();
+  }
+
+  function initRealtimeEvents() {
+    const eventsUrl = WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-events` : '/api/sfx-events';
+    let eventSource = null;
+
+    try {
+      eventSource = new EventSource(eventsUrl);
+
+      eventSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'rename') {
+            updateSingleCardTitle(data.id, data.name);
+          }
+        } catch (err) {
+          console.error('解析推送消息失败:', err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        // 断线后浏览器 EventSource 会自动指数回退重连
+        console.warn('实时推送通道连接波动，等待自动恢复...');
+      };
+    } catch (e) {
+      console.warn('浏览器不支持或初始化 SSE 失败:', e);
+    }
+  }
+
   async function loadCustomNames() {
     try {
       const url = WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-names` : '/api/sfx-names';
@@ -1263,6 +1361,7 @@
 
       applySortAndRender();
       preloadAllMetaInfo();
+      initRealtimeEvents(); // 建立实时推送监听通道
     } catch (e) {
       console.error('加载 assets.json 失败:', e);
       showToast('加载音效数据失败: ' + e.message);
@@ -1639,6 +1738,9 @@
         if (!isActive) dateBadge.classList.add('tooltip-active');
       });
     });
+
+    // 渲染完成后计算全网格自适应字号
+    autoFitCardTitles();
   }
 
   elBtnRenameConfirm.addEventListener('click', async () => {
@@ -1654,15 +1756,11 @@
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      if (newName) {
-        customNames[activeRenameItemId] = newName;
-      } else {
-        delete customNames[activeRenameItemId];
-      }
+      // 本地优先秒级更新当前卡片
+      updateSingleCardTitle(activeRenameItemId, newName);
 
       showToast(currentLang.saveSuccess);
       elRenameModal.classList.remove('show');
-      applySortAndRender();
     } catch (err) {
       showToast(currentLang.saveFail + err.message);
     }
