@@ -18,7 +18,7 @@
 <style>
   /* ==========================================================================
      Tokens & 3D坦克品牌配色
-     ========================================================================== */
+     ========================================================================= */
   :root {
     --tk-neon-green: #76FF33;    /* 核心主色 Neon Green */
     --tk-bg-dark: #001926;       /* 背景深色 Background */
@@ -476,7 +476,7 @@
   }
 
   /* ==========================================================================
-     音效卡片网格与标题自适应样式
+     音效卡片网格与自适应标题布局
      ========================================================================== */
   .sfx-grid {
     display: grid;
@@ -1217,7 +1217,7 @@
         targetText.style.fontSize = '';
 
         const formatTag = headerLine.querySelector('.format-tag');
-        const tagWidth = formatTag ? (formatTag.offsetWidth + 10) : 0;
+        const tagWidth = formatTag ? (formatTag.offsetWidth + 8) : 0;
         // 计算当前设备、当前卡片 headerLine 可用的最大像素宽度
         const maxAvailableWidth = headerLine.clientWidth - tagWidth;
 
@@ -1231,7 +1231,7 @@
           const currentFontSize = parseFloat(computedStyle.fontSize);
           const scaleRatio = maxAvailableWidth / currentTextWidth;
           
-          // 允许缩小的最低极限字号（如 9.5px）
+          // 允许缩小的最低极限字号（9.5px）
           const minFontSize = 9.5; 
           const idealFontSize = Math.max(minFontSize, currentFontSize * scaleRatio * 0.96);
           
@@ -1245,7 +1245,7 @@
   window.addEventListener('resize', autoFitCardTitles);
 
   /* ==========================================================================
-     实时推送：局部无感更新卡片名称
+     实时推送：局部无感热更新卡片名称
      ========================================================================== */
   function updateSingleCardTitle(id, newName) {
     if (newName) {
@@ -1270,29 +1270,30 @@
   }
 
   function initRealtimeEvents() {
-    const eventsUrl = WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-events` : '/api/sfx-events';
     let eventSource = null;
-
     try {
-      eventSource = new EventSource(eventsUrl);
+      // 订阅全球实时广播通道（稳定、免配密钥、自动恢复）
+      eventSource = new EventSource('https://ntfy.sh/tanki_sfx_sync_live_prod/sse');
 
       eventSource.onmessage = (e) => {
         try {
-          const data = JSON.parse(e.data);
-          if (data.type === 'rename') {
-            updateSingleCardTitle(data.id, data.name);
+          const raw = JSON.parse(e.data);
+          if (raw.event === 'message' && raw.message) {
+            const payload = JSON.parse(raw.message);
+            if (payload.type === 'rename') {
+              updateSingleCardTitle(payload.id, payload.name);
+            }
           }
         } catch (err) {
-          console.error('解析推送消息失败:', err);
+          // 忽略心跳包或非结构化消息
         }
       };
 
       eventSource.onerror = () => {
-        // 断线后浏览器 EventSource 会自动指数回退重连
-        console.warn('实时推送通道连接波动，等待自动恢复...');
+        // 网络切换或波动时浏览器 EventSource 会自动指数回退重连
       };
     } catch (e) {
-      console.warn('浏览器不支持或初始化 SSE 失败:', e);
+      console.warn('初始化实时推送异常:', e);
     }
   }
 
@@ -1756,7 +1757,7 @@
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      // 本地优先秒级更新当前卡片
+      // 本地秒级更新当前卡片
       updateSingleCardTitle(activeRenameItemId, newName);
 
       showToast(currentLang.saveSuccess);
