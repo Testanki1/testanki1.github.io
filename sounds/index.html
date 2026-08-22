@@ -169,7 +169,6 @@
     }
   }
 
-  /* 行 1：全宽搜索栏 */
   .toolbar-search-row {
     width: 100%;
   }
@@ -248,7 +247,6 @@
   .search-clear-btn:hover { color: #ffffff; }
   .search-clear-btn:active { transform: scale(0.85); }
 
-  /* 行 2：控制栏组 (精简 MP3/WAV 分段 + 宽裕下拉 + 纯符号升降序) */
   .toolbar-controls-row {
     display: flex;
     align-items: center;
@@ -262,7 +260,6 @@
     }
   }
 
-  /* 精简 MP3 / WAV 分段按钮 (支持再次点击反选恢复全部) */
   .m3-segmented-group {
     display: inline-flex;
     align-items: center;
@@ -316,7 +313,6 @@
     color: var(--tk-bg-dark);
   }
 
-  /* 排序下拉菜单 (获得充裕空间，永不截断) */
   .m3-dropdown-wrapper {
     position: relative;
     flex: 1;
@@ -407,7 +403,6 @@
     color: var(--tk-neon-green);
   }
 
-  /* 纯符号升降序独立按钮 */
   .order-icon-btn {
     position: relative;
     width: 42px;
@@ -497,6 +492,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
   }
 
   .id-title {
@@ -506,15 +502,25 @@
     letter-spacing: -0.3px;
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .custom-name-text {
+    color: #ffffff;
+    font-weight: 800;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .id-prefix {
     color: var(--tk-neon-green);
-    font-size: 0.85em;
+    font-size: 0.8em;
   }
 
   .format-tag {
@@ -657,9 +663,6 @@
   .icon-btn:active { transform: scale(0.88); }
   .icon-btn .material-symbols-rounded { font-size: 17px; }
 
-  /* ==========================================================================
-     右侧专属控制区 (绝对定位停止按钮 + 48px 触控)
-     ========================================================================== */
   .card-controls-right {
     position: relative;
     display: flex;
@@ -804,9 +807,7 @@
   .sfx-btn .material-symbols-rounded { font-size: 20px; pointer-events: none; }
   .play-dot { fill: var(--tk-neon-green); filter: drop-shadow(0 0 4px var(--tk-neon-green)); }
 
-  /* ==========================================================================
-     模态弹窗 & Toast
-     ========================================================================== */
+  /* 模态弹窗 & Toast */
   .modal-overlay {
     position: fixed;
     top: 0;
@@ -831,7 +832,7 @@
     border: 2px solid var(--tk-neon-green);
     border-radius: var(--radius-l);
     padding: 22px 24px;
-    max-width: 400px;
+    max-width: 420px;
     width: calc(100% - 32px);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(118, 255, 51, 0.2);
     transform: scale(0.92);
@@ -855,6 +856,23 @@
     line-height: 1.55;
     color: var(--tk-btn-ice);
     margin-bottom: 18px;
+  }
+
+  .modal-input {
+    width: 100%;
+    height: 40px;
+    background-color: var(--tk-bg-deep);
+    border: 1.5px solid var(--tk-border);
+    border-radius: var(--radius-pill);
+    padding: 0 16px;
+    color: #ffffff;
+    font-size: 0.88rem;
+    outline: none;
+    margin-bottom: 18px;
+    transition: border-color 0.2s;
+  }
+  .modal-input:focus {
+    border-color: var(--tk-neon-green);
   }
 
   .modal-actions {
@@ -933,7 +951,6 @@
 <body>
 
 <div class="container">
-  <!-- 顶部标题栏 -->
   <header class="header-bar">
     <div class="title-group">
       <div class="logo-mark">
@@ -950,20 +967,17 @@
 
     <!-- 工具栏 -->
     <div class="toolbar">
-      <!-- 第 1 行：全宽搜索栏 (不挤压，支持一键清空) -->
       <div class="toolbar-search-row">
         <div class="search-wrapper">
           <span class="material-symbols-rounded leading-icon">search</span>
-          <input type="text" id="searchInput" class="search-input" placeholder="搜索 ID 或日期...">
+          <input type="text" id="searchInput" class="search-input" placeholder="搜索 ID、自定义名称或日期...">
           <button type="button" id="searchClearBtn" class="search-clear-btn" aria-label="清空搜索">
             <span class="material-symbols-rounded" style="font-size: 16px;">close</span>
           </button>
         </div>
       </div>
 
-      <!-- 第 2 行：精简 MP3/WAV 分段 + 排序下拉 + 纯符号升降序按钮 -->
       <div class="toolbar-controls-row">
-        <!-- 仅保留 MP3 与 WAV，支持再次点击反选恢复全部 -->
         <div class="m3-segmented-group" id="filterChipsGroup">
           <button class="m3-segmented-btn" data-format="mp3">MP3</button>
           <button class="m3-segmented-btn" data-format="wav">WAV</button>
@@ -995,7 +1009,6 @@
           </div>
         </div>
 
-        <!-- 纯符号升降序独立切换按钮 -->
         <button class="order-icon-btn" id="btnToggleOrder" title="切换升降序" aria-label="切换升降序">
           <span class="material-symbols-rounded" id="orderIcon">arrow_downward</span>
         </button>
@@ -1003,13 +1016,10 @@
     </div>
   </header>
 
-  <!-- 音效展示网格 -->
-  <main class="sfx-grid" id="sfxGrid">
-    <!-- 动态渲染 -->
-  </main>
+  <main class="sfx-grid" id="sfxGrid"></main>
 </div>
 
-<!-- 确认加载模态窗口 -->
+<!-- 排序时长模态窗口 -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-card">
     <div class="modal-title">
@@ -1026,11 +1036,30 @@
   </div>
 </div>
 
-<!-- 提示气泡 -->
+<!-- 自定义重命名弹窗 -->
+<div class="modal-overlay" id="renameModal">
+  <div class="modal-card">
+    <div class="modal-title">
+      <span class="material-symbols-rounded">edit_note</span>
+      <span>自定义音效名称</span>
+    </div>
+    <div class="modal-desc" id="renameDesc">
+      为该音效设置一个通俗易懂的名称，将被永久同步并展示给所有人：
+    </div>
+    <input type="text" class="modal-input" id="renameInput" placeholder="输入名称（留空清空）..." maxlength="40">
+    <div class="modal-actions">
+      <button class="m3-btn m3-btn-cancel" id="btnRenameCancel">取消</button>
+      <button class="m3-btn m3-btn-confirm" id="btnRenameConfirm">保存并同步</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-box" id="toastBox">提示信息</div>
 
 <script>
-  // 1. 语言与中英文分离策略
+  // ========= 配置 Cloudflare Worker API 地址 =========
+  const WORKER_API_BASE = 'https://你的Worker域名.workers.dev'; // <-- 替换为你部署的 Worker 域名
+
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
   const serverDomain = isZh ? 'res.3dtank.com' : 's.eu.tankionline.com';
 
@@ -1039,7 +1068,7 @@
       title: '3D坦克音效展示',
       setPrefix: '资源集 v',
       sfxSuffix: ' 个音效',
-      searchPlaceholder: '搜索 ID 或日期...',
+      searchPlaceholder: '搜索 ID、名称或日期...',
       sortPrefix: '排序:',
       creationDate: '创建日期',
       updateDate: '更新日期',
@@ -1057,13 +1086,15 @@
       modalConfirm: '确定加载',
       copied: '已复制音效直链',
       playSfx: '播放音效',
-      stopSfx: '停止播放'
+      stopSfx: '停止播放',
+      saveSuccess: '名称已同步至服务器',
+      saveFail: '保存失败: '
     },
     en: {
       title: 'Tanki Online SFX Showcase',
       setPrefix: 'Asset Set v',
       sfxSuffix: ' SFX',
-      searchPlaceholder: 'Search ID or date...',
+      searchPlaceholder: 'Search ID, custom name or date...',
       sortPrefix: 'Sort:',
       creationDate: 'Creation Date',
       updateDate: 'Update Date',
@@ -1081,13 +1112,14 @@
       modalConfirm: 'Confirm',
       copied: 'SFX link copied',
       playSfx: 'Play SFX',
-      stopSfx: 'Stop'
+      stopSfx: 'Stop',
+      saveSuccess: 'Name synchronized to server',
+      saveFail: 'Failed to save: '
     }
   };
 
   const currentLang = isZh ? i18n.zh : i18n.en;
 
-  // 2. 5 级八进制路径生成 (ID + Version -> Octal Path)
   function getHighInt(longValBigInt) {
     return Number(longValBigInt >> 32n);
   }
@@ -1109,7 +1141,6 @@
     ].join("/");
   }
 
-  // 3. 辅助格式化
   function formatDateOnly(ts) {
     const d = new Date(Number(ts));
     if (isNaN(d.getTime())) return '未知';
@@ -1139,18 +1170,18 @@
     return sec < 10 ? `${sec.toFixed(1)}s` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
   }
 
-  // 4. 数据与状态
   let assetSetVersion = 7;
   let items = [];
+  let customNames = {}; // 保存远程拉取的自定义名字 { [id]: '炮塔射击' }
   let currentSortKey = 'creationDate';
-  let currentFormatFilter = 'all'; // 'all' | 'mp3' | 'wav'
+  let currentFormatFilter = 'all';
   let isDescending = true;
   let searchQuery = '';
+  let activeRenameItemId = null;
 
   const activePlayInstances = new Map();
   let isAnimationFrameActive = false;
 
-  // DOM 节点
   const elAppTitle = document.getElementById('appTitle');
   const elBundleBadge = document.getElementById('bundleVerBadge');
   const elTotalBadge = document.getElementById('totalCountBadge');
@@ -1171,7 +1202,24 @@
   const elBtnModalCancel = document.getElementById('btnModalCancel');
   const elBtnModalConfirm = document.getElementById('btnModalConfirm');
 
-  // 5. 初始化加载
+  const elRenameModal = document.getElementById('renameModal');
+  const elRenameInput = document.getElementById('renameInput');
+  const elBtnRenameCancel = document.getElementById('btnRenameCancel');
+  const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
+
+  // 拉取 Cloudflare KV 中的所有自定义名称
+  async function loadCustomNames() {
+    if (!WORKER_API_BASE.startsWith('http')) return;
+    try {
+      const resp = await fetch(`${WORKER_API_BASE}/api/names`);
+      if (resp.ok) {
+        customNames = await resp.json();
+      }
+    } catch (e) {
+      console.warn('获取自定义名称失败:', e);
+    }
+  }
+
   async function initApp() {
     elAppTitle.textContent = currentLang.title;
     elSearchInput.placeholder = currentLang.searchPlaceholder;
@@ -1182,6 +1230,8 @@
       const k = el.getAttribute('data-i18n');
       if (currentLang[k]) el.textContent = currentLang[k];
     });
+
+    await loadCustomNames();
 
     const resp = await fetch('assets.json');
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -1220,7 +1270,6 @@
     preloadAllMetaInfo();
   }
 
-  // 6. 异步读取 meta.info
   async function ensureMetaLoaded(item) {
     if (item.metaLoaded) return;
     const metaUrl = `https://${serverDomain}/${item.path}/meta.info`;
@@ -1280,7 +1329,6 @@
     });
   }
 
-  // 7. 环形轨道粒子动画
   function startOrbitalLoop() {
     if (isAnimationFrameActive) return;
     isAnimationFrameActive = true;
@@ -1325,7 +1373,6 @@
     requestAnimationFrame(frame);
   }
 
-  // 8. 停止播放并清除进度
   function stopAndClearSfx(item) {
     const instances = activePlayInstances.get(item.id);
     if (instances) {
@@ -1352,7 +1399,6 @@
     }
   }
 
-  // 9. 触发播放
   async function triggerSfx(item, wrapperEl, cardEl) {
     if (item.isBuffering) return;
 
@@ -1449,7 +1495,6 @@
     }
   }
 
-  // 10. 格式筛选、排序与渲染
   function applySortAndRender() {
     const query = searchQuery.trim().toLowerCase();
     let list = items.filter(it => {
@@ -1459,7 +1504,8 @@
         }
       }
       if (!query) return true;
-      return it.id.includes(query) || it.creationDateStr.includes(query) || it.updateDateTimeStr.includes(query);
+      const alias = (customNames[it.id] || '').toLowerCase();
+      return it.id.includes(query) || alias.includes(query) || it.creationDateStr.includes(query) || it.updateDateTimeStr.includes(query);
     });
 
     list.sort((a, b) => {
@@ -1484,18 +1530,18 @@
   }
 
   function renderGrid(list) {
-    elGrid.innerHTML = list.map(item => `
+    elGrid.innerHTML = list.map(item => {
+      const customName = customNames[item.id] || '';
+      return `
       <div class="sfx-card ${activePlayInstances.get(item.id)?.size ? 'is-playing' : ''}" id="card-${item.id}">
         <div class="card-left">
           <div class="id-header-line">
-            <div class="id-title" title="${item.id}">
-              <span class="id-prefix">ID:</span>
-              <span>${item.id}</span>
+            <div class="id-title" title="${customName ? customName + ' (ID: ' + item.id + ')' : item.id}">
+              ${customName ? `<span class="custom-name-text">${customName}</span>` : `<span class="id-prefix">ID:</span><span>${item.id}</span>`}
             </div>
             <span class="format-tag">${item.format}</span>
           </div>
 
-          <!-- 日期 Badge（支持移动端轻触展开 Tooltip） -->
           <div class="date-badge ${item.isLegacy ? 'legacy' : 'timestamp'}" data-badge-id="${item.id}">
             <span class="material-symbols-rounded" style="font-size:13px;">
               ${item.isLegacy ? 'history_edu' : 'calendar_today'}
@@ -1503,6 +1549,10 @@
             <span>${item.creationDateStr}</span>
 
             <div class="badge-tooltip">
+              <div class="tooltip-row">
+                <span class="tooltip-label">ID:</span>
+                <span class="tooltip-val">${item.id}</span>
+              </div>
               <div class="tooltip-row">
                 <span class="tooltip-label">${currentLang.creationDateLabel}</span>
                 <span class="tooltip-val">${item.isLegacy ? currentLang.legacyTooltip : formatFullDateTime(item.creationTime)}</span>
@@ -1514,12 +1564,15 @@
             </div>
           </div>
 
-          <!-- 底部文件大小与操作 -->
           <div class="card-footer-line">
             <div class="meta-stats">
               ${formatBytes(item.size)}${item.duration ? ` • ${formatSeconds(item.duration)}` : ''}
             </div>
             <div class="action-buttons">
+              <!-- 重命名按钮 -->
+              <button class="icon-btn btn-rename" data-id="${item.id}" title="自定义名称">
+                <span class="material-symbols-rounded">edit</span>
+              </button>
               <button class="icon-btn btn-copy-url" data-id="${item.id}" title="复制直链">
                 <span class="material-symbols-rounded">link</span>
               </button>
@@ -1530,7 +1583,6 @@
           </div>
         </div>
 
-        <!-- 右侧专属控制区 (绝对定位停止按钮 + 48px 无障碍触控) -->
         <div class="card-controls-right">
           <button class="btn-stop-sfx" data-id="${item.id}" title="${currentLang.stopSfx}">
             <span class="material-symbols-rounded">stop</span>
@@ -1548,28 +1600,34 @@
           </div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
 
-    // 事件绑定
     list.forEach(item => {
       const cardEl = document.getElementById(`card-${item.id}`);
       const wrapperEl = document.getElementById(`wrapper-${item.id}`);
       const btnPlay = wrapperEl.querySelector('.sfx-btn');
       const btnStop = cardEl.querySelector('.btn-stop-sfx');
+      const btnRename = cardEl.querySelector('.btn-rename');
       const dateBadge = cardEl.querySelector('.date-badge');
 
-      // 1. 播放
       btnPlay.addEventListener('click', () => {
         triggerSfx(item, wrapperEl, cardEl);
       });
 
-      // 2. 停止
       btnStop.addEventListener('click', (e) => {
         e.stopPropagation();
         stopAndClearSfx(item);
       });
 
-      // 3. 复制直链
+      // 打开编辑名称弹窗
+      btnRename.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeRenameItemId = item.id;
+        elRenameInput.value = customNames[item.id] || '';
+        elRenameModal.classList.add('show');
+        setTimeout(() => elRenameInput.focus(), 150);
+      });
+
       const btnCopy = cardEl.querySelector('.btn-copy-url');
       btnCopy.addEventListener('click', async () => {
         if (!item.audioUrl) await ensureMetaLoaded(item);
@@ -1577,7 +1635,6 @@
         showToast(currentLang.copied);
       });
 
-      // 4. 移动端轻触 Tooltip 切换
       dateBadge.addEventListener('click', (e) => {
         e.stopPropagation();
         const isActive = dateBadge.classList.contains('tooltip-active');
@@ -1587,32 +1644,58 @@
     });
   }
 
-  // 点击空白处关闭移动端 Tooltip
+  // 保存自定义名称
+  elBtnRenameConfirm.addEventListener('click', async () => {
+    if (!activeRenameItemId) return;
+    const newName = elRenameInput.value.trim();
+
+    try {
+      if (WORKER_API_BASE.startsWith('http')) {
+        const resp = await fetch(`${WORKER_API_BASE}/api/names`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: activeRenameItemId, name: newName })
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      }
+
+      if (newName) {
+        customNames[activeRenameItemId] = newName;
+      } else {
+        delete customNames[activeRenameItemId];
+      }
+
+      showToast(currentLang.saveSuccess);
+      elRenameModal.classList.remove('show');
+      applySortAndRender();
+    } catch (err) {
+      showToast(currentLang.saveFail + err.message);
+    }
+  });
+
+  elBtnRenameCancel.addEventListener('click', () => {
+    elRenameModal.classList.remove('show');
+  });
+
   document.addEventListener('click', () => {
     document.querySelectorAll('.date-badge.tooltip-active').forEach(b => b.classList.remove('tooltip-active'));
   });
 
-  // 11. Segmented Button 切换与反选逻辑 (Toggle to 'all')
   document.querySelectorAll('.m3-segmented-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const targetFormat = btn.getAttribute('data-format');
-      
-      // 如果点击的是已经处于激活状态的按钮，则取消激活并还原为 'all'
       if (currentFormatFilter === targetFormat) {
         currentFormatFilter = 'all';
         btn.classList.remove('active');
       } else {
-        // 否则激活当前选中的格式
         document.querySelectorAll('.m3-segmented-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentFormatFilter = targetFormat;
       }
-      
       applySortAndRender();
     });
   });
 
-  // 12. 自定义下拉菜单与升降序切换
   elDropdownBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     elDropdownWrapper.classList.toggle('open');
@@ -1650,14 +1733,12 @@
     applySortAndRender();
   }
 
-  // 纯符号升降序切换
   elBtnToggleOrder.addEventListener('click', () => {
     isDescending = !isDescending;
     elOrderIcon.textContent = isDescending ? 'arrow_downward' : 'arrow_upward';
     applySortAndRender();
   });
 
-  // 时长模态确认
   elBtnModalCancel.addEventListener('click', () => {
     elModal.classList.remove('show');
   });
@@ -1680,7 +1761,6 @@
     applySortAndRender();
   });
 
-  // 13. 搜索与 Trailing Clear Button
   elSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     if (searchQuery.length > 0) {
@@ -1707,7 +1787,6 @@
     toastTimer = setTimeout(() => elToast.classList.remove('show'), 2200);
   }
 
-  // 启动
   window.addEventListener('DOMContentLoaded', initApp);
 </script>
 </body>
