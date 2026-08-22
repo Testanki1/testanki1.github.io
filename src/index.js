@@ -1,4 +1,4 @@
-// worker.js
+// src/index.js
 
 // 1. 广播中枢 Durable Object 类 (完全免费且支持 SQLite)
 export class SfxHub {
@@ -54,6 +54,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // 处理跨域预检请求 (CORS Preflight)
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      });
+    }
+
     // 路由 A: WebSocket 实时连接
     if (url.pathname === '/api/sfx-ws') {
       const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
@@ -61,7 +72,7 @@ export default {
       return hub.fetch(request);
     }
 
-    // 路由 B: 获取音效名称
+    // 路由 B: 获取音效名称 (GET)
     if (url.pathname === '/api/sfx-names' && request.method === 'GET') {
       let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
       const prefix = `${lang}:`;
@@ -79,7 +90,7 @@ export default {
       });
     }
 
-    // 路由 C: 保存名称并触发全网推送
+    // 路由 C: 保存名称并触发全网推送 (POST)
     if (url.pathname === '/api/sfx-names' && request.method === 'POST') {
       try {
         const body = await request.json();
