@@ -18,7 +18,7 @@
 <style>
   /* ==========================================================================
      Tokens & 3D坦克品牌配色
-     ========================================================================= */
+     ========================================================================== */
   :root {
     --tk-neon-green: #76FF33;    /* 核心主色 Neon Green */
     --tk-bg-dark: #001926;       /* 背景深色 Background */
@@ -1170,6 +1170,7 @@
   let isDescending = true;
   let searchQuery = '';
   let activeRenameItemId = null;
+  let lastSyncTimestamp = Date.now();
 
   const activePlayInstances = new Map();
   let isAnimationFrameActive = false;
@@ -1217,7 +1218,7 @@
         targetText.style.fontSize = '';
 
         const formatTag = headerLine.querySelector('.format-tag');
-        const tagWidth = formatTag ? (formatTag.offsetWidth + 8) : 0;
+        const tagWidth = formatTag ? (formatTag.offsetWidth + 10) : 0;
         // 计算当前设备、当前卡片 headerLine 可用的最大像素宽度
         const maxAvailableWidth = headerLine.clientWidth - tagWidth;
 
@@ -1245,8 +1246,10 @@
   window.addEventListener('resize', autoFitCardTitles);
 
   /* ==========================================================================
-     实时推送：局部无感热更新卡片名称
+     实时同步引擎：局部无感热更新卡片名称
      ========================================================================== */
+  const localBroadcast = ('BroadcastChannel' in window) ? new BroadcastChannel('tanki_sfx_live_sync') : null;
+
   function updateSingleCardTitle(id, newName) {
     if (newName) {
       customNames[id] = newName;
@@ -1269,32 +1272,39 @@
     autoFitCardTitles();
   }
 
-  function initRealtimeEvents() {
-    let eventSource = null;
-    try {
-      // 订阅全球实时广播通道（稳定、免配密钥、自动恢复）
-      eventSource = new EventSource('https://ntfy.sh/tanki_sfx_sync_live_prod/sse');
-
-      eventSource.onmessage = (e) => {
-        try {
-          const raw = JSON.parse(e.data);
-          if (raw.event === 'message' && raw.message) {
-            const payload = JSON.parse(raw.message);
-            if (payload.type === 'rename') {
-              updateSingleCardTitle(payload.id, payload.name);
-            }
-          }
-        } catch (err) {
-          // 忽略心跳包或非结构化消息
+  function initRealtimeSyncEngine() {
+    // 1. 同设备跨标签页：0 毫秒即时同步
+    if (localBroadcast) {
+      localBroadcast.onmessage = (e) => {
+        if (e.data && e.data.type === 'rename') {
+          updateSingleCardTitle(e.data.id, e.data.name);
         }
       };
-
-      eventSource.onerror = () => {
-        // 网络切换或波动时浏览器 EventSource 会自动指数回退重连
-      };
-    } catch (e) {
-      console.warn('初始化实时推送异常:', e);
     }
+
+    // 2. 跨设备全球同步：极轻量增量版本心跳（每次仅 20 字节，不中断音频播放）
+    async function checkRemoteDelta() {
+      try {
+        const url = WORKER_API_BASE 
+          ? `${WORKER_API_BASE}/api/sfx-sync?since=${lastSyncTimestamp}` 
+          : `/api/sfx-sync?since=${lastSyncTimestamp}`;
+        
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.changed) {
+            lastSyncTimestamp = data.ts || Date.now();
+            if (data.changes && Array.isArray(data.changes)) {
+              data.changes.forEach(ch => {
+                updateSingleCardTitle(ch.id, ch.name);
+              });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    setInterval(checkRemoteDelta, 2500);
   }
 
   async function loadCustomNames() {
@@ -1362,7 +1372,7 @@
 
       applySortAndRender();
       preloadAllMetaInfo();
-      initRealtimeEvents(); // 建立实时推送监听通道
+      initRealtimeSyncEngine(); // 启动全球实时同步通道
     } catch (e) {
       console.error('加载 assets.json 失败:', e);
       showToast('加载音效数据失败: ' + e.message);
@@ -1757,8 +1767,13 @@
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      // 本地秒级更新当前卡片
+      // 1. 本地立即热更新当前卡片
       updateSingleCardTitle(activeRenameItemId, newName);
+
+      // 2. 跨标签页即时同步（0ms）
+      if (localBroadcast) {
+        localBroadcast.postMessage({ type: 'rename', id: activeRenameItemId, name: newName });
+      }
 
       showToast(currentLang.saveSuccess);
       elRenameModal.classList.remove('show');
