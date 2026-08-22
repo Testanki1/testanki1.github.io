@@ -476,7 +476,7 @@
   }
 
   /* ==========================================================================
-     音效卡片网格与自适应标题布局
+     音效卡片网格与标题自适应样式
      ========================================================================== */
   .sfx-grid {
     display: grid;
@@ -509,6 +509,44 @@
     box-shadow: 0 0 18px var(--tk-border-glow);
   }
 
+  /* 修改与同步时的动画效果 */
+  @keyframes cardUpdatePulse {
+    0% {
+      border-color: var(--tk-neon-green);
+      box-shadow: 0 0 22px rgba(118, 255, 51, 0.65);
+    }
+    100% {
+      border-color: var(--tk-border);
+      box-shadow: none;
+    }
+  }
+
+  .sfx-card.card-flash {
+    animation: cardUpdatePulse 1.6s var(--m3-motion-standard) forwards;
+  }
+
+  @keyframes titleSpringPop {
+    0% {
+      opacity: 0.1;
+      transform: scale(0.85);
+      filter: brightness(2) drop-shadow(0 0 12px var(--tk-neon-green));
+    }
+    60% {
+      transform: scale(1.08);
+      filter: brightness(1.4) drop-shadow(0 0 16px var(--tk-neon-green));
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+      filter: none;
+    }
+  }
+
+  .title-updated-anim {
+    display: inline-block;
+    animation: titleSpringPop 0.55s var(--m3-motion-spring) forwards;
+  }
+
   .card-left {
     display: flex;
     flex-direction: column;
@@ -517,7 +555,7 @@
     flex: 1;
   }
 
-  /* 核心：卡片标题行自适应布局 */
+  /* 标题行自适应布局 */
   .id-header-line {
     display: flex;
     align-items: center;
@@ -541,7 +579,6 @@
     overflow: hidden;
   }
 
-  /* 自适应名称文本：移除了固定的 max-width: 140px */
   .custom-name-text {
     color: #ffffff;
     font-weight: 800;
@@ -1214,25 +1251,21 @@
         const targetText = customNameEl || idTitleEl;
         if (!targetText) return;
 
-        // 1. 先重置字体大小以便精确获取实际文本宽度
         targetText.style.fontSize = '';
 
         const formatTag = headerLine.querySelector('.format-tag');
         const tagWidth = formatTag ? (formatTag.offsetWidth + 10) : 0;
-        // 计算当前设备、当前卡片 headerLine 可用的最大像素宽度
         const maxAvailableWidth = headerLine.clientWidth - tagWidth;
 
         if (maxAvailableWidth <= 0) return;
 
         const currentTextWidth = targetText.scrollWidth;
 
-        // 2. 如果文本超出可用宽度，按比例计算最佳字号
         if (currentTextWidth > maxAvailableWidth) {
           const computedStyle = window.getComputedStyle(targetText);
           const currentFontSize = parseFloat(computedStyle.fontSize);
           const scaleRatio = maxAvailableWidth / currentTextWidth;
           
-          // 允许缩小的最低极限字号（9.5px）
           const minFontSize = 9.5; 
           const idealFontSize = Math.max(minFontSize, currentFontSize * scaleRatio * 0.96);
           
@@ -1242,15 +1275,16 @@
     });
   }
 
-  // 监听屏幕窗口缩放，自动适配各种设备（手机横竖屏、电脑等）
   window.addEventListener('resize', autoFitCardTitles);
 
   /* ==========================================================================
-     实时同步引擎：局部无感热更新卡片名称
+     实时同步引擎：局部热更新卡片名称与高亮动效
      ========================================================================== */
-  const localBroadcast = ('BroadcastChannel' in window) ? new BroadcastChannel('tanki_sfx_live_sync') : null;
-
   function updateSingleCardTitle(id, newName) {
+    const oldName = customNames[id] || '';
+    const normalizedNew = newName || '';
+    const isChanged = oldName !== normalizedNew;
+
     if (newName) {
       customNames[id] = newName;
     } else {
@@ -1266,45 +1300,59 @@
       titleWrapper.innerHTML = newName 
         ? `<span class="custom-name-text">${newName}</span>` 
         : `<span class="id-prefix">ID:</span><span>${id}</span>`;
+
+      // 只有内容发生实质变化时，触发弹簧放大与边框高光动画
+      if (isChanged) {
+        const animTarget = titleWrapper.querySelector('.custom-name-text') || titleWrapper;
+        animTarget.classList.remove('title-updated-anim');
+        void animTarget.offsetWidth; // 触发回流以重新播放动画
+        animTarget.classList.add('title-updated-anim');
+
+        card.classList.remove('card-flash');
+        void card.offsetWidth;
+        card.classList.add('card-flash');
+      }
     }
 
-    // 针对被更新的卡片重新计算一次字号缩放
     autoFitCardTitles();
   }
 
-  function initRealtimeSyncEngine() {
-    // 1. 同设备跨标签页：0 毫秒即时同步
-    if (localBroadcast) {
-      localBroadcast.onmessage = (e) => {
-        if (e.data && e.data.type === 'rename') {
-          updateSingleCardTitle(e.data.id, e.data.name);
-        }
-      };
-    }
-
-    // 2. 跨设备全球同步：极轻量增量版本心跳（每次仅 20 字节，不中断音频播放）
-    async function checkRemoteDelta() {
-      try {
-        const url = WORKER_API_BASE 
-          ? `${WORKER_API_BASE}/api/sfx-sync?since=${lastSyncTimestamp}` 
-          : `/api/sfx-sync?since=${lastSyncTimestamp}`;
-        
-        const resp = await fetch(url);
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.changed) {
-            lastSyncTimestamp = data.ts || Date.now();
-            if (data.changes && Array.isArray(data.changes)) {
-              data.changes.forEach(ch => {
-                updateSingleCardTitle(ch.id, ch.name);
-              });
-            }
+  // 增量同步请求方法
+  async function checkRemoteDelta() {
+    try {
+      const url = WORKER_API_BASE 
+        ? `${WORKER_API_BASE}/api/sfx-sync?since=${lastSyncTimestamp}` 
+        : `/api/sfx-sync?since=${lastSyncTimestamp}`;
+      
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.changed) {
+          lastSyncTimestamp = data.ts || Date.now();
+          if (data.changes && Array.isArray(data.changes)) {
+            data.changes.forEach(ch => {
+              updateSingleCardTitle(ch.id, ch.name);
+            });
           }
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
+  }
 
+  function initRealtimeSyncEngine() {
+    // 1. 定时心跳轮询增量 (每 2.5 秒一次轻量 20 字节检查)
     setInterval(checkRemoteDelta, 2500);
+
+    // 2. 核心修复：当从后台标签页切换回来，或窗口重新获得焦点时，立即执行同步拉取
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkRemoteDelta();
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      checkRemoteDelta();
+    });
   }
 
   async function loadCustomNames() {
@@ -1372,7 +1420,7 @@
 
       applySortAndRender();
       preloadAllMetaInfo();
-      initRealtimeSyncEngine(); // 启动全球实时同步通道
+      initRealtimeSyncEngine(); // 启动增强型实时同步
     } catch (e) {
       console.error('加载 assets.json 失败:', e);
       showToast('加载音效数据失败: ' + e.message);
@@ -1750,7 +1798,6 @@
       });
     });
 
-    // 渲染完成后计算全网格自适应字号
     autoFitCardTitles();
   }
 
@@ -1767,13 +1814,8 @@
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      // 1. 本地立即热更新当前卡片
+      // 本地秒级更新当前卡片并触发动效
       updateSingleCardTitle(activeRenameItemId, newName);
-
-      // 2. 跨标签页即时同步（0ms）
-      if (localBroadcast) {
-        localBroadcast.postMessage({ type: 'rename', id: activeRenameItemId, name: newName });
-      }
 
       showToast(currentLang.saveSuccess);
       elRenameModal.classList.remove('show');
