@@ -1,6 +1,6 @@
 // functions/api/sfx-names.js
 
-// 1. 获取对应语言的所有自定义名称（内置旧中文数据自动迁移）
+// 1. 获取指定语言的所有自定义名称
 export async function onRequestGet(context) {
   const { request, env } = context;
   try {
@@ -8,38 +8,17 @@ export async function onRequestGet(context) {
     let lang = (url.searchParams.get('lang') || 'zh').toLowerCase();
     if (lang !== 'en') lang = 'zh';
 
-    const list = await env.SFX_NAMES.list();
+    const prefix = `${lang}:`;
+    // 原生利用 prefix 仅拉取对应语言的键
+    const list = await env.SFX_NAMES.list({ prefix });
     const namesMap = {};
 
     await Promise.all(
       list.keys.map(async (keyObj) => {
         const rawKey = keyObj.name;
-        // 忽略版本同步键
-        if (rawKey.startsWith('__LAST_UPDATE')) return;
-
-        // 🚀 【自动迁移逻辑】：如果 key 不包含冒号，属于之前的旧中文数据
-        if (!rawKey.includes(':')) {
-          const oldVal = await env.SFX_NAMES.get(rawKey);
-          if (oldVal) {
-            // 自动迁移保存为 zh:ID
-            await env.SFX_NAMES.put(`zh:${rawKey}`, oldVal);
-            // 删除无前缀旧键
-            await env.SFX_NAMES.delete(rawKey);
-            // 如果当前正在请求中文，直接载入
-            if (lang === 'zh') {
-              namesMap[rawKey] = oldVal;
-            }
-          }
-          return;
-        }
-
-        // 正常多语言前缀读取: zh:ID 或 en:ID
-        const targetPrefix = `${lang}:`;
-        if (rawKey.startsWith(targetPrefix)) {
-          const sfxId = rawKey.slice(targetPrefix.length);
-          const val = await env.SFX_NAMES.get(rawKey);
-          if (val) namesMap[sfxId] = val;
-        }
+        const sfxId = rawKey.slice(prefix.length);
+        const val = await env.SFX_NAMES.get(rawKey);
+        if (val) namesMap[sfxId] = val;
       })
     );
 
@@ -57,7 +36,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// 2. 保存指定语言的音效名称并更新对应语言的增量版本
+// 2. 保存指定语言的音效自定义名称并记录增量版本
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
@@ -80,7 +59,7 @@ export async function onRequestPost(context) {
       await env.SFX_NAMES.delete(kvKey);
     }
 
-    // 记录对应语言的增量更新版本日志
+    // 记录对应语言的增量版本日志（保留最近 30 条修改）
     try {
       const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
       let lastObj = { ts: Date.now(), history: [] };
