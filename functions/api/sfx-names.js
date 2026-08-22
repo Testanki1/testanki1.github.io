@@ -1,6 +1,6 @@
 // functions/api/sfx-names.js
 
-// 1. 获取音效自定义名称
+// 1. 获取所有音效自定义名称
 export async function onRequestGet(context) {
   const { env } = context;
   try {
@@ -8,6 +8,8 @@ export async function onRequestGet(context) {
     const namesMap = {};
     await Promise.all(
       list.keys.map(async (keyObj) => {
+        // 忽略内部增量版本同步键
+        if (keyObj.name === '__LAST_UPDATE__') return;
         const val = await env.SFX_NAMES.get(keyObj.name);
         if (val) namesMap[keyObj.name] = val;
       })
@@ -26,7 +28,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// 2. 保存音效自定义名称并实时广播
+// 2. 保存音效自定义名称并记录实时增量版本
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
@@ -45,21 +47,24 @@ export async function onRequestPost(context) {
       await env.SFX_NAMES.delete(id);
     }
 
-    // 🚀 核心：向全球实时 PubSub 广播频道推送事件（免配置、零延迟、永不断连）
+    // 🚀 记录全球增量版本日志，供所有客户端实时同步
     try {
-      await fetch('https://ntfy.sh/tanki_sfx_sync_live_prod', {
-        method: 'POST',
-        headers: {
-          'Title': 'SFX Rename',
-          'Tags': 'sound,tanki',
-        },
-        body: JSON.stringify({ type: 'rename', id, name: trimmedName })
-      });
-    } catch (pushErr) {
-      console.warn('Real-time broadcast failed:', pushErr);
+      let lastObj = { ts: Date.now(), history: [] };
+      const raw = await env.SFX_NAMES.get('__LAST_UPDATE__');
+      if (raw) {
+        try { lastObj = JSON.parse(raw); } catch(e) {}
+      }
+
+      const newEntry = { id, name: trimmedName, ts: Date.now() };
+      lastObj.ts = newEntry.ts;
+      lastObj.history = [newEntry, ...(lastObj.history || [])].slice(0, 30); // 保留最近 30 条修改记录
+
+      await env.SFX_NAMES.put('__LAST_UPDATE__', JSON.stringify(lastObj));
+    } catch (verErr) {
+      console.warn('记录版本失败:', verErr);
     }
 
-    return new Response(JSON.stringify({ success: true, id, name: trimmedName }), {
+    return new Response(JSON.stringify({ success: true, id, name: trimmedName, ts: Date.now() }), {
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
