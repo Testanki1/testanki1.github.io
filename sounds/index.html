@@ -157,6 +157,24 @@
     border-radius: var(--radius-pill);
     font-size: 0.72rem;
     font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity var(--m3-duration-short);
+  }
+
+  .badge-pulse {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--tk-neon-green);
+    animation: dotPulse 1.2s infinite ease-in-out;
+  }
+
+  @keyframes dotPulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.3); }
   }
 
   /* ==========================================================================
@@ -306,9 +324,7 @@
     color: var(--tk-bg-dark);
   }
 
-  /* ==========================================================================
-     下拉选择器 (Dropdown & Checkmark Physics)
-     ========================================================================== */
+  /* 下拉选择器 */
   .m3-dropdown-wrapper {
     position: relative;
     flex: 1;
@@ -476,12 +492,85 @@
   }
 
   /* ==========================================================================
+     页面加载状态与空状态 (Loading & Empty State)
+     ========================================================================== */
+  .state-container {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 360px;
+    gap: 16px;
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .loading-spinner-box {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-glow-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid rgba(118, 255, 51, 0.15);
+    border-top-color: var(--tk-neon-green);
+    animation: spinTrack 0.85s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+    box-shadow: 0 0 16px rgba(118, 255, 51, 0.3);
+  }
+
+  .loading-inner-core {
+    width: 20px;
+    height: 20px;
+    background-color: var(--tk-neon-green);
+    border-radius: 50%;
+    opacity: 0.8;
+    animation: corePulse 1.4s ease-in-out infinite alternate;
+    box-shadow: 0 0 12px var(--tk-neon-green);
+  }
+
+  @keyframes corePulse {
+    0% { transform: scale(0.65); opacity: 0.4; }
+    100% { transform: scale(1.1); opacity: 0.95; }
+  }
+
+  .state-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.2px;
+  }
+
+  .state-desc {
+    font-size: 0.82rem;
+    color: var(--tk-btn-ice);
+    opacity: 0.75;
+    max-width: 320px;
+    line-height: 1.5;
+  }
+
+  .empty-icon {
+    font-size: 48px;
+    color: var(--tk-btn-ice);
+    opacity: 0.4;
+    margin-bottom: 4px;
+  }
+
+  /* ==========================================================================
      音效卡片网格与标题自适应样式
      ========================================================================== */
   .sfx-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 12px;
+    min-height: 300px;
   }
 
   .sfx-card {
@@ -495,6 +584,12 @@
     gap: 10px;
     position: relative;
     transition: transform var(--m3-duration-short) var(--m3-motion-spring), border-color var(--m3-duration-short), box-shadow var(--m3-duration-short);
+    animation: fadeInCard 0.3s ease-out backwards;
+  }
+
+  @keyframes fadeInCard {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .sfx-card:hover {
@@ -509,7 +604,6 @@
     box-shadow: 0 0 18px var(--tk-border-glow);
   }
 
-  /* 修改与同步时的动画效果 */
   @keyframes cardUpdatePulse {
     0% {
       border-color: var(--tk-neon-green);
@@ -555,7 +649,6 @@
     flex: 1;
   }
 
-  /* 标题行自适应布局 */
   .id-header-line {
     display: flex;
     align-items: center;
@@ -989,8 +1082,8 @@
       <div>
         <h1 id="appTitle">3D坦克音效展示</h1>
         <div class="subtitle">
-          <span class="auto-meta-badge" id="bundleVerBadge">资源集 v7</span>
-          <span class="auto-meta-badge" id="totalCountBadge">0 个音效</span>
+          <span class="auto-meta-badge" id="bundleVerBadge">资源集 ···</span>
+          <span class="auto-meta-badge" id="totalCountBadge"><span class="badge-pulse"></span> 正在加载...</span>
         </div>
       </div>
     </div>
@@ -1046,7 +1139,17 @@
     </div>
   </header>
 
-  <main class="sfx-grid" id="sfxGrid"></main>
+  <!-- 主内容区：预设炫酷科技加载动画 -->
+  <main class="sfx-grid" id="sfxGrid">
+    <div class="state-container" id="gridLoadingState">
+      <div class="loading-spinner-box">
+        <div class="loading-glow-ring"></div>
+        <div class="loading-inner-core"></div>
+      </div>
+      <div class="state-title" id="loadingTextTitle">正在加载音效资产...</div>
+      <div class="state-desc" id="loadingTextDesc">正在连接资源服务器同步音效元数据与索引表</div>
+    </div>
+  </main>
 </div>
 
 <!-- 排序时长模态窗口 -->
@@ -1097,6 +1200,11 @@
       title: '3D坦克音效展示',
       setPrefix: '资源集 v',
       sfxSuffix: ' 个音效',
+      loading: '正在加载...',
+      loadingTitle: '正在加载音效资产...',
+      loadingDesc: '正在连接资源服务器同步音效元数据与索引表',
+      noResults: '未找到匹配的音效',
+      noResultsDesc: '尝试更换搜索关键词或重置筛选条件',
       searchPlaceholder: '搜索 ID、名称或日期...',
       sortPrefix: '排序:',
       creationDate: '创建日期',
@@ -1123,6 +1231,11 @@
       title: 'Tanki Online SFX Showcase',
       setPrefix: 'Asset Set v',
       sfxSuffix: ' SFX',
+      loading: 'Loading...',
+      loadingTitle: 'Loading SFX Assets...',
+      loadingDesc: 'Connecting to server and fetching metadata catalog...',
+      noResults: 'No Sound Effects Found',
+      noResultsDesc: 'Try adjusting your search query or format filters',
       searchPlaceholder: 'Search ID, custom name or date...',
       sortPrefix: 'Sort:',
       creationDate: 'Creation Date',
@@ -1199,7 +1312,7 @@
     return sec < 10 ? `${sec.toFixed(1)}s` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
   }
 
-  let assetSetVersion = 7;
+  let assetSetVersion = null;
   let items = [];
   let customNames = {};
   let currentSortKey = 'creationDate';
@@ -1237,9 +1350,6 @@
   const elBtnRenameCancel = document.getElementById('btnRenameCancel');
   const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
 
-  /* ==========================================================================
-     核心算法：标题字号根据容器尺寸自适应缩放（防止换行或被截断）
-     ========================================================================== */
   function autoFitCardTitles() {
     requestAnimationFrame(() => {
       document.querySelectorAll('.sfx-card').forEach(card => {
@@ -1277,9 +1387,6 @@
 
   window.addEventListener('resize', autoFitCardTitles);
 
-  /* ==========================================================================
-     实时同步引擎：局部热更新卡片名称与高亮动效
-     ========================================================================== */
   function updateSingleCardTitle(id, newName) {
     const oldName = customNames[id] || '';
     const normalizedNew = newName || '';
@@ -1301,11 +1408,10 @@
         ? `<span class="custom-name-text">${newName}</span>` 
         : `<span class="id-prefix">ID:</span><span>${id}</span>`;
 
-      // 只有内容发生实质变化时，触发弹簧放大与边框高光动画
       if (isChanged) {
         const animTarget = titleWrapper.querySelector('.custom-name-text') || titleWrapper;
         animTarget.classList.remove('title-updated-anim');
-        void animTarget.offsetWidth; // 触发回流以重新播放动画
+        void animTarget.offsetWidth;
         animTarget.classList.add('title-updated-anim');
 
         card.classList.remove('card-flash');
@@ -1317,7 +1423,6 @@
     autoFitCardTitles();
   }
 
-  // 增量同步请求方法
   async function checkRemoteDelta() {
     try {
       const url = WORKER_API_BASE 
@@ -1340,14 +1445,10 @@
   }
 
   function initRealtimeSyncEngine() {
-    // 1. 定时心跳轮询增量 (每 2.5 秒一次轻量 20 字节检查)
     setInterval(checkRemoteDelta, 2500);
 
-    // 2. 核心修复：当从后台标签页切换回来，或窗口重新获得焦点时，立即执行同步拉取
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        checkRemoteDelta();
-      }
+      if (!document.hidden) checkRemoteDelta();
     });
 
     window.addEventListener('focus', () => {
@@ -1376,6 +1477,12 @@
     elSearchInput.placeholder = currentLang.searchPlaceholder;
     elSortPrefixText.textContent = currentLang.sortPrefix;
     elCurrentSortText.textContent = currentLang.creationDate;
+
+    // 语言初始化时配置加载文本
+    const loadingTitleEl = document.getElementById('loadingTextTitle');
+    const loadingDescEl = document.getElementById('loadingTextDesc');
+    if (loadingTitleEl) loadingTitleEl.textContent = currentLang.loadingTitle;
+    if (loadingDescEl) loadingDescEl.textContent = currentLang.loadingDesc;
 
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');
@@ -1415,14 +1522,23 @@
         };
       });
 
+      // 数据加载完成后，才展示版本号与实际总数量
       elBundleBadge.textContent = `${currentLang.setPrefix}${assetSetVersion}`;
-      elTotalBadge.textContent = `${items.length}${currentLang.sfxSuffix}`;
+      elTotalBadge.innerHTML = `<span class="material-symbols-rounded" style="font-size: 14px;">equalizer</span> ${items.length}${currentLang.sfxSuffix}`;
 
       applySortAndRender();
       preloadAllMetaInfo();
-      initRealtimeSyncEngine(); // 启动增强型实时同步
+      initRealtimeSyncEngine();
     } catch (e) {
       console.error('加载 assets.json 失败:', e);
+      elTotalBadge.textContent = '加载失败';
+      elGrid.innerHTML = `
+        <div class="state-container">
+          <span class="material-symbols-rounded empty-icon" style="color: var(--tk-alert);">error</span>
+          <div class="state-title" style="color: var(--tk-alert);">数据加载失败</div>
+          <div class="state-desc">${e.message}</div>
+        </div>
+      `;
       showToast('加载音效数据失败: ' + e.message);
     }
   }
@@ -1687,6 +1803,17 @@
   }
 
   function renderGrid(list) {
+    if (list.length === 0) {
+      elGrid.innerHTML = `
+        <div class="state-container">
+          <span class="material-symbols-rounded empty-icon">search_off</span>
+          <div class="state-title">${currentLang.noResults}</div>
+          <div class="state-desc">${currentLang.noResultsDesc}</div>
+        </div>
+      `;
+      return;
+    }
+
     elGrid.innerHTML = list.map(item => {
       const customName = customNames[item.id] || '';
       return `
@@ -1814,7 +1941,6 @@
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      // 本地秒级更新当前卡片并触发动效
       updateSingleCardTitle(activeRenameItemId, newName);
 
       showToast(currentLang.saveSuccess);
