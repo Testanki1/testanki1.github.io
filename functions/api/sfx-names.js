@@ -1,4 +1,6 @@
-// functions/api/names.js
+// functions/api/sfx-names.js
+
+// 1. 获取音效自定义名称
 export async function onRequestGet(context) {
   const { env } = context;
   try {
@@ -21,6 +23,7 @@ export async function onRequestGet(context) {
   }
 }
 
+// 2. 保存音效自定义名称
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
