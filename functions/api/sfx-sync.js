@@ -4,9 +4,12 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   try {
     const url = new URL(request.url);
+    let lang = (url.searchParams.get('lang') || 'zh').toLowerCase();
+    if (lang !== 'en') lang = 'zh';
     const since = parseInt(url.searchParams.get('since') || '0', 10);
 
-    const latest = await env.SFX_NAMES.get('__LAST_UPDATE__');
+    const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
+    const latest = await env.SFX_NAMES.get(syncKey);
     if (latest) {
       const updateData = JSON.parse(latest);
       if (updateData.ts > since) {
