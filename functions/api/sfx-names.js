@@ -9,7 +9,6 @@ export async function onRequestGet(context) {
     if (lang !== 'en') lang = 'zh';
 
     const prefix = `${lang}:`;
-    // 原生利用 prefix 仅拉取对应语言的键
     const list = await env.SFX_NAMES.list({ prefix });
     const namesMap = {};
 
@@ -36,7 +35,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// 2. 保存指定语言的音效自定义名称并记录增量版本
+// 2. 保存指定语言的音效名称并向所有在线客户端广播
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
@@ -53,31 +52,42 @@ export async function onRequestPost(context) {
     const trimmedName = (name || '').trim();
     const kvKey = `${lang}:${id}`;
 
+    // 写入 / 删除 KV
     if (trimmedName) {
       await env.SFX_NAMES.put(kvKey, trimmedName.slice(0, 40));
     } else {
       await env.SFX_NAMES.delete(kvKey);
     }
 
-    // 记录对应语言的增量版本日志（保留最近 30 条修改）
+    // 核心推送：触发 Durable Object 全网毫秒级广播
     try {
-      const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
-      let lastObj = { ts: Date.now(), history: [] };
-      const raw = await env.SFX_NAMES.get(syncKey);
-      if (raw) {
-        try { lastObj = JSON.parse(raw); } catch(e) {}
+      if (env.SFX_HUB) {
+        const hubId = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
+        const hubObject = env.SFX_HUB.get(hubId);
+
+        await hubObject.fetch('https://hub.internal/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'sfx_update',
+            id,
+            name: trimmedName,
+            lang,
+            ts: Date.now()
+          })
+        });
       }
-
-      const newEntry = { id, name: trimmedName, ts: Date.now() };
-      lastObj.ts = newEntry.ts;
-      lastObj.history = [newEntry, ...(lastObj.history || [])].slice(0, 30);
-
-      await env.SFX_NAMES.put(syncKey, JSON.stringify(lastObj));
-    } catch (verErr) {
-      console.warn('记录版本失败:', verErr);
+    } catch (pushErr) {
+      console.warn('广播推送失败:', pushErr);
     }
 
-    return new Response(JSON.stringify({ success: true, id, name: trimmedName, lang, ts: Date.now() }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      id, 
+      name: trimmedName, 
+      lang, 
+      ts: Date.now() 
+    }), {
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
