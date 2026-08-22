@@ -113,7 +113,6 @@
     gap: 14px;
   }
 
-  /* 精致圆润的声波均衡器图标 (取代原来的突兀大绿块) */
   .logo-mark {
     width: 44px;
     height: 44px;
@@ -494,7 +493,7 @@
   }
 
   /* ==========================================================================
-     圆润骨架屏加载动效 (Material 3 Rounded Skeletons)
+     骨架屏加载动效 (Material 3 Rounded Skeletons)
      ========================================================================== */
   .skeleton-card {
     background-color: var(--tk-surface);
@@ -1122,7 +1121,6 @@
 <div class="container">
   <header class="header-bar">
     <div class="title-group">
-      <!-- 优化后的均衡器声波图标 -->
       <div class="logo-mark">
         <span class="material-symbols-rounded">graphic_eq</span>
       </div>
@@ -1186,7 +1184,7 @@
     </div>
   </header>
 
-  <!-- 主内容区：预设 6 个全 Rounded 骨架屏卡片流光动画 -->
+  <!-- 主内容区 -->
   <main class="sfx-grid" id="sfxGrid">
     <div class="skeleton-card">
       <div class="skeleton-left">
@@ -1279,7 +1277,7 @@
   <div class="modal-card">
     <div class="modal-title">
       <span class="material-symbols-rounded">edit_note</span>
-      <span>自定义音效名称</span>
+      <span id="renameModalTitle">自定义音效名称</span>
     </div>
     <div class="modal-desc" id="renameDesc">
       为该音效设置一个通俗易懂的名称，将被永久同步并展示给所有人：
@@ -1298,6 +1296,7 @@
   const WORKER_API_BASE = '';
 
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
+  const currentLangCode = isZh ? 'zh' : 'en';
   const serverDomain = isZh ? 'res.3dtank.com' : 's.eu.tankionline.com';
 
   const i18n = {
@@ -1328,7 +1327,15 @@
       playSfx: '播放音效',
       stopSfx: '停止播放',
       saveSuccess: '名称已同步至服务器',
-      saveFail: '保存失败: '
+      saveFail: '保存失败: ',
+      renameTitle: '自定义音效名称',
+      renameDesc: '为该音效设置一个通俗易懂的中文名称，将被永久同步并展示给所有人：',
+      renamePlaceholder: '输入名称（留空清空）...',
+      renameCancel: '取消',
+      renameConfirm: '保存并同步',
+      btnRename: '自定义名称',
+      btnCopy: '复制直链',
+      btnDownload: '下载音效'
     },
     en: {
       title: 'Tanki Online SFX Showcase',
@@ -1357,7 +1364,15 @@
       playSfx: 'Play SFX',
       stopSfx: 'Stop',
       saveSuccess: 'Name synchronized to server',
-      saveFail: 'Failed to save: '
+      saveFail: 'Failed to save: ',
+      renameTitle: 'Custom SFX Name',
+      renameDesc: 'Set a custom English name for this SFX, which will be synced and displayed globally:',
+      renamePlaceholder: 'Enter name (leave blank to clear)...',
+      renameCancel: 'Cancel',
+      renameConfirm: 'Save & Sync',
+      btnRename: 'Custom Name',
+      btnCopy: 'Copy Link',
+      btnDownload: 'Download'
     }
   };
 
@@ -1443,10 +1458,14 @@
   const elOrderIcon = document.getElementById('orderIcon');
 
   const elModal = document.getElementById('confirmModal');
+  const elModalTitleText = document.getElementById('modalTitleText');
+  const elModalDescText = document.getElementById('modalDescText');
   const elBtnModalCancel = document.getElementById('btnModalCancel');
   const elBtnModalConfirm = document.getElementById('btnModalConfirm');
 
   const elRenameModal = document.getElementById('renameModal');
+  const elRenameModalTitle = document.getElementById('renameModalTitle');
+  const elRenameDesc = document.getElementById('renameDesc');
   const elRenameInput = document.getElementById('renameInput');
   const elBtnRenameCancel = document.getElementById('btnRenameCancel');
   const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
@@ -1526,9 +1545,7 @@
 
   async function checkRemoteDelta() {
     try {
-      const url = WORKER_API_BASE 
-        ? `${WORKER_API_BASE}/api/sfx-sync?since=${lastSyncTimestamp}` 
-        : `/api/sfx-sync?since=${lastSyncTimestamp}`;
+      const url = (WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-sync` : '/api/sfx-sync') + `?lang=${currentLangCode}&since=${lastSyncTimestamp}`;
       
       const resp = await fetch(url);
       if (resp.ok) {
@@ -1559,9 +1576,9 @@
 
   async function loadCustomNames() {
     try {
-      const url = WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-names` : '/api/sfx-names';
+      const url = (WORKER_API_BASE ? `${WORKER_API_BASE}/api/sfx-names` : '/api/sfx-names') + `?lang=${currentLangCode}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
       const resp = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -1578,6 +1595,18 @@
     elSearchInput.placeholder = currentLang.searchPlaceholder;
     elSortPrefixText.textContent = currentLang.sortPrefix;
     elCurrentSortText.textContent = currentLang.creationDate;
+
+    // 模态弹窗文本国际化
+    elModalTitleText.textContent = currentLang.modalTitle;
+    elModalDescText.textContent = currentLang.modalDesc;
+    elBtnModalCancel.textContent = currentLang.modalCancel;
+    elBtnModalConfirm.textContent = currentLang.modalConfirm;
+
+    elRenameModalTitle.textContent = currentLang.renameTitle;
+    elRenameDesc.textContent = currentLang.renameDesc;
+    elRenameInput.placeholder = currentLang.renamePlaceholder;
+    elBtnRenameCancel.textContent = currentLang.renameCancel;
+    elBtnRenameConfirm.textContent = currentLang.renameConfirm;
 
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');
@@ -1617,7 +1646,6 @@
         };
       });
 
-      // 数据加载完成后，才展示版本号与实际总数量
       elBundleBadge.textContent = `${currentLang.setPrefix}${assetSetVersion}`;
       elTotalBadge.innerHTML = `<span class="material-symbols-rounded" style="font-size: 14px;">equalizer</span> ${items.length}${currentLang.sfxSuffix}`;
 
@@ -1947,13 +1975,13 @@
               ${formatBytes(item.size)}${item.duration ? ` • ${formatSeconds(item.duration)}` : ''}
             </div>
             <div class="action-buttons">
-              <button class="icon-btn btn-rename" data-id="${item.id}" title="自定义名称">
+              <button class="icon-btn btn-rename" data-id="${item.id}" title="${currentLang.btnRename}">
                 <span class="material-symbols-rounded">edit</span>
               </button>
-              <button class="icon-btn btn-copy-url" data-id="${item.id}" title="复制直链">
+              <button class="icon-btn btn-copy-url" data-id="${item.id}" title="${currentLang.btnCopy}">
                 <span class="material-symbols-rounded">link</span>
               </button>
-              <a class="icon-btn btn-download" href="${item.audioUrl || '#'}" download="${item.id}.${item.format.toLowerCase()}" target="_blank" title="下载音效">
+              <a class="icon-btn btn-download" href="${item.audioUrl || '#'}" download="${item.id}.${item.format.toLowerCase()}" target="_blank" title="${currentLang.btnDownload}">
                 <span class="material-symbols-rounded">download</span>
               </a>
             </div>
@@ -2031,7 +2059,11 @@
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: activeRenameItemId, name: newName })
+        body: JSON.stringify({
+          id: activeRenameItemId,
+          name: newName,
+          lang: currentLangCode
+        })
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
