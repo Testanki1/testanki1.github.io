@@ -1,5 +1,4 @@
 // functions/api/sfx-names.js
-import { broadcastRename } from './sfx-events.js';
 
 // 1. 获取音效自定义名称
 export async function onRequestGet(context) {
@@ -14,7 +13,10 @@ export async function onRequestGet(context) {
       })
     );
     return new Response(JSON.stringify(namesMap), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
@@ -43,15 +45,25 @@ export async function onRequestPost(context) {
       await env.SFX_NAMES.delete(id);
     }
 
-    // 🚀 核心：成功修改后即刻触发广播
+    // 🚀 核心：向全球实时 PubSub 广播频道推送事件（免配置、零延迟、永不断连）
     try {
-      broadcastRename(id, trimmedName);
-    } catch (e) {
-      console.warn('实时广播发送异常:', e);
+      await fetch('https://ntfy.sh/tanki_sfx_sync_live_prod', {
+        method: 'POST',
+        headers: {
+          'Title': 'SFX Rename',
+          'Tags': 'sound,tanki',
+        },
+        body: JSON.stringify({ type: 'rename', id, name: trimmedName })
+      });
+    } catch (pushErr) {
+      console.warn('Real-time broadcast failed:', pushErr);
     }
 
     return new Response(JSON.stringify({ success: true, id, name: trimmedName }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
