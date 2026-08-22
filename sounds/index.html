@@ -1057,8 +1057,8 @@
 <div class="toast-box" id="toastBox">提示信息</div>
 
 <script>
-  // ========= 填入你在 Cloudflare 创建的 Worker 地址 =========
-  const WORKER_API_BASE = 'https://sfx-names-api.testanki.workers.dev';
+  // 留空即可：直接走 Cloudflare Pages 内置的 /api/names 同源相对路径
+  const WORKER_API_BASE = '';
 
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
   const serverDomain = isZh ? 'res.3dtank.com' : 's.eu.tankionline.com';
@@ -1207,15 +1207,20 @@
   const elBtnRenameCancel = document.getElementById('btnRenameCancel');
   const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
 
+  // 读取名称（带 3 秒超时保护，彻底杜绝任何网络阻塞）
   async function loadCustomNames() {
-    if (!WORKER_API_BASE.startsWith('http')) return;
     try {
-      const resp = await fetch(`${WORKER_API_BASE}/api/names`);
+      const url = WORKER_API_BASE ? `${WORKER_API_BASE}/api/names` : '/api/names';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (resp.ok) {
         customNames = await resp.json();
       }
     } catch (e) {
-      console.warn('获取自定义名称失败:', e);
+      console.warn('获取自定义名称跳过或失败:', e);
     }
   }
 
@@ -1230,43 +1235,50 @@
       if (currentLang[k]) el.textContent = currentLang[k];
     });
 
+    // 1. 读取自定义名称
     await loadCustomNames();
 
-    const resp = await fetch('assets.json');
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    assetSetVersion = data.assetSetVersion || 7;
+    // 2. 加载音效数据
+    try {
+      const resp = await fetch('assets.json');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      assetSetVersion = data.assetSetVersion || 7;
 
-    items = (data.assets || []).map((entry, idx) => {
-      const idBigInt = BigInt(entry.id);
-      const isTimestampId = idBigInt >= 1000000000000n;
-      const creationTime = isTimestampId ? Number(entry.id) : 0;
-      const updateTime = Number(entry.version);
+      items = (data.assets || []).map((entry, idx) => {
+        const idBigInt = BigInt(entry.id);
+        const isTimestampId = idBigInt >= 1000000000000n;
+        const creationTime = isTimestampId ? Number(entry.id) : 0;
+        const updateTime = Number(entry.version);
 
-      return {
-        index: idx,
-        id: entry.id,
-        version: entry.version,
-        path: toPath_v(entry.id, entry.version),
-        isLegacy: !isTimestampId,
-        creationTime: creationTime,
-        updateTime: updateTime,
-        creationDateStr: isTimestampId ? formatDateOnly(creationTime) : currentLang.legacyBadge,
-        updateDateTimeStr: formatFullDateTime(updateTime),
-        audioUrl: null,
-        duration: 0,
-        size: 0,
-        format: 'MP3',
-        metaLoaded: false,
-        isBuffering: false
-      };
-    });
+        return {
+          index: idx,
+          id: entry.id,
+          version: entry.version,
+          path: toPath_v(entry.id, entry.version),
+          isLegacy: !isTimestampId,
+          creationTime: creationTime,
+          updateTime: updateTime,
+          creationDateStr: isTimestampId ? formatDateOnly(creationTime) : currentLang.legacyBadge,
+          updateDateTimeStr: formatFullDateTime(updateTime),
+          audioUrl: null,
+          duration: 0,
+          size: 0,
+          format: 'MP3',
+          metaLoaded: false,
+          isBuffering: false
+        };
+      });
 
-    elBundleBadge.textContent = `${currentLang.setPrefix}${assetSetVersion}`;
-    elTotalBadge.textContent = `${items.length}${currentLang.sfxSuffix}`;
+      elBundleBadge.textContent = `${currentLang.setPrefix}${assetSetVersion}`;
+      elTotalBadge.textContent = `${items.length}${currentLang.sfxSuffix}`;
 
-    applySortAndRender();
-    preloadAllMetaInfo();
+      applySortAndRender();
+      preloadAllMetaInfo();
+    } catch (e) {
+      console.error('加载 assets.json 失败:', e);
+      showToast('加载音效数据失败: ' + e.message);
+    }
   }
 
   async function ensureMetaLoaded(item) {
@@ -1642,19 +1654,19 @@
     });
   }
 
+  // 保存自定义名称
   elBtnRenameConfirm.addEventListener('click', async () => {
     if (!activeRenameItemId) return;
     const newName = elRenameInput.value.trim();
+    const url = WORKER_API_BASE ? `${WORKER_API_BASE}/api/names` : '/api/names';
 
     try {
-      if (WORKER_API_BASE.startsWith('http')) {
-        const resp = await fetch(`${WORKER_API_BASE}/api/names`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: activeRenameItemId, name: newName })
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      }
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: activeRenameItemId, name: newName })
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
       if (newName) {
         customNames[activeRenameItemId] = newName;
