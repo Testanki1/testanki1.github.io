@@ -355,7 +355,7 @@
     box-shadow: 0 2px 8px rgba(118, 255, 51, 0.3);
   }
 
-  /* Dropdown: 固定为“排序依据” */
+  /* Dropdown: 排序依据 */
   .m3-dropdown-wrapper {
     position: relative;
     flex: 1;
@@ -771,7 +771,9 @@
     position: absolute;
     bottom: calc(100% + 8px);
     left: 0;
-    width: 230px;
+    min-width: 250px;
+    width: max-content;
+    max-width: 300px;
     background-color: var(--md-sys-color-surface-container-highest);
     border: 1px solid var(--md-sys-color-primary);
     border-radius: var(--md-sys-shape-corner-large);
@@ -804,12 +806,15 @@
   .tooltip-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 12px;
     font-size: 0.72rem;
-    margin-bottom: 4px;
+    margin-bottom: 5px;
+    white-space: nowrap;
   }
 
   .tooltip-row:last-child { margin-bottom: 0; }
-  .tooltip-label { color: var(--md-sys-color-secondary); opacity: 0.8; }
+  .tooltip-label { color: var(--md-sys-color-secondary); opacity: 0.85; }
   .tooltip-val { color: #ffffff; font-weight: 700; }
 
   .card-footer-line {
@@ -924,7 +929,6 @@
     overflow: visible;
   }
 
-  /* 核心修复：彻底解决正方形发光边界裁剪 */
   .orbital-svg {
     position: absolute;
     top: 0;
@@ -933,7 +937,7 @@
     height: 100%;
     pointer-events: none;
     transform: rotate(-90deg);
-    overflow: visible !important; /* 关键：允许发光向外漫射，不被 50x50 方形视口裁剪 */
+    overflow: visible !important;
   }
 
   .track-circle {
@@ -1008,7 +1012,6 @@
 
   .sfx-btn .material-symbols-rounded { font-size: 22px; pointer-events: none; }
 
-  /* 核心修复：采用 SVG 原生滤镜产生高斯模糊发光，消灭矩形光栅化边缘 */
   .play-dot { 
     fill: var(--md-sys-color-primary); 
     filter: url(#sfxGlowDot);
@@ -1150,7 +1153,7 @@
 </head>
 <body>
 
-<!-- 全局 SVG 矢量高斯发光滤镜定义（杜绝方框边缘） -->
+<!-- 全局 SVG 矢量高斯发光滤镜定义 -->
 <svg style="position: absolute; width: 0; height: 0; pointer-events: none; overflow: hidden;" aria-hidden="true">
   <defs>
     <filter id="sfxGlowDot" x="-100%" y="-100%" width="300%" height="300%">
@@ -1203,7 +1206,7 @@
           <button class="m3-segmented-btn" data-format="wav">WAV</button>
         </div>
 
-        <!-- 排序下拉菜单 -->
+        <!-- 排序下拉菜单（保持纯粹的排序指标，不包含时区文本） -->
         <div class="m3-dropdown-wrapper" id="dropdownWrapper">
           <div class="m3-dropdown-btn" id="dropdownBtn">
             <div class="btn-left-content">
@@ -1357,6 +1360,9 @@
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
   const currentLangCode = isZh ? 'zh' : 'en';
   const serverDomain = isZh ? 'res.3dtank.com' : 's.eu.tankionline.com';
+  
+  // 时区映射：中文为北京时间 (Asia/Shanghai)，英文为世界标准时间 (UTC)
+  const targetTimeZone = isZh ? 'Asia/Shanghai' : 'UTC';
 
   const i18n = {
     zh: {
@@ -1377,8 +1383,8 @@
       ascending: '升序',
       legacyBadge: '早期遗产',
       legacyTooltip: '早期遗产',
-      creationDateLabel: '创建时间:',
-      updateDateLabel: '更新时间:',
+      creationDateLabel: '创建时间 (北京时间):',
+      updateDateLabel: '更新时间 (北京时间):',
       modalTitle: '需要加载音效时长',
       modalDesc: '按时长排序需要解析全部音效流，是否确定继续？',
       modalCancel: '取消',
@@ -1415,8 +1421,8 @@
       ascending: 'Ascending',
       legacyBadge: 'Legacy',
       legacyTooltip: 'Legacy',
-      creationDateLabel: 'Creation Time:',
-      updateDateLabel: 'Update Time:',
+      creationDateLabel: 'Creation Time (UTC):',
+      updateDateLabel: 'Update Time (UTC):',
       modalTitle: 'Duration Scan Required',
       modalDesc: 'Sorting by duration requires loading audio streams. Proceed?',
       modalCancel: 'Cancel',
@@ -1460,20 +1466,44 @@
     ].join("/");
   }
 
+  // 时区安全的日期格式化（仅年月日，用于徽章展示）
   function formatDateOnly(ts) {
     const d = new Date(Number(ts));
-    if (isNaN(d.getTime())) return '未知';
-    const Y = d.getFullYear();
-    const M = String(d.getMonth() + 1).padStart(2, '0');
-    const D = String(d.getDate()).padStart(2, '0');
-    return `${Y}-${M}-${D}`;
+    if (isNaN(d.getTime())) return isZh ? '未知' : 'Unknown';
+    try {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: targetTimeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(d);
+      const getVal = type => parts.find(p => p.type === type)?.value || '';
+      return `${getVal('year')}-${getVal('month')}-${getVal('day')}`;
+    } catch (e) {
+      return d.toISOString().split('T')[0];
+    }
   }
 
+  // 时区安全的完整日期时间格式化（年月日 时分秒，用于悬浮提示展示）
   function formatFullDateTime(ts) {
     const d = new Date(Number(ts));
-    if (isNaN(d.getTime())) return '未知';
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    if (isNaN(d.getTime())) return isZh ? '未知' : 'Unknown';
+    try {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: targetTimeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(d);
+      const getVal = type => parts.find(p => p.type === type)?.value || '00';
+      return `${getVal('year')}-${getVal('month')}-${getVal('day')} ${getVal('hour')}:${getVal('minute')}:${getVal('second')}`;
+    } catch (e) {
+      return d.toISOString().replace('T', ' ').replace(/\..+/, '');
+    }
   }
 
   function formatBytes(bytes) {
