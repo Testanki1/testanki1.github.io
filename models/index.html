@@ -963,6 +963,7 @@
 
     const Dict = {
     zh: {
+        legacy: "早期遗产",
         createdTime: "创建时间",
         updatedTime: "更新时间",
         timeNone: "无时间信息",
@@ -1041,6 +1042,7 @@
         dropVideoBlocked: "浏览器阻止了自动播放，点击画面继续播放视频"
     },
     en: {
+        legacy: "Legacy",
         createdTime: "Created",
         updatedTime: "Updated",
         timeNone: "No timestamp",
@@ -1123,32 +1125,42 @@
     const T = Dict[userLang];
 
     
-    // 毫秒时间戳格式化：中文转北京时间 (UTC+8)，英文转 UTC 时间
+    // 毫秒时间戳格式化：少于 13 位判定为早期自增 ID（早期遗产），13 位及以上按时区转换
     function formatAssetTime(ts) {
         if (!ts) return T.timeNone;
-        const num = typeof ts === 'bigint' ? Number(ts) : Number(ts);
-        if (isNaN(num) || num <= 0) return T.timeNone;
-        const date = new Date(num);
-        if (isNaN(date.getTime())) return T.timeNone;
+        try {
+            const big = BigInt(ts);
 
-        const isZh = userLang === 'zh';
-        const timeZone = isZh ? 'Asia/Shanghai' : 'UTC';
+            // 核心判定：小于 10^12（少于 13 位）为非时间戳编号，算作“早期遗产”
+            if (big < 1000000000000n) {
+                return T.legacy;
+            }
 
-        const formatter = new Intl.DateTimeFormat('en-GB', {
-            timeZone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-        const parts = formatter.formatToParts(date);
-        const m = {};
-        parts.forEach(p => m[p.type] = p.value);
-        const formatted = `${m.year}-${m.month}-${m.day} ${m.hour}:${m.minute}:${m.second}`;
-        return isZh ? `${formatted} (北京时间)` : `${formatted} (UTC)`;
+            const num = Number(big);
+            const date = new Date(num);
+            if (isNaN(date.getTime())) return T.timeNone;
+
+            const isZh = userLang === 'zh';
+            const timeZone = isZh ? 'Asia/Shanghai' : 'UTC';
+
+            const formatter = new Intl.DateTimeFormat('en-GB', {
+                timeZone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const parts = formatter.formatToParts(date);
+            const m = {};
+            parts.forEach(p => m[p.type] = p.value);
+            const formatted = `${m.year}-${m.month}-${m.day} ${m.hour}:${m.minute}:${m.second}`;
+            return isZh ? `${formatted} (北京时间)` : `${formatted} (UTC)`;
+        } catch (e) {
+            return T.timeNone;
+        }
     }
 
     // 渲染指定卡片的创建与更新时间
