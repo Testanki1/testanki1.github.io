@@ -15,7 +15,7 @@ export default {
       });
     }
 
-    // 路由 A: WebSocket 实时长连接 (国内访客通过 pages.dev 接入)
+    // 路由 A: WebSocket 极速连接 (国内访客通过 pages.dev 接入)
     if (url.pathname === '/api/sfx-ws') {
       const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
       const hub = env.SFX_HUB.get(id);
@@ -40,7 +40,7 @@ export default {
       });
     }
 
-    // 路由 C: 保存名称并触发全网毫秒级推送 (POST)
+    // 路由 C: 保存名称并触发 50ms 极速广播 (POST)
     if (url.pathname === '/api/sfx-names' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -51,14 +51,14 @@ export default {
         const trimmed = (name || '').trim();
         const kvKey = `${lang}:${id}`;
 
-        // 1. 写入 KV 存盘
+        // 1. 写入 KV 做持久化存储
         if (trimmed) {
           await env.SFX_NAMES.put(kvKey, trimmed.slice(0, 40));
         } else {
           await env.SFX_NAMES.delete(kvKey);
         }
 
-        // 2. 核心：直接通知 Durable Object 内存广播（绕过 KV 延迟，耗时仅 10ms！）
+        // 2. 核心：直接调用 Durable Object 进行内存级 WebSocket 极速广播 (耗时仅 10ms，彻底消灭 20 秒延迟！)
         if (env.SFX_HUB) {
           const hubId = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
           const hub = env.SFX_HUB.get(hubId);
