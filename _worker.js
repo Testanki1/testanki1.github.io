@@ -4,7 +4,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 跨域预检处理
+    // 跨域预检
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -15,73 +15,14 @@ export default {
       });
     }
 
-    // 路由 A: SSE 服务器主动推送流
-    if (url.pathname === '/api/sfx-stream') {
-      let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
-      const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
-
-      const { readable, writable } = new TransformStream();
-      const writer = writable.getWriter();
-      const encoder = new TextEncoder();
-
-      // 监听客户端关闭页面
-      request.signal.addEventListener('abort', () => {
-        try { writer.close(); } catch (e) {}
-      });
-
-      // 维持推送流
-      (async () => {
-        try {
-          let lastTs = Date.now();
-          await writer.write(encoder.encode(`event: open\ndata: {"status":"connected"}\n\n`));
-
-          // 持续监听 60 秒
-          for (let i = 0; i < 60; i++) {
-            if (request.signal.aborted) break;
-            await new Promise(r => setTimeout(r, 1000));
-            if (request.signal.aborted) break;
-
-            // 每 15 秒发送一次轻量心跳保活，防止 HTTP/3 (QUIC) 协议超时报警
-            if (i % 15 === 0) {
-              await writer.write(encoder.encode(`: ping\n\n`));
-            }
-
-            const latest = await env.SFX_NAMES.get(syncKey);
-            if (latest) {
-              try {
-                const updateData = JSON.parse(latest);
-                if (updateData.ts > lastTs) {
-                  lastTs = updateData.ts;
-                  const payload = JSON.stringify({
-                    type: 'sfx_update',
-                    id: updateData.id,
-                    name: updateData.name,
-                    lang: updateData.lang || lang,
-                    ts: updateData.ts
-                  });
-                  await writer.write(encoder.encode(`data: ${payload}\n\n`));
-                }
-              } catch (e) {}
-            }
-          }
-        } catch (err) {
-          // 忽略正常断开
-        } finally {
-          try { await writer.close(); } catch (e) {}
-        }
-      })();
-
-      return new Response(readable, {
-        headers: {
-          'Content-Type': 'text/event-stream; charset=utf-8',
-          'Cache-Control': 'no-cache, no-transform',
-          'Connection': 'keep-alive',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+    // 路由 A: WebSocket 实时长连接 (国内访客通过 pages.dev 接入)
+    if (url.pathname === '/api/sfx-ws') {
+      const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
+      const hub = env.SFX_HUB.get(id);
+      return hub.fetch(request);
     }
 
-    // 路由 B: 获取音效名称列表 (GET)
+    // 路由 B: 获取所有名称 (GET)
     if (url.pathname === '/api/sfx-names' && request.method === 'GET') {
       let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
       const prefix = `${lang}:`;
@@ -99,7 +40,7 @@ export default {
       });
     }
 
-    // 路由 C: 保存名称并触发全网推送 (POST)
+    // 路由 C: 保存名称并触发全网毫秒级推送 (POST)
     if (url.pathname === '/api/sfx-names' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -110,22 +51,24 @@ export default {
         const trimmed = (name || '').trim();
         const kvKey = `${lang}:${id}`;
 
+        // 1. 写入 KV 存盘
         if (trimmed) {
           await env.SFX_NAMES.put(kvKey, trimmed.slice(0, 40));
         } else {
           await env.SFX_NAMES.delete(kvKey);
         }
 
-        // 写入版本变更通知
-        const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
-        await env.SFX_NAMES.put(syncKey, JSON.stringify({
-          id,
-          name: trimmed,
-          lang,
-          ts: Date.now()
-        }));
+        // 2. 核心：直接通知 Durable Object 内存广播（绕过 KV 延迟，耗时仅 10ms！）
+        if (env.SFX_HUB) {
+          const hubId = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
+          const hub = env.SFX_HUB.get(hubId);
+          await hub.fetch('https://internal/broadcast', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'sfx_update', id, name: trimmed, lang, ts: Date.now() })
+          });
+        }
 
-        return new Response(JSON.stringify({ success: true, id, name: trimmed, lang }), {
+        return new Response(JSON.stringify({ success: true, id, name: trimmed }), {
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
       } catch (err) {
@@ -133,7 +76,7 @@ export default {
       }
     }
 
-    // 默认返回静态页面
+    // 默认返回静态资源
     return env.ASSETS.fetch(request);
   }
 };
