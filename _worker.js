@@ -4,7 +4,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 跨域预检
+    // 跨域预检处理
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -15,14 +15,62 @@ export default {
       });
     }
 
-    // 路由 A: WebSocket 实时连接 (国内访客通过 pages.dev 接入)
-    if (url.pathname === '/api/sfx-ws') {
-      const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
-      const hub = env.SFX_HUB.get(id);
-      return hub.fetch(request);
+    // 路由 A: SSE 服务器主动推送流 (Server-Sent Events 长连接)
+    if (url.pathname === '/api/sfx-stream') {
+      let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
+      const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
+
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+
+      // 在后台维持长连接并主动推流
+      (async () => {
+        try {
+          let lastTs = Date.now();
+          // 发送连接建立事件
+          await writer.write(encoder.encode(`event: open\ndata: {"status":"connected"}\n\n`));
+
+          // 保持长连接 45 秒（超时后浏览器 EventSource 会自动无缝重连）
+          for (let i = 0; i < 45; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            
+            const latest = await env.SFX_NAMES.get(syncKey);
+            if (latest) {
+              try {
+                const updateData = JSON.parse(latest);
+                if (updateData.ts > lastTs) {
+                  lastTs = updateData.ts;
+                  const payload = JSON.stringify({
+                    type: 'sfx_update',
+                    id: updateData.id,
+                    name: updateData.name,
+                    lang: updateData.lang || lang,
+                    ts: updateData.ts
+                  });
+                  // 服务器主动向客户端推送数据
+                  await writer.write(encoder.encode(`data: ${payload}\n\n`));
+                }
+              } catch (e) {}
+            }
+          }
+          await writer.close();
+        } catch (err) {
+          try { await writer.close(); } catch (e) {}
+        }
+      })();
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     }
 
-    // 路由 B: 获取音效名称 (GET)
+    // 路由 B: 获取音效名称列表 (GET)
     if (url.pathname === '/api/sfx-names' && request.method === 'GET') {
       let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
       const prefix = `${lang}:`;
@@ -57,17 +105,16 @@ export default {
           await env.SFX_NAMES.delete(kvKey);
         }
 
-        // 内网通知 DO 广播
-        if (env.SFX_HUB) {
-          const hubId = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
-          const hub = env.SFX_HUB.get(hubId);
-          await hub.fetch('https://internal/broadcast', {
-            method: 'POST',
-            body: JSON.stringify({ type: 'sfx_update', id, name: trimmed, lang, ts: Date.now() })
-          });
-        }
+        // 写入版本变更通知，供 SSE 长连接推流
+        const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
+        await env.SFX_NAMES.put(syncKey, JSON.stringify({
+          id,
+          name: trimmed,
+          lang,
+          ts: Date.now()
+        }));
 
-        return new Response(JSON.stringify({ success: true, id, name: trimmed }), {
+        return new Response(JSON.stringify({ success: true, id, name: trimmed, lang }), {
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
       } catch (err) {
@@ -75,7 +122,7 @@ export default {
       }
     }
 
-    // 默认返回静态页面
+    // 默认返回静态页面 (index.html 等)
     return env.ASSETS.fetch(request);
   }
 };
