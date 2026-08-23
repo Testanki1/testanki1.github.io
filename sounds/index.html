@@ -1500,36 +1500,25 @@
     autoFitCardTitles();
   }
 
-  // =========================================================================
-  // WebSocket 实时推送引擎 (取代原 2.5 秒轮询)
-  // =========================================================================
-  function initRealtimeSyncEngine() {
-    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsHost = location.host;
-    if (WORKER_API_BASE) {
-      wsHost = WORKER_API_BASE.replace(/^https?:\/\//, '');
-    }
-    const wsUrl = `${wsProtocol}//${wsHost}/api/sfx-ws?lang=${currentLangCode}`;
+  let sfxEventSource = null;
+  let reconnectTimer = null;
 
+  // 初始化 SSE 服务器主动推送引擎
+  function initRealtimeSyncEngine() {
     function connect() {
-      if (sfxSocket && (sfxSocket.readyState === WebSocket.OPEN || sfxSocket.readyState === WebSocket.CONNECTING)) {
-        return;
+      if (sfxEventSource) {
+        sfxEventSource.close();
       }
 
-      sfxSocket = new WebSocket(wsUrl);
+      const streamUrl = `/api/sfx-stream?lang=${currentLangCode}`;
+      sfxEventSource = new EventSource(streamUrl);
 
-      sfxSocket.onopen = () => {
-        clearInterval(pingInterval);
-        // 心跳保活: 每 30 秒发送 Ping
-        pingInterval = setInterval(() => {
-          if (sfxSocket && sfxSocket.readyState === WebSocket.OPEN) {
-            sfxSocket.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 30000);
+      sfxEventSource.onopen = () => {
+        console.log('[SFX Stream] 服务器实时推送流已建立');
       };
 
       // 收到服务器主动下发的数据
-      sfxSocket.onmessage = (event) => {
+      sfxEventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'sfx_update') {
@@ -1537,32 +1526,28 @@
             updateSingleCardTitle(data.id, data.name);
           }
         } catch (e) {
-          console.error('[SFX Push] 解析推送数据失败:', e);
+          console.error('[SFX Stream] 解析推送数据失败:', e);
         }
       };
 
-      sfxSocket.onclose = () => {
-        clearInterval(pingInterval);
+      sfxEventSource.onerror = () => {
+        sfxEventSource.close();
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(connect, 3000);
-      };
-
-      sfxSocket.onerror = () => {
-        if (sfxSocket) sfxSocket.close();
       };
     }
 
     connect();
 
-    // 页面唤醒/切换标签时检查长连接状态
+    // 页面唤醒/切换标签时自动检查
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && (!sfxSocket || sfxSocket.readyState === WebSocket.CLOSED)) {
+      if (!document.hidden && (!sfxEventSource || sfxEventSource.readyState === EventSource.CLOSED)) {
         connect();
       }
     });
 
     window.addEventListener('focus', () => {
-      if (!sfxSocket || sfxSocket.readyState === WebSocket.CLOSED) {
+      if (!sfxEventSource || sfxEventSource.readyState === EventSource.CLOSED) {
         connect();
       }
     });
