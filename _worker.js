@@ -1,10 +1,7 @@
-// _worker.js
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 跨域预检
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -15,14 +12,14 @@ export default {
       });
     }
 
-    // 路由 A: WebSocket 极速连接 (国内访客通过 pages.dev 接入)
+    // 路由 A: WebSocket 实时连接 (国内访客通过 pages.dev 接入)
     if (url.pathname === '/api/sfx-ws') {
       const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
       const hub = env.SFX_HUB.get(id);
       return hub.fetch(request);
     }
 
-    // 路由 B: 获取所有名称 (GET)
+    // 路由 B: 获取名称 (GET)
     if (url.pathname === '/api/sfx-names' && request.method === 'GET') {
       let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
       const prefix = `${lang}:`;
@@ -40,7 +37,7 @@ export default {
       });
     }
 
-    // 路由 C: 保存名称并触发 50ms 极速广播 (POST)
+    // 路由 C: 保存名称并触发全网毫秒级推送 (POST)
     if (url.pathname === '/api/sfx-names' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -51,14 +48,13 @@ export default {
         const trimmed = (name || '').trim();
         const kvKey = `${lang}:${id}`;
 
-        // 1. 写入 KV 做持久化存储
         if (trimmed) {
           await env.SFX_NAMES.put(kvKey, trimmed.slice(0, 40));
         } else {
           await env.SFX_NAMES.delete(kvKey);
         }
 
-        // 2. 核心：直接调用 Durable Object 进行内存级 WebSocket 极速广播 (耗时仅 10ms，彻底消灭 20 秒延迟！)
+        // 核心：直接调用 Durable Object 进行内存级 WebSocket 广播 (耗时仅 10ms！)
         if (env.SFX_HUB) {
           const hubId = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
           const hub = env.SFX_HUB.get(hubId);
@@ -76,7 +72,6 @@ export default {
       }
     }
 
-    // 默认返回静态资源
     return env.ASSETS.fetch(request);
   }
 };
