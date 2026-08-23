@@ -650,7 +650,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
     width: 100%;
   }
@@ -669,13 +669,13 @@
     overflow: hidden;
   }
 
+  /* 修复：移除 font-size 过渡动画，防止 JS 测量宽度产生竞态误差 */
   .custom-name-text {
     color: #ffffff;
     font-weight: 800;
     white-space: nowrap;
     display: inline-block;
     transform-origin: left center;
-    transition: font-size 0.15s ease-out;
   }
 
   .id-prefix {
@@ -1427,42 +1427,71 @@
   const elBtnRenameCancel = document.getElementById('btnRenameCancel');
   const elBtnRenameConfirm = document.getElementById('btnRenameConfirm');
 
+  // =========================================================================
+  // 彻底修复自适应字号测量机制（分三阶段消除 Layout Thrashing 并支持字体加载回调）
+  // =========================================================================
+  let autoFitRafId = null;
+
   function autoFitCardTitles() {
-    requestAnimationFrame(() => {
-      document.querySelectorAll('.sfx-card').forEach(card => {
+    if (autoFitRafId) cancelAnimationFrame(autoFitRafId);
+    autoFitRafId = requestAnimationFrame(() => {
+      const cards = document.querySelectorAll('.sfx-card');
+      if (!cards.length) return;
+
+      // 阶段 1：批量重置字号，让文本回到默认自然尺寸
+      const measureList = [];
+      cards.forEach(card => {
         const headerLine = card.querySelector('.id-header-line');
         if (!headerLine) return;
 
+        const formatTag = headerLine.querySelector('.format-tag');
         const customNameEl = headerLine.querySelector('.custom-name-text');
         const idTitleEl = headerLine.querySelector('.id-title');
         const targetText = customNameEl || idTitleEl;
         if (!targetText) return;
 
-        targetText.style.fontSize = '';
+        targetText.style.fontSize = ''; // 重置字号
+        measureList.push({ headerLine, formatTag, targetText });
+      });
 
-        const formatTag = headerLine.querySelector('.format-tag');
-        const tagWidth = formatTag ? (formatTag.offsetWidth + 10) : 0;
-        const maxAvailableWidth = headerLine.clientWidth - tagWidth;
+      // 阶段 2：批量读取与精确计算目标字号（避免循环读写引发回流抖动）
+      const updateList = [];
+      measureList.forEach(({ headerLine, formatTag, targetText }) => {
+        const tagWidth = formatTag ? formatTag.offsetWidth : 0;
+        const gap = 8;
+        const availableWidth = headerLine.clientWidth - tagWidth - gap;
 
-        if (maxAvailableWidth <= 0) return;
+        if (availableWidth <= 20) return;
 
-        const currentTextWidth = targetText.scrollWidth;
+        const naturalWidth = targetText.scrollWidth;
 
-        if (currentTextWidth > maxAvailableWidth) {
+        if (naturalWidth > availableWidth) {
           const computedStyle = window.getComputedStyle(targetText);
-          const currentFontSize = parseFloat(computedStyle.fontSize);
-          const scaleRatio = maxAvailableWidth / currentTextWidth;
-          
-          const minFontSize = 9.5; 
-          const idealFontSize = Math.max(minFontSize, currentFontSize * scaleRatio * 0.96);
-          
-          targetText.style.fontSize = `${idealFontSize.toFixed(1)}px`;
+          const baseFontSize = parseFloat(computedStyle.fontSize) || 16.8;
+          const scaleRatio = availableWidth / naturalWidth;
+          const minFontSize = 9.5;
+          const targetFontSize = Math.max(minFontSize, baseFontSize * scaleRatio * 0.96);
+
+          updateList.push({ targetText, fontSize: `${targetFontSize.toFixed(1)}px` });
         }
+      });
+
+      // 阶段 3：批量应用最终缩放字号
+      updateList.forEach(({ targetText, fontSize }) => {
+        targetText.style.fontSize = fontSize;
       });
     });
   }
 
+  // 监听容器尺寸与窗口尺寸变化
   window.addEventListener('resize', autoFitCardTitles);
+
+  // 关键修复：当 Google 字体加载完成后，重新计算一次字号，解决字体延迟导致不缩小的现象
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      autoFitCardTitles();
+    });
+  }
 
   function updateSingleCardTitle(id, newName) {
     const oldName = customNames[id] || '';
@@ -2039,6 +2068,7 @@
       });
     });
 
+    // 触发全局精确自适应
     autoFitCardTitles();
   }
 
