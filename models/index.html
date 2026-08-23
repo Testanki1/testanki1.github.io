@@ -690,6 +690,40 @@
 #paint-drop-overlay .drop-sub { font-size:11.5px; color:var(--md-sys-color-on-surface-variant); line-height:1.55; }
 @keyframes dropPulse { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
 #paint-drop-overlay.show .drop-icon { animation:dropPulse 1.5s ease-in-out infinite; }
+    
+        /* 资源创建/更新时间信息展示 */
+        .asset-meta-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 6px 10px;
+            margin-top: 6px;
+            background: rgba(0, 34, 51, 0.55);
+            border: 1px solid rgba(191, 213, 255, 0.1);
+            border-radius: 8px;
+            font-size: 11px;
+            box-sizing: border-box;
+        }
+        .asset-meta-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .asset-meta-lbl {
+            color: var(--md-sys-color-on-surface-variant);
+            opacity: 0.8;
+            white-space: nowrap;
+        }
+        .asset-meta-val {
+            font-variant-numeric: tabular-nums;
+            color: #ffffff;
+            font-size: 11px;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
     <script type="importmap">
         { 
@@ -929,6 +963,9 @@
 
     const Dict = {
     zh: {
+        createdTime: "创建时间",
+        updatedTime: "更新时间",
+        timeNone: "无时间信息",
         appTitle: "3D坦克模型展示",
         handleLbl: "菜单与装备",
         tabNormal: "本地文件",
@@ -1004,6 +1041,9 @@
         dropVideoBlocked: "浏览器阻止了自动播放，点击画面继续播放视频"
     },
     en: {
+        createdTime: "Created",
+        updatedTime: "Updated",
+        timeNone: "No timestamp",
         appTitle: "Tanki Model Showcase",
         handleLbl: "Menu & Equip",
         tabNormal: "Local File",
@@ -1081,6 +1121,63 @@
     }
 };
     const T = Dict[userLang];
+
+    
+    // 毫秒时间戳格式化：中文转北京时间 (UTC+8)，英文转 UTC 时间
+    function formatAssetTime(ts) {
+        if (!ts) return T.timeNone;
+        const num = typeof ts === 'bigint' ? Number(ts) : Number(ts);
+        if (isNaN(num) || num <= 0) return T.timeNone;
+        const date = new Date(num);
+        if (isNaN(date.getTime())) return T.timeNone;
+
+        const isZh = userLang === 'zh';
+        const timeZone = isZh ? 'Asia/Shanghai' : 'UTC';
+
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        const parts = formatter.formatToParts(date);
+        const m = {};
+        parts.forEach(p => m[p.type] = p.value);
+        const formatted = `${m.year}-${m.month}-${m.day} ${m.hour}:${m.minute}:${m.second}`;
+        return isZh ? `${formatted} (北京时间)` : `${formatted} (UTC)`;
+    }
+
+    // 渲染指定卡片的创建与更新时间
+    function updateAssetMetaUI(containerId, leafEntry) {
+        let el = document.getElementById(`meta-${containerId}`);
+        if (!el) {
+            const col = document.querySelector(`#${containerId} .control-col`);
+            if (!col) return;
+            el = document.createElement('div');
+            el.id = `meta-${containerId}`;
+            el.className = 'asset-meta-info';
+            col.appendChild(el);
+        }
+        if (!leafEntry || (!leafEntry.id && !leafEntry.version)) {
+            el.style.display = 'none';
+            return;
+        }
+        el.style.display = 'flex';
+        el.innerHTML = `
+            <div class="asset-meta-item">
+                <span class="asset-meta-lbl">${T.createdTime}</span>
+                <span class="asset-meta-val">${formatAssetTime(leafEntry.id)}</span>
+            </div>
+            <div class="asset-meta-item">
+                <span class="asset-meta-lbl">${T.updatedTime}</span>
+                <span class="asset-meta-val">${formatAssetTime(leafEntry.version)}</span>
+            </div>
+        `;
+    }
 
     function applyI18n() {
         document.title = T.appTitle; 
@@ -2329,6 +2426,32 @@ document.addEventListener('pointerdown', (e) => {
     function renderPaintCurrent() {
         const info = currentPaintName ? PAINTS_CATALOG[currentPaintName] : null;
         const localRec = currentPaintName ? LOCAL_PAINTS.get(currentPaintName) : null;
+        const leaf = info ? info._leaf : null;
+
+        // 实时更新迷彩卡片的时间信息
+        document.querySelectorAll('.card-paint .control-col').forEach(col => {
+            let metaEl = col.querySelector('.paint-meta-info');
+            if (!metaEl) {
+                metaEl = document.createElement('div');
+                metaEl.className = 'asset-meta-info paint-meta-info';
+                col.appendChild(metaEl);
+            }
+            if (!info || localRec || !leaf) {
+                metaEl.style.display = 'none';
+            } else {
+                metaEl.style.display = 'flex';
+                metaEl.innerHTML = `
+                    <div class="asset-meta-item">
+                        <span class="asset-meta-lbl">${T.createdTime}</span>
+                        <span class="asset-meta-val">${formatAssetTime(leaf.id)}</span>
+                    </div>
+                    <div class="asset-meta-item">
+                        <span class="asset-meta-lbl">${T.updatedTime}</span>
+                        <span class="asset-meta-val">${formatAssetTime(leaf.version)}</span>
+                    </div>
+                `;
+            }
+        });
 
         // Pattern-scale slider only makes sense while something is applied.
         document.querySelectorAll('.paint-scale-row').forEach(r => {
@@ -2826,6 +2949,7 @@ document.addEventListener('pointerdown', (e) => {
         sceneLib.meshes = [];
         // Hide garage texture chips when environment is unloaded
         renderSceneTextureNames();
+        updateAssetMetaUI('group-scene', null);
         // Environment gone → restore orbit camera
         setCameraMode('orbit');
         if (refit) fitCamera();
@@ -3048,14 +3172,19 @@ document.addEventListener('pointerdown', (e) => {
         if(loadingState[type]) return; 
         const name = document.getElementById(`sel-${type}-name`).value; const skin = document.getElementById(`sel-${type}-skin`).value;
         if(!name || !skin || name==='Loading...' || skin==='-') return;
-        const path = toResourcePath(assetsData[`${type}s`][name][skin]); if(!path) return;
+        const leaf = (assetsData[`${type}s`][name] || {})[skin];
+        const path = toResourcePath(leaf); if(!path) return;
+        updateAssetMetaUI(`card-${type}`, leaf);
         const wrapper = document.getElementById(`box-${type}`).querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
         loadingState[type] = true; await loadRemoteAsset(path, type);
         if(wrapper) wrapper.classList.remove('loading'); loadingState[type] = false;
     }
 
     async function triggerSceneLoad() {
-        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value; const path = toResourcePath(assetsData.garage && assetsData.garage[variant]); if(!path) return;
+        if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value;
+        const leaf = assetsData.garage && assetsData.garage[variant];
+        const path = toResourcePath(leaf); if(!path) return;
+        updateAssetMetaUI('group-scene', leaf);
         const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
         loadingState.scene = true; await loadRemoteScene(path, variant);
         if(wrapper) wrapper.classList.remove('loading'); loadingState.scene = false;
@@ -4964,7 +5093,9 @@ document.addEventListener('pointerdown', (e) => {
         pools.drone = [];
         pools.supply.forEach(p => p.tex.dispose());
         pools.supply = [];
-        renderTextureNames(); // hide drone/supply texture chips
+        renderTextureNames();
+        updateAssetMetaUI('card-drone', null);
+        updateAssetMetaUI('card-supply', null); // hide drone/supply texture chips
     }
 
     function enterMoreMode() {
@@ -5007,8 +5138,10 @@ document.addEventListener('pointerdown', (e) => {
         const entry = assetsData.supplies && assetsData.supplies[name];
         if (!entry) return;
         const skinsMap = entrySkinsMap(entry);
-        const pathStr = toResourcePath(skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0]);
+        const leaf = skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0];
+        const pathStr = toResourcePath(leaf);
         if (!pathStr) return;
+        updateAssetMetaUI('card-supply', leaf);
         const meta = await fetchMeta(pathStr);
         const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
         if (!modelEntry) throw new Error("A3D/3DS model file not found");
@@ -5062,8 +5195,10 @@ document.addEventListener('pointerdown', (e) => {
         const entry = assetsData.drones && assetsData.drones[name];
         if (!entry) return;
         const skinsMap = entrySkinsMap(entry);
-        const pathStr = toResourcePath(skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0]);
+        const leaf = skinsMap[skin] || skinsMap.default || Object.values(skinsMap)[0];
+        const pathStr = toResourcePath(leaf);
         if (!pathStr) return;
+        updateAssetMetaUI('card-drone', leaf);
         const meta = await fetchMeta(pathStr);
         const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
         if (!modelEntry) throw new Error("A3D/3DS model file not found");
@@ -5169,7 +5304,8 @@ document.addEventListener('pointerdown', (e) => {
                 mountPos = null;
                 setCameraMode('orbit');
             }
-            sceneLib.tex.clear(); sceneLib.meshes=[]; msg(T.clear);
+            sceneLib.tex.clear(); sceneLib.meshes=[]; ['card-hull', 'card-turret', 'card-grenade', 'group-scene', 'card-drone', 'card-supply'].forEach(id => updateAssetMetaUI(id, null));
+            msg(T.clear);
             for (const type of ['hull', 'turret', 'grenade']) {
                 const el = document.getElementById(`attach-${type}`);
                 if (el) el.remove();
@@ -5838,7 +5974,8 @@ document.addEventListener('pointerdown', (e) => {
             slots.grenade = null;
         }
         pools.grenade = [];
-        renderTextureNames(); // drop the grenade texture chips
+        renderTextureNames();
+        updateAssetMetaUI('card-grenade', null); // drop the grenade texture chips
     }
 
     function revertGrenadePick() {
@@ -5870,7 +6007,9 @@ document.addEventListener('pointerdown', (e) => {
         if (!entry) return;
         const skinsMap = entrySkinsMap(entry);
         const skin = skinsMap.default ? 'default' : Object.keys(skinsMap)[0];
-        const pathStr = toResourcePath(skinsMap[skin]); if (!pathStr) return;
+        const leaf = skinsMap[skin];
+        const pathStr = toResourcePath(leaf); if (!pathStr) return;
+        updateAssetMetaUI('card-grenade', leaf);
         try {
             const meta = await fetchMeta(pathStr);
             const modelEntry = meta.find(f => f.name.toLowerCase().endsWith('.a3d')) || meta.find(f => f.name.toLowerCase().endsWith('.3ds'));
