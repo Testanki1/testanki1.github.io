@@ -1499,7 +1499,9 @@
     autoFitCardTitles();
   }
 
-  // 初始化 SSE 服务器主动推送引擎
+  let sfxEventSource = null;
+
+  // 初始化 SSE 服务器主动推送引擎 (浏览器原生静默重连)
   function initRealtimeSyncEngine() {
     function connect() {
       if (sfxEventSource) {
@@ -1527,9 +1529,7 @@
       };
 
       sfxEventSource.onerror = () => {
-        sfxEventSource.close();
-        clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(connect, 3000);
+        // EventSource 会在连接断开时由浏览器底层自动静默重连，无需打印错误
       };
     }
 
