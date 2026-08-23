@@ -15,7 +15,7 @@ export default {
       });
     }
 
-    // 路由 A: SSE 服务器主动推送流 (Server-Sent Events 长连接)
+    // 路由 A: SSE 服务器主动推送流
     if (url.pathname === '/api/sfx-stream') {
       let lang = (url.searchParams.get('lang') || 'zh').toLowerCase() === 'en' ? 'en' : 'zh';
       const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
@@ -24,17 +24,28 @@ export default {
       const writer = writable.getWriter();
       const encoder = new TextEncoder();
 
-      // 在后台维持长连接并主动推流
+      // 监听客户端关闭页面
+      request.signal.addEventListener('abort', () => {
+        try { writer.close(); } catch (e) {}
+      });
+
+      // 维持推送流
       (async () => {
         try {
           let lastTs = Date.now();
-          // 发送连接建立事件
           await writer.write(encoder.encode(`event: open\ndata: {"status":"connected"}\n\n`));
 
-          // 保持长连接 45 秒（超时后浏览器 EventSource 会自动无缝重连）
-          for (let i = 0; i < 45; i++) {
+          // 持续监听 60 秒
+          for (let i = 0; i < 60; i++) {
+            if (request.signal.aborted) break;
             await new Promise(r => setTimeout(r, 1000));
-            
+            if (request.signal.aborted) break;
+
+            // 每 15 秒发送一次轻量心跳保活，防止 HTTP/3 (QUIC) 协议超时报警
+            if (i % 15 === 0) {
+              await writer.write(encoder.encode(`: ping\n\n`));
+            }
+
             const latest = await env.SFX_NAMES.get(syncKey);
             if (latest) {
               try {
@@ -48,14 +59,14 @@ export default {
                     lang: updateData.lang || lang,
                     ts: updateData.ts
                   });
-                  // 服务器主动向客户端推送数据
                   await writer.write(encoder.encode(`data: ${payload}\n\n`));
                 }
               } catch (e) {}
             }
           }
-          await writer.close();
         } catch (err) {
+          // 忽略正常断开
+        } finally {
           try { await writer.close(); } catch (e) {}
         }
       })();
@@ -105,7 +116,7 @@ export default {
           await env.SFX_NAMES.delete(kvKey);
         }
 
-        // 写入版本变更通知，供 SSE 长连接推流
+        // 写入版本变更通知
         const syncKey = `__LAST_UPDATE_${lang.toUpperCase()}__`;
         await env.SFX_NAMES.put(syncKey, JSON.stringify({
           id,
@@ -122,7 +133,7 @@ export default {
       }
     }
 
-    // 默认返回静态页面 (index.html 等)
+    // 默认返回静态页面
     return env.ASSETS.fetch(request);
   }
 };
