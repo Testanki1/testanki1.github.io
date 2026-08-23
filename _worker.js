@@ -1,10 +1,60 @@
 // _worker.js
 
+// 1. 广播中枢 (SQLite 免费版 Durable Object)
+export class SfxHub {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.sessions = new Set();
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    // 内部广播
+    if (url.pathname.endsWith('/broadcast')) {
+      const payload = await request.text();
+      for (const ws of this.sessions) {
+        try {
+          ws.send(payload);
+        } catch (err) {
+          this.sessions.delete(ws);
+        }
+      }
+      return new Response(JSON.stringify({ success: true }));
+    }
+
+    // 处理 WebSocket 握手
+    if (request.headers.get('Upgrade') !== 'websocket') {
+      return new Response('Expected Upgrade: websocket', { status: 426 });
+    }
+
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+
+    server.accept();
+    this.sessions.add(server);
+
+    server.addEventListener('message', (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'ping') server.send(JSON.stringify({ type: 'pong' }));
+      } catch (e) {}
+    });
+
+    server.addEventListener('close', () => this.sessions.delete(server));
+    server.addEventListener('error', () => this.sessions.delete(server));
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+}
+
+// 2. 主请求路由
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 跨域预检处理
+    // 跨域预检
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -15,7 +65,7 @@ export default {
       });
     }
 
-    // 路由 A: WebSocket 实时连接 -> 转发至 sfx-hub
+    // 路由 A: WebSocket 实时连接
     if (url.pathname === '/api/sfx-ws') {
       const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
       const hub = env.SFX_HUB.get(id);
@@ -57,7 +107,7 @@ export default {
           await env.SFX_NAMES.delete(kvKey);
         }
 
-        // 触发 sfx-hub 广播
+        // 推送给 DO 广播中枢
         if (env.SFX_HUB) {
           const hubId = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
           const hub = env.SFX_HUB.get(hubId);
@@ -75,7 +125,7 @@ export default {
       }
     }
 
-    // 默认返回静态页面
+    // 静态网页 (index.html, assets.json 等)
     return env.ASSETS.fetch(request);
   }
 };
