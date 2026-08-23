@@ -891,20 +891,42 @@
   .loading-spinner-circle {
     fill: none;
     stroke: var(--tk-crystals);
-    stroke-width: 2.5;
+    stroke-width: 3;
     stroke-linecap: round;
-    stroke-dasharray: 40 120;
+    stroke-dasharray: 1, 126;
+    stroke-dashoffset: 0;
     opacity: 0;
+    filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.6));
+    transform-origin: 25px 25px;
     transition: opacity var(--m3-duration-short) var(--m3-motion-standard);
   }
 
+  /* 双层复合动效：外层整体旋转 + 内层动态拉伸收缩 */
   .sfx-trigger-wrapper.loading .loading-spinner-circle {
     opacity: 1;
-    animation: spinTrack 0.8s linear infinite;
+    animation: m3-spinner-rotate 1.8s linear infinite,
+               m3-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
-  @keyframes spinTrack {
-    to { transform: rotate(360deg); transform-origin: 25px 25px; }
+  @keyframes m3-spinner-rotate {
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes m3-spinner-dash {
+    0% {
+      stroke-dasharray: 1, 126;
+      stroke-dashoffset: 0;
+    }
+    50% {
+      stroke-dasharray: 90, 126;
+      stroke-dashoffset: -32px;
+    }
+    100% {
+      stroke-dasharray: 90, 126;
+      stroke-dashoffset: -124px;
+    }
   }
 
   .sfx-btn {
@@ -930,8 +952,9 @@
 
   .sfx-trigger-wrapper.loading .sfx-btn {
     pointer-events: none !important;
-    filter: grayscale(0.4);
-    opacity: 0.65;
+    filter: grayscale(0.5);
+    opacity: 0.6;
+    transform: scale(0.9);
     cursor: wait !important;
   }
 
