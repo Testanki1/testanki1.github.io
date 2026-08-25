@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PATTERN VIEWER</title>
+  
+  <!-- 引入 Rubik、M PLUS 1p 字体 及 Material Symbols 图标 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700;800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+  <style>
+    :root {
+      --color-primary: #76FF33;
+      --color-on-primary: #001926;
+      --color-primary-glow: rgba(118, 255, 51, 0.32);
+      
+      --color-background: #001926;
+      --color-surface: #032133;
+      --color-surface-container: #062a40;
+      --color-surface-container-high: #0c3650;
+      
+      --color-outline: rgba(191, 213, 255, 0.2);
+      --color-outline-variant: rgba(191, 213, 255, 0.08);
+      
+      --color-text-main: #BFD5FF;
+      --color-text-dim: rgba(191, 213, 255, 0.65);
+      
+      --font-family-main: 'Rubik', 'M PLUS 1p', -apple-system, BlinkMacSystemFont, sans-serif;
+      --ease-m3-expressive: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-family-main);
+      background-color: var(--color-background);
+      color: var(--color-text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 响应式顶部应用栏：Flex 自适应布局防止移动端截断 */
+    header {
+      height: 64px;
+      padding: 0 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      background: linear-gradient(180deg, var(--color-surface) 0%, rgba(0, 25, 38, 0.7) 100%);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--color-outline-variant);
+      z-index: 20;
+      width: 100%;
+      max-width: 100vw;
+    }
+
+    /* 滑动分段选择器（手机端自适应弹性收缩） */
+    .segmented-control {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      height: 42px;
+      background-color: var(--color-surface-container);
+      border: 1px solid var(--color-outline);
+      border-radius: 9999px;
+      padding: 3px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+      flex: 1;
+      max-width: 280px;
+    }
+
+    .segmented-indicator {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 3px;
+      width: calc(50% - 3px);
+      background-color: var(--color-primary);
+      border-radius: 9999px;
+      transition: transform 0.32s var(--ease-m3-expressive);
+      box-shadow: 0 2px 12px var(--color-primary-glow);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .segmented-control[data-active="orig"] .segmented-indicator {
+      transform: translateX(100%);
+    }
+
+    .segmented-btn {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      height: 100%;
+      min-width: 0; /* 允许在窄屏下平滑收缩，不撑破父级 */
+      appearance: none;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--font-family-main);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--color-text-dim);
+      padding: 0 0.5rem;
+      white-space: nowrap;
+      border-radius: 9999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.25s var(--ease-m3-expressive), transform 0.15s ease;
+    }
+
+    .segmented-btn:active {
+      transform: scale(0.96);
+    }
+
+    .segmented-btn.active {
+      color: var(--color-on-primary);
+    }
+
+    /* 右侧操作按钮组 (紧凑防挤压) */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
+
+    .action-btn {
+      appearance: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 9999px;
+      background-color: var(--color-surface-container);
+      border: 1px solid var(--color-outline);
+      color: var(--color-text-main);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.25s var(--ease-m3-expressive);
+      outline: none;
+      flex-shrink: 0;
+    }
+
+    .action-btn:hover {
+      background-color: var(--color-surface-container-high);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      box-shadow: 0 0 14px rgba(118, 255, 51, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .action-btn:active {
+      transform: scale(0.92);
+    }
+
+    .action-btn.copied {
+      background-color: var(--color-primary);
+      color: var(--color-on-primary);
+      border-color: var(--color-primary);
+      box-shadow: 0 0 16px var(--color-primary-glow);
+    }
+
+    .material-symbols-rounded {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: 19px;
+      line-height: 1;
+    }
+
+    /* 主画布视口 */
+    main {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.85rem;
+      overflow: hidden;
+    }
+
+    .viewport-card {
+      width: 100%;
+      height: 100%;
+      background: var(--color-surface);
+      border: 1px solid var(--color-outline);
+      border-radius: 24px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: inset 0 0 60px rgba(0, 15, 25, 0.8);
+    }
+
+    .stage-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem;
+      z-index: 1;
+      transition: opacity 0.25s var(--ease-m3-expressive), transform 0.25s var(--ease-m3-expressive);
+    }
+
+    .stage-container svg {
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .stage-container.switching {
+      opacity: 0;
+      transform: scale(0.985);
+    }
+
+    /* 平板及桌面端增宽舒适度 */
+    @media (min-width: 600px) {
+      header {
+        height: 72px;
+        padding: 0 1.5rem;
+      }
+      .segmented-control {
+        height: 46px;
+        max-width: 320px;
+      }
+      .segmented-btn {
+        font-size: 0.875rem;
+      }
+      .action-btn {
+        width: 44px;
+        height: 44px;
+      }
+      main {
+        padding: 1.5rem;
+      }
+      .viewport-card {
+        border-radius: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <!-- 切换开关 -->
+    <div class="segmented-control" id="toggle-group" data-active="new" role="tablist">
+      <div class="segmented-indicator" aria-hidden="true"></div>
+      <button class="segmented-btn active" id="btn-new" role="tab" aria-selected="true">3D坦克</button>
+      <button class="segmented-btn" id="btn-orig" role="tab" aria-selected="false">TANKIONLINE</button>
+    </div>
+
+    <!-- 右侧操作按钮组 -->
+    <div class="header-actions">
+      <button class="action-btn" id="btn-copy" title="复制当前 SVG" aria-label="Copy SVG">
+        <span class="material-symbols-rounded">content_copy</span>
+      </button>
+      <button class="action-btn" id="btn-download" title="下载当前 SVG" aria-label="Download SVG">
+        <span class="material-symbols-rounded">download</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div class="viewport-card">
+      <div class="stage-container" id="stage"></div>
+    </div>
+  </main>
+
+  <script>
+    const GLYPH_COMPONENTS = [
+      {
+        name: "3",
+        width: 4,
+        paths: [
+          {
+            d: "M1.5 1C0.671573 1 0 1.67157 0 2.5V2.75C0 2.88807 0.111929 3 0.25 3H0.75C0.888071 3 1 2.88807 1 2.75V2.5C1 2.22386 1.22386 2 1.5 2H2.5C2.77614 2 3 2.22386 3 2.5V4H1.75C1.61193 4 1.5 4.11193 1.5 4.25V4.75C1.5 4.88807 1.61193 5 1.75 5H3V6.5C3 6.77614 2.77614 7 2.5 7H1.5C1.22386 7 1 6.77614 1 6.5V6.25C1 6.11193 0.888071 6 0.75 6H0.25C0.111929 6 0 6.11193 0 6.25V6.5C0 7.32843 0.671573 8 1.5 8H2.5C3.32843 8 4 7.32843 4 6.5V2.5C4 1.67157 3.32843 1 2.5 1H1.5Z",
+            evenodd: false
+          }
+        ]
+      },
+      {
+        name: "D",
+        width: 4,
+        paths: [
+          {
+            d: "M0.25 1C0.11193 1 0 1.11193 0 1.25V7.75C0 7.88807 0.11193 8 0.25 8H2.5C3.32843 8 4 7.32843 4 6.5V2.5C4 1.67157 3.32843 1 2.5 1H0.25ZM2.5 2H1V7H2.5C2.77614 7 3 6.77614 3 6.5V2.5C3 2.22386 2.77614 2 2.5 2Z",
+            evenodd: true
+          }
+        ]
+      },
+      {
+        name: "TAN_LEFT",
+        width: 2,
+        paths: [
+          {
+            d: "M0.75 1C0.6119 1 0.5 1.11193 0.5 1.25V2H0.25C0.1119 2 0 2.11193 0 2.25V2.75C0 2.88807 0.1119 3 0.25 3H0.5V7H0.25C0.1119 7 0 7.11193 0 7.25V7.75C0 7.88807 0.1119 8 0.25 8H1.75C1.8881 8 2 7.88807 2 7.75V7.25C2 7.11193 1.8881 7 1.75 7H1.5V3H1.75C1.8881 3 2 2.88807 2 2.75V2.25C2 2.11193 1.8881 2 1.75 2H1.5V1.25C1.5 1.11193 1.3881 1 1.25 1H0.75Z",
+            evenodd: false
+          }
+        ]
+      },
+      {
+        name: "TAN_RIGHT",
+        width: 4,
+        paths: [
+          {
+            d: "M0.25 1C0.1119 1 0 1.11193 0 1.25V5.75C0 5.88807 0.1119 6 0.25 6H3.75C3.8881 6 4 5.88807 4 5.75V1.25C4 1.11193 3.8881 1 3.75 1H0.25ZM1 5V4H3V5H1ZM1 3H3V2H1V3Z",
+            evenodd: true
+          },
+          {
+            d: "M0 7.25C0 7.11193 0.1119 7 0.25 7H3.75C3.8881 7 4 7.25V7.75C4 7.88807 3.8881 8 3.75 8H0.25C0.1119 8 0 7.88807 0 7.75V7.25Z",
+            evenodd: false
+          }
+        ]
+      },
+      {
+        name: "KE",
+        width: 6,
+        paths: [
+          {
+            d: "M2.75 0C2.6119 0 2.5 0.111929 2.5 0.25V1H0.25C0.1119 1 0 1.11193 0 1.25V1.75C0 1.88807 0.1119 2 0.25 2H2.5V3H0.25C0.1119 3 0 3.11193 0 3.25V5.75C0 5.88807 0.1119 6 0.25 6H1.5V6.5C1.5 6.77614 1.2761 7 1 7H0.25C0.1119 7 0 7.11193 0 7.25V7.75C0 7.88807 0.1119 8 0.25 8H1C1.8284 8 2.5 7.32843 2.5 6.5V6H3.5V7.75C3.5 7.88807 3.6119 8 3.75 8H5.75C5.8881 8 6 7.88807 6 7.75V7.25C6 7.11193 5.8881 7 5.75 7H4.5V6H5.75C5.8881 6 6 5.88807 6 5.75V3.25C6 3.11193 5.8881 3 5.75 3H3.5V2H5.75C5.8881 2 6 1.88807 6 1.75V1.25C6 1.11193 5.8881 1 5.75 1H3.5V0.25C3.5 0.111929 3.3881 0 3.25 0H2.75ZM5 5V4H1V5H5Z",
+            evenodd: true
+          }
+        ]
+      }
+    ];
+
+    const FALLBACK_SVG = `<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg"><g opacity="0.14" clip-path="url(#clip0_138_88)"><path d="M697.218 252.657L650.523 299.353L575.784 224.614L622.479 177.919L641.164 196.603L613.147 224.621L622.489 233.963L650.506 205.946L669.191 224.63L641.174 252.648L650.516 261.99L678.533 233.973L697.218 252.657Z" stroke="#BFD5FF"/><path d="M493.6 306.798L512.279 288.12L587.017 362.858L568.339 381.536L493.6 306.798Z" stroke="#BFD5FF"/><path d="M545.919 366.587L564.603 385.272L527.247 422.628L452.509 347.89L471.187 329.212L527.241 385.265L545.919 366.587Z" stroke="#BFD5FF"/><path fill-rule="evenodd" clip-rule="evenodd" d="M347.911 452.487C339.659 460.74 339.661 474.122 347.916 482.377L392.759 527.22C401.015 535.476 414.397 535.478 422.65 527.226L448.799 501.076C457.051 492.824 457.049 479.441 448.794 471.186L403.951 426.343C395.695 418.088 382.313 418.085 374.06 426.338L347.911 452.487ZM407.701 504.805L426.379 486.127L389.009 448.758L370.331 467.436L407.701 504.805Z" stroke="#BFD5FF"/><path d="M392.739 407.66L411.417 388.982L467.464 407.673L430.095 370.303L448.773 351.625L523.511 426.364L504.833 445.042L448.786 426.351L486.155 463.72L467.477 482.398L392.739 407.66Z" stroke="#BFD5FF"/><path d="M516.014 284.384L534.692 265.706L590.74 284.397L553.37 247.028L572.048 228.35L646.787 303.088L628.109 321.766L572.061 303.075L609.431 340.444L590.753 359.123L516.014 284.384Z" stroke="#BFD5FF"/><path d="M310.555 489.843L329.233 471.165L403.971 545.904L385.293 564.582L310.555 489.843Z" stroke="#BFD5FF"/><path d="M269.463 530.935L250.785 549.613L325.523 624.352L344.202 605.674L316.175 577.647L334.853 558.969L362.88 586.996L381.558 568.317L358.202 544.962C352.621 539.381 345.167 536.818 337.865 537.272C338.319 529.97 335.756 522.515 330.175 516.935L306.819 493.579L288.141 512.257L316.168 540.284L297.49 558.962L269.463 530.935Z" stroke="#BFD5FF"/><path d="M209.693 590.705L191.015 609.383L265.753 684.122L284.432 665.444L247.062 628.074L303.11 646.766L321.788 628.087L247.049 553.349L228.371 572.027L265.74 609.396L209.693 590.705Z" stroke="#BFD5FF"/><path d="M108.838 728.93L90.1531 710.245L127.509 672.889L202.248 747.627L183.57 766.306L127.516 710.252L108.838 728.93Z" stroke="#BFD5FF"/><path fill-rule="evenodd" clip-rule="evenodd" d="M205.983 743.892L146.193 684.101C137.937 675.846 137.935 662.463 146.187 654.211L172.337 628.061C180.589 619.809 193.972 619.811 202.227 628.067L262.018 687.857L243.34 706.536L224.655 687.851L205.977 706.529L224.662 725.214L205.983 743.892ZM187.292 687.844L205.97 669.166L187.286 650.482L168.608 669.16L187.292 687.844Z" stroke="#BFD5FF"/></g><defs><clipPath id="clip0_138_88"><rect width="1920" height="1080" fill="white"/></clipPath></defs></svg>`;
+
+    function parseSvgPath(d) {
+      const commands = [];
+      const regex = /([a-df-z])([^a-df-z]*)/gi;
+      let match;
+      let curX = 0, curY = 0, startX = 0, startY = 0;
+
+      while ((match = regex.exec(d)) !== null) {
+        const type = match[1];
+        const isRelative = type === type.toLowerCase();
+        const upperType = type.toUpperCase();
+        const nums = match[2].trim().match(/-?[0-9]*\.?[0-9]+(?:e[-+]?[0-9]+)?/gi);
+        const args = nums ? nums.map(Number) : [];
+        let i = 0;
+
+        switch (upperType) {
+          case 'M':
+            while (i < args.length) {
+              const x = isRelative ? curX + args[i] : args[i];
+              const y = isRelative ? curY + args[i + 1] : args[i + 1];
+              if (i === 0) {
+                commands.push({ type: 'M', x, y });
+                startX = x; startY = y;
+              } else {
+                commands.push({ type: 'L', x, y });
+              }
+              curX = x; curY = y;
+              i += 2;
+            }
+            break;
+          case 'L':
+            while (i < args.length) {
+              const x = isRelative ? curX + args[i] : args[i];
+              const y = isRelative ? curY + args[i + 1] : args[i + 1];
+              commands.push({ type: 'L', x, y });
+              curX = x; curY = y;
+              i += 2;
+            }
+            break;
+          case 'H':
+            while (i < args.length) {
+              const x = isRelative ? curX + args[i] : args[i];
+              commands.push({ type: 'L', x, y: curY });
+              curX = x; i += 1;
+            }
+            break;
+          case 'V':
+            while (i < args.length) {
+              const y = isRelative ? curY + args[i] : args[i];
+              commands.push({ type: 'L', x: curX, y });
+              curY = y; i += 1;
+            }
+            break;
+          case 'C':
+            while (i < args.length) {
+              const x1 = isRelative ? curX + args[i] : args[i];
+              const y1 = isRelative ? curY + args[i + 1] : args[i + 1];
+              const x2 = isRelative ? curX + args[i + 2] : args[i + 2];
+              const y2 = isRelative ? curY + args[i + 3] : args[i + 3];
+              const x = isRelative ? curX + args[i + 4] : args[i + 4];
+              const y = isRelative ? curY + args[i + 5] : args[i + 5];
+              commands.push({ type: 'C', x1, y1, x2, y2, x, y });
+              curX = x; curY = y; i += 6;
+            }
+            break;
+          case 'Z':
+            commands.push({ type: 'Z' });
+            curX = startX; curY = startY;
+            break;
+        }
+      }
+      return commands;
+    }
+
+    const PARSED_GLYPHS = GLYPH_COMPONENTS.map(g => ({
+      name: g.name,
+      width: g.width,
+      paths: g.paths.map(p => ({
+        cmds: parseSvgPath(p.d),
+        evenodd: p.evenodd
+      }))
+    }));
+
+    function transformPath(parsedCmds, transformFn) {
+      let d = '';
+      for (const cmd of parsedCmds) {
+        if (cmd.type === 'M') {
+          const pt = transformFn(cmd.x, cmd.y);
+          d += `M${Number(pt.x.toFixed(3))} ${Number(pt.y.toFixed(3))}`;
+        } else if (cmd.type === 'L') {
+          const pt = transformFn(cmd.x, cmd.y);
+          d += `L${Number(pt.x.toFixed(3))} ${Number(pt.y.toFixed(3))}`;
+        } else if (cmd.type === 'C') {
+          const p1 = transformFn(cmd.x1, cmd.y1);
+          const p2 = transformFn(cmd.x2, cmd.y2);
+          const p = transformFn(cmd.x, cmd.y);
+          d += `C${Number(p1.x.toFixed(3))} ${Number(p1.y.toFixed(3))} ${Number(p2.x.toFixed(3))} ${Number(p2.y.toFixed(3))} ${Number(p.x.toFixed(3))} ${Number(p.y.toFixed(3))}`;
+        } else if (cmd.type === 'Z') {
+          d += 'Z';
+        }
+      }
+      return d;
+    }
+
+    function transformSvgContent(svgText) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const allPaths = Array.from(doc.querySelectorAll('svg > g path, svg > path')).filter(p => !p.closest('defs') && !p.closest('clipPath'));
+      if (allPaths.length === 0) return svgText;
+
+      const rawClusters = [];
+      for (let i = 0; i < allPaths.length; i += 11) {
+        rawClusters.push(allPaths.slice(i, i + 11));
+      }
+
+      const charGap = 0.4;
+      const glyphOffsets = [];
+      let relX = 0;
+      PARSED_GLYPHS.forEach((g, idx) => {
+        glyphOffsets.push({ glyph: g, startX: relX });
+        relX += g.width;
+        if (idx < PARSED_GLYPHS.length - 1) relX += charGap;
+      });
+      const singleWordWidth = relX;
+      const wordCycle = singleWordWidth + charGap;
+
+      const clusterItems = [];
+      rawClusters.forEach((chunk) => {
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        chunk.forEach(p => {
+          const d = p.getAttribute('d') || '';
+          const cmds = parseSvgPath(d);
+          cmds.forEach(c => {
+            if (c.x !== undefined && c.y !== undefined) {
+              const u = (c.x - c.y) / Math.SQRT2;
+              const v = (c.x + c.y) / Math.SQRT2;
+              if (u < minU) minU = u;
+              if (u > maxU) maxU = u;
+              if (v < minV) minV = v;
+              if (v > maxV) maxV = v;
+            }
+          });
+        });
+        if (minU === Infinity) return;
+        clusterItems.push({
+          chunk,
+          firstPath: chunk[0],
+          parentNode: chunk[0].parentNode,
+          strokeWidth: chunk[0].getAttribute('stroke-width') || null,
+          minU, maxU, minV, maxV,
+          centerV: (minV + maxV) / 2
+        });
+      });
+
+      const stripeMap = new Map();
+      clusterItems.forEach(ci => {
+        const vKey = Math.round(ci.centerV / 25) * 25;
+        if (!stripeMap.has(vKey)) stripeMap.set(vKey, { clusters: [] });
+        stripeMap.get(vKey).clusters.push(ci);
+      });
+
+      stripeMap.forEach((st) => {
+        st.clusters.sort((a, b) => a.minU - b.minU);
+        let stripeMinV = Infinity, stripeMaxV = -Infinity;
+        st.clusters.forEach(c => {
+          if (c.minV < stripeMinV) stripeMinV = c.minV;
+          if (c.maxV > stripeMaxV) stripeMaxV = c.maxV;
+        });
+        const scale = (stripeMaxV - stripeMinV) / 8 || 13.208;
+        const v0 = stripeMinV;
+
+        const segments = [];
+        let curSeg = null;
+        st.clusters.forEach(c => {
+          if (!curSeg) {
+            curSeg = { minU: c.minU, maxU: c.maxU, clusters: [c] };
+          } else {
+            if (c.minU <= curSeg.maxU + 35 * scale) {
+              curSeg.maxU = Math.max(curSeg.maxU, c.maxU);
+              curSeg.clusters.push(c);
+            } else {
+              segments.push(curSeg);
+              curSeg = { minU: c.minU, maxU: c.maxU, clusters: [c] };
+            }
+          }
+        });
+        if (curSeg) segments.push(curSeg);
+
+        segments.forEach(seg => {
+          const segUnits = (seg.maxU - seg.minU) / scale;
+          const strokeWidth = seg.clusters[0].strokeWidth;
+          const parentNode = seg.clusters[0].parentNode;
+          const refNode = seg.clusters[0].firstPath;
+
+          let N = Math.floor((segUnits + charGap) / wordCycle);
+          if (N < 1) N = 1;
+
+          const totalChainUnits = N * singleWordWidth + (N - 1) * charGap;
+          const marginUnits = (segUnits - totalChainUnits) / 2;
+          const startU = seg.minU + marginUnits * scale;
+
+          const newElements = [];
+          for (let w = 0; w < N; w++) {
+            const curWordStart = startU + w * wordCycle * scale;
+            glyphOffsets.forEach(({ glyph, startX }) => {
+              const partStartU = curWordStart + startX * scale;
+              const transformFn = (X, Y) => ({
+                x: (v0 + Y * scale + partStartU + X * scale) / Math.SQRT2,
+                y: (v0 + Y * scale - (partStartU + X * scale)) / Math.SQRT2
+              });
+
+              glyph.paths.forEach(pDef => {
+                const np = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+                np.setAttribute('d', transformPath(pDef.cmds, transformFn));
+                np.setAttribute('stroke', '#BFD5FF');
+                if (strokeWidth) np.setAttribute('stroke-width', strokeWidth);
+                if (pDef.evenodd) {
+                  np.setAttribute('fill-rule', 'evenodd');
+                  np.setAttribute('clip-rule', 'evenodd');
+                }
+                newElements.push(np);
+              });
+            });
+          }
+          newElements.forEach(np => parentNode.insertBefore(np, refNode));
+        });
+
+        st.clusters.forEach(c => {
+          c.chunk.forEach(p => p.parentNode && p.parentNode.removeChild(p));
+        });
+      });
+
+      return new XMLSerializer().serializeToString(doc);
+    }
+
+    let rawSvgData = '';
+    let convertedSvgData = '';
+    let currentMode = 'new';
+
+    const stageEl = document.getElementById('stage');
+    const toggleGroup = document.getElementById('toggle-group');
+    const btnNew = document.getElementById('btn-new');
+    const btnOrig = document.getElementById('btn-orig');
+    const btnCopy = document.getElementById('btn-copy');
+    const btnDownload = document.getElementById('btn-download');
+
+    function getCurrentSvg() {
+      return currentMode === 'new' ? convertedSvgData : rawSvgData;
+    }
+
+    function applyRender(mode) {
+      currentMode = mode;
+      toggleGroup.setAttribute('data-active', mode);
+
+      btnNew.classList.toggle('active', mode === 'new');
+      btnNew.setAttribute('aria-selected', mode === 'new');
+      btnOrig.classList.toggle('active', mode === 'orig');
+      btnOrig.setAttribute('aria-selected', mode === 'orig');
+
+      stageEl.classList.add('switching');
+      setTimeout(() => {
+        stageEl.innerHTML = getCurrentSvg();
+        stageEl.classList.remove('switching');
+      }, 150);
+    }
+
+    function toggleView() {
+      applyRender(currentMode === 'new' ? 'orig' : 'new');
+    }
+
+    btnNew.addEventListener('click', () => applyRender('new'));
+    btnOrig.addEventListener('click', () => applyRender('orig'));
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        toggleView();
+      }
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      const svg = getCurrentSvg();
+      if (!svg) return;
+
+      try {
+        await navigator.clipboard.writeText(svg);
+        const icon = btnCopy.querySelector('.material-symbols-rounded');
+        const prevIcon = icon.textContent;
+        
+        icon.textContent = 'check';
+        btnCopy.classList.add('copied');
+        
+        setTimeout(() => {
+          icon.textContent = prevIcon;
+          btnCopy.classList.remove('copied');
+        }, 1600);
+      } catch (err) {
+        console.error('Copy failed', err);
+      }
+    });
+
+    btnDownload.addEventListener('click', () => {
+      const svg = getCurrentSvg();
+      if (!svg) return;
+
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = currentMode === 'new' ? '3d-tank-pattern.svg' : 'tankionline-pattern.svg';
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+
+    async function initPattern() {
+      try {
+        const response = await fetch('./background-pattern.svg');
+        if (!response.ok) throw new Error('Fetch failed');
+        rawSvgData = await response.text();
+      } catch (err) {
+        rawSvgData = FALLBACK_SVG;
+      }
+
+      convertedSvgData = transformSvgContent(rawSvgData);
+      applyRender('new');
+    }
+
+    initPattern();
+  </script>
+</body>
+</html>
