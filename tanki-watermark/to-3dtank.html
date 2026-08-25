@@ -557,13 +557,13 @@
 
               glyph.paths.forEach(pDef => {
                 const np = doc.createElementNS("http://www.w3.org/2000/svg", "path");
-                np.setAttribute('d', transformPath(pDef.cmds, transformFn));
-                np.setAttribute('stroke', '#BFD5FF');
-                if (strokeWidth) np.setAttribute('stroke-width', strokeWidth);
                 if (pDef.evenodd) {
                   np.setAttribute('fill-rule', 'evenodd');
                   np.setAttribute('clip-rule', 'evenodd');
                 }
+                np.setAttribute('d', transformPath(pDef.cmds, transformFn));
+                np.setAttribute('stroke', '#BFD5FF');
+                if (strokeWidth) np.setAttribute('stroke-width', strokeWidth);
                 newElements.push(np);
               });
             });
@@ -576,7 +576,50 @@
         });
       });
 
-      return new XMLSerializer().serializeToString(doc);
+      return serializeLikeOriginal(doc);
+    }
+
+    function serializeLikeOriginal(doc) {
+      const svgEl = doc.documentElement;
+      const width = svgEl.getAttribute('width') || '1920';
+      const height = svgEl.getAttribute('height') || '1080';
+      const viewBox = svgEl.getAttribute('viewBox') || `0 0 ${width} ${height}`;
+      const g = svgEl.querySelector('g');
+      const opacity = (g && g.getAttribute('opacity')) || '0.14';
+      const clipPath = (g && g.getAttribute('clip-path')) || 'url(#clip0_138_88)';
+      const clip = svgEl.querySelector('clipPath');
+      const clipId = (clip && clip.getAttribute('id')) || 'clip0_138_88';
+
+      const lines = [
+        `<svg width="${width}" height="${height}" viewBox="${viewBox}" fill="none" xmlns="http://www.w3.org/2000/svg">`,
+        `<g opacity="${opacity}" clip-path="${clipPath}">`
+      ];
+
+      const paths = g
+        ? Array.from(g.childNodes).filter((n) => n.nodeType === 1 && n.tagName && n.tagName.toLowerCase() === 'path')
+        : [];
+      paths.forEach((p) => {
+        const d = p.getAttribute('d') || '';
+        if (!d) return;
+        const even = p.getAttribute('fill-rule') === 'evenodd';
+        if (even) {
+          lines.push(`<path fill-rule="evenodd" clip-rule="evenodd" d="${d}" stroke="#BFD5FF"/>`);
+        } else {
+          lines.push(`<path d="${d}" stroke="#BFD5FF"/>`);
+        }
+      });
+
+      lines.push(
+        `</g>`,
+        `<defs>`,
+        `<clipPath id="${clipId}">`,
+        `<rect width="${width}" height="${height}" fill="white"/>`,
+        `</clipPath>`,
+        `</defs>`,
+        `</svg>`,
+        ``
+      );
+      return lines.join('\n');
     }
 
     let rawSvgData = '';
@@ -673,5 +716,5 @@
 
     initPattern();
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a30695f2adb8f429',t:'MTc4NzYxODg0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
