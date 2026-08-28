@@ -858,7 +858,7 @@
             overflow-y: auto;
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
             border: 1px solid var(--md-sys-color-outline-variant);
-            position: relative; /* 保证关闭按钮绝对定位基准正确 */
+            position: relative;
          }
 
          /* --- 弹窗的右上角关闭按钮 --- */
@@ -937,7 +937,6 @@
             margin-top: 12px;
          }
          
-         /* 【关键修改】专门取消弹窗内部表格的大块留白，让弹窗高度紧贴内容 */
          .modal-content .leaderboard-table-wrapper {
             min-height: auto;
             margin-bottom: 0;
@@ -1718,9 +1717,7 @@
          renderHistory();
 
          /* ============================================================
-          * Cloudflare Pages 代理配置（代理路由在仓库根目录 _worker.js 的 /proxy）
-          * pages.dev 国内可直连；调用格式与 page-icons 一致：
-          * proxyBase + encodeURIComponent(目标URL)
+          * Cloudflare Pages 代理配置
           * ============================================================ */
          const API_CONFIG = {
             proxyBase: "https://testanki1.pages.dev/proxy?",
@@ -1731,7 +1728,6 @@
             leaderboardUrl: "https://ratings.tankionline.com/api/eu/top/",
             monitorInterval: 3000,
          };
-         // 通过 Cloudflare Pages 代理转发请求（自动附加 CORS 头）
          function proxied(targetUrl) {
             return API_CONFIG.proxyBase + encodeURIComponent(targetUrl);
          }
@@ -1784,11 +1780,11 @@
             currentUsername = "",
             currentServer = "",
             leaderboardData = null,
-            currentLeaderboardIndex = 0;
+            currentLeaderboardIndex = 0,
+            isFetchingLeaderboard = false; // 防重复请求锁
 
+         // 【修复点 1】：统一交由 processUrlParams 处理，避免加载时二次调用
          document.addEventListener("DOMContentLoaded", () => {
-            if (!new URLSearchParams(window.location.search).has("username"))
-               fetchAndRenderLeaderboard();
             processUrlParams();
          });
          window.addEventListener("popstate", () => {
@@ -1944,7 +1940,11 @@
             }
          }
 
+         // 【修复点 2】：增加 isFetchingLeaderboard 防重复网络请求机制
          async function fetchAndRenderLeaderboard() {
+            if (isFetchingLeaderboard) return;
+            isFetchingLeaderboard = true;
+
             const container = elements.leaderboardContainer;
             container.style.display = "block";
             container.innerHTML = `<div class="loader" style="display: flex;"><div class="loader-inner"></div></div>`;
@@ -1966,6 +1966,8 @@
                } else throw new Error("Format Error");
             } catch (error) {
                container.innerHTML = `<p class="no-data-message" style="color: var(--md-sys-color-error);">Error: ${error.message}</p>`;
+            } finally {
+               isFetchingLeaderboard = false;
             }
          }
 
@@ -2075,7 +2077,6 @@
                lastProfileData = profileData;
             } catch (error) {
                displayError(error.message);
-               // 核心修复：即使查询失败，也要把左上角的返回按钮展示出来
                elements.backToLeaderboardContainer.style.display = "block";
             } finally {
                setLoading(false);
