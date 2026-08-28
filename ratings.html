@@ -1717,7 +1717,13 @@
          applyLanguageToStaticHTML();
          renderHistory();
 
+         /* ============================================================
+          * Cloudflare Pages 代理配置（代理路由在仓库根目录 _worker.js 的 /proxy）
+          * pages.dev 国内可直连；调用格式与 page-icons 一致：
+          * proxyBase + encodeURIComponent(目标URL)
+          * ============================================================ */
          const API_CONFIG = {
+            proxyBase: "https://testanki1.pages.dev/proxy?",
             baseUrls: {
                eu: "https://ratings.tankionline.com/api/eu/profile/",
                cn: "https://ratings.3dtank.com/get_stat/profile/",
@@ -1725,6 +1731,10 @@
             leaderboardUrl: "https://ratings.tankionline.com/api/eu/top/",
             monitorInterval: 3000,
          };
+         // 通过 Cloudflare Pages 代理转发请求（自动附加 CORS 头）
+         function proxied(targetUrl) {
+            return API_CONFIG.proxyBase + encodeURIComponent(targetUrl);
+         }
          const RANKS = isChinese
             ?["新兵","二等兵","一等兵","下士","中士","上士","三级军士长","二级军士长","一级军士长","军士长","五级准尉","四级准尉","三级准尉","二级准尉","一级准尉","特级准尉","少尉","中尉","上尉","少校","中校","上校","准将","少将","中将","上将","元帅","陆军元帅","统帅","大元帅","传奇"]
             :["Recruit","Private","Gefreiter","Corporal","Master Corporal","Sergeant","Staff Sergeant","Master Sergeant","First Sergeant","Sergeant-Major","Warrant Officer 1","Warrant Officer 2","Warrant Officer 3","Warrant Officer 4","Warrant Officer 5","Third Lieutenant","Second Lieutenant","First Lieutenant","Captain","Major","Lieutenant Colonel","Colonel","Brigadier","Major General","Lieutenant General","General","Marshal","Field Marshal","Commander","Generalissimo","Legend"];
@@ -1882,7 +1892,7 @@
          }
 
          async function fetchStarsLeaderboardData() {
-            const apiUrl = `https://corsproxy.io/?${encodeURIComponent("https://pages.tankionline.com/challenge-accepted")}`;
+            const apiUrl = proxied("https://pages.tankionline.com/challenge-accepted");
             try {
                const response = await fetch(apiUrl);
                if (!response.ok) throw new Error("Status " + response.status);
@@ -1940,9 +1950,7 @@
             container.innerHTML = `<div class="loader" style="display: flex;"><div class="loader-inner"></div></div>`;
             try {
                const[regularDataResponse, starsData] = await Promise.all([
-                  fetch(
-                     `https://corsproxy.io/?${encodeURIComponent(API_CONFIG.leaderboardUrl)}`,
-                  ).then((res) => {
+                  fetch(proxied(API_CONFIG.leaderboardUrl)).then((res) => {
                      if (!res.ok) throw new Error(res.status);
                      return res.json();
                   }),
@@ -2075,9 +2083,7 @@
          }
          async function fetchProfileData(server, username) {
             const targetUrl = `${API_CONFIG.baseUrls[server]}?user=${encodeURIComponent(username)}&lang=${isChinese ? "cn" : "en"}&_=${Date.now()}`;
-            const response = await fetch(
-               `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-            );
+            const response = await fetch(proxied(targetUrl));
             if (!response.ok) throw new Error(response.status);
             const data = await response.json();
             if (data?.responseType === "NOT_FOUND")
