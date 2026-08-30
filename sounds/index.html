@@ -4,11 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3D坦克音效展示</title>
-<script>
-  if (location.hostname.includes('github.io')) {
-    location.replace(location.href.replace(location.host, 'testanki1.pages.dev'));
-  }
-</script>
 <!-- 官方规范字体: Rubik 与 M PLUS 1p -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1365,7 +1360,11 @@
 <div class="toast-box" id="toastBox">提示信息</div>
 
 <script>
-  const WORKER_API_BASE = '';
+  // Worker 接口（/api/sfx-names、/api/sfx-ws）只在 Cloudflare Pages 上跑，GitHub Pages 没有 Worker。
+  // 所以在 github.io 上访问时，把接口指向 pages.dev，两个域名都能正常用，不再需要强制跳转。
+  const WORKER_API_BASE = /github\.io$/.test(location.hostname)
+    ? 'https://testanki1.pages.dev'
+    : '';
 
   const isZh = (navigator.language || navigator.userLanguage || '').toLowerCase().startsWith('zh');
   const currentLangCode = isZh ? 'zh' : 'en';
