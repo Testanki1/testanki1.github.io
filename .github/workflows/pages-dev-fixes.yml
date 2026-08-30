@@ -1,0 +1,194 @@
+name: 修复 pages.dev 硬编码域名
+
+# 一次性维护任务：把 5 处写死域名的地方改成按当前访问域名自适应。
+#
+#   music/index.html      音乐/歌词地址写死 pages.dev      -> 取当前目录
+#   page-icons/index.html 代理地址写死 pages.dev           -> github.io 时指回 pages.dev
+#   ratings.html          同上
+#   servers.html          展示给用户的测试服网址写死 github.io -> 按 location.host 渲染
+#   news.json             公告里的站内链接写死 github.io    -> 改成相对路径
+#
+# 补丁以内嵌 heredoc 形式放在下面（git diff -U0，不含上下文行），
+# 好处是复制粘贴时被编辑器吃掉行尾空格也不会损坏补丁。
+# 注意：git apply 默认拒绝零上下文补丁，必须带 --unidiff-zero。
+#
+# 幂等：已应用过会自动跳过（用 --reverse --check 判断），不会重复提交。
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 如何落地改动
+        type: choice
+        options:
+          - pull-request   # 开/更新 PR（推荐）
+          - commit-main    # 直接提交回 main
+          - dry-run        # 只检查不落地
+        default: pull-request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fix:
+    name: 应用域名自适应补丁
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: 写出内嵌补丁
+        run: |
+          cat > "$RUNNER_TEMP/fix.patch" <<'PATCH_EOF'
+          diff --git a/music/index.html b/music/index.html
+          index c2ad4a0..47892a3 100644
+          --- a/music/index.html
+          +++ b/music/index.html
+          @@ -189 +189,2 @@
+          -        const musicBaseUrl = "https://testanki1.pages.dev/music/";
+          +        // 取当前页面所在目录，github.io 与 pages.dev 都走同源，不再跨域名拉歌词
+          +        const musicBaseUrl = new URL('./', location.href).href;
+          diff --git a/news.json b/news.json
+          index 9da0693..6a52c28 100644
+          --- a/news.json
+          +++ b/news.json
+          @@ -32 +32 @@
+          -    "content": "<div><div class='wp-block-buttons is-layout-flex wp-block-buttons-is-layout-flex' style='gap: 0.5em; display: flex; flex-flow: column wrap; align-items: center; margin-bottom: 1rem; justify-content: center; color: rgb(0, 25, 38)'><div class='wp-block-button is-style-green-arrow' style='margin: 0px; display: inline-block; width: 320px;'><a class='wp-block-button__link wp-element-button' href='https://testanki1.github.io/fund-results/summer-major-2026#gid=0' target='_blank' style='border-radius: 0.5rem; box-shadow: none; padding: 1.25rem; text-decoration-line: none; cursor: pointer; display: flex; text-align: center; justify-content: center; word-break: break-word; color: rgb(118, 255, 51); background: rgba(118, 255, 51, 0.15); font-size: 1.125rem; transition: 0.15s; align-items: center; border: 1px solid rgba(118, 255, 51, 0.25); text-transform: uppercase; width: 320px; opacity: 1;' onmouseover='this.style.background=\"rgb(118, 255, 51)\"; this.style.color=\"rgb(0, 25, 38)\"; this.style.opacity=\"0.8\";' onmouseout='this.style.background=\"rgba(118, 255, 51)\"; this.style.color=\"rgb(118, 255, 51)\"; this.style.opacity=\"1\";' ontouchstart='this.style.background=\"rgb(118, 255, 51)\"; this.style.color=\"rgb(0, 25, 38)\"; this.style.opacity=\"0.8\";' ontouchend='this.style.background=\"rgba(118, 255, 51)\"; this.style.color=\"rgb(118, 255, 51)\"; this.style.opacity=\"1\";'>获奖者</a></div></div></div>"
+          +    "content": "<div><div class='wp-block-buttons is-layout-flex wp-block-buttons-is-layout-flex' style='gap: 0.5em; display: flex; flex-flow: column wrap; align-items: center; margin-bottom: 1rem; justify-content: center; color: rgb(0, 25, 38)'><div class='wp-block-button is-style-green-arrow' style='margin: 0px; display: inline-block; width: 320px;'><a class='wp-block-button__link wp-element-button' href='/fund-results/summer-major-2026#gid=0' target='_blank' style='border-radius: 0.5rem; box-shadow: none; padding: 1.25rem; text-decoration-line: none; cursor: pointer; display: flex; text-align: center; justify-content: center; word-break: break-word; color: rgb(118, 255, 51); background: rgba(118, 255, 51, 0.15); font-size: 1.125rem; transition: 0.15s; align-items: center; border: 1px solid rgba(118, 255, 51, 0.25); text-transform: uppercase; width: 320px; opacity: 1;' onmouseover='this.style.background=\"rgb(118, 255, 51)\"; this.style.color=\"rgb(0, 25, 38)\"; this.style.opacity=\"0.8\";' onmouseout='this.style.background=\"rgba(118, 255, 51)\"; this.style.color=\"rgb(118, 255, 51)\"; this.style.opacity=\"1\";' ontouchstart='this.style.background=\"rgb(118, 255, 51)\"; this.style.color=\"rgb(0, 25, 38)\"; this.style.opacity=\"0.8\";' ontouchend='this.style.background=\"rgba(118, 255, 51)\"; this.style.color=\"rgb(118, 255, 51)\"; this.style.opacity=\"1\";'>获奖者</a></div></div></div>"
+          diff --git a/page-icons/index.html b/page-icons/index.html
+          index 821dbc3..bf06fe0 100644
+          --- a/page-icons/index.html
+          +++ b/page-icons/index.html
+          @@ -385 +385,2 @@
+          -            proxyBase: 'https://testanki1.pages.dev/proxy?', // 自建 Cloudflare Pages 代理（仓库 _worker.js 的 /proxy 路由）
+          +            // /proxy 是 Cloudflare Pages 的 Worker 路由，GitHub Pages 上没有，需要指回 pages.dev
+          +            proxyBase: /github\.io$/.test(location.hostname) ? 'https://testanki1.pages.dev/proxy?' : '/proxy?',
+          diff --git a/ratings.html b/ratings.html
+          index 92b8818..94cbf6d 100644
+          --- a/ratings.html
+          +++ b/ratings.html
+          @@ -1723 +1723,2 @@
+          -            proxyBase: "https://testanki1.pages.dev/proxy?",
+          +            // /proxy 是 Cloudflare Pages 的 Worker 路由，GitHub Pages 上没有，需要指回 pages.dev
+          +            proxyBase: /github\.io$/.test(location.hostname) ? "https://testanki1.pages.dev/proxy?" : "/proxy?",
+          diff --git a/servers.html b/servers.html
+          index b6325f5..c137456 100644
+          --- a/servers.html
+          +++ b/servers.html
+          @@ -560 +560 @@
+          -                    <span class="url-marquee-content">https://testanki1.github.io/test</span>
+          +                    <span class="url-marquee-content" id="test-server-url">/test</span>
+          @@ -561,0 +562,5 @@
+          +                <script>
+          +                    // 按当前访问的域名显示测试服地址（github.io / pages.dev 都正确）
+          +                    // 必须写在 setupMarquees() 之前，否则复制出来的是旧文本
+          +                    document.getElementById('test-server-url').textContent = location.host + '/test';
+          +                </script>
+          PATCH_EOF
+          echo "补丁行数：$(wc -l < "$RUNNER_TEMP/fix.patch")"
+
+      - name: 判断补丁状态
+        id: state
+        run: |
+          P="$RUNNER_TEMP/fix.patch"
+          if git apply --unidiff-zero --check "$P" 2>/dev/null; then
+            echo "value=pending" >> "$GITHUB_OUTPUT"
+            echo "补丁尚未应用，可以应用"
+          elif git apply --unidiff-zero --reverse --check "$P" 2>/dev/null; then
+            echo "value=applied" >> "$GITHUB_OUTPUT"
+            echo "补丁已经应用过，跳过"
+          else
+            echo "value=conflict" >> "$GITHUB_OUTPUT"
+            echo "::warning::补丁与当前代码冲突，需要人工处理"
+          fi
+
+      - name: 应用补丁
+        if: steps.state.outputs.value == 'pending' && inputs.apply != 'dry-run'
+        run: |
+          git apply --unidiff-zero "$RUNNER_TEMP/fix.patch"
+          echo "已应用："
+          git diff --stat
+
+      - name: 冲突详情
+        if: steps.state.outputs.value == 'conflict'
+        run: |
+          git apply --unidiff-zero -v --check "$RUNNER_TEMP/fix.patch" || true
+          echo "::error::补丁无法应用，请在本地 git apply 后手动解决冲突"
+          exit 1
+
+      - name: 校验 5 处修改是否到位
+        if: steps.state.outputs.value != 'conflict' && inputs.apply != 'dry-run'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          checks = [
+              ("music/index.html",       'musicBaseUrl = "https://testanki1.pages.dev/music/"', False),
+              ("page-icons/index.html",  "location.hostname",                                    True),
+              ("ratings.html",           "location.hostname",                                    True),
+              ("servers.html",           "https://testanki1.github.io/test",                     False),
+              ("news.json",              "https://testanki1.github.io/fund-results",             False),
+          ]
+          bad = []
+          for path, needle, want in checks:
+              text = Path(path).read_text(encoding="utf-8")
+              ok = (needle in text) == want
+              print(("  OK  " if ok else "  FAIL") + f" {path}: {needle}（应{'存在' if want else '不存在'}）")
+              if not ok:
+                  bad.append(path)
+          if bad:
+              raise SystemExit("校验未通过：" + ", ".join(bad))
+          print("全部 5 处校验通过")
+          PY
+
+      - name: 统计改动
+        id: diff
+        if: inputs.apply != 'dry-run'
+        run: |
+          echo "count=$(git status --porcelain | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: 提交回 main
+        if: steps.diff.outputs.count != '0' && inputs.apply == 'commit-main'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: 去掉写死的域名，github.io 与 pages.dev 都能用"
+          git push origin main
+
+      - name: 开 / 更新 PR
+        if: steps.diff.outputs.count != '0' && inputs.apply == 'pull-request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="chore/domain-agnostic"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add -A
+          git commit -m "fix: 去掉写死的域名，github.io 与 pages.dev 都能用"
+          git push --force origin "$BRANCH"
+
+          cat > pr_body.md <<'EOF'
+          由 `.github/workflows/pages-dev-fixes.yml` 自动生成。
+
+          - music：音乐/歌词地址改为按当前目录取，不再跨域名
+          - page-icons / ratings：/proxy 是 Cloudflare Pages 的 Worker 路由，
+            在 GitHub Pages 上自动指回 pages.dev（照抄 sounds/index.html 的双域名写法）
+          - servers.html：滚动字幕里的测试服网址按 location.host 渲染
+          - news.json：公告里的站内链接改成相对路径
+          EOF
+
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            echo "PR 已存在，内容已更新"
+            gh pr edit "$BRANCH" --body-file pr_body.md
+          else
+            gh pr create --base main --head "$BRANCH" \
+              --title "fix: 去掉写死的域名，github.io 与 pages.dev 都能用" \
+              --body-file pr_body.md
+          fi
+
+      - name: 没有可改的内容
+        if: steps.diff.outputs.count == '0'
+        run: echo "补丁已应用过或无需改动，跳过提交。"
