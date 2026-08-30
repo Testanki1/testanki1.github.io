@@ -17,6 +17,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Install git-filter-repo
+        shell: bash
+        run: |
+          set -e
+
+          python3 -m pip install -q git-filter-repo
+
+          echo "git-filter-repo 版本:"
+          git filter-repo --version
+
       - name: Scan historical resources
         shell: bash
         run: |
@@ -44,16 +54,16 @@ jobs:
           def is_target_file(path):
               path_lower = path.lower()
 
-              # 所有历史中的 map.bin
+              # 删除所有历史中的 map.bin
               if path_lower == "map.bin" or path_lower.endswith("/map.bin"):
                   return True
 
-              # augments_icon 目录中的 SVG 和 TXT
+              # 删除 augments_icon 目录中的 SVG 和 TXT
               if re.search(r'(^|/)augments_icon(/|$)', path_lower):
                   if path_lower.endswith(".svg") or path_lower.endswith(".txt"):
                       return True
 
-              # 所有目录中的音频文件，包括 music、sounds 等目录
+              # 删除所有目录中的音频文件
               if audio_pattern.search(path_lower):
                   return True
 
@@ -64,18 +74,20 @@ jobs:
 
               return False
 
-          # 当前 main 分支中的所有 Blob 都保留
+          # 读取当前 main 分支中的所有 Blob
           current_blobs = set()
 
           with open("/tmp/current-blobs.txt", encoding="utf-8") as f:
               for line in f:
                   value = line.strip()
+
                   if value:
                       current_blobs.add(bytes.fromhex(value))
 
           target_blobs = set()
           target_paths = {}
 
+          # 扫描所有可访问的 Git 历史对象
           with open("/tmp/all-history-objects.txt", encoding="utf-8") as f:
               for line in f:
                   line = line.rstrip("\n")
@@ -87,13 +99,18 @@ jobs:
 
                   if is_target_file(path):
                       blob_id = bytes.fromhex(sha)
+
                       target_blobs.add(blob_id)
                       target_paths.setdefault(sha, path)
 
-          # 只删除历史中不再被当前 main 使用的目标资源
+          # 当前 main 使用的 Blob 全部保留
           remove_blobs = target_blobs - current_blobs
 
-          with open("/tmp/remove-resource-blobs.txt", "w", encoding="utf-8") as f:
+          with open(
+              "/tmp/remove-resource-blobs.txt",
+              "w",
+              encoding="utf-8"
+          ) as f:
               for blob_id in sorted(remove_blobs):
                   f.write(blob_id.hex() + "\n")
 
@@ -156,32 +173,7 @@ jobs:
           echo "确认当前资源仍然存在"
           echo "========================================"
 
-          audio_count=0
-          map_count=0
-          augments_count=0
-
-          while IFS= read -r file; do
-            [ -z "$file" ] && continue
-
-            if [ -f "$file" ]; then
-              size=$(stat -c%s "$file")
-
-              case "${file,,}" in
-                *.mp3|*.wav|*.ogg|*.opus|*.m4a|*.aac|*.flac|*.aiff|*.aif|*.wma|*.mid|*.midi)
-                  echo "保留音频: ${file} (${size} bytes)"
-                  audio_count=$((audio_count + 1))
-                  ;;
-                */map.bin|map.bin)
-                  echo "保留地图文件: ${file} (${size} bytes)"
-                  map_count=$((map_count + 1))
-                  ;;
-                */augments_icon/*.svg|*/augments_icon/*.txt)
-                  echo "保留 augments_icon 文件: ${file} (${size} bytes)"
-                  augments_count=$((augments_count + 1))
-                  ;;
-              esac
-            fi
-          done < <(
+          audio_count=$(
             find . -type f \
               ! -path "./.git/*" \
               \( \
@@ -197,16 +189,38 @@ jobs:
                 -o -iname "*.wma" \
                 -o -iname "*.mid" \
                 -o -iname "*.midi" \
-                -o -iname "map.bin" \
-                -o -path "*/augments_icon/*.svg" \
-                -o -path "*/augments_icon/*.txt" \
-              \)
+              \) \
+              | wc -l
           )
 
+          map_count=$(
+            find . -type f \
+              ! -path "./.git/*" \
+              -iname "map.bin" \
+              | wc -l
+          )
+
+          augments_svg_count=$(
+            find . -type f \
+              ! -path "./.git/*" \
+              -path "*/augments_icon/*.svg" \
+              | wc -l
+          )
+
+          augments_txt_count=$(
+            find . -type f \
+              ! -path "./.git/*" \
+              -path "*/augments_icon/*.txt" \
+              | wc -l
+          )
+
+          echo "当前音频文件数量: ${audio_count}"
+          echo "当前 map.bin 数量: ${map_count}"
+          echo "当前 augments_icon SVG 数量: ${augments_svg_count}"
+          echo "当前 augments_icon TXT 数量: ${augments_txt_count}"
+
           echo
-          echo "当前保留音频数量: ${audio_count}"
-          echo "当前保留 map.bin 数量: ${map_count}"
-          echo "当前保留 augments_icon SVG/TXT 数量: ${augments_count}"
+          echo "当前资源检查完成"
 
       - name: Force push rewritten history
         shell: bash
