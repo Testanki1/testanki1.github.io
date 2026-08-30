@@ -42,6 +42,22 @@ SKIP_DIRS = {".git", "node_modules", ".github", "dist", "build", "out", ".venv",
 PATH_CHARS = r"[^\s\"'`<>\\)\]]"
 
 
+def read_text(path: Path) -> str:
+    """读文件并保留原始换行符（CRLF 不会被悄悄转成 LF）。
+
+    Path.read_text() 的 newline= 参数只有 Python 3.13+ 才有，
+    这里用内建 open() 保证 3.8+ / CI 上的 3.12 都能跑。
+    """
+    with open(path, "r", encoding="utf-8", newline="") as fh:
+        return fh.read()
+
+
+def write_text(path: Path, text: str) -> None:
+    """写文件，同样保留换行符原样。"""
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+
+
 class Replacement(NamedTuple):
     line: int
     old: str
@@ -227,7 +243,7 @@ def main() -> int:
 
     for f in files:
         try:
-            source = f.read_text(encoding="utf-8", newline="")
+            source = read_text(f)
         except (UnicodeDecodeError, OSError) as e:
             print(f"跳过 {f}: {e}", file=sys.stderr)
             continue
@@ -241,7 +257,7 @@ def main() -> int:
             changed.append((f, reps, skipped))
             total_reps += len(reps)
             if not args.check:
-                f.write_text(new_source, encoding="utf-8", newline="")
+                write_text(f, new_source)
 
     # ---- 控制台输出 ----
     verb = "将改写" if args.check else "已改写"
@@ -277,7 +293,7 @@ def main() -> int:
             for s in skipped:
                 lines.append(f"> 跳过 L{s.line} `{s.url}` — {s.reason}")
             lines.append("")
-        Path(args.summary_file).write_text("\n".join(lines), encoding="utf-8")
+        write_text(Path(args.summary_file), "\n".join(lines))
 
     return 1 if (args.check and total_reps) else 0
 
