@@ -73,7 +73,7 @@ export default {
     }
 
     // 路由 D: 通用 CORS 代理（ratings.html 排行榜/玩家数据用）
-    // 用法: /proxy?<encodeURIComponent(目标URL)>  （与原 findorp.pages.dev 代理格式一致）
+    // 用法: /proxy?<encodeURIComponent(目标URL)>
     //      或 /proxy?url=<encodeURIComponent(目标URL)>
     if (url.pathname === '/proxy') {
       const PROXY_ALLOWED_HOSTS = ['.tankionline.com', '.3dtank.com'];
