@@ -1,0 +1,252 @@
+name: Clean old resource files from Git history
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clean_history_resources:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan historical resources
+        shell: bash
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "扫描 Git 历史中的旧资源文件"
+          echo "========================================"
+
+          echo "清理前提交数量: $(git rev-list --count HEAD)"
+
+          git rev-list --objects --all > /tmp/all-history-objects.txt
+
+          echo "记录当前 main 分支中的所有资源 Blob..."
+          git ls-tree -r HEAD | awk '{print $3}' > /tmp/current-blobs.txt
+
+          python3 <<'PY'
+          import re
+
+          audio_pattern = re.compile(
+              r'\.(mp3|wav|ogg|opus|m4a|aac|flac|aiff|aif|wma|mid|midi)$',
+              re.IGNORECASE
+          )
+
+          def is_target_file(path):
+              path_lower = path.lower()
+
+              # 所有历史中的 map.bin
+              if path_lower == "map.bin" or path_lower.endswith("/map.bin"):
+                  return True
+
+              # augments_icon 目录中的 SVG 和 TXT 文件
+              if re.search(r'(^|/)augments_icon(/|$)', path_lower):
+                  if path_lower.endswith(".svg") or path_lower.endswith(".txt"):
+                      return True
+
+              # 所有历史中的音频文件
+              if audio_pattern.search(path_lower):
+                  return True
+
+              return False
+
+          # 当前 main 分支中的所有 Blob 都必须保留
+          current_blobs = set()
+
+          with open("/tmp/current-blobs.txt", encoding="utf-8") as f:
+              for line in f:
+                  value = line.strip()
+                  if value:
+                      current_blobs.add(bytes.fromhex(value))
+
+          target_blobs = set()
+          target_paths = {}
+
+          with open("/tmp/all-history-objects.txt", encoding="utf-8") as f:
+              for line in f:
+                  line = line.rstrip("\n")
+
+                  if " " not in line:
+                      continue
+
+                  sha, path = line.split(" ", 1)
+
+                  if is_target_file(path):
+                      blob_id = bytes.fromhex(sha)
+                      target_blobs.add(blob_id)
+                      target_paths.setdefault(sha, path)
+
+          # 只删除历史中不再被当前 main 使用的目标资源 Blob
+          remove_blobs = target_blobs - current_blobs
+
+          with open("/tmp/remove-resource-blobs.txt", "w", encoding="utf-8") as f:
+              for blob_id in sorted(remove_blobs):
+                  f.write(blob_id.hex() + "\n")
+
+          print("历史目标资源 Blob 数量:", len(target_blobs))
+          print("当前 main Blob 数量:", len(current_blobs))
+          print("准备删除的旧资源 Blob 数量:", len(remove_blobs))
+
+          print()
+          print("准备删除的旧资源示例:")
+
+          shown = 0
+
+          for sha, path in sorted(target_paths.items()):
+              if bytes.fromhex(sha) in remove_blobs:
+                  print(" -", path)
+                  shown += 1
+
+                  if shown >= 50:
+                      break
+          PY
+
+          remove_count=$(grep -c . /tmp/remove-resource-blobs.txt || true)
+
+          echo
+          echo "最终准备删除的旧资源 Blob: ${remove_count} 个"
+
+      - name: Remove old resource blobs
+        shell: bash
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "删除历史中的旧资源 Blob"
+          echo "========================================"
+
+          git filter-repo \
+            --force \
+            --quiet \
+            --blob-callback '
+          remove_ids = {
+              bytes.fromhex(line.strip())
+              for line in open("/tmp/remove-resource-blobs.txt")
+              if line.strip()
+          }
+
+          if blob.original_id in remove_ids:
+              blob.skip()
+          '
+
+          echo
+          echo "历史清理完成"
+          echo "清理后提交数量: $(git rev-list --count HEAD)"
+
+      - name: Verify current resources
+        shell: bash
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "确认当前资源仍然存在"
+          echo "========================================"
+
+          missing=0
+          found_audio=0
+          found_maps=0
+          found_augments=0
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            if [ -f "$file" ]; then
+              size=$(stat -c%s "$file")
+              echo "保留: ${file} (${size} bytes)"
+
+              case "${file,,}" in
+                *.mp3|*.wav|*.ogg|*.opus|*.m4a|*.aac|*.flac|*.aiff|*.aif|*.wma|*.mid|*.midi)
+                  found_audio=$((found_audio + 1))
+                  ;;
+              esac
+
+              case "${file,,}" in
+                */map.bin|map.bin)
+                  found_maps=$((found_maps + 1))
+                  ;;
+              esac
+
+              if [[ "${file,,}" == *"/augments_icon/"* ]] && \
+                 [[ "${file,,}" == *.svg || "${file,,}" == *.txt ]]; then
+                found_augments=$((found_augments + 1))
+              fi
+            else
+              echo "缺失: ${file}"
+              missing=$((missing + 1))
+            fi
+          done < <(
+            find . -type f \
+              ! -path "./.git/*" \
+              \( \
+                -iname "*.mp3" \
+                -o -iname "*.wav" \
+                -o -iname "*.ogg" \
+                -o -iname "*.opus" \
+                -o -iname "*.m4a" \
+                -o -iname "*.aac" \
+                -o -iname "*.flac" \
+                -o -iname "*.aiff" \
+                -o -iname "*.aif" \
+                -o -iname "*.wma" \
+                -o -iname "*.mid" \
+                -o -iname "*.midi" \
+                -o -iname "map.bin" \
+                -o -path "*/augments_icon/*.svg" \
+                -o -path "*/augments_icon/*.txt" \
+              \)
+          )
+
+          echo
+          echo "当前音频文件数量: ${found_audio}"
+          echo "当前 map.bin 数量: ${found_maps}"
+          echo "当前 augments_icon SVG/TXT 数量: ${found_augments}"
+          echo "缺失资源数量: ${missing}"
+
+          if [ "$missing" -ne 0 ]; then
+            echo "检测到当前资源缺失，停止推送"
+            exit 1
+          fi
+
+      - name: Force push rewritten history
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+
+          echo "========================================"
+          echo "强制推送清理后的 Git 历史"
+          echo "========================================"
+
+          GIT_TERMINAL_PROMPT=0 git push \
+            --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:main \
+            > /tmp/push.log 2>&1
+
+          rc=$?
+
+          echo "push 退出码: ${rc}"
+          echo "push 输出:"
+          tail -50 /tmp/push.log
+
+          if [ "$rc" -ne 0 ]; then
+            echo
+            echo "强制推送失败，请检查 main 分支保护规则"
+            exit "$rc"
+          fi
+
+          echo
+          echo "========================================"
+          echo "强制推送成功"
+          echo "========================================"
+          echo "当前提交数量: $(git rev-list --count HEAD)"
