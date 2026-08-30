@@ -1,3 +1,47 @@
+// ============ 软 404 修正 ============
+// Cloudflare Pages 因为仓库里没有 404.html，把本站判定成了单页应用（SPA）：
+// 任何匹配不到文件的路径，env.ASSETS.fetch() 都会返回 200 + /index.html 的内容，
+// 也就是「软 404」—— 缺失的图标、失效的链接统统返回首页，
+// 浏览器和搜索引擎都收不到任何错误信号。
+// 下面把这种兜底响应识别出来，改成返回「空 body + 404 状态码」，
+// 浏览器收到后就会显示自己的原生 404 错误页（本项目不提供任何自定义 404 页面）。
+
+let INDEX_FINGERPRINT = null;
+
+// 取一次首页内容作为指纹（只记长度 + 前 512 字符，避免每次全量比对）
+async function getIndexFingerprint(env, baseUrl) {
+  if (INDEX_FINGERPRINT !== null) return INDEX_FINGERPRINT;
+  const res = await env.ASSETS.fetch(new Request(new URL('/index.html', baseUrl).href));
+  const text = await res.text();
+  INDEX_FINGERPRINT = { len: text.length, head: text.slice(0, 512) };
+  return INDEX_FINGERPRINT;
+}
+
+// 以 identity 编码请求，保证读到的 body 是明文
+function plainRequest(request) {
+  const headers = new Headers(request.headers);
+  headers.set('accept-encoding', 'identity');
+  return new Request(request.url, { method: request.method, headers, redirect: 'manual' });
+}
+
+async function serveAssetOr404(request, env) {
+  if (request.method !== 'GET') return env.ASSETS.fetch(request);
+
+  const path = new URL(request.url).pathname;
+  const res = await env.ASSETS.fetch(plainRequest(request));
+
+  // 首页本身不算兜底；非 HTML 响应（图片/字体/JSON 等）不参与判断
+  if (path === '/' || path === '/index.html') return res;
+  if (!(res.headers.get('content-type') || '').includes('text/html')) return res;
+
+  // 读副本做判断：命中兜底才替换响应，否则原封不动返回（不影响任何正常页面）
+  const body = await res.clone().text();
+  const fp = await getIndexFingerprint(env, request.url);
+  const isFallback = body.length === fp.len && body.slice(0, 512) === fp.head;
+
+  return isFallback ? new Response(null, { status: 404 }) : res;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -137,6 +181,7 @@ export default {
       return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
     }
 
-    return env.ASSETS.fetch(request);
+    // 静态资源：顺带修正 Pages 的 SPA 兜底（软 404）
+    return await serveAssetOr404(request, env);
   }
 };
