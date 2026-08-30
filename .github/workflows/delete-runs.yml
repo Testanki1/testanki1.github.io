@@ -1,0 +1,153 @@
+name: Delete all workflow runs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  delete_runs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete workflow runs with progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+
+          echo "========================================"
+          echo "开始统计 Workflow 运行记录"
+          echo "========================================"
+
+          initial_total=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=1" \
+            --jq '.total_count' 2>/dev/null)
+
+          initial_total=${initial_total:-0}
+          old_total=$((initial_total - 1))
+
+          if [ "$old_total" -lt 0 ]; then
+            old_total=0
+          fi
+
+          echo "全部 Workflow 记录: ${initial_total} 条"
+          echo "预计可删除记录: ${old_total} 条"
+          echo "当前运行记录不会在运行过程中删除"
+          echo "并发数: 32"
+          echo
+
+          delete_one() {
+            id="$1"
+
+            for attempt in 1 2 3 4 5; do
+              if gh api \
+                --method DELETE \
+                "/repos/${GITHUB_REPOSITORY}/actions/runs/${id}" \
+                >/dev/null 2>&1; then
+                echo "OK:${id}"
+                return 0
+              fi
+
+              echo "RETRY:${id}:第${attempt}次重试" >&2
+              sleep $((attempt * 5))
+            done
+
+            echo "FAIL:${id}"
+            return 1
+          }
+
+          export -f delete_one
+
+          deleted=0
+          failed=0
+          round=0
+
+          while true; do
+            round=$((round + 1))
+
+            ids=$(gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100&page=1" \
+              --jq '.workflow_runs[].id' 2>/dev/null)
+
+            ids=$(printf '%s\n' "$ids" | grep -vx "${GITHUB_RUN_ID}" || true)
+
+            if [ -z "$ids" ]; then
+              echo
+              echo "没有其他可删除的运行记录"
+              break
+            fi
+
+            count=$(printf '%s\n' "$ids" | grep -c .)
+
+            echo
+            echo "----------------------------------------"
+            echo "第 ${round} 轮"
+            echo "本轮准备处理: ${count} 条"
+            echo "已成功删除: ${deleted} 条"
+            echo "删除失败: ${failed} 条"
+            echo "----------------------------------------"
+
+            result=$(printf '%s\n' "$ids" | \
+              xargs -r -n 1 -P 32 bash -c 'delete_one "$1"' _ 2>&1)
+
+            printf '%s\n' "$result"
+
+            success_count=$(printf '%s\n' "$result" | grep -c '^OK:' || true)
+            fail_count=$(printf '%s\n' "$result" | grep -c '^FAIL:' || true)
+
+            deleted=$((deleted + success_count))
+            failed=$((failed + fail_count))
+
+            remaining_total=$(gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=1" \
+              --jq '.total_count' 2>/dev/null)
+
+            remaining_total=${remaining_total:-0}
+            remaining_other=$((remaining_total - 1))
+
+            if [ "$remaining_other" -lt 0 ]; then
+              remaining_other=0
+            fi
+
+            echo
+            echo "本轮成功删除: ${success_count} 条"
+            echo "本轮删除失败: ${fail_count} 条"
+            echo "累计成功删除: ${deleted} 条"
+            echo "累计删除失败: ${failed} 条"
+            echo "当前剩余记录: ${remaining_other} 条"
+            echo "总记录进度: ${deleted}/${old_total}"
+
+            if [ "$success_count" -eq 0 ]; then
+              echo
+              echo "本轮没有成功删除记录，可能触发 API 限流"
+              echo "等待 30 秒后重试"
+              sleep 30
+            else
+              sleep 3
+            fi
+          done
+
+          final_total=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=1" \
+            --jq '.total_count' 2>/dev/null)
+
+          final_total=${final_total:-0}
+          final_other=$((final_total - 1))
+
+          if [ "$final_other" -lt 0 ]; then
+            final_other=0
+          fi
+
+          echo
+          echo "========================================"
+          echo "删除任务完成"
+          echo "========================================"
+          echo "开始时全部记录: ${initial_total} 条"
+          echo "预计旧记录数量: ${old_total} 条"
+          echo "累计成功删除: ${deleted} 条"
+          echo "累计删除失败: ${failed} 条"
+          echo "当前运行记录: 1 条"
+          echo "其他剩余记录: ${final_other} 条"
+          echo "========================================"
