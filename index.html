@@ -151,7 +151,7 @@
         background: linear-gradient(90deg, var(--sys-color-outline), transparent);
     }
 
-    /* 横向滚动容器，留有 padding-top 缓冲，防止截断卡片顶部边框 */
+    /* 横向滚动容器 */
     .news-carousel {
         display: flex;
         gap: 1.5rem;
@@ -291,6 +291,7 @@
         transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
         display: flex;
         flex-direction: column;
+        cursor: pointer;
         -webkit-mask-image: -webkit-radial-gradient(white, black);
     }
 
@@ -489,6 +490,57 @@
     }
     .dialog-content::-webkit-scrollbar { display: none; }
 
+    /* 音频弹窗专属样式 */
+    .audio-dialog-surface {
+        max-width: 480px;
+    }
+    .audio-options-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+        padding: 2rem 1.5rem;
+    }
+    @media screen and (max-width: 480px) {
+        .audio-options-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .audio-option-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 2.25rem 1rem;
+        background: var(--sys-color-surface);
+        border: 1px solid var(--sys-color-outline);
+        border-radius: var(--sys-shape-corner-large);
+        color: var(--sys-color-on-surface);
+        text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+        text-align: center;
+    }
+    .audio-option-btn:hover {
+        background: var(--sys-color-surface-hover);
+        border-color: var(--sys-color-secondary);
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0, 212, 255, 0.2);
+    }
+    .audio-option-btn .material-symbols-rounded {
+        font-size: 52px;
+        color: var(--sys-color-secondary);
+        transition: transform 0.3s ease;
+    }
+    .audio-option-btn:hover .material-symbols-rounded {
+        transform: scale(1.15);
+    }
+    .audio-option-btn .option-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
     /* All News Grid Dialog Style */
     .popup-news-grid {
         display: grid;
@@ -646,12 +698,12 @@
 </head>
 <body>
 
-    <!-- 恢复舒展边距的顶部 Logo -->
+    <!-- 顶部 Logo -->
     <header>
         <img src="https://testanki1.github.io/logo.svg" alt="Testanki" class="logo" />
     </header>
 
-    <!-- 恢复舒展边距的服务器列表按钮 -->
+    <!-- 服务器列表按钮 -->
     <div class="action-row">
         <a href="https://testanki1.github.io/servers" class="btn btn-primary" data-translate="server_list">
             服务器列表
@@ -667,7 +719,7 @@
             </div>
         </section>
 
-        <!-- Tools Grid (保留原版文字介绍) -->
+        <!-- Tools Grid -->
         <section class="section-container">
             <div class="tools-grid">
                 
@@ -719,13 +771,14 @@
                     <p data-translate="map_editor_desc">一个基于网页的地图编辑器，允许您在浏览器中查看和创建地图。（注：目前仍在开发中）</p>
                 </a>
 
-                <a href="https://testanki1.github.io/music" class="tool-card">
+                <!-- 游戏音乐与音效 卡片（点击触发弹窗） -->
+                <div class="tool-card" onclick="openAudioDialog()">
                     <div class="image-wrapper">
                         <img src="https://tankionline.com/en/wp-content/uploads/2024/11/music.jpg" alt="">
                     </div>
-                    <h3><span data-translate="music_title">音乐</span></h3>
-                    <p data-translate="music_desc">3D坦克的音乐，包括官方主题音乐、游戏背景音乐、迷你游戏背景音乐。</p>
-                </a>
+                    <h3><span data-translate="music_title">游戏音乐与音效</span></h3>
+                    <p data-translate="music_desc">3D坦克的音乐与音效，包括官方主题音乐、游戏背景音乐、迷你游戏背景音乐及游戏内音效。</p>
+                </div>
 
                 <a href="https://testanki1.github.io/stickers/" class="tool-card">
                     <div class="image-wrapper">
@@ -789,6 +842,30 @@
         本站提供与3D坦克游戏相关的内容和工具。<br>
         注：本站为玩家制作，与3D坦克官方无关。联系邮箱：testanki@qq.com。
     </footer>
+
+    <!-- 音频选择弹窗 -->
+    <div class="dialog-overlay" id="audio-dialog">
+        <div class="dialog-surface audio-dialog-surface">
+            <div class="dialog-header">
+                <h3 data-translate="audio_dialog_title">选择类型</h3>
+                <button class="icon-btn" onclick="closeAudioDialog()" title="关闭">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+            <div class="dialog-content">
+                <div class="audio-options-grid">
+                    <a href="https://testanki1.github.io/music" class="audio-option-btn">
+                        <span class="material-symbols-rounded">headphones</span>
+                        <span class="option-title" data-translate="audio_music_btn">音乐</span>
+                    </a>
+                    <a href="https://testanki1.github.io/sounds" class="audio-option-btn">
+                        <span class="material-symbols-rounded">volume_up</span>
+                        <span class="option-title" data-translate="audio_sounds_btn">音效</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 查看所有新闻弹窗 -->
     <div class="dialog-overlay" id="all-news-dialog">
@@ -982,6 +1059,18 @@
             window.history.replaceState({ path: newUrl.href }, '', newUrl.href);
         }
 
+        /* 音频弹窗控制 */
+        function openAudioDialog() {
+            const dialog = document.getElementById('audio-dialog');
+            dialog.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeAudioDialog() {
+            document.getElementById('audio-dialog').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
         function copyToClipboard(id) {
             const url = `${window.location.origin}${window.location.pathname}?p=${id}`;
             navigator.clipboard.writeText(url).then(() => {
@@ -1021,8 +1110,11 @@
                 map_editor_title: "Web Map Editor. Remaster",
                 map_editor_desc: "A web-based map editor, allowing you to view and create maps in your browser. (Note: Currently still in development)",
                 
-                music_title: "Music",
-                music_desc: "Music from Tanki Online, including the official theme music, in-game background music, minigame background music.",
+                music_title: "Game Music & Sound Effects",
+                music_desc: "Music and sound effects from Tanki Online, including official theme music, in-game BGM, minigame BGM, and in-game sound effects.",
+                audio_dialog_title: "Select Audio",
+                audio_music_btn: "Music",
+                audio_sounds_btn: "Sound Effects",
                 
                 stickers_title: "Stickers",
                 stickers_desc: "Tanki Online have their own stickers! There are 20 of them, and they are very cool! Use these stickers and share them with your friends, let Tanki become even closer to them!",
