@@ -79,7 +79,7 @@
         height: auto;
     }
 
-    /* 恢复按钮行舒适间距，不显得拥挤 */
+    /* 恢复按钮行舒适间距 */
     .action-row {
         display: flex;
         justify-content: center;
@@ -388,6 +388,7 @@
         text-transform: uppercase;
     }
 
+    /* 弹窗通用基础 */
     .dialog-overlay {
         position: fixed;
         inset: 0;
@@ -431,12 +432,13 @@
         opacity: 1;
     }
 
+    /* 仅对大型阅读类弹窗在手机端应用全屏，排除小型操作弹窗 */
     @media screen and (max-width: 768px) {
-        .dialog-overlay {
+        .dialog-overlay:not(#audio-dialog) {
             padding: 0;
             align-items: flex-start;
         }
-        .dialog-surface {
+        .dialog-overlay:not(#audio-dialog) .dialog-surface {
             max-width: 100%;
             height: 100dvh;
             max-height: 100dvh;
@@ -484,62 +486,77 @@
     .dialog-content {
         flex: 1;
         overflow-y: auto;
-        padding-bottom: 3rem;
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
     .dialog-content::-webkit-scrollbar { display: none; }
 
-    /* 音频弹窗专属样式 */
-    .audio-dialog-surface {
-        max-width: 480px;
+    /* ========== 音频小弹窗专属精致样式 ========== */
+    #audio-dialog {
+        padding: 1rem;
+        align-items: center; /* 确保在任何屏幕上都居中显示 */
     }
+
+    .audio-dialog-surface {
+        max-width: 400px;
+        width: 100%;
+        height: auto !important; /* 强制自适应高度，保持小弹窗形态 */
+        max-height: none !important;
+        border-radius: var(--sys-shape-corner-extra-large) !important;
+        border: 1px solid var(--sys-color-outline) !important;
+    }
+
     .audio-options-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 1.25rem;
-        padding: 2rem 1.5rem;
+        gap: 1rem;
+        padding: 1.5rem;
     }
-    @media screen and (max-width: 480px) {
-        .audio-options-grid {
-            grid-template-columns: 1fr;
-        }
-    }
+
     .audio-option-btn {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1rem;
-        padding: 2.25rem 1rem;
+        gap: 0.75rem;
+        padding: 1.75rem 1rem;
         background: var(--sys-color-surface);
         border: 1px solid var(--sys-color-outline);
         border-radius: var(--sys-shape-corner-large);
         color: var(--sys-color-on-surface);
         text-decoration: none;
-        transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+        transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
         text-align: center;
     }
+
     .audio-option-btn:hover {
         background: var(--sys-color-surface-hover);
         border-color: var(--sys-color-secondary);
-        transform: translateY(-4px);
-        box-shadow: 0 12px 28px rgba(0, 212, 255, 0.2);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 212, 255, 0.2);
     }
+
+    .audio-option-btn:active {
+        transform: scale(0.96);
+    }
+
     .audio-option-btn .material-symbols-rounded {
-        font-size: 52px;
+        font-size: 44px;
         color: var(--sys-color-secondary);
         transition: transform 0.3s ease;
     }
+
     .audio-option-btn:hover .material-symbols-rounded {
-        transform: scale(1.15);
+        transform: scale(1.1);
     }
+
     .audio-option-btn .option-title {
-        font-size: 1.15rem;
+        font-size: 1.05rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
+    /* ========================================= */
 
     /* All News Grid Dialog Style */
     .popup-news-grid {
@@ -771,7 +788,7 @@
                     <p data-translate="map_editor_desc">一个基于网页的地图编辑器，允许您在浏览器中查看和创建地图。（注：目前仍在开发中）</p>
                 </a>
 
-                <!-- 游戏音乐与音效 卡片（点击触发弹窗） -->
+                <!-- 游戏音乐与音效 卡片（点击触发小弹窗） -->
                 <div class="tool-card" onclick="openAudioDialog()">
                     <div class="image-wrapper">
                         <img src="https://tankionline.com/en/wp-content/uploads/2024/11/music.jpg" alt="">
@@ -843,8 +860,8 @@
         注：本站为玩家制作，与3D坦克官方无关。联系邮箱：testanki@qq.com。
     </footer>
 
-    <!-- 音频选择弹窗 -->
-    <div class="dialog-overlay" id="audio-dialog">
+    <!-- 音频选择小弹窗（点击背景区域也可关闭） -->
+    <div class="dialog-overlay" id="audio-dialog" onclick="if(event.target===this) closeAudioDialog()">
         <div class="dialog-surface audio-dialog-surface">
             <div class="dialog-header">
                 <h3 data-translate="audio_dialog_title">选择类型</h3>
@@ -859,7 +876,7 @@
                         <span class="option-title" data-translate="audio_music_btn">音乐</span>
                     </a>
                     <a href="https://testanki1.github.io/sounds" class="audio-option-btn">
-                        <span class="material-symbols-rounded">volume_up</span>
+                        <span class="material-symbols-rounded">graphic_eq</span>
                         <span class="option-title" data-translate="audio_sounds_btn">音效</span>
                     </a>
                 </div>
@@ -1059,7 +1076,7 @@
             window.history.replaceState({ path: newUrl.href }, '', newUrl.href);
         }
 
-        /* 音频弹窗控制 */
+        /* 音频小弹窗控制 */
         function openAudioDialog() {
             const dialog = document.getElementById('audio-dialog');
             dialog.classList.add('active');
