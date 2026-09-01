@@ -3525,11 +3525,8 @@ document.addEventListener('pointerdown', (e) => {
                     // 补偿底层纹理暗沉，放大 4.5 倍以恢复游戏内原版的鲜亮感，同时用 clamp 截断防曝光
                     vec3 blendedColor = paintColor * baseLightColor * 4.5;
                     
-                    // 提取坦克模型原本表面的高光和磨损掉漆（金属白边独立于迷彩显示）
-                    vec3 highlights = max(vec3(0.0), baseLightColor - vec3(0.25)) * 1.5;
-                    
-                    // 结合迷彩和高光划痕
-                    vec3 finalPaint = clamp(blendedColor + highlights, 0.0, 1.0);
+                    // 结合迷彩（已去掉原版 ×1.5 的高亮/金属白边叠加）
+                    vec3 finalPaint = clamp(blendedColor, 0.0, 1.0);
                     
                     // detailsAlpha 决定哪里是迷彩(0.0)，哪里是黑色通风口等不喷漆的地方(1.0)
                     float detailsAlpha = lightTex.a;
@@ -5396,10 +5393,9 @@ document.addEventListener('pointerdown', (e) => {
             vec4 paintTex = texture2D(paintMap, paintUv);
             vec3 paintColor = paintTex.rgb;
 
-            // 保持与实时渲染完全一致的明亮、鲜艳度及金属划痕提取
+            // 保持与实时渲染完全一致的明亮、鲜艳度（已去掉原版 ×1.5 高亮白边）
             vec3 blendedColor = paintColor * baseLightColor * 4.5;
-            vec3 highlights = max(vec3(0.0), baseLightColor - vec3(0.25)) * 1.5;
-            vec3 finalPaint = clamp(blendedColor + highlights, 0.0, 1.0);
+            vec3 finalPaint = clamp(blendedColor, 0.0, 1.0);
             
             float detailsAlpha = lightTex.a;
             vec3 finalColor = mix(finalPaint, baseLightColor, detailsAlpha);
