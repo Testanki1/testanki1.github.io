@@ -3241,7 +3241,8 @@ document.addEventListener('pointerdown', (e) => {
             if (!m.isMesh) return; const apply = (mat) => {
                 const name = ((m.userData.originalName || "") + " " + (m.name || "") + " " + (mat.name || "")).toLowerCase();
                 let target = texLightmap; if (name.includes('track') || name.includes('chain')) target = texTracks || target; else if (name.includes('wheel')) target = texWheels || target;
-                if (target) { mat.map = target; mat.emissiveMap = target; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }
+                // 已统一去掉自发光（emissive），让带/不带迷彩的基准一致
+                if (target) { mat.map = target; mat.emissiveMap = null; mat.emissive = new THREE.Color(0x000000); mat.emissiveIntensity = 0.0; mat.needsUpdate = true; }
             }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material);
         });
     }
@@ -3369,7 +3370,8 @@ document.addEventListener('pointerdown', (e) => {
         const newMat = originalMat.clone();
         const lightMapTex = originalMat.map;
         newMat.map = lightMapTex;
-        // Option 3: Clear emissive self-glow channel on camouflage material
+        // 相机处（applyTexturesFromPool / setMat / runSceneInjector）已统一去除自发光，
+        // 两侧基准一致；这里同样把 emissive 清零，保证迷彩材质不带任何自发光。
         if (newMat.emissive) newMat.emissive.setHex(0x000000);
         newMat.emissiveIntensity = 0.0;
         newMat.emissiveMap = null;
@@ -3520,16 +3522,17 @@ document.addEventListener('pointerdown', (e) => {
 
                     vec4 paintTex = texture2DGradEXT(paintMap, paintUv, dx, dy);
                     vec3 paintColor = paintTex.rgb;
-                    
-                    // 【关键修正：强力提亮】
-                    // 补偿底层纹理暗沉，放大 4.5 倍以恢复游戏内原版的鲜亮感，同时用 clamp 截断防曝光
-                    vec3 blendedColor = paintColor * baseLightColor * 4.5;
-                    
-                    // 提取坦克模型原本表面的高光和磨损掉漆（金属白边独立于迷彩显示）
-                    vec3 highlights = max(vec3(0.0), baseLightColor - vec3(0.25)) * 1.5;
-                    
-                    // 结合迷彩和高光划痕
-                    vec3 finalPaint = clamp(blendedColor + highlights, 0.0, 1.0);
+
+                    // 【亮度归一化细节因子】以底色亮度归一化，细节因子每像素围绕 1.0 波动，
+                    // 只保留底图的色彩/磨损/高光起伏，不再把迷彩整体乘暗，
+                    // 使开启迷彩后的亮度与不带迷彩保持一致。
+                    float baseLum = dot(baseLightColor, vec3(0.2126, 0.7152, 0.0722));
+                    baseLum = max(baseLum, 0.05);
+                    vec3 detailFactor = baseLightColor / baseLum;
+
+                    vec3 finalPaint = clamp(paintColor * detailFactor, 0.0, 1.0);
+                    finalPaint += max(vec3(0.0), baseLightColor - vec3(0.5)) * 0.6;
+                    finalPaint = clamp(finalPaint, 0.0, 1.0);
                     
                     // detailsAlpha 决定哪里是迷彩(0.0)，哪里是黑色通风口等不喷漆的地方(1.0)
                     float detailsAlpha = lightTex.a;
@@ -5396,10 +5399,13 @@ document.addEventListener('pointerdown', (e) => {
             vec4 paintTex = texture2D(paintMap, paintUv);
             vec3 paintColor = paintTex.rgb;
 
-            // 保持与实时渲染完全一致的明亮、鲜艳度及金属划痕提取
-            vec3 blendedColor = paintColor * baseLightColor * 4.5;
-            vec3 highlights = max(vec3(0.0), baseLightColor - vec3(0.25)) * 1.5;
-            vec3 finalPaint = clamp(blendedColor + highlights, 0.0, 1.0);
+            // 与实时渲染完全一致：亮度归一化细节因子，避免迷彩被底色乘暗
+            float baseLum2 = dot(baseLightColor, vec3(0.2126, 0.7152, 0.0722));
+            baseLum2 = max(baseLum2, 0.05);
+            vec3 detailFactor2 = baseLightColor / baseLum2;
+            vec3 finalPaint = clamp(paintColor * detailFactor2, 0.0, 1.0);
+            finalPaint += max(vec3(0.0), baseLightColor - vec3(0.5)) * 0.6;
+            finalPaint = clamp(finalPaint, 0.0, 1.0);
             
             float detailsAlpha = lightTex.a;
             vec3 finalColor = mix(finalPaint, baseLightColor, detailsAlpha);
@@ -5706,10 +5712,11 @@ document.addEventListener('pointerdown', (e) => {
 
             if (bestTex) {
                 const prevName = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name || '';
+                // 已统一去掉自发光（emissive），让带/不带迷彩的基准一致
                 mesh.material = new THREE.MeshStandardMaterial({
                     map: bestTex,
-                    emissiveMap: bestTex,
-                    emissive: new THREE.Color(0x888888),
+                    emissiveMap: null,
+                    emissive: new THREE.Color(0x000000),
                     color: 0xffffff,
                     transparent: true,
                     alphaTest: 0.5,
@@ -6073,7 +6080,7 @@ document.addEventListener('pointerdown', (e) => {
     function addUI(id, text) { const div = document.createElement('div'); div.className = 'file-item'; div.innerHTML = `<span class="material-symbols-rounded">insert_drive_file</span><span>${text}</span>`; document.getElementById(id).appendChild(div); }
     
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
-    function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = t; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
+    function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = null; mat.emissive = new THREE.Color(0x000000); mat.emissiveIntensity = 0.0; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}})}
     // Tight bbox over effectively-visible meshes only (respects per-category
     // switches, skips grenade clones when hidden, ignores attachment markers).
