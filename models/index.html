@@ -3241,7 +3241,7 @@ document.addEventListener('pointerdown', (e) => {
             if (!m.isMesh) return; const apply = (mat) => {
                 const name = ((m.userData.originalName || "") + " " + (m.name || "") + " " + (mat.name || "")).toLowerCase();
                 let target = texLightmap; if (name.includes('track') || name.includes('chain')) target = texTracks || target; else if (name.includes('wheel')) target = texWheels || target;
-                if (target) { mat.map = target; mat.emissiveMap = target; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }
+                if (target) { mat.map = target; mat.emissiveMap = null; mat.emissive = new THREE.Color(0x000000); mat.emissiveIntensity = 0.0; mat.needsUpdate = true; }
             }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material);
         });
     }
@@ -5708,8 +5708,8 @@ document.addEventListener('pointerdown', (e) => {
                 const prevName = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name || '';
                 mesh.material = new THREE.MeshStandardMaterial({
                     map: bestTex,
-                    emissiveMap: bestTex,
-                    emissive: new THREE.Color(0x888888),
+                    emissiveMap: null,
+                    emissive: new THREE.Color(0x000000),
                     color: 0xffffff,
                     transparent: true,
                     alphaTest: 0.5,
@@ -6073,7 +6073,7 @@ document.addEventListener('pointerdown', (e) => {
     function addUI(id, text) { const div = document.createElement('div'); div.className = 'file-item'; div.innerHTML = `<span class="material-symbols-rounded">insert_drive_file</span><span>${text}</span>`; document.getElementById(id).appendChild(div); }
     
     function setupTex(t) { t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }
-    function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = t; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 0.5; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
+    function setMat(m, t) { const apply = (mat) => { mat.map = t; mat.emissiveMap = null; mat.emissive = new THREE.Color(0x000000); mat.emissiveIntensity = 0.0; mat.needsUpdate = true; }; if (Array.isArray(m.material)) m.material.forEach(apply); else apply(m.material); }
     function dispose(g){if(!g)return; g.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}})}
     // Tight bbox over effectively-visible meshes only (respects per-category
     // switches, skips grenade clones when hidden, ignores attachment markers).
