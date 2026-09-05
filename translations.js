@@ -448,7 +448,7 @@ const replacementDict = {
 "Armor-Piercing Missiles": "穿甲导弹",
 "Jamming Missiles": "干扰导弹",
 "Missile launcher «Cyclone»": "导弹发射器 «旋风»",
-"Missile launcher «Uranium»": "导弹发射器 «镭射»",
+"Missile launcher «Uranium»": "导弹发射器 «铀»",
 "Missile launcher «Tandem»": "导弹发射器 «串联»",
 "Missile launcher «Hydra»": "导弹发射器 «九头蛇»",
 "Missile launcher «Faust»": "导弹发射器 «浮士德»",
