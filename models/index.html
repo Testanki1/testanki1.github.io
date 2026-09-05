@@ -876,6 +876,7 @@
                 <div class="card-title" style="color:var(--scene)" id="t-scene-title">Map / Garage</div>
                 <div class="control-col">
                     <div id="box-scene"><select id="sel-scene-var" class="native-select-hidden"></select></div>
+                    <div id="box-scene-year" style="display:none"><select id="sel-scene-year" class="native-select-hidden"></select></div>
                 </div>
             </div>
         </div>
@@ -978,6 +979,7 @@
         lblModel: "装备",
         lblSkin: "皮肤",
         lblEnv: "环境",
+        lblYear: "年份",
         envLabel: "显示环境",
         sceneTitle: "地图 / 车库",
         exportTitle: "导出 GLB 模型",
@@ -1057,6 +1059,7 @@
         lblModel: "Equipment",
         lblSkin: "Skin",
         lblEnv: "Environment",
+        lblYear: "Year",
         envLabel: "Show Environment",
         sceneTitle: "Map / Garage",
         exportTitle: "Export GLB",
@@ -3040,7 +3043,7 @@ document.addEventListener('pointerdown', (e) => {
         let currentVal = nativeSel.value || (items[0] && items[0].value); if (!currentVal) return;
 
         const wrapper = document.createElement('div'); wrapper.className = 'icon-grid-wrapper';
-        let labelTxt = ""; if(type === 'model') labelTxt = T.lblModel; else if(type === 'skin') labelTxt = T.lblSkin; else if(type === 'env') labelTxt = T.lblEnv; else if(type === 'grenade') labelTxt = T.grenadeTitle; else if(type === 'drone') labelTxt = T.droneTitle; else if(type === 'supply') labelTxt = T.supplyTitle;
+        let labelTxt = ""; if(type === 'model') labelTxt = T.lblModel; else if(type === 'skin') labelTxt = T.lblSkin; else if(type === 'env') labelTxt = T.lblEnv; else if(type === 'year') labelTxt = T.lblYear; else if(type === 'grenade') labelTxt = T.grenadeTitle; else if(type === 'drone') labelTxt = T.droneTitle; else if(type === 'supply') labelTxt = T.supplyTitle;
 
         wrapper.innerHTML = `<div class="icon-grid-header"><div class="icon-grid-label">${labelTxt}</div><div class="selection-text" id="sel-txt-${nativeSelectId}"></div></div><div class="icon-grid"></div>`;
         const grid = wrapper.querySelector('.icon-grid'); const selText = wrapper.querySelector(`#sel-txt-${nativeSelectId}`);
@@ -3048,7 +3051,7 @@ document.addEventListener('pointerdown', (e) => {
         for (const item of items) {
             const btn = document.createElement('div'); btn.className = 'icon-grid-btn'; 
             // 1. Do not treat supply as a plain text button (remove 'supply').
-            if (type === 'env' || type === 'grenade' || type === 'drone') btn.classList.add('text-btn'); 
+            if (type === 'env' || type === 'year' || type === 'grenade' || type === 'drone') btn.classList.add('text-btn'); 
             btn.title = item.label;
             if (item.value === currentVal) { btn.classList.add('selected'); selText.innerText = item.label; }
 
@@ -3072,7 +3075,7 @@ document.addEventListener('pointerdown', (e) => {
                 } else { 
                     btn.innerText = item.label.substring(0, 2); 
                 }
-            } else if (type === 'env' || type === 'grenade' || type === 'drone') { 
+            } else if (type === 'env' || type === 'year' || type === 'grenade' || type === 'drone') { 
                 btn.innerText = item.label; 
             }
 
@@ -3148,7 +3151,9 @@ document.addEventListener('pointerdown', (e) => {
         await renderIconGrid('sel-scene-var', 'env', sceneItems);
         // Options are permanently visible now; picking an environment implies enabling it
         document.getElementById('group-scene').classList.add('visible');
-        selScene.onchange = () => { activateSceneToggle(); triggerSceneLoad(); };
+        selScene.onchange = async () => { await updateSceneYearSelect(selScene.value); activateSceneToggle(); triggerSceneLoad(); };
+        document.getElementById('sel-scene-year').onchange = () => { activateSceneToggle(); triggerSceneLoad(); };
+        if (sceneItems.length) await updateSceneYearSelect(selScene.value || sceneItems[0].value);
         if(hullItems.length) await updateSkinSelect('hull', hullItems[0].value);
         if(turretItems.length) await updateSkinSelect('turret', turretItems[0].value);
         if(typeof buildPaintsCatalogFromAssets === 'function'){ buildPaintsCatalogFromAssets(); }
@@ -3192,9 +3197,36 @@ document.addEventListener('pointerdown', (e) => {
         if(wrapper) wrapper.classList.remove('loading'); loadingState[type] = false;
     }
 
+    // Garage entries may be a single leaf ({id, version}) or a map of
+    // year -> leaf (e.g. "生日": { "16": {...}, "17": {...} }).
+    // Years are listed newest first so the latest one is selected by default.
+    function garageYearKeys(variant) {
+        const entry = assetsData && assetsData.garage && assetsData.garage[variant];
+        if (!entry || isLeafEntry(entry)) return [];
+        return Object.keys(entry).sort((a, b) => Number(b) - Number(a));
+    }
+    async function updateSceneYearSelect(variant) {
+        const box = document.getElementById('box-scene-year');
+        const sel = document.getElementById('sel-scene-year');
+        const years = garageYearKeys(variant);
+        if (!years.length) { sel.innerHTML = ''; box.style.display = 'none'; return; }
+        sel.innerHTML = '';
+        await renderIconGrid('sel-scene-year', 'year', years.map(y => ({ value: y, label: y })));
+        box.style.display = '';
+    }
+    function currentGarageLeaf() {
+        const variant = document.getElementById('sel-scene-var').value;
+        const entry = assetsData && assetsData.garage && assetsData.garage[variant];
+        if (!entry) return null;
+        if (isLeafEntry(entry)) return entry;
+        const years = garageYearKeys(variant);
+        const year = document.getElementById('sel-scene-year').value || years[0];
+        return entry[year] || entry[years[0]] || null;
+    }
+
     async function triggerSceneLoad() {
         if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value;
-        const leaf = assetsData.garage && assetsData.garage[variant];
+        const leaf = currentGarageLeaf();
         const path = toResourcePath(leaf); if(!path) return;
         updateAssetMetaUI('group-scene', leaf);
         const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
