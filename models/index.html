@@ -3465,7 +3465,6 @@ document.addEventListener('pointerdown', (e) => {
             shader.uniforms.paintFrameOffset = { value: new THREE.Vector2(0, 0) };
             shader.uniforms.paintFrameScale = { value: new THREE.Vector2(1, 1) };
             shader.uniforms.paintUseFrameTransform = { value: isAnim ? 1.0 : 0.0 };
-            shader.uniforms.paintTexelSize = { value: new THREE.Vector2(0.01, 0.01) };
             shader.uniforms.multihui = { value: new THREE.Vector2(1, 1) };
             shader.uniforms.uvTransform = { value: new THREE.Vector2(1, 1) };
             shader.uniforms.paintUvScale = { value: new THREE.Vector2(finalDensity, finalDensity * paintAspect) };
@@ -3488,14 +3487,13 @@ document.addEventListener('pointerdown', (e) => {
                 `
             );
             if(isAnim && frame){
+                // = 游戏的 animatedPaintUVTransform：xy = 帧大小(uv)，zw = 当前帧起点(uv)
                 shader.uniforms.paintFrameScale.value.set(frame.frameWidth / frame.imageWidth, frame.frameHeight / frame.imageHeight);
                 shader.uniforms.paintFrameOffset.value.set(0, 1 - frame.frameHeight / frame.imageHeight);
-                shader.uniforms.paintTexelSize.value.set(2.0 / frame.imageWidth, 2.0 / frame.imageHeight);
                 shader.uniforms.paintUseFrameTransform.value = 1.0;
             } else {
                 shader.uniforms.paintFrameScale.value.set(1,1);
                 shader.uniforms.paintFrameOffset.value.set(0,0);
-                shader.uniforms.paintTexelSize.value.set(0.5 / 256, 0.5 / 256);
                 shader.uniforms.paintUseFrameTransform.value = 0.0;
             }
             shader.fragmentShader = shader.fragmentShader.replace(
@@ -3505,7 +3503,6 @@ document.addEventListener('pointerdown', (e) => {
                 uniform vec2 paintFrameOffset;
                 uniform vec2 paintFrameScale;
                 uniform float paintUseFrameTransform;
-                uniform vec2 paintTexelSize;
                 uniform vec2 multihui;
                 uniform vec2 uvTransform;
                 uniform vec2 paintUvScale;
@@ -3543,18 +3540,26 @@ document.addEventListener('pointerdown', (e) => {
                     vec4 lightTex = texture2D(map, vMapUv);
                     vec3 baseLightColor = lightTex.rgb;
 
-                    vec2 dx = dFdx(vMapUv * paintUvScale);
-                    vec2 dy = dFdy(vMapUv * paintUvScale);
-
-                    vec2 camoBaseUv = vMapUv;
-                    if(vPaintMirror > 0.5) camoBaseUv.x = 1.0 - camoBaseUv.x;
+                    // ---- 迷彩 UV：与游戏 Tank 着色器相同 ----
+                    //   顶点: v_uv_paint = fract(uv) * paintUVScale
+                    //   片元: 动画 paintUV = fract(v_uv_paint / anim.xy) * anim.xy + anim.zw
+                    //         静态 paintUV = v_uv_paint                     (Repeat 环绕)
+                    // 没有半纹素内缩。官方模型的 uv 都在 (0,1) 内，顶点阶段的 fract 是恒等
+                    // 变换，这里不做（履带的 uv 跨越整数，逐顶点 fract 会把它撕裂）。
+                    // 游戏的纹理不做 flipY（v=0 是图片顶部），three.js 相反；对 v 减 1 后
+                    // 再平铺，静态/动画迷彩的图案相位就与游戏逐像素一致（含非整数重复数）。
+                    vec2 camoBaseUv = vec2(vMapUv.x, vMapUv.y - 1.0);
+                    if(vPaintMirror > 0.5) camoBaseUv.x = 1.0 - camoBaseUv.x;   // viewer 自己的镜像修正（游戏没有）
                     vec2 tiledPaintUv = camoBaseUv * paintUvScale;
                     vec2 paintUv = tiledPaintUv;
                     if(paintUseFrameTransform > 0.5){
-                        vec2 safeTiledUv = mix(paintTexelSize, vec2(1.0) - paintTexelSize, fract(tiledPaintUv / paintFrameScale));
-                        paintUv = safeTiledUv * paintFrameScale + paintFrameOffset;
+                        paintUv = fract(tiledPaintUv / paintFrameScale) * paintFrameScale + paintFrameOffset;
                     }
 
+                    // 梯度取自连续的 uv*scale：静态迷彩的 mip 选择与游戏的 texture() 完全相同，
+                    // 动画精灵图没有 mipmap 所以梯度无关紧要；只是避免镜像岛边界出现 LOD 细线。
+                    vec2 dx = dFdx(vMapUv * paintUvScale);
+                    vec2 dy = dFdy(vMapUv * paintUvScale);
                     vec4 paintTex = texture2DGradEXT(paintMap, paintUv, dx, dy);
 
                     // three.js 把 sRGB 贴图上传为 SRGB8_ALPHA8，采样结果已是线性值。
@@ -3646,7 +3651,14 @@ document.addEventListener('pointerdown', (e) => {
             const f = info.frame;
             const cols = Math.max(1, Math.floor(f.imageWidth / f.frameWidth));
             const rows = Math.max(1, Math.floor(f.imageHeight / f.frameHeight));
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            // 与游戏一致：动画精灵图用 ClampToEdge + 线性过滤、【不生成 mipmap】
+            // (TextureParams smooth=true, wrap=ClampToEdge, mipMapping=false)。
+            // 帧内的环绕由着色器里的 fract() 完成；没有 mipmap，fract 造成的导数
+            // 跳变就不会在帧边界选到错误的 mip 层，所以也不再需要半纹素内缩。
+            tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.generateMipmaps = false;
             tex.repeat.set(f.frameWidth / f.imageWidth, f.frameHeight / f.imageHeight);
             tex.offset.set(0, 1 - f.frameHeight / f.imageHeight);
             frameData = {
@@ -5414,7 +5426,6 @@ document.addEventListener('pointerdown', (e) => {
         uniform vec2 paintFrameOffset;
         uniform vec2 paintFrameScale;
         uniform float paintUseFrameTransform;
-        uniform vec2 paintTexelSize;
         uniform float hasMap;
         uniform float paintMapIsSRGBEncoded;
         varying vec2 vUv;
@@ -5440,15 +5451,13 @@ document.addEventListener('pointerdown', (e) => {
             vec4 lightTex = hasMap > 0.5 ? texture2D(map, vUv) : vec4(1.0);
             vec3 baseLightColor = lightTex.rgb;
 
-            vec2 camoBaseUv = vUv;
+            // 与实时着色器相同的游戏 UV 规则（见 createPaintShaderMat）：无半纹素内缩
+            vec2 camoBaseUv = vec2(vUv.x, vUv.y - 1.0);
             if(vMirror > 0.5) camoBaseUv.x = 1.0 - camoBaseUv.x;
             vec2 tiledPaintUv = camoBaseUv * paintUvScale;
-            vec2 paintUv = tiledPaintUv;
+            vec2 paintUv = tiledPaintUv;                       // 静态：Repeat 环绕
             if(paintUseFrameTransform > 0.5){
-                vec2 safeTiledUv = mix(paintTexelSize, vec2(1.0) - paintTexelSize, fract(tiledPaintUv / paintFrameScale));
-                paintUv = safeTiledUv * paintFrameScale + paintFrameOffset;
-            } else {
-                paintUv = fract(tiledPaintUv);
+                paintUv = fract(tiledPaintUv / paintFrameScale) * paintFrameScale + paintFrameOffset;
             }
 
             vec4 paintTex = texture2D(paintMap, paintUv);
@@ -5521,10 +5530,7 @@ document.addEventListener('pointerdown', (e) => {
                 paintFrameScale: { value: isAnim
                     ? new THREE.Vector2(frame.frameWidth / frame.imageWidth, frame.frameHeight / frame.imageHeight)
                     : new THREE.Vector2(1, 1) },
-                paintUseFrameTransform: { value: isAnim ? 1.0 : 0.0 },
-                paintTexelSize: { value: isAnim
-                    ? new THREE.Vector2(2.0 / frame.imageWidth, 2.0 / frame.imageHeight)
-                    : new THREE.Vector2(0.5 / 256, 0.5 / 256) }
+                paintUseFrameTransform: { value: isAnim ? 1.0 : 0.0 }
             },
             side: THREE.DoubleSide, depthTest: false, depthWrite: false
         });
