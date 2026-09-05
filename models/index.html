@@ -1329,7 +1329,10 @@ if (pCls) pCls.title = T.btnClose;
     camera.position.set(150, 150, 150);
     camera.rotation.order = 'YXZ';
     const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer: true}); 
-    renderer.setPixelRatio(devicePixelRatio); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(devicePixelRatio); renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Shadow mapping is intentionally left OFF: nothing in the scene ever sets
+    // receiveShadow, so a shadow pass would cost a full extra render for zero
+    // visible result. Same for the recording renderer further down.
     document.body.appendChild(renderer.domElement);
 
     // Default: orbit around model. Free-look is only enabled while an environment is loaded.
@@ -1983,7 +1986,7 @@ document.addEventListener('pointerdown', (e) => {
     groupNormal.visible = false; groupAssembly.visible = true; groupMore.visible = false;
     root.add(groupNormal); root.add(groupAssembly); root.add(groupMore);
     const lg = new THREE.Group(); scene.add(lg); lg.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); lg.add(sun); lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
+    const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); lg.add(sun); lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
     window.addEventListener('resize', () => {
         const updateLayout = () => {
@@ -2734,7 +2737,6 @@ document.addEventListener('pointerdown', (e) => {
         recordRenderer.setPixelRatio(1);
         recordRenderer.setSize(RECORD_WIDTH, RECORD_HEIGHT, false);
         recordRenderer.outputColorSpace = THREE.SRGBColorSpace;
-        recordRenderer.shadowMap.enabled = true;
 
         recordCamera = camera.clone();
         recordCamera.aspect = RECORD_WIDTH / RECORD_HEIGHT;
