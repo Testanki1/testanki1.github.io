@@ -1312,10 +1312,14 @@ if (pCls) pCls.title = T.btnClose;
     //         'video'   -> mp4/webm/mov/... driven by a <video> element
     const LOCAL_PAINTS = new Map(); window.LOCAL_PAINTS = LOCAL_PAINTS;
     let localPaintSeq = 0;
-    // Per-paint pattern scale multiplier (1 = the automatic physical size).
+    // Per-paint pattern scale multiplier (1 = exactly the game's tiling rule).
     let paintScaleMul = 1.0; window.paintScaleMul = paintScaleMul;
     const PAINT_SCALE_MIN = 0.1, PAINT_SCALE_MAX = 10.0;
     const LOCAL_PAINT_DEFAULT_SCALE = 1.0;
+    // 本地图片/视频的像素上限：长边超过它的媒体在套用游戏平铺规则前先按比例缩到该
+    // 值（与 lightmap 的 cap 归一化同一思路）。512 = 官方最大的静态迷彩尺寸，这样一
+    // 张 4K 照片在车身上的表现与 512² 官方迷彩相同（1 次重复），而不是只露出一角。
+    const LOCAL_PAINT_MAX_TEXELS = 512;
 
     const IMAGE_EXT_RE = /\.(png|jpe?g|jfif|pjpeg|pjp|webp|bmp|dib|gif|apng|avif|ico|cur|tiff?|svg|jxl|heic|heif)$/i;
     const VIDEO_EXT_RE = /\.(mp4|m4v|webm|ogv|ogg|mov|qt|avi|mkv|3gp|3g2|mpe?g|mpg|ts|m2ts|flv|wmv)$/i;
@@ -3288,66 +3292,42 @@ document.addEventListener('pointerdown', (e) => {
     // retune the tiling uniform without rebuilding or recompiling anything.
     const allPaintMats = new Set();
 
-    // ---- UV texel-density measurement -------------------------------------
-    // Returns "how many world units one UV unit spans" for a mesh, i.e. the
-    // physical size of one full texture repeat on that surface.
-    //
-    // NOTE ON METHOD: this samples |dP/du| and |dP/dv| PER TRIANGLE and takes the
-    // median.  A global sqrt(sum(worldArea)/sum(uvArea)) looks equivalent but is
-    // NOT: tank hulls mirror/overlap large parts of their unwrap (both track
-    // sides share one patch of the atlas), so the summed uvArea double-counts and
-    // the ratio collapses — on the stock hull it reports 215 instead of the true
-    // 931, a 4.3x error, while agreeing to within 6% on the turret.  The median
-    // of per-triangle derivatives is immune to overlap and to a few degenerate
-    // seam triangles.
-    const uvDensityCache = new WeakMap();
-    function measureWorldUnitsPerUV(mesh){
-        if(!mesh || !mesh.isMesh) return null;
-        const g = mesh.geometry;
-        const cached = uvDensityCache.get(g);
-        if(cached !== undefined) return cached;
-        const pos = g?.attributes?.position, uv = g?.attributes?.uv;
-        if(!pos || !uv){ uvDensityCache.set(g, null); return null; }
-        mesh.updateWorldMatrix(true, false);
-        const sc = new THREE.Vector3();
-        mesh.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), sc);
-        const meshScale = (Math.abs(sc.x) + Math.abs(sc.y) + Math.abs(sc.z)) / 3 || 1;
-        const idx = g.index ? g.index.array : null;
-        const triCount = (idx ? idx.length : pos.count) / 3;
-        const stride = Math.max(1, Math.floor(triCount / 2000));
-        const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
-        const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
-        const dPdu = new THREE.Vector3(), dPdv = new THREE.Vector3();
-        const samples = [];
-        for(let t = 0; t < triCount; t += stride){
-            const i = t * 3;
-            const i0 = idx ? idx[i] : i, i1 = idx ? idx[i+1] : i+1, i2 = idx ? idx[i+2] : i+2;
-            a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
-            e1.subVectors(b, a); e2.subVectors(c, a);
-            const du1 = uv.getX(i1) - uv.getX(i0), dv1 = uv.getY(i1) - uv.getY(i0);
-            const du2 = uv.getX(i2) - uv.getX(i0), dv2 = uv.getY(i2) - uv.getY(i0);
-            const det = du1 * dv2 - du2 * dv1;
-            if(Math.abs(det) < 1e-12) continue;
-            dPdu.copy(e1).multiplyScalar(dv2).addScaledVector(e2, -dv1).divideScalar(det);
-            dPdv.copy(e1).multiplyScalar(-du2).addScaledVector(e2, du1).divideScalar(det);
-            const su = dPdu.length(), sv = dPdv.length();
-            if(!isFinite(su) || !isFinite(sv) || su <= 0 || sv <= 0) continue;
-            samples.push(Math.sqrt(su * sv));   // isotropic scale of this triangle
-        }
-        let ratio = null;
-        if(samples.length){
-            samples.sort((x, y) => x - y);
-            ratio = samples[samples.length >> 1] * meshScale;
-        }
-        uvDensityCache.set(g, ratio);
-        return ratio;
-    }
+    // ---- 迷彩平铺规则：与游戏客户端 (main.js, shader "Tank") 完全一致 -------
+    // 游戏里每类部件有一个 lightmap 纹素上限 cap（K_() 的第 5 个参数）：
+    //     车身 512 · 炮塔 256 · 手雷 128 · 无人机 128
+    // 每帧计算：
+    //     o = max(lmW, lmH) <= cap ? 1 : max(lmW, lmH) / cap   // 只把过大的 lightmap 缩到 cap
+    //     paintUVScale = vec2( lmW / (paintW * o),  lmH / (paintH * o) )
+    // 其中 paintW/paintH 是 paintTexture 的【整图】像素尺寸 —— 动画迷彩也是整张
+    // 1024² 精灵图，而不是单帧；帧的重复数由片元着色器里的
+    //     fract(v_uv_paint / animatedPaintUVTransform.xy)      (xy = 1/每行帧数, 1/每列帧数)
+    // 再展开得到：帧重复 = paintUVScale / (1/numFramesX) = lmW / (frameW * o)。
+    // 即「1 个迷彩纹素 = 1 个(归一化后的) lightmap 纹素」。图案大小完全由迷彩贴图的
+    // 像素尺寸决定，不同迷彩本来就不一样大（1×1 纯色、113~512 的花纹、128/64 的动画帧）。
+    // 旧版按网格物理纹素密度(world units per UV)推算重复数的做法已整体移除。
+    const PAINT_TEXEL_CAP = { hull: 512, turret: 256, grenade: 128, drone: 128, supply: 128 };
+    const PAINT_DENSITY_MIN = 1e-4, PAINT_DENSITY_MAX = 4096.0;
 
-    // World units spanned by one camouflage repeat at the reference resolution.
-    // 465 = the hull's historical tile size (it sits at ~930 world units per UV
-    // unit and the legacy default density was 2), so the hull keeps the look it
-    // always had and the turret/grenade are brought into line with it.
-    const PAINT_BASE_TILE = 465.0;
+    // 自下而上找网格属于哪个槽位，返回对应的 cap。手雷克隆体挂在炮塔 fmnt 下，
+    // 所以先检查 isGrenadeClone 再比较槽位根节点。
+    function paintTexelCapForMesh(mesh){
+        let p = mesh;
+        while(p){
+            if(p.userData && p.userData.isGrenadeClone) return PAINT_TEXEL_CAP.grenade;
+            if(slots.grenade && p === slots.grenade.template) return PAINT_TEXEL_CAP.grenade;
+            if(slots.turret && p === slots.turret.group) return PAINT_TEXEL_CAP.turret;
+            if(slots.hull && p === slots.hull.group) return PAINT_TEXEL_CAP.hull;
+            if(slots.more && p === slots.more.group) return PAINT_TEXEL_CAP[slots.more.cat] || PAINT_TEXEL_CAP.drone;
+            p = p.parent;
+        }
+        return 0;   // 归属未知：由调用方回退到显式传入的部件类型
+    }
+    function imageDims(img){
+        if(!img) return null;
+        const w = img.naturalWidth || img.videoWidth || img.width || 0;
+        const h = img.naturalHeight || img.videoHeight || img.height || 0;
+        return (w > 0 && h > 0) ? { w, h } : null;
+    }
 
     // ---- Mirrored-UV detection (fixes flipped camo on shared/mirrored parts) --
     // Many tank hulls reuse ("mirror") one UV island for both left/right sides
@@ -3399,7 +3379,8 @@ document.addEventListener('pointerdown', (e) => {
         g.setAttribute('mirrorFlag', new THREE.BufferAttribute(flags, 1));
     }
 
-    function createPaintShaderMat(originalMat, paintEntry, worldUnitsPerUV){
+    // texelCap: 该网格所属部件的 lightmap 纹素上限（PAINT_TEXEL_CAP），由 applyPaintToGroup 传入。
+    function createPaintShaderMat(originalMat, paintEntry, texelCap){
         const newMat = originalMat.clone();
         const lightMapTex = originalMat.map;
         newMat.map = lightMapTex;
@@ -3410,65 +3391,57 @@ document.addEventListener('pointerdown', (e) => {
         newMat.needsUpdate = true;
         const isAnim = !!paintEntry.isAnimated && !!paintEntry.frame;
         const frame = paintEntry.frame;
+        const isLocal = !!paintEntry.isLocal;
 
-        // ---- Tiling density -------------------------------------------------
-        // Tile in UV space (no triplanar: that blends two projections together
-        // in the ~45-degree band between axes, which smears the pattern and can
-        // mirror asymmetric artwork).  To still get a consistent PHYSICAL size
-        // across parts, the UV repeat count is derived from each mesh's own texel
-        // density: repeats = (world units per UV unit) / (world units per tile).
-        let texWidth = 150;
-        // For animated camouflages, use single-frame width (frameWidth) instead of full sprite sheet image width
-        if (frame && frame.frameWidth) {
-            texWidth = frame.frameWidth;
-        } else if (paintEntry.info && paintEntry.info.frame && paintEntry.info.frame.frameWidth) {
-            texWidth = paintEntry.info.frame.frameWidth;
-        } else if (paintEntry.texture && paintEntry.texture.image && paintEntry.texture.image.width) {
-            texWidth = paintEntry.texture.image.width;
+        // ---- 平铺密度：游戏规则（见 PAINT_TEXEL_CAP 上方的说明）---------------
+        // 仍然在 UV 空间平铺（不用 triplanar：两个投影在 45° 附近会互相糊掉、还会
+        // 镜像不对称的图案）。重复次数不再由网格的物理纹素密度推算，而是和游戏
+        // 客户端一样，直接由「lightmap 尺寸 / 部件 cap / 迷彩尺寸」决定。
+        //
+        // 1) lightmap 尺寸，按部件 cap 归一化（o 只会缩小过大的 lightmap）
+        const cap = (texelCap > 0) ? texelCap : PAINT_TEXEL_CAP.hull;
+        const lm = imageDims(lightMapTex && lightMapTex.image) || { w: cap, h: cap };
+        const lmMax = Math.max(lm.w, lm.h);
+        const lmNorm = lmMax <= cap ? 1 : lmMax / cap;
+        //
+        // 2) 迷彩尺寸 = 迷彩贴图的像素尺寸。动画迷彩也一样取【整张精灵图】(1024²)，
+        //    不是单帧：游戏里 paintUVScale 用的是 paintTexture 的整图宽高，然后在片元
+        //    着色器里 fract(v_uv_paint / anim.xy) 用 anim.xy = 1/帧数 再展开成帧重复数。
+        //    本文件的着色器（live 与烘焙）结构相同：fract(tiledPaintUv / paintFrameScale)，
+        //    所以这里的 paintUvScale 必须是「整张精灵图的重复数」，
+        //    实际帧重复数 = paintUvScale / paintFrameScale = lmW / (frameW · o)。
+        let paint = null;
+        if (isAnim && frame && frame.imageWidth > 0 && frame.imageHeight > 0) {
+            paint = { w: frame.imageWidth, h: frame.imageHeight };
+        } else if (isLocal && paintEntry.width > 0 && paintEntry.height > 0) {
+            paint = { w: paintEntry.width, h: paintEntry.height };
+        } else {
+            paint = imageDims(paintEntry.texture && paintEntry.texture.image);
         }
-        texWidth = Math.max(1, texWidth);
-        // Do not derive pattern scale from texture resolution; use the standard physical baseline.
-    const tileWorld = PAINT_BASE_TILE; 
+        if (!paint) paint = { w: 256, h: 256 };
+        // 本地照片/视频没有官方迷彩那样的像素预算：一张 1920×1080 的照片按原样套用
+        // 规则，在车身上只能看到 1/4。这里对本地媒体套用与 lightmap 相同的 o 规则，
+        // 把长边超过 LOCAL_PAINT_MAX_TEXELS(=官方最大的静态迷彩 512) 的媒体缩到 512，
+        // 小图（像素画等）保持原样，行为与官方迷彩完全一致。
+        if (isLocal) {
+            const pMax = Math.max(paint.w, paint.h);
+            const pNorm = pMax <= LOCAL_PAINT_MAX_TEXELS ? 1 : pMax / LOCAL_PAINT_MAX_TEXELS;
+            paint = { w: paint.w / pNorm, h: paint.h / pNorm };
+        }
+        //
+        // 3) paintUVScale = ( lmW / (paintW·o) , lmH / (paintH·o) )
+        //    U、V 分开计算，所以非正方形迷彩(410×359、270×114、本地照片)的纹素仍是正方形。
+        const repeatU = THREE.MathUtils.clamp(lm.w / (paint.w * lmNorm), PAINT_DENSITY_MIN, PAINT_DENSITY_MAX);
+        const repeatV = THREE.MathUtils.clamp(lm.h / (paint.h * lmNorm), PAINT_DENSITY_MIN, PAINT_DENSITY_MAX);
+        // 下游(setPaintScale / 烘焙导出)统一用「U 方向重复数 + V/U 比」表示。
+        const autoDensity = repeatU;
+        const paintAspect = repeatV / repeatU;
 
-    let autoDensity;
-    if (worldUnitsPerUV && isFinite(worldUnitsPerUV) && worldUnitsPerUV > 1e-6) {
-        autoDensity = worldUnitsPerUV / tileWorld;
-    } else {
-        // Fallback: use two default repeats; do not infer scale from pixels.
-        autoDensity = 2.0; 
-    }
-
-    // ================== Animated/static paint density adjustments ==================
-    const isLocal = !!paintEntry.isLocal;
-    if (isLocal) {
-        // Local images/videos are user media and receive no official-paint density compensation.
-        // Tile once at the physical baseline; the Pattern scale slider handles the rest.
-        autoDensity *= 1.0;
-    } else if (isAnim) {
-        // Animated paint is too dense: multiply by a value below 1 to enlarge the pattern.
-        // For example, 0.5 halves density and doubles pattern size.
-        autoDensity *= 0.25;  
-    } else {
-        // Static paint is too sparse: multiply by a value above 1 for more, smaller repeats.
-        // For example, 2.0 doubles density and halves pattern size.
-        autoDensity *= 2.0;  
-    }
-    // ================================================================
-
-    // Guard rails only — deliberately NOT quantised: snapping to 0.5 steps
-    autoDensity = THREE.MathUtils.clamp(autoDensity, 0.02, 64.0);
-
-        // Aspect correction: official camos are square sheets, but a local
-        // photo can be any shape (e.g. 1920x1080). Tiling a 16:9 image with an
-        // equal U/V repeat squashes it, so V gets scaled by width/height to
-        // keep every pixel square on the hull.
-        const paintAspect = (isLocal && paintEntry.aspect && isFinite(paintEntry.aspect) && paintEntry.aspect > 0)
-            ? paintEntry.aspect : 1.0;
-        // The slider divides the density (bigger scale = fewer, larger repeats).
+        // 图案大小滑块：作为额外的倍率叠加在游戏规则之上（越大 = 重复越少、图案越大）。
         const userScale = THREE.MathUtils.clamp(
             (paintEntry.scale && isFinite(paintEntry.scale)) ? paintEntry.scale : 1.0,
             PAINT_SCALE_MIN, PAINT_SCALE_MAX);
-        const finalDensity = THREE.MathUtils.clamp(autoDensity / userScale, 0.005, 256.0);
+        const finalDensity = THREE.MathUtils.clamp(autoDensity / userScale, PAINT_DENSITY_MIN, PAINT_DENSITY_MAX);
 
         // three.js caches compiled programs by this key and skips onBeforeCompile
         // on a hit, so the key has to cover everything baked into the shader.
@@ -3481,9 +3454,11 @@ document.addEventListener('pointerdown', (e) => {
         newMat.userData.paintEntry = paintEntry;
         newMat.userData.isPaintMat = true;
         newMat.userData.paintDensity = finalDensity;
-        newMat.userData.paintBaseDensity = autoDensity;   // pre-slider value
-        newMat.userData.paintAspect = paintAspect;
-        newMat.userData.paintTileWorld = tileWorld;
+        newMat.userData.paintBaseDensity = autoDensity;   // pre-slider U repeats (game rule)
+        newMat.userData.paintAspect = paintAspect;        // V repeats / U repeats
+        newMat.userData.paintTexelCap = cap;
+        newMat.userData.paintLightmapSize = [lm.w, lm.h];
+        newMat.userData.paintTexelNorm = lmNorm;
         allPaintMats.add(newMat);
         newMat.onBeforeCompile = (shader)=>{
             shader.uniforms.paintMap = { value: paintEntry.texture };
@@ -3694,8 +3669,10 @@ document.addEventListener('pointerdown', (e) => {
         return entry;
     }
 
-    function applyPaintToGroup(grp, paintEntry){
+    // partType: 'hull' | 'turret' | 'grenade' | 'drone' | 'supply'（可选；缺省时按槽位归属推断）
+    function applyPaintToGroup(grp, paintEntry, partType){
         if(!grp || !paintEntry) return 0;
+        const partCap = partType ? (PAINT_TEXEL_CAP[partType] || 0) : 0;
         let applied = 0;
         const hullNameUpper = (slots.hull?.group?.name || document.getElementById('sel-hull-name')?.value || '').toUpperCase();
         grp.traverse(o=>{
@@ -3707,8 +3684,10 @@ document.addEventListener('pointerdown', (e) => {
             if(geom && geom.attributes.uv && !geom.attributes.uv2){
                 geom.setAttribute('uv2', geom.attributes.uv.clone());
             }
-            // Physical-size matching: how much world surface one UV unit covers.
-            const worldUnitsPerUV = measureWorldUnitsPerUV(o);
+            // 游戏规则：平铺数只取决于 lightmap 尺寸 / 部件 cap / 迷彩尺寸。
+            // 先按网格实际归属判断（炮塔组里的手雷克隆体要用手雷的 cap），
+            // 再回退到调用方给的部件类型，最后默认按车身处理。
+            const texelCap = paintTexelCapForMesh(o) || partCap || PAINT_TEXEL_CAP.hull;
             // Bake the mirrored-UV-island flag once per geometry (cheap, cached
             // via the attribute itself) so the paint shader can flip the camo's
             // U coordinate back on parts that reuse a mirrored UV island.
@@ -3734,7 +3713,7 @@ document.addEventListener('pointerdown', (e) => {
                     paintOriginalMap.delete(mat);
                     try{ mat.dispose(); }catch(e){}
                 }
-                const paintedMat = createPaintShaderMat(baseMat, paintEntry, worldUnitsPerUV);
+                const paintedMat = createPaintShaderMat(baseMat, paintEntry, texelCap);
                 paintOriginalMap.set(paintedMat, baseMat);
                 newMats.push(paintedMat);
                 applied++;
@@ -3944,9 +3923,10 @@ document.addEventListener('pointerdown', (e) => {
                 paintAnimState = null;
             }
             renderPaintCurrent();
-            if(slots.hull?.group) applyPaintToGroup(slots.hull.group, entry);
-            if(slots.turret?.group) applyPaintToGroup(slots.turret.group, entry);
-            if(slots.more?.group) applyPaintToGroup(slots.more.group, entry);
+            if(slots.hull?.group) applyPaintToGroup(slots.hull.group, entry, 'hull');
+            // 炮塔组里还挂着手雷克隆体：applyPaintToGroup 会按网格归属自动改用手雷的 cap
+            if(slots.turret?.group) applyPaintToGroup(slots.turret.group, entry, 'turret');
+            if(slots.more?.group) applyPaintToGroup(slots.more.group, entry, slots.more.cat);
             msg(`${T.paintApplied}: ${name}`);
             document.querySelectorAll('.paint-item').forEach(el => {
                 el.classList.toggle('selected', el.dataset.name === name);
@@ -4391,6 +4371,7 @@ document.addEventListener('pointerdown', (e) => {
             texture: tex, isAnimated: false, frame: null,
             info: PAINTS_CATALOG[name], name,
             isLocal: true, localKind: kind, aspect: rec.aspect,
+            width: rec.width, height: rec.height,   // 原始像素尺寸（平铺规则用）
             scale: LOCAL_PAINT_DEFAULT_SCALE
         };
         paintCache.set(name, entry);
@@ -4576,8 +4557,8 @@ document.addEventListener('pointerdown', (e) => {
         for(const mat of allPaintMats){
             const base = mat.userData.paintBaseDensity;
             if(!base) continue;
-            const d = THREE.MathUtils.clamp(base / paintScaleMul, 0.005, 256.0);
-            const asp = mat.userData.paintAspect || 1;
+            const d = THREE.MathUtils.clamp(base / paintScaleMul, PAINT_DENSITY_MIN, PAINT_DENSITY_MAX);
+            const asp = mat.userData.paintAspect || 1;   // V repeats / U repeats
             mat.userData.paintDensity = d;
             const sh = mat.userData.shader;
             if(sh && sh.uniforms && sh.uniforms.paintUvScale) sh.uniforms.paintUvScale.value.set(d, d * asp);
@@ -5258,7 +5239,7 @@ document.addEventListener('pointerdown', (e) => {
         groupMore.add(group);
         registerAnim(group);
         renderTextureNames(); // supply texture chips (if the model references any)
-        if(visState.paint && currentPaintEntry && group) applyPaintToGroup(group, currentPaintEntry);
+        if(visState.paint && currentPaintEntry && group) applyPaintToGroup(group, currentPaintEntry, 'supply');
         if (currentMode === 'more') fitCamera();
     }
 
@@ -5317,7 +5298,7 @@ document.addEventListener('pointerdown', (e) => {
         groupMore.add(group);
         registerAnim(group);
         renderTextureNames(); // drone texture chips (if the model references any)
-        if(visState.paint && currentPaintEntry && group) applyPaintToGroup(group, currentPaintEntry);
+        if(visState.paint && currentPaintEntry && group) applyPaintToGroup(group, currentPaintEntry, 'drone');
         if (currentMode === 'more') fitCamera();
     }
 
@@ -5957,7 +5938,7 @@ document.addEventListener('pointerdown', (e) => {
         
         // Auto-reapply active camouflage when equipping a new skin or model
         if (visState.paint && currentPaintEntry) {
-            applyPaintToGroup(grp, currentPaintEntry);
+            applyPaintToGroup(grp, currentPaintEntry, type);   // type: 'hull' | 'turret' → cap 512 / 256
         }
 
         // Grenades ride the turret — re-mount them on the replacement model's fmnt
@@ -6049,7 +6030,7 @@ document.addEventListener('pointerdown', (e) => {
             clone.quaternion.identity();
             clone.scale.set(1, 1, 1);
             if (visState.paint && currentPaintEntry) {
-                applyPaintToGroup(clone, currentPaintEntry);
+                applyPaintToGroup(clone, currentPaintEntry, 'grenade');   // cap 128
             }
             f.add(clone);
         }
