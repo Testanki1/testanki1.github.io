@@ -3494,6 +3494,10 @@ document.addEventListener('pointerdown', (e) => {
             shader.uniforms.multihui = { value: new THREE.Vector2(1, 1) };
             shader.uniforms.uvTransform = { value: new THREE.Vector2(1, 1) };
             shader.uniforms.paintUvScale = { value: new THREE.Vector2(finalDensity, finalDensity * paintAspect) };
+            // three.js 对 VideoTexture 不做硬件 sRGB 解码（采样得到的是原始 gamma 值），
+            // 而 TextureLoader / CanvasTexture 采样得到的已经是线性值。着色器据此决定
+            // 迷彩是否还需要先编码回 gamma 空间再参与混合。
+            shader.uniforms.paintMapIsSRGBEncoded = { value: (paintEntry.texture && paintEntry.texture.isVideoTexture) ? 1.0 : 0.0 };
 
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <common>',
@@ -3530,11 +3534,35 @@ document.addEventListener('pointerdown', (e) => {
                 uniform vec2 multihui;
                 uniform vec2 uvTransform;
                 uniform vec2 paintUvScale;
+                uniform float paintMapIsSRGBEncoded;
                 varying float vPaintMirror;
+
+                // ---- 与游戏客户端一致的迷彩混合 (hard light) ----
+                // 官方 WebGL 客户端 (main.js, tank material) 的做法是:
+                //     color = blend_hardlight(paintColor, lightmapColor)
+                //     color = mix(color, lightmapColor, lightmap.a)
+                // 其中 hard light 以 lightmap 作为「控制层」:
+                //     lightmap < 0.5 : 2 * paint * lightmap           (multiply, 变暗)
+                //     lightmap >= 0.5: 1 - 2 * (1-paint) * (1-lightmap)  (screen,   变亮)
+                // 这一步在 gamma(sRGB) 空间进行 —— 游戏纹理以 sRGB 编码上传但采样时不解码。
+                vec3 tankiHardLight(vec3 paint, vec3 lm){
+                    vec3 k = step(vec3(0.5), lm);
+                    vec3 dark  = 2.0 * paint * lm;
+                    vec3 light = 1.0 - 2.0 * (1.0 - paint) * (1.0 - lm);
+                    return mix(dark, light, k);
+                }
+                vec3 tankiLinearToSRGB(vec3 c){
+                    c = clamp(c, 0.0, 1.0);
+                    return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
+                }
+                vec3 tankiSRGBToLinear(vec3 c){
+                    c = clamp(c, 0.0, 1.0);
+                    return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045))));
+                }
                 `
             );
 
-            // ================== 核心混合算法 (极致鲜艳 + 金属质感) ==================
+            // ================== 核心混合算法 (与游戏客户端相同的 hard light) ==================
             const customMapFragment = `
                 #ifdef USE_MAP
                     vec4 lightTex = texture2D(map, vMapUv);
@@ -3553,20 +3581,20 @@ document.addEventListener('pointerdown', (e) => {
                     }
 
                     vec4 paintTex = texture2DGradEXT(paintMap, paintUv, dx, dy);
-                    vec3 paintColor = paintTex.rgb;
-                    
-                    // 【关键修正：强力提亮】
-                    // 补偿底层纹理暗沉，放大 4.5 倍以恢复游戏内原版的鲜亮感，同时用 clamp 截断防曝光
-                    vec3 blendedColor = paintColor * baseLightColor * 4.5;
-                    
-                    // 结合迷彩（已去掉原版 ×1.5 的高亮/金属白边叠加）
-                    vec3 finalPaint = clamp(blendedColor, 0.0, 1.0);
-                    
+
+                    // three.js 把 sRGB 贴图上传为 SRGB8_ALPHA8，采样结果已是线性值。
+                    // 游戏是在 gamma 空间做 hard light 的，所以先把两张图都编码回 sRGB，
+                    // 混合完再解码回线性，交给 three.js 的 PBR 光照。没有任何经验放大系数。
+                    vec3 paintSRGB = (paintMapIsSRGBEncoded > 0.5) ? clamp(paintTex.rgb, 0.0, 1.0) : tankiLinearToSRGB(paintTex.rgb);
+                    vec3 lightSRGB = tankiLinearToSRGB(baseLightColor);
+
+                    vec3 blendedSRGB = tankiHardLight(paintSRGB, lightSRGB);
+
                     // detailsAlpha 决定哪里是迷彩(0.0)，哪里是黑色通风口等不喷漆的地方(1.0)
                     float detailsAlpha = lightTex.a;
-                    vec3 finalColor = mix(finalPaint, baseLightColor, detailsAlpha);
-                    
-                    diffuseColor.rgb *= finalColor;
+                    vec3 finalSRGB = mix(blendedSRGB, lightSRGB, detailsAlpha);
+
+                    diffuseColor.rgb *= tankiSRGBToLinear(finalSRGB);
                 #endif
             `;
 
@@ -5407,8 +5435,26 @@ document.addEventListener('pointerdown', (e) => {
         uniform float paintUseFrameTransform;
         uniform vec2 paintTexelSize;
         uniform float hasMap;
+        uniform float paintMapIsSRGBEncoded;
         varying vec2 vUv;
         varying float vMirror;
+
+        // 与实时着色器完全相同的 hard light 混合 (见 createPaintShaderMat)
+        vec3 tankiHardLight(vec3 paint, vec3 lm){
+            vec3 k = step(vec3(0.5), lm);
+            vec3 dark  = 2.0 * paint * lm;
+            vec3 light = 1.0 - 2.0 * (1.0 - paint) * (1.0 - lm);
+            return mix(dark, light, k);
+        }
+        vec3 tankiLinearToSRGB(vec3 c){
+            c = clamp(c, 0.0, 1.0);
+            return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
+        }
+        vec3 tankiSRGBToLinear(vec3 c){
+            c = clamp(c, 0.0, 1.0);
+            return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045))));
+        }
+
         void main(){
             vec4 lightTex = hasMap > 0.5 ? texture2D(map, vUv) : vec4(1.0);
             vec3 baseLightColor = lightTex.rgb;
@@ -5425,16 +5471,17 @@ document.addEventListener('pointerdown', (e) => {
             }
 
             vec4 paintTex = texture2D(paintMap, paintUv);
-            vec3 paintColor = paintTex.rgb;
 
-            // 保持与实时渲染完全一致的明亮、鲜艳度（已去掉原版 ×1.5 高亮白边）
-            vec3 blendedColor = paintColor * baseLightColor * 4.5;
-            vec3 finalPaint = clamp(blendedColor, 0.0, 1.0);
-            
+            // 与实时渲染完全一致：在 gamma 空间做 hard light，再解码回线性写入 sRGB 渲染目标
+            vec3 paintSRGB = (paintMapIsSRGBEncoded > 0.5) ? clamp(paintTex.rgb, 0.0, 1.0) : tankiLinearToSRGB(paintTex.rgb);
+            vec3 lightSRGB = tankiLinearToSRGB(baseLightColor);
+            vec3 blendedSRGB = tankiHardLight(paintSRGB, lightSRGB);
+
             float detailsAlpha = lightTex.a;
-            vec3 finalColor = mix(finalPaint, baseLightColor, detailsAlpha);
-            
-            gl_FragColor = vec4(finalColor, 1.0);
+            vec3 finalSRGB = mix(blendedSRGB, lightSRGB, detailsAlpha);
+
+            // 渲染目标是 SRGBColorSpace，three.js 会在写入时做线性 -> sRGB 编码
+            gl_FragColor = vec4(tankiSRGBToLinear(finalSRGB), 1.0);
         }`;
 
     // Pick a bake resolution that respects the source lightmap: no point
@@ -5487,6 +5534,7 @@ document.addEventListener('pointerdown', (e) => {
                 map: { value: mat.map || null },
                 hasMap: { value: mat.map ? 1.0 : 0.0 },
                 paintMap: { value: pe.texture },
+                paintMapIsSRGBEncoded: { value: (pe.texture && pe.texture.isVideoTexture) ? 1.0 : 0.0 },
                 paintUvScale: { value: new THREE.Vector2(density, density * aspect) },
                 paintFrameOffset: { value: offset },
                 paintFrameScale: { value: isAnim
