@@ -2,7 +2,7 @@
 // @name         Garage → Highland Map Swap
 // @name:zh-CN   车库地图替换高原
 // @namespace    tanki/garage-swap
-// @version      1.6.0
+// @version      1.6.1
 // @description  Replaces Highland map with the Garage scene in browser memory. Supports client-side conversion and offline mode.
 // @description:zh-CN 浏览器本地实时把高原地图替换为车库场景，包含本地碰撞转换与脱机模式。
 // @author       you
@@ -801,7 +801,7 @@
     const core = globalThis.GarageMapCore;
     if (!core) return;
 
-    // --- i18n detection
+    // --- i18n
     const isZh = (() => {
         const lang = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
         return lang.startsWith('zh');
@@ -821,7 +821,7 @@
         debug: true
     };
 
-    const LOG = (...a) => { if (CFG.debug) console.log('%c[Garage → Highland]', 'color:#9cff57;font-weight:bold', ...a); };
+    const LOG = (...a) => { if (CFG.debug) console.log('%c[Garage → Highland]', 'color:#76FF33;font-weight:bold', ...a); };
     const LS_KEY = 'garageSwap.lightmapLevel';
     try {
         const saved = parseInt(window.localStorage.getItem(LS_KEY), 10);
@@ -1069,137 +1069,128 @@
         return true;
     }
 
-    // --- M3 Expressive UI & Drawer (No button on screen, opens with Alt+G or top-right swipe)
-    const ICON_CLOSE = '<svg viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>';
-    const ICON_WIFI_OFF = '<svg viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 26.5T560-138v-80q16-3 31.5-8.5T621-240L492-369q-4 3-7.5 5.5T478-359l-58-58q20-13 41.5-22t44.5-15l-94-94q-32 12-61 28.5T296-480l-58-58q38-27 80.5-46.5T406-615L277-744q-47 18-89.5 44T110-638l-56-58q48-43 104-74.5T275-821L56-1040l56-56 736 736-56 56Zm-312-344Z"/></svg>';
+    // --- Original SVG icons (fixed and verified)
+    const ICON_CLOSE = '<svg viewBox="0 -960 960 960"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></svg>';
+    const ICON_WIFI_OFF = '<svg viewBox="0 -960 960 960"><path d="M762-84 414-434q-31 7-59.5 19T301-386q-21 14-46.5 14.5T212-389q-18-18-16.5-43.5T217-473q23-17 48.5-31t52.5-26l-90-90q-26 14-50.5 29.5T130-557q-20 16-45.5 16T42-559q-18-18-17-43t21-41q22-18 45-34.5t49-30.5l-56-56q-11-11-11-28t11-28q11-11 28-11t28 11l679 679q12 12 12 28.5T819-84q-12 11-28.5 11.5T762-84Zm-353-65.5Q380-179 380-220q0-42 29-71t71-29q42 0 71 29t29 71q0 41-29 70.5T480-120q-42 0-71-29.5ZM753-395q-16 16-37.5 15.5T678-396l-10-10-10-10-96-96q-13-13-5-27t28-9q45 11 85.5 31t75.5 47q18 14 20.5 36.5T753-395Zm165-164q-17 18-42 18.5T831-556q-72-59-161.5-91.5T480-680q-21 0-40.5 1.5T400-674q-25 4-45-10.5T331-724q-4-25 11-45t40-24q24-4 48.5-5.5T480-800q125 0 235.5 41.5T914-644q20 17 21 42t-17 43Z"/></svg>';
 
+    // --- Original Theme CSS with M3 Expressive layout & shapes
     const UI_CSS = `
         :host {
-            --md-sys-color-primary: #9cff57;
-            --md-sys-color-on-primary: #123800;
-            --md-sys-color-primary-container: #235200;
-            --md-sys-color-on-primary-container: #b9ff7d;
-            --md-sys-color-surface: #101418;
-            --md-sys-color-surface-container-low: #181c20;
-            --md-sys-color-surface-container: #1e2227;
-            --md-sys-color-surface-container-high: #282c32;
-            --md-sys-color-surface-container-highest: #33373e;
-            --md-sys-color-on-surface: #e1e2e8;
-            --md-sys-color-on-surface-variant: #c3c7d0;
-            --md-sys-color-outline: #8d919a;
-            --md-sys-color-outline-variant: rgba(255, 255, 255, 0.1);
-            --md-sys-color-error: #ffb4ab;
-            --md-sys-color-error-container: #93000a;
-            --md-sys-color-on-error: #690005;
-            --md-sys-color-inverse-surface: #e1e2e8;
-            --md-sys-color-inverse-on-surface: #191c20;
-            font-family: 'Roboto Flex', 'Google Sans Flex', 'Rubik', system-ui, -apple-system, sans-serif;
+            --primary: #76FF33;
+            --bg: #001926;
+            --surface-high: rgba(191, 213, 255, .08);
+            --surface-highest: rgba(191, 213, 255, .12);
+            --on-surface: #E2E2E9;
+            --on-surface-variant: #BFD5FF;
+            --outline: #4D7380;
+            --error: #FF6666;
+            font-family: Rubik, system-ui, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
         * { box-sizing: border-box; font-family: inherit; margin: 0; padding: 0; }
         .overlay {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); opacity: 0;
-            pointer-events: none; transition: opacity 0.35s cubic-bezier(0.2, 0, 0, 1);
-            backdrop-filter: blur(8px);
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); opacity: 0;
+            pointer-events: none; transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1);
+            backdrop-filter: blur(5px);
         }
         .drawer {
-            position: fixed; top: 0; right: 0; width: 380px; max-width: 90vw; height: 100%;
-            background: var(--md-sys-color-surface-container-low);
-            color: var(--md-sys-color-on-surface);
-            pointer-events: auto; transform: translateX(100%);
-            transition: transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1);
+            position: fixed; top: 0; right: 0; width: 380px; max-width: 88vw; height: 100%;
+            background: var(--bg); color: var(--on-surface); pointer-events: auto;
+            transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1);
             display: flex; flex-direction: column;
-            box-shadow: -12px 0 40px rgba(0, 0, 0, 0.6);
+            box-shadow: -12px 0 36px rgba(0, 0, 0, 0.65);
             border-top-left-radius: 28px; border-bottom-left-radius: 28px;
             overflow: hidden;
         }
         .header {
-            padding: 24px; display: flex; justify-content: space-between;
+            padding: 22px 24px; display: flex; justify-content: space-between;
             align-items: flex-start; gap: 12px;
         }
         .title-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-        .title { font-size: 20px; font-weight: 700; color: var(--md-sys-color-primary); letter-spacing: -0.2px; }
+        .title { font-size: 19px; font-weight: 700; color: var(--primary); letter-spacing: -0.2px; }
         .status-chip {
             display: inline-flex; align-items: center; gap: 8px;
-            padding: 4px 10px; border-radius: 9999px;
-            background: var(--md-sys-color-surface-container-high);
+            padding: 4px 12px; border-radius: 9999px;
+            background: var(--surface-highest);
             width: fit-content; max-width: 100%;
         }
         .status-dot {
             width: 8px; height: 8px; border-radius: 50%;
-            background: var(--md-sys-color-outline); flex-shrink: 0;
+            background: #888; flex-shrink: 0;
         }
-        .status-dot.ok { background: var(--md-sys-color-primary); box-shadow: 0 0 8px var(--md-sys-color-primary); }
-        .status-dot.err { background: var(--md-sys-color-error); }
-        .status-dot.off { background: #ffb74d; }
+        .status-dot.ok { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+        .status-dot.err { background: var(--error); }
+        .status-dot.off { background: #FFB74D; }
         .status-text {
-            font-size: 11px; font-weight: 500; color: var(--md-sys-color-on-surface-variant);
+            font-size: 11.5px; font-weight: 500; color: var(--on-surface-variant);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .icon-btn {
-            background: transparent; border: none; color: var(--md-sys-color-on-surface-variant);
-            width: 40px; height: 40px; border-radius: 20px; display: flex;
+            background: transparent; border: none; color: var(--on-surface-variant);
+            width: 38px; height: 38px; border-radius: 50%; display: flex;
             align-items: center; justify-content: center; cursor: pointer;
-            transition: background-color 0.2s, transform 0.2s; flex-shrink: 0;
+            transition: background-color 0.2s, transform 0.15s; flex-shrink: 0;
         }
-        .icon-btn:hover { background: var(--md-sys-color-surface-container-highest); }
+        .icon-btn:hover { background: var(--surface-highest); color: var(--on-surface); }
         .icon-btn:active { transform: scale(0.92); }
         .icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
         .content { flex: 1; overflow-y: auto; padding: 0 20px 24px; display: flex; flex-direction: column; gap: 16px; }
         .card {
-            background: var(--md-sys-color-surface-container);
-            border: 1px solid var(--md-sys-color-outline-variant);
+            background: var(--surface-high);
+            border: 1px solid rgba(191, 213, 255, 0.08);
             border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 12px;
         }
-        .card-title { font-size: 15px; font-weight: 600; color: var(--md-sys-color-on-surface); }
-        .card-desc { font-size: 12px; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; white-space: pre-line; }
+        .card-title { font-size: 15px; font-weight: 600; color: var(--primary); }
+        .card-desc { font-size: 12px; color: var(--on-surface-variant); line-height: 1.45; white-space: pre-line; }
         .btn {
-            background: var(--md-sys-color-surface-container-highest);
-            color: var(--md-sys-color-on-surface);
-            border: 1px solid var(--md-sys-color-outline-variant);
-            padding: 10px 18px; border-radius: 9999px; font-weight: 600;
+            background: var(--surface-highest); color: var(--on-surface);
+            border: 1px solid transparent; padding: 0 20px; height: 40px;
+            border-radius: 9999px; font-weight: 600;
             display: inline-flex; align-items: center; justify-content: center;
-            gap: 8px; font-size: 13px; cursor: pointer;
-            transition: transform 0.15s, background-color 0.2s, border-color 0.2s;
+            gap: 8px; font-size: 13.5px; cursor: pointer;
+            transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s, border-color 0.2s;
         }
-        .btn:hover { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: transparent; }
+        .btn:hover { background: rgba(118, 255, 51, 0.15); border-color: rgba(118, 255, 51, 0.4); color: var(--primary); }
         .btn:active { transform: scale(0.96); }
-        .btn.full { width: 100%; }
+        .btn.full { width: 100%; border-color: var(--outline); }
         .btn.active {
-            background: var(--md-sys-color-error-container);
-            color: var(--md-sys-color-error);
-            border-color: transparent;
+            background: rgba(255, 102, 102, 0.18);
+            border-color: var(--error);
+            color: var(--error);
         }
-        .btn svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+        .svg-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; flex-shrink: 0;
+        }
+        .svg-icon svg { width: 100%; height: 100%; fill: currentColor; }
         .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
         .btn-group .btn { flex: 1; min-width: 120px; }
         .slider-box { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-        .slider-header { font-size: 12px; color: var(--md-sys-color-on-surface-variant); display: flex; justify-content: space-between; }
+        .slider-header { font-size: 12px; color: var(--on-surface-variant); }
         input[type=range] {
             -webkit-appearance: none; appearance: none; width: 100%; height: 10px;
-            border-radius: 9999px; background: var(--md-sys-color-surface-container-highest);
+            border-radius: 9999px; background: var(--surface-highest);
             outline: none; cursor: pointer;
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none; width: 22px; height: 22px;
-            border-radius: 50%; background: var(--md-sys-color-primary);
+            border-radius: 50%; background: var(--primary);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
             transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1);
         }
-        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.18); }
         .footer-hint {
             padding: 4px 8px; text-align: center; font-size: 11px;
-            color: var(--md-sys-color-outline); letter-spacing: 0.2px;
+            color: var(--outline); letter-spacing: 0.2px;
         }
         .toast {
             position: fixed; bottom: 32px; left: 50%;
             transform: translateX(-50%) translateY(20px);
-            background: var(--md-sys-color-inverse-surface);
-            color: var(--md-sys-color-inverse-on-surface);
-            padding: 12px 24px; border-radius: 9999px; font-size: 13px; font-weight: 600;
+            background: var(--on-surface-variant); color: var(--bg);
+            padding: 12px 24px; border-radius: 9999px; font-size: 13.5px; font-weight: 600;
             opacity: 0; pointer-events: none;
             transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1), transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); max-width: 90vw; text-align: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); max-width: 90vw; text-align: center;
         }
     `;
 
@@ -1230,7 +1221,7 @@
                         <div class="card-title">${t('脱机模式', 'Offline Mode')}</div>
                         <div class="card-desc">${t('切断服务器连接并屏蔽掉线提示，配合碰撞生成以探索地图外区域。', 'Disconnect from the server and suppress disconnection notices to explore outside borders.')}</div>
                         <button class="btn full" id="offline-btn">
-                            ${ICON_WIFI_OFF}
+                            <span class="svg-icon">${ICON_WIFI_OFF}</span>
                             <span id="offline-text">${t('开启脱机', 'Enable Offline')}</span>
                         </button>
                     </div>
@@ -1249,7 +1240,7 @@
                         </div>
                     </div>
                     <div class="footer-hint">
-                        ${t('快捷键: Alt + G · 或在右上角向左滑动呼出面板', 'Shortcut: Alt + G · or swipe left from top-right corner')}
+                        ${t('快捷键: Alt + G · 或从右上角向左滑动呼出面板', 'Shortcut: Alt + G · or swipe left from top-right corner')}
                     </div>
                 </div>
             </div>
