@@ -2832,7 +2832,7 @@ let cameraTarget;
              return { binData: binZipped, propsToWrite, idMapping };
          }
          
-         window.selectPrefab = function(baseName) {
+         window.selectPrefab = function(baseName, sourceObject = null) {
              try {
                  window.isGhostFrozen = false;
                  if (ghost) {
@@ -2852,7 +2852,14 @@ let cameraTarget;
                  window.dragMode = 'none';
                  if (window.updateDragModeUI) window.updateDragModeUI();
          
-                 currentPrefabGroup = prefabs.get(baseName);
+                 // A prop name identifies geometry, not a unique appearance. Original map
+                 // instances can use different materials and atlas UVs under the same name.
+                 // Keep that instance as the placement template without changing the library.
+                 currentPrefabGroup = sourceObject ? sourceObject.clone() : prefabs.get(baseName);
+                 if (sourceObject) {
+                     currentPrefabGroup.position.set(0, 0, 0);
+                     currentPrefabGroup.rotation.set(0, 0, 0, 'ZYX');
+                 }
                  window.currentBaseName = baseName;
                  
                  if (currentPrefabGroup) {
@@ -3536,14 +3543,7 @@ let cameraTarget;
                      if (name) {
                          window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; 
                          
-                         if (!prefabs.has(name)) {
-                             const fallbackPrefab = window.originalObjectBeingMoved.clone();
-                             fallbackPrefab.position.set(0, 0, 0);
-                             fallbackPrefab.rotation.set(0, 0, 0);
-                             prefabs.set(name, fallbackPrefab);
-                         }
-                         
-                         window.selectPrefab(name);
+                         window.selectPrefab(name, window.originalObjectBeingMoved);
                          if (ghost) {
                             ghost.rotation.copy(rot); ghost.position.copy(pos);
                             ghost.children.forEach((c, i) => { if (scales[i]) c.scale.copy(scales[i]); });
@@ -3594,14 +3594,7 @@ let cameraTarget;
                      if (name) {
                          window.dragMode = 'none'; updateDragModeUI(); window.isGhostLockedToOriginal = true; 
                          
-                         if (!prefabs.has(name)) {
-                             const fallbackPrefab = selectedObjectForAction.clone();
-                             fallbackPrefab.position.set(0, 0, 0);
-                             fallbackPrefab.rotation.set(0, 0, 0);
-                             prefabs.set(name, fallbackPrefab);
-                         }
-                         
-                         window.selectPrefab(name);
+                         window.selectPrefab(name, selectedObjectForAction);
                          window.isContinuousCopyEnabled = true;
                          const copyBtn = document.getElementById('continuous-copy-btn');
                          if (copyBtn) copyBtn.className = 'm3-btn m3-btn-primary';
@@ -3874,5 +3867,5 @@ let cameraTarget;
          loadMain();
              
       </script>
-   </body>
+   <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ad0a65297ad429',t:'MTc5MjA0ODYxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
