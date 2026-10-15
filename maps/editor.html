@@ -3773,14 +3773,20 @@ let cameraTarget;
                  
                  if (!isDragging && ghost && (e.button === 0 || e.pointerType === 'touch')) {
                      updateGhost(e.clientX, e.clientY, window.dragMode !== 'none' || window.isGhostLockedToOriginal);
-                     const instance = currentPrefabGroup.clone();
-                    instance.position.copy(ghost.position); instance.rotation.copy(ghost.rotation);
-                    instance.children.forEach((c, i) => { if (ghost.children[i]) c.scale.copy(ghost.children[i].scale); });
-                    instance.updateMatrixWorld(true);
+
+                     // A move must keep the exact object that was picked.  Recreating it from
+                     // the library prefab can replace a prop-specific material (for example,
+                     // the coloured container_new variants) with the library's material.
+                     const instance = window.originalObjectBeingMoved || currentPrefabGroup.clone();
+                     instance.position.copy(ghost.position);
+                     instance.rotation.copy(ghost.rotation);
+                     instance.children.forEach((c, i) => { if (ghost.children[i]) c.scale.copy(ghost.children[i].scale); });
+                     instance.updateMatrixWorld(true);
                      instance.userData.worldBox = new THREE.Box3().setFromObject(instance, true);
                      instance.userData.baseName = window.currentBaseName;
                      editorGroup.add(instance);
-                     window.originalObjectBeingMoved = null; window.originalObjectParent = null;
+                     window.originalObjectBeingMoved = null;
+                     window.originalObjectParent = null;
          
                      if (!window.isContinuousCopyEnabled) {
                          editorGroup.remove(ghost); ghost = null; window.isGhostLockedToOriginal = false; window.isGhostFrozen = false; document.querySelector('.grid-floating-panel').style.display = 'none';
