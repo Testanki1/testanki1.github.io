@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Map Edit & Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      3.3.1
+// @version      3.3.2
 // @description  Modify map and regenerate collisions to freely customize and explore maps.
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -209,12 +209,29 @@
         map: 'map'
     };
 
-    const THEME_ICONS = {
-        'Summer Day': 'https://s.eu.tankionline.com/static/images/summer_day.14c71f7e.svg',
-        'Summer Evening': 'https://s.eu.tankionline.com/static/images/summer_evening.a77627d2.svg',
-        'Autumn': 'https://s.eu.tankionline.com/static/images/autumn_day.ef311d44.svg',
-        'Winter Day': 'https://s.eu.tankionline.com/static/images/winter_day.618f73d3.svg'
+    // 主题图标是游戏客户端自带的静态文件，不在 res.3dtank.com 上：
+    // 3dtank.com → 当前域名/play/static/images/；tankionline.com → s.eu.tankionline.com/static/images/
+    // 优先跟随游戏主脚本所在位置，这样中文服、欧服、测试服都会从各自的客户端加载。
+    const THEME_ICON_FILES = {
+        'Summer Day': 'summer_day.14c71f7e.svg',
+        'Summer Evening': 'summer_evening.a77627d2.svg',
+        'Autumn': 'autumn_day.ef311d44.svg',
+        'Winter Day': 'winter_day.618f73d3.svg'
     };
+
+    function getStaticBase() {
+        const mainScript = document.querySelector('script[src*="static/js/main."]');
+        if (mainScript && mainScript.src && mainScript.src.includes('/static/js/')) {
+            return mainScript.src.slice(0, mainScript.src.indexOf('/static/js/'));
+        }
+        if (window.location.hostname.includes('3dtank.com')) return window.location.origin + '/play';
+        return 'https://s.eu.tankionline.com';
+    }
+
+    function getThemeIconUrl(themeName) {
+        const file = THEME_ICON_FILES[themeName];
+        return file ? `${getStaticBase()}/static/images/${file}` : null;
+    }
 
     function getResourceBase() {
         const search = window.location.search;
@@ -2895,7 +2912,7 @@
                     tabBtn.className = 'theme-tab m3-interactive';
                     tabBtn.title = I18N.themeNames[theme.name] || theme.name;
 
-                    const iconUrl = THEME_ICONS[theme.name];
+                    const iconUrl = getThemeIconUrl(theme.name);
                     if (iconUrl) {
                         tabBtn.innerHTML = `<div class="theme-icon-mask" style="-webkit-mask-image: url('${iconUrl}'); mask-image: url('${iconUrl}');"></div>`;
                     } else { tabBtn.innerText = (I18N.themeNames[theme.name] || theme.name).charAt(0); }

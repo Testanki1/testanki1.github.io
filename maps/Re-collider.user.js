@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Remastered Maps Re-collider
 // @namespace    http://tampermonkey.net/
-// @version      2.4.2
+// @version      2.4.3
 // @description  Regenerate collisions for Remastered maps + Offline Mode for Out-of-bounds Exploration
 // @match        *://*.3dtank.com/play*
 // @match        *://*.tankionline.com/play*
@@ -87,7 +87,6 @@
         broadFilterLabel: isZh ? "过滤含有以下关键词的模型碰撞：" : "Filter model collisions containing these keywords:",
         addKeyword: isZh ? "添加关键词..." : "Add keyword...",
         exactModelsLabel: isZh ? "设置含碰撞的模型：" : "Set models with collisions:",
-        viewModels: isZh ? "查看模型" : "View Models",
         loadingModels: isZh ? "加载模型中...<br><span style=\"font-size:10px; opacity:0.7\">或者进入地图加载。</span>" : "Loading models...<br><span style=\"font-size:10px; opacity:0.7\">Or join the map to load manually.</span>",
         mapNames: {
             "Highland REMASTER": isZh ? "高原 重制" : "Highland REMASTER",
@@ -110,7 +109,6 @@
 
     const ICONS = {
         close: `<svg viewBox="0 -960 960 960"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></svg>`,
-        travel_explore: `<svg viewBox="0 -960 960 960"><path d="M80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q127 0 226.5 70T851-629q7 17 .5 34T828-572q-16 5-30.5-3T777-599q-24-60-69-106t-108-71v16q0 33-23.5 56.5T520-680h-80v80q0 17-11.5 28.5T400-560h-80v80h40q17 0 28.5 11.5T400-440v80h-40L168-552q-3 18-5.5 36t-2.5 36q0 122 80.5 213T443-162q16 2 26.5 13.5T480-120q0 17-11.5 28.5T441-82Q288-97 184-210T80-480Zm736 352L716-228q-21 12-45 20t-51 8q-75 0-127.5-52.5T440-380q0-75 52.5-127.5T620-560q75 0 127.5 52.5T800-380q0 27-8 51t-20 45l100 100q11 11 11 28t-11 28q-11 11-28 11t-28-11ZM691-309q29-29 29-71t-29-71q-29-29-71-29t-71 29q-29 29-29 71t29 71q29 29 71 29t71-29Z"/></svg>`,
         keyboard: `<svg viewBox="0 -960 960 960"><path d="M160-200q-33 0-56.5-23.5T80-280v-400q0-33 23.5-56.5T160-760h640q33 0 56.5 23.5T880-680v400q0 33-23.5 56.5T800-200H160Zm0-80h640v-400H160v400Zm200-40h240q17 0 28.5-11.5T640-360q0-17-11.5-28.5T600-400H360q-17 0-28.5 11.5T320-360q0 17 11.5 28.5T360-320Zm-200 40v-400 400Zm108.5-291.5Q280-583 280-600t-11.5-28.5Q257-640 240-640t-28.5 11.5Q200-617 200-600t11.5 28.5Q223-560 240-560t28.5-11.5Zm120 0Q400-583 400-600t-11.5-28.5Q377-640 360-640t-28.5 11.5Q320-617 320-600t11.5 28.5Q343-560 360-560t28.5-11.5Zm120 0Q520-583 520-600t-11.5-28.5Q497-640 480-640t-28.5 11.5Q440-617 440-600t11.5 28.5Q463-560 480-560t28.5-11.5Zm120 0Q640-583 640-600t-11.5-28.5Q617-640 600-640t-28.5 11.5Q560-617 560-600t11.5 28.5Q583-560 600-560t28.5-11.5Zm120 0Q760-583 760-600t-11.5-28.5Q737-640 720-640t-28.5 11.5Q680-617 680-600t11.5 28.5Q703-560 720-560t28.5-11.5Zm-480 120Q280-463 280-480t-11.5-28.5Q257-520 240-520t-28.5 11.5Q200-497 200-480t11.5 28.5Q223-440 240-440t28.5-11.5Zm120 0Q400-463 400-480t-11.5-28.5Q377-520 360-520t-28.5 11.5Q320-497 320-480t11.5 28.5Q343-440 360-440t28.5-11.5Zm120 0Q520-463 520-480t-11.5-28.5Q497-520 480-520t-28.5 11.5Q440-497 440-480t11.5 28.5Q463-440 480-440t28.5-11.5Zm120 0Q640-463 640-480t-11.5-28.5Q617-520 600-520t-28.5 11.5Q560-497 560-480t11.5 28.5Q583-440 600-440t28.5-11.5Zm120 0Q760-463 760-480t-11.5-28.5Q737-520 720-520t-28.5 11.5Q680-497 680-480t11.5 28.5Q703-440 720-440t28.5-11.5Z"/></svg>`,
         restart_alt: `<svg viewBox="0 -960 960 960"><path d="M393-132q-103-29-168-113.5T160-440q0-57 19-108.5t54-94.5q11-12 27-12.5t29 12.5q11 11 11.5 27T290-586q-24 31-37 68t-13 78q0 81 47.5 144.5T410-209q13 4 21.5 15t8.5 24q0 20-14 31.5t-33 6.5Zm174 0q-19 5-33-7t-14-32q0-12 8.5-23t21.5-15q75-24 122.5-87T720-440q0-100-70-170t-170-70h-3l16 16q11 11 11 28t-11 28q-11 11-28 11t-28-11l-84-84q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l84-84q11-11 28-11t28 11q11 11 11 28t-11 28l-16 16h3q134 0 227 93t93 227q0 109-65 194T567-132Z"/></svg>`,
         visibility: `<svg viewBox="0 -960 960 960"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg>`,
@@ -118,12 +116,29 @@
         wifi_off: `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M762-84 414-434q-31 7-59.5 19T301-386q-21 14-46.5 14.5T212-389q-18-18-16.5-43.5T217-473q23-17 48.5-31t52.5-26l-90-90q-26 14-50.5 29.5T130-557q-20 16-45.5 16T42-559q-18-18-17-43t21-41q22-18 45-34.5t49-30.5l-56-56q-11-11-11-28t11-28q11-11 28-11t28 11l679 679q12 12 12 28.5T819-84q-12 11-28.5 11.5T762-84Zm-353-65.5Q380-179 380-220q0-42 29-71t71-29q42 0 71 29t29 71q0 41-29 70.5T480-120q-42 0-71-29.5ZM753-395q-16 16-37.5 15.5T678-396l-10-10-10-10-96-96q-13-13-5-27t28-9q45 11 85.5 31t75.5 47q18 14 20.5 36.5T753-395Zm165-164q-17 18-42 18.5T831-556q-72-59-161.5-91.5T480-680q-21 0-40.5 1.5T400-674q-25 4-45-10.5T331-724q-4-25 11-45t40-24q24-4 48.5-5.5T480-800q125 0 235.5 41.5T914-644q20 17 21 42t-17 43Z"/></svg>`
     };
 
-    const THEME_ICONS = {
-        "Summer Day": "https://s.eu.tankionline.com/static/images/summer_day.14c71f7e.svg",
-        "Summer Evening": "https://s.eu.tankionline.com/static/images/summer_evening.a77627d2.svg",
-        "Autumn": "https://s.eu.tankionline.com/static/images/autumn_day.ef311d44.svg",
-        "Winter Day": "https://s.eu.tankionline.com/static/images/winter_day.618f73d3.svg"
+    // 主题图标是游戏客户端自带的静态文件，不在 res.3dtank.com 上：
+    // 3dtank.com → 当前域名/play/static/images/；tankionline.com → s.eu.tankionline.com/static/images/
+    // 优先跟随游戏主脚本所在位置，这样中文服、欧服、测试服都会从各自的客户端加载。
+    const THEME_ICON_FILES = {
+        "Summer Day": "summer_day.14c71f7e.svg",
+        "Summer Evening": "summer_evening.a77627d2.svg",
+        "Autumn": "autumn_day.ef311d44.svg",
+        "Winter Day": "winter_day.618f73d3.svg"
     };
+
+    function getStaticBase() {
+        const mainScript = document.querySelector('script[src*="static/js/main."]');
+        if (mainScript && mainScript.src && mainScript.src.includes('/static/js/')) {
+            return mainScript.src.slice(0, mainScript.src.indexOf('/static/js/'));
+        }
+        if (window.location.hostname.includes('3dtank.com')) return window.location.origin + '/play';
+        return 'https://s.eu.tankionline.com';
+    }
+
+    function getThemeIconUrl(themeName) {
+        const file = THEME_ICON_FILES[themeName];
+        return file ? `${getStaticBase()}/static/images/${file}` : null;
+    }
 
     function getResourceBase() {
         const search = window.location.search;
@@ -599,7 +614,7 @@
                     tabBtn.className = 'theme-tab m3-interactive';
                     tabBtn.title = I18N.themeNames[theme.name] || theme.name;
 
-                    const iconUrl = THEME_ICONS[theme.name];
+                    const iconUrl = getThemeIconUrl(theme.name);
                     if (iconUrl) {
                         tabBtn.innerHTML = `<div class="theme-icon-mask" style="-webkit-mask-image: url('${iconUrl}'); mask-image: url('${iconUrl}');"></div>`;
                     } else { tabBtn.innerText = (I18N.themeNames[theme.name] || theme.name).charAt(0); }
@@ -678,33 +693,13 @@
                     tagsContainer.onclick = () => tagInput.focus();
                     contentInner.appendChild(tagsContainer);
 
-                    let decimalFolderId = "0";
-                    if (theme.path) {
-                        let rawFolderId = theme.path.split('/').pop();
-                        decimalFolderId = rawFolderId;
-                        if (/^[0-7]+$/.test(rawFolderId)) {
-                            try { decimalFolderId = parseInt(rawFolderId, 8).toString(10); } catch (e) {}
-                        }
-                    }
-                    const viewerUrl = `https://testanki1.github.io/maps/special/collision-regenerate?map=${decimalFolderId}`;
-
                     const listHeaderRow = document.createElement('div');
                     listHeaderRow.style.display = 'flex'; listHeaderRow.style.justifyContent = 'space-between'; listHeaderRow.style.alignItems = 'center';
                     const listLabel = document.createElement('div');
                     listLabel.style.fontSize = '12px'; listLabel.style.color = 'var(--on-surface-variant)';
                     listLabel.innerText = I18N.exactModelsLabel;
 
-                    const viewModelBtn = document.createElement('a');
-                    viewModelBtn.href = viewerUrl; viewModelBtn.target = '_blank';
-                    viewModelBtn.className = 'm3-interactive';
-                    Object.assign(viewModelBtn.style, {
-                        display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-                        background: 'rgba(118,255,51,0.15)', color: 'var(--primary)', borderRadius: '12px',
-                        textDecoration: 'none', fontSize: '12px', fontWeight: '500'
-                    });
-                    viewModelBtn.innerHTML = `<span class="svg-icon" style="width:14px; height:14px;">${ICONS.travel_explore}</span>${I18N.viewModels}`;
-
-                    listHeaderRow.appendChild(listLabel); listHeaderRow.appendChild(viewModelBtn);
+                    listHeaderRow.appendChild(listLabel);
                     contentInner.appendChild(listHeaderRow);
 
                     const modelListContainer = document.createElement('div');
