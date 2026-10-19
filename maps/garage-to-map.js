@@ -2,7 +2,7 @@
 // @name         Garage → Highland Map Swap
 // @name:zh-CN   车库地图替换高原
 // @namespace    tanki/garage-swap
-// @version      1.6.1
+// @version      1.6.2
 // @description  Replaces Highland map with the Garage scene in browser memory. Supports client-side conversion and offline mode.
 // @description:zh-CN 浏览器本地实时把高原地图替换为车库场景，包含本地碰撞转换与脱机模式。
 // @author       you
@@ -808,15 +808,33 @@
     })();
     const t = (zh, en) => (isZh ? zh : en);
 
+    // --- 资源路径：使用 ID + Version 生成（同 resource-path-generator）
+    // 中文设备 → res.3dtank.com；其他语言 → s.eu.tankionline.com
+    const RESOURCE_BASE = isZh ? 'https://res.3dtank.com' : 'https://s.eu.tankionline.com';
+    function generateResourcePath(id, version) {
+        const idBig = BigInt(String(id));
+        const highId = Number(idBig >> 32n);
+        const lowId = Number(idBig & 0xFFFFFFFFn);
+        return [
+            highId.toString(8),
+            ((lowId >>> 16) & 0xFFFF).toString(8),
+            ((lowId >>> 8) & 0xFF).toString(8),
+            (lowId & 0xFF).toString(8),
+            BigInt(String(version)).toString(8)
+        ].join('/');
+    }
+
+    const GARAGE = { id: 1785908830440, version: 1785928516087 };
+
     const CFG = {
         enabled: true,
         targets: [
-            { name: t('高原 夏季白天', 'Highland Summer Day'), path: '570/174542/371/116/31656237623240', ground: 'grass1' },
-            { name: t('高原 夏季傍晚', 'Highland Summer Evening'), path: '570/174542/371/160/31656237625001', ground: 'grass1' },
-            { name: t('高原 秋季', 'Highland Autumn'), path: '570/174542/371/121/31656237623231', ground: 'withered_grass' },
-            { name: t('高原 冬季白天', 'Highland Winter Day'), path: '570/174542/371/124/31656237623250', ground: 'grass1_snow' }
-        ],
-        garageBase: 'https://res.3dtank.com/637/150166/40/350/31772150500767/',
+            { name: t('高原 夏季白天', 'Highland Summer Day'), id: 1619091716430, version: 1775742428832, ground: 'grass1' },
+            { name: t('高原 夏季傍晚', 'Highland Summer Evening'), id: 1619091716464, version: 1775742429697, ground: 'grass1' },
+            { name: t('高原 秋季', 'Highland Autumn'), id: 1619091716433, version: 1775742428825, ground: 'withered_grass' },
+            { name: t('高原 冬季白天', 'Highland Winter Day'), id: 1619091716436, version: 1775742428840, ground: 'grass1_snow' }
+        ].map(tgt => ({ ...tgt, path: generateResourcePath(tgt.id, tgt.version) })),
+        garageBase: `${RESOURCE_BASE}/${generateResourcePath(GARAGE.id, GARAGE.version)}/`,
         cfg: {},
         debug: true
     };
