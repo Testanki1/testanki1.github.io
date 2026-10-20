@@ -3851,6 +3851,9 @@ document.addEventListener('pointerdown', (e) => {
         const sw = document.getElementById('sw-' + type);
         if (sw) sw.classList.toggle('active', visState[type]);
         applyTypeVisibility(type);
+        if (!currentSoloPart && cameraMode !== 'fly') {
+            fitCamera();
+        }
         if (currentSoloPart) {
             applySoloView();
         }
@@ -4169,7 +4172,7 @@ document.addEventListener('pointerdown', (e) => {
         else startCanvasRecording();
     };
 
-    function clearSceneEnvironment(refit = false) { hidePartTooltip();
+    function clearSceneEnvironment(refit = true) { hidePartTooltip();
         if (slots.scene) {
             disposeMixer(slots.scene);
             groupAssembly.remove(slots.scene);
@@ -4199,20 +4202,18 @@ document.addEventListener('pointerdown', (e) => {
         if (active) {
             // Load environment if none is currently in the scene
             if (!slots.scene && document.getElementById('sel-scene-var').value) {
-                triggerSceneLoad(true);
+                triggerSceneLoad();
             } else if (slots.scene) {
                 slots.scene.visible = true;
+                setCameraMode('fly');
                 if (currentSoloPart) {
                     applySoloView();
                 }
             }
         } else {
-            if (slots.scene) {
-                slots.scene.visible = false;
-            }
-            if (currentSoloPart) {
-                applySoloView();
-            }
+            // Turning off must fully unload the environment (not just hide the UI),
+            // otherwise the garage still affects the camera framing/center.
+            clearSceneEnvironment(true);
         }
     }
     function activateSceneToggle() {
@@ -4452,13 +4453,13 @@ document.addEventListener('pointerdown', (e) => {
         return entry[year] || entry[years[0]] || null;
     }
 
-    async function triggerSceneLoad(keepCamera = false) {
+    async function triggerSceneLoad() {
         if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value;
         const leaf = currentGarageLeaf();
         const path = toResourcePath(leaf); if(!path) return;
         updateAssetMetaUI('group-scene', leaf);
         const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
-        loadingState.scene = true; await loadRemoteScene(path, variant, keepCamera);
+        loadingState.scene = true; await loadRemoteScene(path, variant);
         if(wrapper) wrapper.classList.remove('loading'); loadingState.scene = false;
     }
 
@@ -6150,7 +6151,7 @@ document.addEventListener('pointerdown', (e) => {
         return { matTex, meshMats };
     }
 
-    async function loadRemoteScene(path, variant, keepCamera = false) {
+    async function loadRemoteScene(path, variant) {
         if(slots.scene) { disposeMixer(slots.scene); groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
         sceneLib.meshes =[]; sceneLib.tex.clear();
         try {
@@ -6245,10 +6246,8 @@ document.addEventListener('pointerdown', (e) => {
             }
             slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); renderSceneTextureNames();
             renderPartsList();
-            if (!keepCamera) {
-                setCameraMode('fly');
-                placeEnvCamera(combinedGroup);
-            }
+            setCameraMode('fly');
+            placeEnvCamera(combinedGroup);
             if (currentSoloPart) {
                 applySoloView();
             }
