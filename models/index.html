@@ -586,6 +586,36 @@
         #group-scene.visible { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
 
+        .btn-reset-cam {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin-top: 10px;
+            padding: 9px 14px;
+            border-radius: var(--shape-s);
+            background: var(--md-sys-color-surface-container);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            color: var(--md-sys-color-on-surface);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1.3);
+            box-sizing: border-box;
+        }
+        .btn-reset-cam:hover {
+            background: var(--md-state-hover);
+            border-color: var(--scene);
+            color: var(--scene);
+        }
+        .btn-reset-cam:active {
+            transform: scale(0.98);
+        }
+        .btn-reset-cam .material-symbols-rounded {
+            font-size: 18px;
+        }
+
         .btn-text { background: transparent; border: none; height: 36px; padding: 0 16px; border-radius: 18px; cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s; }
         .btn-text.error { color: var(--tanki-salmon); margin-top: 4px; width: 100%; border: 1px solid var(--md-sys-color-outline-variant); }
         .btn-text.error:hover { background: rgba(255, 102, 102, 0.08); border-color: var(--tanki-salmon); }
@@ -1113,6 +1143,10 @@
                 <div class="control-col">
                     <div id="box-scene"><select id="sel-scene-var" class="native-select-hidden"></select></div>
                     <div id="box-scene-year" style="display:none"><select id="sel-scene-year" class="native-select-hidden"></select></div>
+                    <button type="button" class="btn-reset-cam" id="btn-reset-env-cam" onclick="resetGarageCamera(event)">
+                        <span class="material-symbols-rounded">center_focus_strong</span>
+                        <span id="t-btn-reset-cam">Reset View</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1285,7 +1319,9 @@
         partModeIsolatedDesc: "无空间偏移，单一部件独立居中展示（无翻转镜像）",
         closeSoloView: "退出单件",
         soloThisPart: "仅显示此部件",
-        soloActiveBadge: "部件展示中"
+        soloActiveBadge: "部件展示中",
+        resetCam: "重置镜头",
+        resetCamSuccess: "车库镜头已重置"
     },
     en: {
         legacy: "Legacy",
@@ -1374,7 +1410,9 @@
         partModeIsolatedDesc: "No spatial offsets, standalone part centered (no mirror/flip)",
         closeSoloView: "Exit Solo",
         soloThisPart: "Solo Part",
-        soloActiveBadge: "Part Solo View"
+        soloActiveBadge: "Part Solo View",
+        resetCam: "Reset View",
+        resetCamSuccess: "Garage camera reset"
     }
 };
     const T = Dict[userLang];
@@ -1471,6 +1509,10 @@
 if (pCls) pCls.title = T.btnClose;
         document.getElementById('t-env-label').innerText = T.envLabel;
         document.getElementById('t-scene-title').innerText = T.sceneTitle;
+        const resetBtn = document.getElementById('t-btn-reset-cam');
+        if (resetBtn) resetBtn.innerText = T.resetCam;
+        const resetEnvBtn = document.getElementById('btn-reset-env-cam');
+        if (resetEnvBtn) resetEnvBtn.title = T.resetCam;
 
         document.getElementById('tab-btn-assembly').title = T.tabAssembly;
         document.getElementById('tab-btn-more').title = T.tabMore;
@@ -1606,8 +1648,10 @@ if (pCls) pCls.title = T.btnClose;
 
     // Free-look (map-editor style): drag rotates camera itself; WASD/R/F move via FlyControls
     const cameraTarget = new THREE.Object3D();
+    window.cameraTarget = cameraTarget;
     cameraTarget.position.copy(camera.position);
     const flyControls = new FlyControls(cameraTarget, renderer.domElement);
+    window.flyControls = flyControls;
     flyControls.movementSpeed = FLY_SPEED;
     flyControls.rollSpeed = 0;
     flyControls.autoForward = false;
@@ -1992,8 +2036,7 @@ function ensureAttachUI() {
 }
 
 function projectNodeTooltip(node, name) {
-    const worldPos = new THREE.Vector3();
-    node.getWorldPosition(worldPos);
+    const worldPos = getGarageObjectWorldCenter(node) || new THREE.Vector3();
     const screen = worldPos.clone().project(camera);
     const x = (screen.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-screen.y * 0.5 + 0.5) * window.innerHeight;
@@ -2009,6 +2052,19 @@ function getGarageObjectWorldCenter(obj) {
             return obj.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(obj.matrixWorld);
         }
     }
+    let childBoxCenter = null;
+    obj.traverse(child => {
+        if (childBoxCenter) return;
+        if (child.isMesh && child.geometry) {
+            child.updateMatrixWorld(true);
+            if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+            if (child.geometry.boundingBox) {
+                childBoxCenter = child.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(child.matrixWorld);
+            }
+        }
+    });
+    if (childBoxCenter) return childBoxCenter;
+
     const wp = new THREE.Vector3();
     obj.getWorldPosition(wp);
     return wp;
@@ -2183,16 +2239,16 @@ function isMeshInSlot(mesh, type) {
 
 function isCamMarkerName(n) {
     n = (n || '').toLowerCase();
-    return n === 'cam0' || n === 'cam' || n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n.startsWith('cam') || n.startsWith('_cam');
+    return n === 'cam0' || n === 'cam' || n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n === '_cam0' || n === '_cam_t0' || n.startsWith('cam') || n.startsWith('_cam');
 }
 
 function isCollisionOrHelperMesh(o) {
-    if (!o || !o.isMesh) return false;
+    if (!o) return false;
     if (o.name === '__inPlaceBoneOverlay' || o.name === '__soloPartGroup') return false;
     if (o.userData?.isAttachmentMarker) return true;
-    if (o.userData?.isCollision) return true;
+    if (o.userData?.isCollision || o.userData?.isHelperMesh) return true;
     const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
-    if (isCamMarkerName(raw) || isCamMarkerName(o.name) || isCamMarkerName(o.userData?.originalName)) return true;
+    if (isCamMarkerName(raw) || isCamMarkerName(o.name) || isCamMarkerName(o.userData?.originalName) || isCamMarkerName(o.parent?.name)) return true;
     if (raw.match(/box|bound|col|shape/)) {
         if (isMeshInSlot(o, 'hull') || isMeshInSlot(o, 'turret') || raw.includes('bound') || raw.includes('collision') || raw.includes('col') || raw.match(/^box\d+/)) {
             return true;
@@ -6279,7 +6335,15 @@ document.addEventListener('pointerdown', (e) => {
                 }
 
                 grp.traverse(o => {
+                    const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
+                    const isCam = isCamMarkerName(raw) || isCamMarkerName(o.name) || isCamMarkerName(o.userData?.originalName) || isCamMarkerName(o.parent?.name);
+                    if (isCam && o.isMesh) {
+                        o.visible = false;
+                        o.userData.origVisible = false;
+                        o.userData.isHelperMesh = true;
+                    }
                     if (!o.isMesh) return;
+                    if (o.userData.isHelperMesh) return;
                     if (o.parent) o.userData.parentName = o.parent.name;
 
                     const refs = [];
@@ -6329,9 +6393,16 @@ document.addEventListener('pointerdown', (e) => {
             combinedGroup.userData.emptyNodes = [];
             const seenAttach = new Set();
             combinedGroup.traverse(o => {
-                const n = (o.name || o.userData?.originalName || '').toLowerCase();
-                if (isCamMarkerName(n)) {
-                    const rawName = o.userData?.originalName || o.name;
+                const rawName = o.userData?.originalName || o.name || '';
+                const lower = rawName.toLowerCase();
+                const parentLower = (o.parent?.name || '').toLowerCase();
+                const isCam = isCamMarkerName(lower) || isCamMarkerName(parentLower) || isCamMarkerName(o.name);
+                if (isCam && o.isMesh) {
+                    o.visible = false;
+                    o.userData.origVisible = false;
+                    o.userData.isHelperMesh = true;
+                }
+                if (isCamMarkerName(lower)) {
                     if (!seenAttach.has(rawName)) {
                         seenAttach.add(rawName);
                         combinedGroup.userData.emptyNodes.push({ name: rawName, node: o });
@@ -6365,17 +6436,20 @@ document.addEventListener('pointerdown', (e) => {
         let camNode = null;
         let camTargetNode = null;
         envGroup.traverse(o => {
-            const n = (o.name || o.userData?.originalName || '').toLowerCase();
+            const raw = (o.userData?.originalName || o.name || '').toLowerCase();
+            const parentRaw = (o.parent?.name || '').toLowerCase();
             // Camera markers in garage assets: cam0 (eye) / cam_t0 (look-at helper)
-            if (n === 'cam0' || n === 'cam' || n === '_cam0') {
+            if (raw === 'cam0' || raw === 'cam' || raw === '_cam0' || parentRaw === 'cam0') {
                 if (!camNode) camNode = o;
             }
-            if (n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n === '_cam_t0') {
+            if (raw === 'cam_t0' || raw === 'cam_t' || raw === 'camt0' || raw === '_cam_t0' || parentRaw === 'cam_t0') {
                 if (!camTargetNode) camTargetNode = o;
             }
-            // Hide the helper geometry itself (mesh may be named differently under A3D parent)
-            if (o.isMesh && (isCamMarkerName(o.name) || isCamMarkerName(o.parent && o.parent.name) || isCamMarkerName(o.userData?.originalName))) {
+            // Permanently hide the helper geometry itself
+            if (o.isMesh && (isCamMarkerName(raw) || isCamMarkerName(o.name) || isCamMarkerName(parentRaw))) {
                 o.visible = false;
+                o.userData.origVisible = false;
+                o.userData.isHelperMesh = true;
             }
         });
 
@@ -6436,6 +6510,18 @@ document.addEventListener('pointerdown', (e) => {
         cameraTarget.position.copy(camera.position);
         cameraTarget.quaternion.copy(camera.quaternion);
     }
+
+    window.resetGarageCamera = function(e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (slots.scene) {
+            setCameraMode('fly');
+            placeEnvCamera(slots.scene);
+            msg(T.resetCamSuccess || (userLang === 'zh' ? '车库镜头已重置' : 'Garage camera reset'));
+        } else {
+            fitCamera();
+            msg(userLang === 'zh' ? '镜头已重置' : 'Camera reset');
+        }
+    };
 
     hidePartTooltip(); window.switchMode = function(mode) {
         clearSoloPart();
