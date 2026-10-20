@@ -2000,6 +2000,20 @@ function projectNodeTooltip(node, name) {
     showPartTooltip(name, x, y, node);
 }
 
+function getGarageObjectWorldCenter(obj) {
+    if (!obj) return null;
+    obj.updateMatrixWorld(true);
+    if (obj.isMesh && obj.geometry) {
+        if (!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
+        if (obj.geometry.boundingBox) {
+            return obj.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(obj.matrixWorld);
+        }
+    }
+    const wp = new THREE.Vector3();
+    obj.getWorldPosition(wp);
+    return wp;
+}
+
 function toggleAttachmentMarker(type, info) {
     const grp = getSlotGroup(type);
     if (!grp) return;
@@ -2025,8 +2039,9 @@ function toggleAttachmentMarker(type, info) {
         if (info.btn) info.btn.classList.remove('active');
         return;
     }
-    const worldPos = new THREE.Vector3();
-    info.node.getWorldPosition(worldPos);
+    const worldPos = (type === 'scene' && info.node)
+        ? getGarageObjectWorldCenter(info.node)
+        : info.node.getWorldPosition(new THREE.Vector3());
     const localPos = grp.worldToLocal(worldPos.clone());
 
     // 3D marker: fixed world size beyond threshold, shrinks when camera gets closer than threshold
@@ -6367,10 +6382,13 @@ document.addEventListener('pointerdown', (e) => {
         const look = new THREE.Vector3();
         let hasLook = false;
 
-        // 1. Garage cam_t0 (authentic target)
+        // 1. Garage cam_t0 (authentic target at box center)
         if (camTargetNode) {
-            camTargetNode.getWorldPosition(look);
-            hasLook = true;
+            const c = getGarageObjectWorldCenter(camTargetNode);
+            if (c) {
+                look.copy(c);
+                hasLook = true;
+            }
         }
 
         // 2. Fallback to assembled tank
@@ -6405,7 +6423,9 @@ document.addEventListener('pointerdown', (e) => {
 
         const pos = new THREE.Vector3();
         if (camNode) {
-            camNode.getWorldPosition(pos);
+            const c = getGarageObjectWorldCenter(camNode);
+            if (c) pos.copy(c);
+            else camNode.getWorldPosition(pos);
         } else {
             // Fallback elevated view toward the target
             pos.set(look.x + 350, look.y + 250, look.z + 350);
