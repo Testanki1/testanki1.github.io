@@ -2154,6 +2154,16 @@ function isMeshInSlot(mesh, type) {
     return false;
 }
 
+function isCollisionOrHelperMesh(o, type) {
+    if (!o) return false;
+    if (o.userData?.isAttachmentMarker) return true;
+    if (type === 'hull' || type === 'turret') {
+        const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
+        if (raw.match(/box|bound|col|shape/)) return true;
+    }
+    return false;
+}
+
 function findMeshesForPart(type, partName) {
     const list = [];
     if (type === 'grenade') {
@@ -2181,12 +2191,8 @@ function findMeshesForPart(type, partName) {
     if (!grp) return [];
     grp.traverse(o => {
         if (!o.isMesh) return;
-        if (o.userData?.isAttachmentMarker) return;
+        if (isCollisionOrHelperMesh(o, type)) return;
         if (type === 'turret' && isUnderGrenade(o)) return;
-        if (type === 'hull' || type === 'turret') {
-            const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-            if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) return;
-        }
         if (getPartName(o) === partName) {
             list.push(o);
         }
@@ -2219,14 +2225,8 @@ function collectPartsForType(type) {
         if (grp) {
             grp.traverse(o => {
                 if (!o.isMesh) return;
-                if (o.userData?.isAttachmentMarker) return;
+                if (isCollisionOrHelperMesh(o, type)) return;
                 if (type === 'turret' && isUnderGrenade(o)) return;
-
-                // Only filter collision boxes for hull and turret
-                if (type === 'hull' || type === 'turret') {
-                    const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-                    if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) return;
-                }
 
                 const name = getPartName(o);
                 if (name) names.add(name);
@@ -2394,13 +2394,9 @@ function clearSoloPart() {
 function restoreAllMeshesVisibility() {
     root.traverse(o => {
         if (!o.isMesh) return;
-        if (o.userData?.isAttachmentMarker) {
-            o.visible = true;
-            return;
-        }
-        const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-        if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) {
-            o.visible = false;
+        const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
+        if (o.userData?.isAttachmentMarker || raw.match(/box|bound|col|shape/)) {
+            o.visible = !!o.userData?.isAttachmentMarker;
             return;
         }
         if (o.userData.origVisible !== undefined) {
@@ -2443,16 +2439,9 @@ function applySoloView() {
         const activeMeshes = [];
         root.traverse(o => {
             if (!o.isMesh) return;
-            if (o.userData?.isAttachmentMarker) {
+            if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
                 o.visible = false;
                 return;
-            }
-            if (currentSoloPart.type === 'hull' || currentSoloPart.type === 'turret') {
-                const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-                if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) {
-                    o.visible = false;
-                    return;
-                }
             }
 
             const pName = getPartName(o);
