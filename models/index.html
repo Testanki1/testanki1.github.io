@@ -206,10 +206,8 @@
         .parts-section-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
             margin-bottom: 8px;
             gap: 8px;
-            flex-wrap: wrap;
         }
         .parts-count-badge {
             font-size: 11px;
@@ -218,41 +216,6 @@
             background: rgba(191, 213, 255, 0.12);
             color: var(--md-sys-color-outline);
             font-weight: 500;
-        }
-        .parts-mode-toggle {
-            display: inline-flex;
-            align-items: center;
-            background: rgba(0, 34, 51, 0.85);
-            border: 1px solid var(--md-sys-color-outline-variant);
-            border-radius: 8px;
-            padding: 2px;
-            gap: 2px;
-        }
-        .parts-mode-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 8px;
-            font-size: 11px;
-            font-weight: 500;
-            font-family: inherit;
-            border: none;
-            border-radius: 6px;
-            background: transparent;
-            color: var(--md-sys-color-on-surface-variant);
-            cursor: pointer;
-            transition: all 0.15s ease;
-            user-select: none;
-            white-space: nowrap;
-        }
-        .parts-mode-btn:hover {
-            color: var(--md-sys-color-on-surface);
-            background: rgba(255, 255, 255, 0.06);
-        }
-        .parts-mode-btn.active {
-            background: var(--md-sys-color-primary-container);
-            color: var(--md-sys-color-primary);
-            font-weight: 600;
         }
         .parts-chip-row {
             display: flex;
@@ -308,20 +271,6 @@
             opacity: 1;
             background: var(--md-sys-color-primary);
             box-shadow: 0 0 6px var(--md-sys-color-primary);
-        }
-        .part-chip.part-chip-all {
-            border-style: dashed;
-        }
-        .part-chip.part-chip-all.active {
-            border-style: solid;
-            background: rgba(191, 213, 255, 0.12);
-            color: var(--md-sys-color-outline);
-            border-color: var(--md-sys-color-outline);
-            box-shadow: none;
-        }
-        .part-chip.part-chip-all.active .chip-dot {
-            opacity: 1;
-            background: var(--md-sys-color-outline);
         }
 
         /* Floating HUD when soloing a part */
@@ -397,20 +346,20 @@
         .solo-hud-close {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            font-size: 12px;
-            font-weight: 500;
-            font-family: inherit;
-            border: 1px solid rgba(255, 102, 102, 0.4);
-            border-radius: 14px;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid rgba(255, 102, 102, 0.35);
+            border-radius: 50%;
             background: rgba(255, 102, 102, 0.1);
             color: var(--tanki-salmon);
             cursor: pointer;
             transition: all 0.15s ease;
+            flex-shrink: 0;
         }
         .solo-hud-close:hover {
-            background: rgba(255, 102, 102, 0.2);
+            background: rgba(255, 102, 102, 0.25);
             border-color: var(--tanki-salmon);
             color: #fff;
         }
@@ -426,7 +375,7 @@
             }
             .solo-hud-tag { font-size: 12px; }
             .solo-hud-btn { padding: 3px 8px; font-size: 11px; }
-            .solo-hud-close { padding: 3px 8px; font-size: 11px; }
+            .solo-hud-close { width: 24px; height: 24px; }
         }
 
         #attach-hull .anim-chip.active,
@@ -1034,9 +983,8 @@
                 <span id="t-hud-isolated">独立单件</span>
             </button>
         </div>
-        <button class="solo-hud-close" id="hud-btn-close" title="全部显示">
+        <button class="solo-hud-close" id="hud-btn-close" title="退出单件">
             <span class="material-symbols-rounded">close</span>
-            <span id="t-hud-close">全部显示</span>
         </button>
     </div>
     <!-- Add: Animated part info popover -->
@@ -1318,7 +1266,7 @@
         partModeIsolated: "独立单件",
         partModeInPlaceDesc: "保留在模型中的空间位置，隐藏其他部件",
         partModeIsolatedDesc: "无空间偏移，单一部件独立居中展示（无翻转镜像）",
-        showAllParts: "全部显示",
+        closeSoloView: "退出单件",
         soloThisPart: "仅显示此部件",
         soloActiveBadge: "部件展示中"
     },
@@ -1407,7 +1355,7 @@
         partModeIsolated: "Isolated",
         partModeInPlaceDesc: "Keep spatial position in model, hide other parts",
         partModeIsolatedDesc: "No spatial offsets, standalone part centered (no mirror/flip)",
-        showAllParts: "Show All",
+        closeSoloView: "Exit Solo",
         soloThisPart: "Solo Part",
         soloActiveBadge: "Part Solo View"
     }
@@ -2230,27 +2178,10 @@ function ensurePartsUI() {
                     <span class="parts-title-text">${T.partsTitle}</span>
                     <span class="parts-count-badge" id="parts-count-${type}">0</span>
                 </div>
-                <div class="parts-mode-toggle" id="parts-mode-toggle-${type}">
-                    <button type="button" class="parts-mode-btn ${soloViewMode === 'inplace' ? 'active' : ''}" data-mode="inplace" title="${T.partModeInPlaceDesc}">
-                        <span class="material-symbols-rounded" style="font-size:13px;">filter_center_focus</span>
-                        <span>${T.partModeInPlace}</span>
-                    </button>
-                    <button type="button" class="parts-mode-btn ${soloViewMode === 'isolated' ? 'active' : ''}" data-mode="isolated" title="${T.partModeIsolatedDesc}">
-                        <span class="material-symbols-rounded" style="font-size:13px;">deployed_code</span>
-                        <span>${T.partModeIsolated}</span>
-                    </button>
-                </div>
             </div>
             <div class="parts-chip-row" id="parts-row-${type}"></div>
         `;
         col.appendChild(wrap);
-
-        wrap.querySelectorAll('.parts-mode-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                setSoloMode(btn.dataset.mode);
-            };
-        });
     }
 }
 
@@ -2272,17 +2203,7 @@ function renderPartsList() {
 
         if (countBadge) countBadge.textContent = parts.length;
 
-        // "Show All" chip
-        const allBtn = document.createElement('button');
-        allBtn.className = 'part-chip part-chip-all' + (!currentSoloPart ? ' active' : '');
-        allBtn.type = 'button';
-        allBtn.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${T.showAllParts}</span>`;
-        allBtn.onclick = () => {
-            clearSoloPart();
-        };
-        row.appendChild(allBtn);
-
-        // Individual part chips
+        // Individual part chips only
         for (const pName of parts) {
             const btn = document.createElement('button');
             const isActive = currentSoloPart && currentSoloPart.name === pName && currentSoloPart.type === type;
@@ -2502,18 +2423,10 @@ function applySoloView() {
 
 function updateSoloUI() {
     document.querySelectorAll('.part-chip').forEach(btn => {
-        if (btn.classList.contains('part-chip-all')) {
-            btn.classList.toggle('active', !currentSoloPart);
-        } else {
-            const p = btn.dataset.part;
-            const t = btn.dataset.type;
-            const isActive = currentSoloPart && currentSoloPart.name === p && currentSoloPart.type === t;
-            btn.classList.toggle('active', !!isActive);
-        }
-    });
-
-    document.querySelectorAll('.parts-mode-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === soloViewMode);
+        const p = btn.dataset.part;
+        const t = btn.dataset.type;
+        const isActive = currentSoloPart && currentSoloPart.name === p && currentSoloPart.type === t;
+        btn.classList.toggle('active', !!isActive);
     });
 
     const hud = document.getElementById('part-solo-hud');
@@ -2551,10 +2464,8 @@ function initPartsHUD() {
     const btnClose = document.getElementById('hud-btn-close');
     if (btnClose) {
         btnClose.onclick = () => clearSoloPart();
-        btnClose.title = T.showAllParts;
+        btnClose.title = T.closeSoloView || '退出单件';
     }
-    const tClose = document.getElementById('t-hud-close');
-    if (tClose) tClose.textContent = T.showAllParts;
 }
 initPartsHUD();
 
