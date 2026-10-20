@@ -1976,10 +1976,12 @@ function renderSceneTextureNames() {
 }
 
 function ensureAttachUI() {
-    for (const type of ['hull', 'turret']) {
+    for (const type of ['hull', 'turret', 'scene']) {
         if (document.getElementById(`attach-${type}`)) continue;
-        const idx = type === 'hull' ? 1 : 2;
-        const col = document.querySelector(`#panel-assembly .m3-card:nth-of-type(${idx}) .control-col`);
+        let col = null;
+        if (type === 'hull') col = document.querySelector('#card-hull .control-col');
+        else if (type === 'turret') col = document.querySelector('#card-turret .control-col');
+        else if (type === 'scene') col = document.querySelector('#group-scene .control-col');
         if (!col) continue;
         const wrap = document.createElement('div');
         wrap.id = `attach-${type}`;
@@ -1999,8 +2001,8 @@ function projectNodeTooltip(node, name) {
 }
 
 function toggleAttachmentMarker(type, info) {
-    if (!slots[type]) return;
-    const grp = slots[type].group;
+    const grp = getSlotGroup(type);
+    if (!grp) return;
     if (!grp.userData.attachmentMarkers) grp.userData.attachmentMarkers = new Map();
     const markers = grp.userData.attachmentMarkers;
     if (markers.has(info.name)) {
@@ -2021,11 +2023,18 @@ function toggleAttachmentMarker(type, info) {
         });
         markers.delete(info.name);
         if (info.btn) info.btn.classList.remove('active');
+        if (type === 'scene' && info.node && info.node.isMesh) {
+            info.node.visible = false;
+        }
         return;
     }
     const worldPos = new THREE.Vector3();
     info.node.getWorldPosition(worldPos);
     const localPos = grp.worldToLocal(worldPos.clone());
+
+    if (type === 'scene' && info.node && info.node.isMesh) {
+        info.node.visible = true;
+    }
 
     // 3D marker: fixed world size beyond threshold, shrinks when camera gets closer than threshold
     if (!grp.userData.attachmentThreshold) {
@@ -2066,13 +2075,13 @@ function toggleAttachmentMarker(type, info) {
 
 function renderAttachmentPoints() {
     ensureAttachUI();
-    for (const type of ['hull', 'turret']) {
+    for (const type of ['hull', 'turret', 'scene']) {
         const wrap = document.getElementById(`attach-${type}`);
         if (!wrap) continue;
         const row = wrap.querySelector('.anim-chip-row');
         row.innerHTML = '';
-        const slot = slots[type];
-        const empties = slot?.group?.userData?.emptyNodes || [];
+        const grp = getSlotGroup(type);
+        const empties = grp?.userData?.emptyNodes || [];
         if (empties.length === 0) { wrap.style.display = 'none'; continue; }
         for (const info of empties) {
             const btn = document.createElement('button');
@@ -2080,7 +2089,7 @@ function renderAttachmentPoints() {
             btn.type = 'button';
             btn.innerHTML = `<span class="chip-dot"></span><span class="chip-text">${info.name}</span>`;
             info.btn = btn;
-            const active = slot?.group?.userData?.attachmentMarkers?.has(info.name);
+            const active = grp?.userData?.attachmentMarkers?.has(info.name);
             if (active) btn.classList.add('active');
 
             // Add consistent pressing effects
@@ -2159,12 +2168,18 @@ function isMeshInSlot(mesh, type) {
     return false;
 }
 
+function isCamMarkerName(n) {
+    n = (n || '').toLowerCase();
+    return n === 'cam0' || n === 'cam' || n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n.startsWith('cam') || n.startsWith('_cam');
+}
+
 function isCollisionOrHelperMesh(o) {
     if (!o || !o.isMesh) return false;
     if (o.name === '__inPlaceBoneOverlay' || o.name === '__soloPartGroup') return false;
     if (o.userData?.isAttachmentMarker) return true;
     if (o.userData?.isCollision) return true;
     const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
+    if (isCamMarkerName(raw) || isCamMarkerName(o.name) || isCamMarkerName(o.userData?.originalName)) return true;
     if (raw.match(/box|bound|col|shape/)) {
         if (isMeshInSlot(o, 'hull') || isMeshInSlot(o, 'turret') || raw.includes('bound') || raw.includes('collision') || raw.includes('col') || raw.match(/^box\d+/)) {
             return true;
@@ -3890,7 +3905,7 @@ document.addEventListener('pointerdown', (e) => {
         if (sw) sw.classList.toggle('active', visState[type]);
         applyTypeVisibility(type);
         if (!currentSoloPart && cameraMode !== 'fly') {
-            fitCamera();
+            if (typeof updateCameraTargetPreservingView === 'function') updateCameraTargetPreservingView();
         }
         if (currentSoloPart) {
             applySoloView();
@@ -4223,6 +4238,8 @@ document.addEventListener('pointerdown', (e) => {
         // Hide garage texture chips when environment is unloaded
         renderSceneTextureNames();
         updateAssetMetaUI('group-scene', null);
+        const attachScene = document.getElementById('attach-scene');
+        if (attachScene) attachScene.style.display = 'none';
         if (currentSoloPart && currentSoloPart.type === 'scene') clearSoloPart();
         renderPartsList();
         // Environment gone → restore orbit camera
@@ -6296,6 +6313,19 @@ document.addEventListener('pointerdown', (e) => {
                 combinedGroup.add(grp);
             }
             slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); renderSceneTextureNames();
+            combinedGroup.userData.emptyNodes = [];
+            const seenAttach = new Set();
+            combinedGroup.traverse(o => {
+                const n = (o.name || o.userData?.originalName || '').toLowerCase();
+                if (isCamMarkerName(n)) {
+                    const rawName = o.userData?.originalName || o.name;
+                    if (!seenAttach.has(rawName)) {
+                        seenAttach.add(rawName);
+                        combinedGroup.userData.emptyNodes.push({ name: rawName, node: o });
+                    }
+                }
+            });
+            renderAttachmentPoints();
             renderPartsList();
             alignHullToGarageBase();
             if (isGarageAlreadyActive && savedFlyPos && savedFlyQuat) {
@@ -6313,12 +6343,6 @@ document.addEventListener('pointerdown', (e) => {
         } catch(e) { console.error(e); msg(String(e.message || e)); }
     }
 
-    // Hide garage camera helper meshes and put the free-look camera on cam0,
-    // aiming at the tank (hull/turret), not the whole garage bounds.
-    function isCamMarkerName(n) {
-        n = (n || '').toLowerCase();
-        return n === 'cam0' || n === 'cam' || n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n.startsWith('cam');
-    }
     function placeEnvCamera(envGroup) {
         if (!envGroup) return;
         envGroup.updateMatrixWorld(true);
@@ -6326,61 +6350,58 @@ document.addEventListener('pointerdown', (e) => {
         if (slots.turret?.group) slots.turret.group.updateMatrixWorld(true);
 
         let camNode = null;
+        let camTargetNode = null;
         envGroup.traverse(o => {
-            const n = (o.name || '').toLowerCase();
+            const n = (o.name || o.userData?.originalName || '').toLowerCase();
             // Camera markers in garage assets: cam0 (eye) / cam_t0 (look-at helper)
-            if (n === 'cam0' || n === 'cam') camNode = o;
+            if (n === 'cam0' || n === 'cam' || n === '_cam0') {
+                if (!camNode) camNode = o;
+            }
+            if (n === 'cam_t0' || n === 'cam_t' || n === 'camt0' || n === '_cam_t0') {
+                if (!camTargetNode) camTargetNode = o;
+            }
             // Hide the helper geometry itself (mesh may be named differently under A3D parent)
-            if (o.isMesh && (isCamMarkerName(o.name) || isCamMarkerName(o.parent && o.parent.name) || isCamMarkerName(o.userData.originalName))) {
+            if (o.isMesh && (isCamMarkerName(o.name) || isCamMarkerName(o.parent && o.parent.name) || isCamMarkerName(o.userData?.originalName))) {
                 o.visible = false;
             }
         });
 
-        // Look-at: prefer assembled tank; fall back to garage tank platform markers
         const look = new THREE.Vector3();
         let hasLook = false;
-        const tankBox = new THREE.Box3();
-        let hasTankBox = false;
-        const expandTank = (grp) => {
-            if (!grp) return;
-            const b = new THREE.Box3().setFromObject(grp);
-            if (b.isEmpty()) return;
-            if (!hasTankBox) { tankBox.copy(b); hasTankBox = true; }
-            else tankBox.union(b);
-        };
-        expandTank(slots.hull?.group);
-        expandTank(slots.turret?.group);
-        if (hasTankBox) {
-            tankBox.getCenter(look);
+
+        // 1. Garage cam_t0 (authentic target)
+        if (camTargetNode) {
+            camTargetNode.getWorldPosition(look);
             hasLook = true;
-        } else {
-            // No tank loaded yet — aim at garage tnk_plat / tnk_base / cam_t0
-            const platBox = new THREE.Box3();
-            let hasPlat = false;
-            envGroup.traverse(o => {
-                if (!o.isMesh || !o.visible) return;
-                const n = ((o.name || '') + ' ' + (o.userData.originalName || '') + ' ' + (o.parent?.name || '')).toLowerCase();
-                if (!(n.includes('tnk_plat') || n.includes('tnk_base') || n.includes('tank'))) return;
-                const geo = o.geometry;
-                if (!geo) return;
-                if (!geo.boundingBox) geo.computeBoundingBox();
-                if (!geo.boundingBox) return;
-                const wb = geo.boundingBox.clone().applyMatrix4(o.matrixWorld);
-                if (!hasPlat) { platBox.copy(wb); hasPlat = true; }
-                else platBox.union(wb);
-            });
-            if (hasPlat) {
-                platBox.getCenter(look);
+        }
+
+        // 2. Fallback to assembled tank
+        if (!hasLook) {
+            const tankBox = new THREE.Box3();
+            let hasTankBox = false;
+            const expandTank = (grp) => {
+                if (!grp) return;
+                const b = new THREE.Box3().setFromObject(grp);
+                if (b.isEmpty()) return;
+                if (!hasTankBox) { tankBox.copy(b); hasTankBox = true; }
+                else tankBox.union(b);
+            };
+            expandTank(slots.hull?.group);
+            expandTank(slots.turret?.group);
+            if (hasTankBox) {
+                tankBox.getCenter(look);
+                hasLook = true;
+            }
+        }
+
+        // 3. Fallback to garage platform / origin
+        if (!hasLook) {
+            const tnkBaseTopY = findGaragePlatformBaseTopY(envGroup);
+            if (tnkBaseTopY !== null) {
+                look.set(0, tnkBaseTopY, 0);
                 hasLook = true;
             } else {
-                // Last resort: cam_t0 world position or origin
-                let camT = null;
-                envGroup.traverse(o => {
-                    const n = (o.name || '').toLowerCase();
-                    if (n === 'cam_t0' || n === 'cam_t' || n === 'camt0') camT = o;
-                });
-                if (camT) { camT.getWorldPosition(look); hasLook = true; }
-                else look.set(0, 0, 0);
+                look.set(0, 0, 0);
             }
         }
 
@@ -6388,9 +6409,8 @@ document.addEventListener('pointerdown', (e) => {
         if (camNode) {
             camNode.getWorldPosition(pos);
         } else {
-            // Fallback elevated view toward the tank
-            const dist = hasTankBox ? Math.max(tankBox.getSize(new THREE.Vector3()).length() * 1.5, 120) : 400;
-            pos.set(look.x + dist * 0.7, look.y + dist * 0.45, look.z + dist * 0.7);
+            // Fallback elevated view toward the target
+            pos.set(look.x + 350, look.y + 250, look.z + 350);
         }
 
         camera.position.copy(pos);
@@ -7327,14 +7347,35 @@ document.addEventListener('pointerdown', (e) => {
         snapTurret();
     }
 
+    let hasInitialFramed = false;
+    function updateCameraTargetPreservingView() {
+        if (cameraMode === 'fly') return;
+        if (!hasInitialFramed) {
+            if (slots.hull && slots.turret) {
+                hasInitialFramed = true;
+            }
+            fitCamera();
+            return;
+        }
+        const b = computeVisibleBBox(root);
+        if (b.isEmpty()) return;
+        const newCenter = b.getCenter(new THREE.Vector3());
+        if (cameraMode === 'orbit') {
+            const delta = newCenter.clone().sub(orbitControls.target);
+            camera.position.add(delta);
+            orbitControls.target.copy(newCenter);
+            orbitControls.update();
+        }
+    }
+
     function equipAssembly(grp, fname, type) {
         if(slots[type]) { const old = slots[type].group; disposeMixer(old); groupAssembly.remove(old); dispose(old); }
         slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
         applyTypeVisibility(type); // keep the card switch state across reloads
-        // 在车库漫游模式或单件观察模式下，切换装备保持镜头绝对不变
+        // 在车库漫游模式或单件观察模式下，切换装备保持镜头绝对不变；非车库模式下保持视角/距离不变，只微调中心点
         if (!currentSoloPart && cameraMode !== 'fly') {
-            fitCamera();
+            updateCameraTargetPreservingView();
         }
         registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames(); renderPartsList();
         alignHullToGarageBase();
