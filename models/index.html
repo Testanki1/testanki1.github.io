@@ -2158,13 +2158,16 @@ function isMeshInSlot(mesh, type) {
     return false;
 }
 
-function isCollisionOrHelperMesh(o, type) {
-    if (!o) return false;
+function isCollisionOrHelperMesh(o) {
+    if (!o || !o.isMesh) return false;
     if (o.name === '__inPlaceBoneOverlay' || o.name === '__soloPartGroup') return false;
     if (o.userData?.isAttachmentMarker) return true;
-    if (type === 'hull' || type === 'turret') {
-        const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
-        if (raw.match(/box|bound|col|shape/)) return true;
+    if (o.userData?.isCollision) return true;
+    const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
+    if (raw.match(/box|bound|col|shape/)) {
+        if (isMeshInSlot(o, 'hull') || isMeshInSlot(o, 'turret') || raw.includes('bound') || raw.includes('collision') || raw.includes('col') || raw.match(/^box\d+/)) {
+            return true;
+        }
     }
     return false;
 }
@@ -2240,6 +2243,8 @@ function getBoneSubGeometry(skinnedMesh, boneName) {
     const newPos = [];
     const newNorm = [];
     const newUv = [];
+    const newSIdx = [];
+    const newSW = [];
     const newIdx = [];
     const vertMap = new Map();
     const groups = [];
@@ -2253,6 +2258,8 @@ function getBoneSubGeometry(skinnedMesh, boneName) {
                 newPos.push(pos.getX(oldVi), pos.getY(oldVi), pos.getZ(oldVi));
                 if (norm) newNorm.push(norm.getX(oldVi), norm.getY(oldVi), norm.getZ(oldVi));
                 if (uv) newUv.push(uv.getX(oldVi), uv.getY(oldVi));
+                if (sIdx) newSIdx.push(sIdx.getX(oldVi), sIdx.getY(oldVi), sIdx.getZ(oldVi), sIdx.getW(oldVi));
+                if (sW) newSW.push(sW.getX(oldVi), sW.getY(oldVi), sW.getZ(oldVi), sW.getW(oldVi));
             }
             newIdx.push(vertMap.get(oldVi));
         });
@@ -2266,6 +2273,8 @@ function getBoneSubGeometry(skinnedMesh, boneName) {
     subG.setAttribute('position', new THREE.BufferAttribute(new Float32Array(newPos), 3));
     if (norm) subG.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(newNorm), 3));
     if (uv) subG.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(newUv), 2));
+    if (sIdx && newSIdx.length > 0) subG.setAttribute('skinIndex', new THREE.BufferAttribute(new Float32Array(newSIdx), 4));
+    if (sW && newSW.length > 0) subG.setAttribute('skinWeight', new THREE.BufferAttribute(new Float32Array(newSW), 4));
     subG.setIndex(newIdx);
     groups.forEach(grp => subG.addGroup(grp.start, grp.count, grp.materialIndex));
     subG.computeBoundingBox();
@@ -2282,7 +2291,7 @@ function findBoneSubPartInSlot(type, partName) {
     let found = null;
     grp.traverse(o => {
         if (found || !o.isSkinnedMesh || !o.skeleton) return;
-        if (isCollisionOrHelperMesh(o, type)) return;
+        if (isCollisionOrHelperMesh(o)) return;
         const bones = o.skeleton.bones;
         let bIdx = bones.findIndex(b => cleanPartName(b.name || '').toLowerCase() === cleanTarget);
         if (bIdx === -1 && bones.length > 1 && (cleanTarget === type || cleanTarget === 'root' || (type === 'hull' && cleanTarget === 'hull') || (type === 'turret' && cleanTarget === 'turret'))) {
@@ -2525,14 +2534,6 @@ function setSoloPart(type, partName, mode = null) {
         return;
     }
 
-    // Save camera before first entering solo mode
-    if (!currentSoloPart) {
-        savedCameraState = {
-            pos: camera.position.clone(),
-            target: orbitControls.target.clone()
-        };
-    }
-
     currentSoloPart = { name: partName, type: type };
     window.currentSoloPart = currentSoloPart;
     applySoloView();
@@ -2542,14 +2543,22 @@ function setSoloPart(type, partName, mode = null) {
 function setSoloMode(mode) {
     if (mode !== 'inplace' && mode !== 'isolated') return;
     if (soloViewMode === mode) return;
-    if (mode === 'isolated' && soloViewMode === 'inplace') {
+    const oldMode = soloViewMode;
+    soloViewMode = mode;
+    window.soloViewMode = soloViewMode;
+    if (oldMode === 'inplace' && mode === 'isolated') {
         savedCameraState = {
             pos: camera.position.clone(),
             target: orbitControls.target.clone()
         };
+    } else if (oldMode === 'isolated' && mode === 'inplace') {
+        if (savedCameraState) {
+            camera.position.copy(savedCameraState.pos);
+            orbitControls.target.copy(savedCameraState.target);
+            orbitControls.update();
+            savedCameraState = null;
+        }
     }
-    soloViewMode = mode;
-    window.soloViewMode = soloViewMode;
     if (currentSoloPart) {
         applySoloView();
     }
@@ -2675,20 +2684,13 @@ function clearSoloPart() {
 function restoreAllMeshesVisibility() {
     root.traverse(o => {
         if (!o.isMesh) return;
-        if (o.userData?.isAttachmentMarker) {
-            o.visible = true;
-            return;
-        }
-        if (o.userData?.isCollision) {
+        if (isCollisionOrHelperMesh(o)) {
             o.visible = false;
             return;
         }
-        const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
-        if (isMeshInSlot(o, 'hull') || isMeshInSlot(o, 'turret')) {
-            if (raw.match(/box|bound|col|shape/)) {
-                o.visible = false;
-                return;
-            }
+        if (o.userData?.isAttachmentMarker) {
+            o.visible = true;
+            return;
         }
         if (o.userData.origVisible !== undefined) {
             o.visible = o.userData.origVisible;
@@ -2717,12 +2719,7 @@ function applySoloView() {
 
     if (soloViewMode === 'inplace') {
         // Mode 1: 空间原位 / 保留空间位置，其他部件半透明幽灵材质衬托（看清原有位置）
-        // 如果是从 Mode 2 (isolated) 切回 Mode 1，将镜头恢复到进入 Mode 2 前的原本视角
-        if (savedCameraState) {
-            camera.position.copy(savedCameraState.pos);
-            orbitControls.target.copy(savedCameraState.target);
-            orbitControls.update();
-        }
+        // 模式 1 下绝对不动镜头，无论连续切换什么部件均 100% 保持用户当前视角完全不变！
         clearSoloGroup();
         restoreAllMaterials();
 
@@ -2738,10 +2735,10 @@ function applySoloView() {
         const boneInfo = findBoneSubPartInSlot(currentSoloPart.type, currentSoloPart.name);
 
         if (boneInfo) {
-            // 骨骼部件原位高亮：全车其他网格半透明衬托，提取该骨骼对应表面高亮呈现
+            // 骨骼部件原位高亮：全车其他网格半透明衬托，提取该骨骼对应表面高亮呈现并绑定骨骼实时动画
             root.traverse(o => {
                 if (!o.isMesh) return;
-                if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
+                if (isCollisionOrHelperMesh(o)) {
                     o.visible = false;
                     return;
                 }
@@ -2766,9 +2763,17 @@ function applySoloView() {
                 m.polygonOffsetFactor = -1.0;
                 m.polygonOffsetUnits = -4.0;
             });
-            inPlaceBoneOverlay = new THREE.Mesh(boneInfo.geometry.clone(), overlayMat);
+            inPlaceBoneOverlay = new THREE.SkinnedMesh(boneInfo.geometry.clone(), overlayMat);
             inPlaceBoneOverlay.name = '__inPlaceBoneOverlay';
-            boneInfo.skinnedMesh.add(inPlaceBoneOverlay);
+            inPlaceBoneOverlay.bind(boneInfo.skinnedMesh.skeleton, boneInfo.skinnedMesh.bindMatrix);
+            if (boneInfo.skinnedMesh.parent) {
+                boneInfo.skinnedMesh.parent.add(inPlaceBoneOverlay);
+                inPlaceBoneOverlay.position.copy(boneInfo.skinnedMesh.position);
+                inPlaceBoneOverlay.quaternion.copy(boneInfo.skinnedMesh.quaternion);
+                inPlaceBoneOverlay.scale.copy(boneInfo.skinnedMesh.scale);
+            } else {
+                boneInfo.skinnedMesh.add(inPlaceBoneOverlay);
+            }
 
             // 空间原位模式：镜头完全保持不变，不动镜头！让用户在当前原有视角中直接看清部件位置！
 
@@ -2776,7 +2781,7 @@ function applySoloView() {
             // 普通独立网格部件：选中部件 100% 实体，车身其他部件半透明衬托
             root.traverse(o => {
                 if (!o.isMesh) return;
-                if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
+                if (isCollisionOrHelperMesh(o)) {
                     o.visible = false;
                     return;
                 }
