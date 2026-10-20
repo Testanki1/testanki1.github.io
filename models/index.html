@@ -1941,10 +1941,8 @@ function collectTextureNames(grp) {
     const names = new Set();
     function addName(raw) {
         if (!raw) return;
-        // Strip extension only; keep original casing from the model file
-        // (grenade mats may carry the artist's Windows source path — shown as-is).
-        const base = String(raw).replace(/\.[^.]+$/, '');
-        if (base) names.add(base);
+        const str = String(raw).trim();
+        if (str) names.add(str);
     }
     // Only model-authored refs — never CDN / loaded file names (map.name, sceneLib.tex).
     // A3D: group.userData.textureNames + mat.userData.texName
@@ -7744,7 +7742,7 @@ document.addEventListener('pointerdown', (e) => {
         function createMesh(geo, matsArr, parentNodeIdx) { if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) { const skData = geo.userData.skinData; const bones = []; const boneInverses = []; for (let k = 0; k < skData.numBones; k++) { const nodeIdx = skData.boneIds[k]; const boneNode = nds[nodeIdx]; bones.push(boneNode); if (bindMats && bindMats[nodeIdx]) { boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); } else { boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert()); } } const skel = new THREE.Skeleton(bones, boneInverses); const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; const skm = new THREE.SkinnedMesh(geo, finalMat); let bindMatrix = null; if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) { bindMatrix = bindMats[parentNodeIdx]; } if (bindMatrix) { skm.bind(skel, bindMatrix); } else { skm.bind(skel); } return skm; } else { const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; return new THREE.Mesh(geo, finalMat); } }
         if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); const src=mats[idx]; subMat.name=(src?src.n:"default"); if(src&&src.t) subMat.userData.texName=src.t; return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) { m.visible=false; m.userData.origVisible=false; m.userData.isCollision=true; } m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
         const texNames = new Set();
-        if (mats && mats.length) mats.forEach(m => { if (m.t) { const base = String(m.t).replace(/\.[^.]+$/, ''); if (base) texNames.add(base); } });
+        if (mats && mats.length) mats.forEach(m => { if (m.t) { const str = String(m.t).trim(); if (str) texNames.add(str); } });
         grp.userData.textureNames = Array.from(texNames);
 
         if(anim){ const nameToNode={}; nds.forEach(nn=>{ if(nn&&nn.name) nameToNode[nn.name]=nn; }); grp.userData.anim={ tracks: anim.tracks, clips: anim.clips, groups: (anim.clips && anim.clips.length) ? anim.clips[0].groups : (anim.groups||[]), duration: anim.duration, nameToNode }; }
