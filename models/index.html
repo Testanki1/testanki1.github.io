@@ -280,19 +280,22 @@
             left: 50%;
             transform: translateX(-50%) translateY(-10px);
             z-index: 85;
-            background: rgba(0, 25, 38, 0.9);
+            background: rgba(0, 25, 38, 0.92);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(118, 255, 51, 0.4);
             border-radius: 24px;
-            padding: 6px 14px;
+            padding: 4px 10px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.25s cubic-bezier(0.2,0,0,1), transform 0.25s cubic-bezier(0.2,0,0,1);
+            white-space: nowrap;
+            flex-wrap: nowrap;
+            user-select: none;
         }
         #part-solo-hud.show {
             opacity: 1;
@@ -302,46 +305,60 @@
         .solo-hud-tag {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             font-size: 13px;
             font-weight: 600;
             color: var(--md-sys-color-primary);
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-shrink: 1;
         }
         .solo-hud-tag .material-symbols-rounded {
-            font-size: 18px;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .solo-hud-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .solo-hud-modes {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             background: rgba(0, 34, 51, 0.9);
             border-radius: 16px;
             padding: 2px;
             gap: 2px;
             border: 1px solid rgba(191, 213, 255, 0.15);
+            flex-shrink: 0;
         }
         .solo-hud-btn {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            font-size: 12px;
-            font-weight: 500;
-            font-family: inherit;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
             border: none;
-            border-radius: 14px;
+            border-radius: 50%;
             background: transparent;
             color: var(--md-sys-color-on-surface-variant);
             cursor: pointer;
             transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .solo-hud-btn .material-symbols-rounded {
+            font-size: 16px;
         }
         .solo-hud-btn:hover {
             color: #fff;
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.1);
         }
         .solo-hud-btn.active {
             background: var(--md-sys-color-primary);
             color: var(--tanki-dark);
-            font-weight: 600;
         }
         .solo-hud-close {
             display: inline-flex;
@@ -369,13 +386,15 @@
         @media (max-width: 768px) {
             #part-solo-hud {
                 top: 56px;
-                padding: 4px 10px;
-                gap: 8px;
+                padding: 4px 8px;
+                gap: 6px;
                 max-width: calc(100vw - 32px);
             }
-            .solo-hud-tag { font-size: 12px; }
-            .solo-hud-btn { padding: 3px 8px; font-size: 11px; }
+            .solo-hud-tag { font-size: 12px; max-width: 120px; }
+            .solo-hud-btn { width: 24px; height: 24px; }
+            .solo-hud-btn .material-symbols-rounded { font-size: 15px; }
             .solo-hud-close { width: 24px; height: 24px; }
+            .solo-hud-close .material-symbols-rounded { font-size: 15px; }
         }
 
         #attach-hull .anim-chip.active,
@@ -974,13 +993,11 @@
             <span class="solo-hud-name"></span>
         </div>
         <div class="solo-hud-modes">
-            <button class="solo-hud-btn" data-mode="inplace" id="hud-btn-inplace" title="保留在模型中的空间位置，隐藏其他部件">
-                <span class="material-symbols-rounded" style="font-size:14px;">filter_center_focus</span>
-                <span id="t-hud-inplace">空间原位</span>
+            <button class="solo-hud-btn" data-mode="inplace" id="hud-btn-inplace" title="空间原位：保留在模型中的空间位置，隐藏其他部件">
+                <span class="material-symbols-rounded">filter_center_focus</span>
             </button>
-            <button class="solo-hud-btn" data-mode="isolated" id="hud-btn-isolated" title="无空间偏移，单一部件独立居中展示（无翻转镜像）">
-                <span class="material-symbols-rounded" style="font-size:14px;">deployed_code</span>
-                <span id="t-hud-isolated">独立单件</span>
+            <button class="solo-hud-btn" data-mode="isolated" id="hud-btn-isolated" title="独立单件：无空间偏移，单一部件独立居中展示（无翻转镜像）">
+                <span class="material-symbols-rounded">deployed_code</span>
             </button>
         </div>
         <button class="solo-hud-close" id="hud-btn-close" title="退出单件">
@@ -2093,33 +2110,83 @@ function getSlotGroup(type) {
     if (type === 'hull') return slots.hull?.group;
     if (type === 'turret') return slots.turret?.group;
     if (type === 'grenade') return slots.grenade?.template;
+    if (type === 'scene') return slots.scene;
     if (type === 'drone') return (slots.more?.cat === 'drone' ? slots.more.group : null);
     if (type === 'supply') return (slots.more?.cat === 'supply' ? slots.more.group : null);
     if (type === 'normal') return groupNormal;
     return null;
 }
 
-function isMeshInSlot(mesh, type) {
-    const grp = getSlotGroup(type);
-    if (!grp) return false;
-    let p = mesh;
+function isAncestorOf(ancestor, child) {
+    if (!ancestor || !child) return false;
+    let p = child;
     while (p) {
-        if (p === grp) return true;
+        if (p === ancestor) return true;
         p = p.parent;
     }
     return false;
 }
 
+function isMeshInSlot(mesh, type) {
+    if (!mesh) return false;
+    if (type === 'grenade') {
+        return isUnderGrenade(mesh);
+    }
+    if (type === 'turret') {
+        if (isUnderGrenade(mesh)) return false;
+        return isAncestorOf(slots.turret?.group, mesh);
+    }
+    if (type === 'hull') {
+        return isAncestorOf(slots.hull?.group, mesh);
+    }
+    if (type === 'scene') {
+        return isAncestorOf(slots.scene, mesh);
+    }
+    if (type === 'drone') {
+        return (slots.more?.cat === 'drone' && isAncestorOf(slots.more?.group, mesh));
+    }
+    if (type === 'supply') {
+        return (slots.more?.cat === 'supply' && isAncestorOf(slots.more?.group, mesh));
+    }
+    if (type === 'normal') {
+        return isAncestorOf(groupNormal, mesh);
+    }
+    return false;
+}
+
 function findMeshesForPart(type, partName) {
+    const list = [];
+    if (type === 'grenade') {
+        // First look for mounted grenade clones in scene
+        root.traverse(o => {
+            if (!o.isMesh) return;
+            if (o.userData?.isAttachmentMarker) return;
+            if (isUnderGrenade(o) && getPartName(o) === partName) {
+                list.push(o);
+            }
+        });
+        // Fallback to template if not mounted
+        if (list.length === 0 && slots.grenade?.template) {
+            slots.grenade.template.traverse(o => {
+                if (!o.isMesh) return;
+                if (getPartName(o) === partName) {
+                    list.push(o);
+                }
+            });
+        }
+        return list;
+    }
+
     const grp = getSlotGroup(type);
     if (!grp) return [];
-    const list = [];
     grp.traverse(o => {
         if (!o.isMesh) return;
         if (o.userData?.isAttachmentMarker) return;
         if (type === 'turret' && isUnderGrenade(o)) return;
-        const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-        if (orig.match(/box|bound|col|shape/)) return;
+        if (type === 'hull' || type === 'turret') {
+            const orig = (o.userData?.originalName || o.name || '').toLowerCase();
+            if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) return;
+        }
         if (getPartName(o) === partName) {
             list.push(o);
         }
@@ -2128,21 +2195,47 @@ function findMeshesForPart(type, partName) {
 }
 
 function collectPartsForType(type) {
-    const grp = getSlotGroup(type);
-    if (!grp) return [];
     const names = new Set();
-    grp.traverse(o => {
-        if (!o.isMesh) return;
-        if (o.userData?.isAttachmentMarker) return;
-        if (type === 'turret' && isUnderGrenade(o)) return;
-        const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-        if (orig.match(/box|bound|col|shape/)) return;
-        const name = getPartName(o);
-        if (name) names.add(name);
-    });
+    if (type === 'grenade') {
+        let found = false;
+        root.traverse(o => {
+            if (!o.isMesh) return;
+            if (o.userData?.isAttachmentMarker) return;
+            if (isUnderGrenade(o)) {
+                found = true;
+                const name = getPartName(o);
+                if (name) names.add(name);
+            }
+        });
+        if (!found && slots.grenade?.template) {
+            slots.grenade.template.traverse(o => {
+                if (!o.isMesh) return;
+                const name = getPartName(o);
+                if (name) names.add(name);
+            });
+        }
+    } else {
+        const grp = getSlotGroup(type);
+        if (grp) {
+            grp.traverse(o => {
+                if (!o.isMesh) return;
+                if (o.userData?.isAttachmentMarker) return;
+                if (type === 'turret' && isUnderGrenade(o)) return;
+
+                // Only filter collision boxes for hull and turret
+                if (type === 'hull' || type === 'turret') {
+                    const orig = (o.userData?.originalName || o.name || '').toLowerCase();
+                    if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) return;
+                }
+
+                const name = getPartName(o);
+                if (name) names.add(name);
+            });
+        }
+    }
 
     const arr = Array.from(names);
-    const mainKeys = ['hull', 'turret', 'drone', 'supply', 'bomb', 'grenade'];
+    const mainKeys = ['hull', 'turret', 'drone', 'supply', 'bomb', 'grenade', 'room0', 'drop_box'];
     arr.sort((a, b) => {
         const aLow = a.toLowerCase();
         const bLow = b.toLowerCase();
@@ -2156,12 +2249,13 @@ function collectPartsForType(type) {
 }
 
 function ensurePartsUI() {
-    for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply', 'normal']) {
+    for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply', 'scene', 'normal']) {
         if (document.getElementById(`parts-${type}`)) continue;
         let col = null;
         if (type === 'hull') col = document.querySelector('#card-hull .control-col');
         else if (type === 'turret') col = document.querySelector('#card-turret .control-col');
         else if (type === 'grenade') col = document.querySelector('#card-grenade .control-col');
+        else if (type === 'scene') col = document.querySelector('#group-scene .control-col');
         else if (type === 'drone') col = document.querySelector('#card-drone .control-col');
         else if (type === 'supply') col = document.querySelector('#card-supply .control-col');
         else if (type === 'normal') col = document.getElementById('panel-normal');
@@ -2187,7 +2281,7 @@ function ensurePartsUI() {
 
 function renderPartsList() {
     ensurePartsUI();
-    for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply', 'normal']) {
+    for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply', 'scene', 'normal']) {
         const wrap = document.getElementById(`parts-${type}`);
         if (!wrap) continue;
         const row = document.getElementById(`parts-row-${type}`);
@@ -2305,7 +2399,7 @@ function restoreAllMeshesVisibility() {
             return;
         }
         const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-        if (orig.match(/box|bound|col|shape/)) {
+        if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) {
             o.visible = false;
             return;
         }
@@ -2321,6 +2415,11 @@ function restoreAllMeshesVisibility() {
             applyTypeVisibility(t);
         }
     });
+
+    const envActive = document.querySelector('.env-toggle')?.classList.contains('active');
+    if (slots.scene) {
+        slots.scene.visible = !!envActive;
+    }
 }
 
 function applySoloView() {
@@ -2328,7 +2427,7 @@ function applySoloView() {
     hidePartTooltip();
 
     if (soloViewMode === 'inplace') {
-        // Mode 1: 空间原位 / 保留空间
+        // Mode 1: 空间原位 / 保留空间位置
         if (soloGroup) {
             soloGroup.visible = false;
         }
@@ -2336,30 +2435,53 @@ function applySoloView() {
         if (groupMore) groupMore.visible = (currentMode === 'more');
         if (groupNormal) groupNormal.visible = (currentMode === 'normal');
 
+        // Containers visibility
+        if (slots.hull?.group) slots.hull.group.visible = true;
+        if (slots.turret?.group) slots.turret.group.visible = true;
+        if (slots.scene) slots.scene.visible = (currentSoloPart.type === 'scene');
+
+        const activeMeshes = [];
         root.traverse(o => {
             if (!o.isMesh) return;
             if (o.userData?.isAttachmentMarker) {
                 o.visible = false;
                 return;
             }
-            const orig = (o.userData?.originalName || o.name || '').toLowerCase();
-            if (orig.match(/box|bound|col|shape/)) {
-                o.visible = false;
-                return;
+            if (currentSoloPart.type === 'hull' || currentSoloPart.type === 'turret') {
+                const orig = (o.userData?.originalName || o.name || '').toLowerCase();
+                if (orig.match(/^(col|bound|collision|shape|box\d*$)/)) {
+                    o.visible = false;
+                    return;
+                }
             }
 
             const pName = getPartName(o);
             const isMatch = (pName === currentSoloPart.name) && isMeshInSlot(o, currentSoloPart.type);
             o.visible = isMatch;
+            if (isMatch) {
+                activeMeshes.push(o);
+                let p = o.parent;
+                while (p && p !== root) {
+                    p.visible = true;
+                    p = p.parent;
+                }
+            }
         });
 
-        const slotGrp = getSlotGroup(currentSoloPart.type);
-        if (slotGrp) slotGrp.visible = true;
-
-        if (savedCameraState) {
-            camera.position.copy(savedCameraState.pos);
-            orbitControls.target.copy(savedCameraState.target);
-            orbitControls.update();
+        // Frame camera on the active part in situ
+        if (activeMeshes.length > 0) {
+            const box = new THREE.Box3();
+            activeMeshes.forEach(m => box.expandByObject(m));
+            if (!box.isEmpty()) {
+                const c = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z, 1);
+                const dist = Math.max(maxDim * 2.2, 120);
+                camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
+                camera.lookAt(c);
+                orbitControls.target.copy(c);
+                orbitControls.update();
+            }
         }
 
     } else {
@@ -2382,7 +2504,6 @@ function applySoloView() {
 
         const meshes = findMeshesForPart(currentSoloPart.type, currentSoloPart.name);
         if (meshes.length > 0) {
-            const slotGrp = getSlotGroup(currentSoloPart.type);
             for (const m of meshes) {
                 const clone = m.clone();
                 // Strictly positive scale — no negative scaling / mirroring / flipping
@@ -2393,7 +2514,7 @@ function applySoloView() {
                 );
                 clone.quaternion.copy(m.quaternion);
                 clone.position.copy(m.position);
-                if (m.parent && m.parent !== slotGrp && m.parent.name === currentSoloPart.name) {
+                if (m.parent && m.parent.name === currentSoloPart.name) {
                     clone.quaternion.multiplyQuaternions(m.parent.quaternion, clone.quaternion);
                 }
                 clone.visible = true;
@@ -2448,18 +2569,14 @@ function initPartsHUD() {
     const btnInplace = document.getElementById('hud-btn-inplace');
     if (btnInplace) {
         btnInplace.onclick = () => setSoloMode('inplace');
-        btnInplace.title = T.partModeInPlaceDesc;
+        btnInplace.title = `${T.partModeInPlace}：${T.partModeInPlaceDesc}`;
     }
-    const tInplace = document.getElementById('t-hud-inplace');
-    if (tInplace) tInplace.textContent = T.partModeInPlace;
 
     const btnIsolated = document.getElementById('hud-btn-isolated');
     if (btnIsolated) {
         btnIsolated.onclick = () => setSoloMode('isolated');
-        btnIsolated.title = T.partModeIsolatedDesc;
+        btnIsolated.title = `${T.partModeIsolated}：${T.partModeIsolatedDesc}`;
     }
-    const tIsolated = document.getElementById('t-hud-isolated');
-    if (tIsolated) tIsolated.textContent = T.partModeIsolated;
 
     const btnClose = document.getElementById('hud-btn-close');
     if (btnClose) {
@@ -3649,6 +3766,8 @@ document.addEventListener('pointerdown', (e) => {
         // Hide garage texture chips when environment is unloaded
         renderSceneTextureNames();
         updateAssetMetaUI('group-scene', null);
+        if (currentSoloPart && currentSoloPart.type === 'scene') clearSoloPart();
+        renderPartsList();
         // Environment gone → restore orbit camera
         setCameraMode('orbit');
         if (refit) fitCamera();
@@ -5700,6 +5819,7 @@ document.addEventListener('pointerdown', (e) => {
                 combinedGroup.add(grp);
             }
             slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); renderSceneTextureNames();
+            renderPartsList();
             setCameraMode('fly');
             placeEnvCamera(combinedGroup);
         } catch(e) { console.error(e); msg(String(e.message || e)); }
@@ -5839,6 +5959,8 @@ document.addEventListener('pointerdown', (e) => {
         renderTextureNames();
         updateAssetMetaUI('card-drone', null);
         updateAssetMetaUI('card-supply', null); // hide drone/supply texture chips
+        if (currentSoloPart && (currentSoloPart.type === 'drone' || currentSoloPart.type === 'supply')) clearSoloPart();
+        renderPartsList();
     }
 
     function enterMoreMode() {
@@ -6008,6 +6130,8 @@ document.addEventListener('pointerdown', (e) => {
         }
         // The other category's cached textures die with its model
         for (const c of ['drone', 'supply']) if (c !== keepCat) { pools[c].forEach(p => p.tex.dispose()); pools[c] = []; }
+        if (currentSoloPart && (currentSoloPart.type === 'drone' || currentSoloPart.type === 'supply')) clearSoloPart();
+        renderPartsList();
     }
 
     document.getElementById('btn-clear').onclick = () => { hidePartTooltip();
@@ -6060,7 +6184,7 @@ document.addEventListener('pointerdown', (e) => {
                 const texEl = document.getElementById(`tex-${type}`);
                 if (texEl) texEl.remove();
             }
-            for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply', 'normal']) {
+            for (const type of ['hull', 'turret', 'grenade', 'drone', 'supply', 'scene', 'normal']) {
                 const partsEl = document.getElementById(`parts-${type}`);
                 if (partsEl) partsEl.remove();
             }
