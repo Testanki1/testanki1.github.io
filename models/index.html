@@ -2711,6 +2711,17 @@ function restoreAllMeshesVisibility() {
     }
 }
 
+function isSlotAllowedInSolo(type) {
+    if (type === 'hull') return (visState.hull !== false) || (currentSoloPart?.type === 'hull');
+    if (type === 'turret') return (visState.turret !== false) || (currentSoloPart?.type === 'turret');
+    if (type === 'grenade') return (visState.grenade === true) || (currentSoloPart?.type === 'grenade');
+    if (type === 'scene') {
+        const envActive = !!document.querySelector('.env-toggle')?.classList.contains('active');
+        return envActive || (currentSoloPart?.type === 'scene');
+    }
+    return true;
+}
+
 function applySoloView() {
     if (!currentSoloPart) return;
     hidePartTooltip();
@@ -2727,28 +2738,46 @@ function applySoloView() {
         if (groupMore) groupMore.visible = (currentMode === 'more');
         if (groupNormal) groupNormal.visible = (currentMode === 'normal');
 
-        // Containers visibility
-        if (slots.hull?.group) slots.hull.group.visible = true;
-        if (slots.turret?.group) slots.turret.group.visible = true;
-        if (slots.scene) slots.scene.visible = (currentSoloPart.type === 'scene');
+        // Containers visibility — 严格遵循类别的开启/关闭状态（仅在查看该类别部件时才允许显示）
+        if (slots.hull?.group) {
+            slots.hull.group.visible = isSlotAllowedInSolo('hull');
+        }
+        if (slots.turret?.group) {
+            slots.turret.group.visible = isSlotAllowedInSolo('turret') || isSlotAllowedInSolo('grenade');
+        }
+        if (slots.scene) {
+            slots.scene.visible = isSlotAllowedInSolo('scene');
+        }
 
         const boneInfo = findBoneSubPartInSlot(currentSoloPart.type, currentSoloPart.name);
 
         if (boneInfo) {
-            // 骨骼部件原位高亮：全车其他网格半透明衬托，提取该骨骼对应表面高亮呈现并绑定骨骼实时动画
+            // 骨骼部件原位高亮：全场允许显示的网格（车身、车库、手榴弹等）半透明衬托，提取该骨骼对应表面高亮呈现并绑定骨骼实时动画
             root.traverse(o => {
                 if (!o.isMesh) return;
                 if (isCollisionOrHelperMesh(o)) {
                     o.visible = false;
                     return;
                 }
+                if (isMeshInSlot(o, 'hull') && !isSlotAllowedInSolo('hull')) {
+                    o.visible = false;
+                    return;
+                }
+                if (isMeshInSlot(o, 'turret') && !isSlotAllowedInSolo('turret')) {
+                    o.visible = false;
+                    return;
+                }
+                if (isMeshInSlot(o, 'scene') && !isSlotAllowedInSolo('scene')) {
+                    o.visible = false;
+                    return;
+                }
+                if (isUnderGrenade(o) && !isSlotAllowedInSolo('grenade')) {
+                    o.visible = false;
+                    return;
+                }
+
                 o.visible = true;
                 setMeshGhost(o, true);
-                let p = o.parent;
-                while (p && p !== root) {
-                    p.visible = true;
-                    p = p.parent;
-                }
             });
 
             const overlayMat = (Array.isArray(boneInfo.skinnedMesh.material)
@@ -2778,10 +2807,26 @@ function applySoloView() {
             // 空间原位模式：镜头完全保持不变，不动镜头！让用户在当前原有视角中直接看清部件位置！
 
         } else {
-            // 普通独立网格部件：选中部件 100% 实体，车身其他部件半透明衬托
+            // 普通独立网格部件：选中部件 100% 实体，全场其他网格（车身、车库、手榴弹等）半透明衬托
             root.traverse(o => {
                 if (!o.isMesh) return;
                 if (isCollisionOrHelperMesh(o)) {
+                    o.visible = false;
+                    return;
+                }
+                if (isMeshInSlot(o, 'hull') && !isSlotAllowedInSolo('hull')) {
+                    o.visible = false;
+                    return;
+                }
+                if (isMeshInSlot(o, 'turret') && !isSlotAllowedInSolo('turret')) {
+                    o.visible = false;
+                    return;
+                }
+                if (isMeshInSlot(o, 'scene') && !isSlotAllowedInSolo('scene')) {
+                    o.visible = false;
+                    return;
+                }
+                if (isUnderGrenade(o) && !isSlotAllowedInSolo('grenade')) {
                     o.visible = false;
                     return;
                 }
@@ -2792,11 +2837,6 @@ function applySoloView() {
 
                 if (isMatch) {
                     setMeshGhost(o, false);
-                    let p = o.parent;
-                    while (p && p !== root) {
-                        p.visible = true;
-                        p = p.parent;
-                    }
                 } else {
                     setMeshGhost(o, true);
                 }
@@ -2854,7 +2894,7 @@ function applySoloView() {
             const center = finalBox.getCenter(new THREE.Vector3());
             const size = finalBox.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z, 1);
-            const dist = Math.max(maxDim * 1.5, 60);
+            const dist = Math.max(maxDim * 1.25, 60);
             camera.position.set(center.x + dist, center.y + dist * 0.55, center.z + dist);
             camera.lookAt(center);
             orbitControls.target.copy(center);
@@ -2902,7 +2942,7 @@ function applySoloView() {
                 const c = finalBox.getCenter(new THREE.Vector3());
                 const size = finalBox.getSize(new THREE.Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z, 1);
-                const dist = Math.max(maxDim * 1.35, 60);
+                const dist = Math.max(maxDim * 1.25, 60);
                 camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
                 camera.lookAt(c);
                 orbitControls.target.copy(c);
@@ -3811,7 +3851,9 @@ document.addEventListener('pointerdown', (e) => {
         const sw = document.getElementById('sw-' + type);
         if (sw) sw.classList.toggle('active', visState[type]);
         applyTypeVisibility(type);
-        fitCamera();
+        if (currentSoloPart) {
+            applySoloView();
+        }
     }
     // Environment-style semantics for grenades: OFF unloads outright
     // (clearGrenadeTemplate); ON loads the currently picked grenade.
@@ -3827,8 +3869,12 @@ document.addEventListener('pointerdown', (e) => {
         if (sw) sw.classList.toggle('active', visState.grenade);
         if (visState.grenade) {
             if (!slots.grenade) triggerGrenadeLoad();
+            else applyTypeVisibility('grenade');
         } else {
             clearGrenadeTemplate();
+        }
+        if (currentSoloPart) {
+            applySoloView();
         }
     }
     ['hull', 'turret', 'grenade'].forEach(t => {
@@ -4123,7 +4169,7 @@ document.addEventListener('pointerdown', (e) => {
         else startCanvasRecording();
     };
 
-    function clearSceneEnvironment(refit = true) { hidePartTooltip();
+    function clearSceneEnvironment(refit = false) { hidePartTooltip();
         if (slots.scene) {
             disposeMixer(slots.scene);
             groupAssembly.remove(slots.scene);
@@ -4152,12 +4198,21 @@ document.addEventListener('pointerdown', (e) => {
         if (sw) sw.classList.toggle('active', active);
         if (active) {
             // Load environment if none is currently in the scene
-            if (!slots.scene && document.getElementById('sel-scene-var').value) triggerSceneLoad();
-            else if (slots.scene) setCameraMode('fly');
+            if (!slots.scene && document.getElementById('sel-scene-var').value) {
+                triggerSceneLoad(true);
+            } else if (slots.scene) {
+                slots.scene.visible = true;
+                if (currentSoloPart) {
+                    applySoloView();
+                }
+            }
         } else {
-            // Turning off must fully unload the environment (not just hide the UI),
-            // otherwise the garage still affects the camera framing/center.
-            clearSceneEnvironment(true);
+            if (slots.scene) {
+                slots.scene.visible = false;
+            }
+            if (currentSoloPart) {
+                applySoloView();
+            }
         }
     }
     function activateSceneToggle() {
@@ -4397,13 +4452,13 @@ document.addEventListener('pointerdown', (e) => {
         return entry[year] || entry[years[0]] || null;
     }
 
-    async function triggerSceneLoad() {
+    async function triggerSceneLoad(keepCamera = false) {
         if(loadingState.scene) return; const variant = document.getElementById('sel-scene-var').value;
         const leaf = currentGarageLeaf();
         const path = toResourcePath(leaf); if(!path) return;
         updateAssetMetaUI('group-scene', leaf);
         const wrapper = document.getElementById('box-scene').querySelector('.icon-grid-wrapper'); if(wrapper) wrapper.classList.add('loading');
-        loadingState.scene = true; await loadRemoteScene(path, variant);
+        loadingState.scene = true; await loadRemoteScene(path, variant, keepCamera);
         if(wrapper) wrapper.classList.remove('loading'); loadingState.scene = false;
     }
 
@@ -6095,7 +6150,7 @@ document.addEventListener('pointerdown', (e) => {
         return { matTex, meshMats };
     }
 
-    async function loadRemoteScene(path, variant) {
+    async function loadRemoteScene(path, variant, keepCamera = false) {
         if(slots.scene) { disposeMixer(slots.scene); groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
         sceneLib.meshes =[]; sceneLib.tex.clear();
         try {
@@ -6190,8 +6245,13 @@ document.addEventListener('pointerdown', (e) => {
             }
             slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); renderSceneTextureNames();
             renderPartsList();
-            setCameraMode('fly');
-            placeEnvCamera(combinedGroup);
+            if (!keepCamera) {
+                setCameraMode('fly');
+                placeEnvCamera(combinedGroup);
+            }
+            if (currentSoloPart) {
+                applySoloView();
+            }
         } catch(e) { console.error(e); msg(String(e.message || e)); }
     }
 
@@ -7124,6 +7184,7 @@ document.addEventListener('pointerdown', (e) => {
         applyTypeVisibility(type); // keep the card switch state across reloads
         fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames(); renderPartsList();
         if (currentSoloPart && currentSoloPart.type === type) clearSoloPart();
+        else if (currentSoloPart) applySoloView();
         
         // Auto-reapply active camouflage when equipping a new skin or model
         if (visState.paint && currentPaintEntry) {
@@ -7301,6 +7362,7 @@ document.addEventListener('pointerdown', (e) => {
             attachGrenadesToTurret();
             renderTextureNames(); // show grenade texture chips alongside hull/turret
             renderPartsList();
+            if (currentSoloPart) applySoloView();
         } catch(e) {
             console.error(e);
             msg(`${T.grenadeFail}: ${e.message || e}`);
@@ -7351,7 +7413,7 @@ document.addEventListener('pointerdown', (e) => {
         const c = b.getCenter(new THREE.Vector3());
         const size = b.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z, 1);
-        const dist = Math.max(maxDim * 1.2, 80);
+        const dist = Math.max(maxDim * 1.25, 60);
         camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
         camera.lookAt(c);
         if (cameraMode === 'fly') {
