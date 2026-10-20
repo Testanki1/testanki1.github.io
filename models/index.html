@@ -2023,26 +2023,24 @@ function toggleAttachmentMarker(type, info) {
         });
         markers.delete(info.name);
         if (info.btn) info.btn.classList.remove('active');
-        if (type === 'scene' && info.node && info.node.isMesh) {
-            info.node.visible = false;
-        }
         return;
     }
     const worldPos = new THREE.Vector3();
     info.node.getWorldPosition(worldPos);
     const localPos = grp.worldToLocal(worldPos.clone());
 
-    if (type === 'scene' && info.node && info.node.isMesh) {
-        info.node.visible = true;
-    }
-
     // 3D marker: fixed world size beyond threshold, shrinks when camera gets closer than threshold
     if (!grp.userData.attachmentThreshold) {
-        const box = new THREE.Box3().setFromObject(grp);
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z, 1);
-        grp.userData.attachmentBaseRadius = Math.max(1.5, maxDim * 0.018);
-        grp.userData.attachmentThreshold = maxDim * 0.5;
+        if (type === 'scene') {
+            grp.userData.attachmentBaseRadius = 3.5;
+            grp.userData.attachmentThreshold = 150;
+        } else {
+            const box = new THREE.Box3().setFromObject(grp);
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z, 1);
+            grp.userData.attachmentBaseRadius = Math.max(1.5, maxDim * 0.018);
+            grp.userData.attachmentThreshold = maxDim * 0.5;
+        }
     }
     const radius = grp.userData.attachmentBaseRadius;
     const marker = new THREE.Mesh(
@@ -3276,11 +3274,11 @@ document.addEventListener('pointerdown', (e) => {
 
     function updateAttachmentMarkerScales() {
         const worldPos = new THREE.Vector3();
-        for (const type of ['hull', 'turret']) {
-            const slot = slots[type];
-            if (!slot || !slot.group) continue;
-            const markers = slot.group.userData.attachmentMarkers;
-            const threshold = slot.group.userData.attachmentThreshold;
+        for (const type of ['hull', 'turret', 'scene']) {
+            const grp = getSlotGroup(type);
+            if (!grp) continue;
+            const markers = grp.userData?.attachmentMarkers;
+            const threshold = grp.userData?.attachmentThreshold;
             if (!markers || markers.size === 0 || !threshold) continue;
             for (const marker of markers.values()) {
                 marker.getWorldPosition(worldPos);
