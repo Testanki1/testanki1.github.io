@@ -1547,6 +1547,7 @@ if (pCls) pCls.title = T.btnClose;
     const pools = { hull:[], turret:[], grenade:[], drone:[], supply:[], paint:[] }; const activeClips = { hull: new Set(), turret: new Set(), scene: new Set() };
     let assetsData = null; const sceneLib = { tex: new Map(), meshes:[] };
     let PAINTS_CATALOG = {}; window.PAINTS_CATALOG = PAINTS_CATALOG;
+    const paintOriginalMap = new WeakMap();
     let currentPaintName = null;
     let currentPaintEntry = null;
     const paintCache = new Map();
@@ -2567,8 +2568,32 @@ function setSoloMode(mode) {
 
 let inPlaceBoneOverlay = null;
 
+function getCleanBaseMaterial(mat) {
+    if (!mat) return mat;
+    let base = mat;
+    if (typeof paintOriginalMap !== 'undefined' && paintOriginalMap) {
+        while (paintOriginalMap.has(base)) {
+            base = paintOriginalMap.get(base);
+        }
+    }
+    const cloned = base.clone();
+    if (cloned.userData?.origSoloProps) {
+        const orig = cloned.userData.origSoloProps;
+        cloned.transparent = orig.transparent;
+        cloned.opacity = orig.opacity;
+        cloned.depthWrite = orig.depthWrite;
+        delete cloned.userData.origSoloProps;
+    } else {
+        cloned.transparent = false;
+        cloned.opacity = 1.0;
+        cloned.depthWrite = true;
+    }
+    return cloned;
+}
+
 function clearInPlaceBoneOverlay() {
     if (inPlaceBoneOverlay) {
+        if (typeof clearPaintFromGroup === 'function') clearPaintFromGroup(inPlaceBoneOverlay);
         if (inPlaceBoneOverlay.parent) inPlaceBoneOverlay.parent.remove(inPlaceBoneOverlay);
         if (inPlaceBoneOverlay.geometry) inPlaceBoneOverlay.geometry.dispose();
         if (inPlaceBoneOverlay.material) {
@@ -2581,6 +2606,7 @@ function clearInPlaceBoneOverlay() {
 
 function clearSoloGroup() {
     if (soloGroup) {
+        if (typeof clearPaintFromGroup === 'function') clearPaintFromGroup(soloGroup);
         if (soloGroup.parent) soloGroup.parent.remove(soloGroup);
         while (soloGroup.children.length > 0) {
             const child = soloGroup.children[0];
@@ -2592,6 +2618,7 @@ function clearSoloGroup() {
             }
         }
         soloGroup = null;
+        window.soloGroup = null;
     }
 }
 
@@ -2781,8 +2808,8 @@ function applySoloView() {
             });
 
             const overlayMat = (Array.isArray(boneInfo.skinnedMesh.material)
-                ? boneInfo.skinnedMesh.material.map(m => m.clone())
-                : boneInfo.skinnedMesh.material.clone());
+                ? boneInfo.skinnedMesh.material.map(m => getCleanBaseMaterial(m))
+                : getCleanBaseMaterial(boneInfo.skinnedMesh.material));
             const oMats = Array.isArray(overlayMat) ? overlayMat : [overlayMat];
             oMats.forEach(m => {
                 m.transparent = false;
@@ -2802,6 +2829,9 @@ function applySoloView() {
                 inPlaceBoneOverlay.scale.copy(boneInfo.skinnedMesh.scale);
             } else {
                 boneInfo.skinnedMesh.add(inPlaceBoneOverlay);
+            }
+            if (visState.paint && currentPaintEntry) {
+                applyPaintToGroup(inPlaceBoneOverlay, currentPaintEntry, currentSoloPart.type);
             }
 
             // 空间原位模式：镜头完全保持不变，不动镜头！让用户在当前原有视角中直接看清部件位置！
@@ -2863,6 +2893,7 @@ function applySoloView() {
         soloGroup = new THREE.Group();
         soloGroup.name = '__soloPartGroup';
         root.add(soloGroup);
+        window.soloGroup = soloGroup;
 
         const boneInfo = findBoneSubPartInSlot(currentSoloPart.type, currentSoloPart.name);
         if (boneInfo) {
@@ -2875,8 +2906,8 @@ function applySoloView() {
             subG.computeBoundingSphere();
 
             const soloMat = (Array.isArray(boneInfo.skinnedMesh.material)
-                ? boneInfo.skinnedMesh.material.map(m => m.clone())
-                : boneInfo.skinnedMesh.material.clone());
+                ? boneInfo.skinnedMesh.material.map(m => getCleanBaseMaterial(m))
+                : getCleanBaseMaterial(boneInfo.skinnedMesh.material));
             const sMats = Array.isArray(soloMat) ? soloMat : [soloMat];
             sMats.forEach(m => {
                 m.transparent = false;
@@ -2885,10 +2916,16 @@ function applySoloView() {
             });
 
             const soloMesh = new THREE.Mesh(subG, soloMat);
+            soloMesh.name = currentSoloPart.name;
+            soloMesh.userData.originalName = currentSoloPart.name;
             soloMesh.visible = true;
             soloGroup.add(soloMesh);
             soloGroup.position.set(0, 0, 0);
             soloGroup.updateMatrixWorld(true);
+
+            if (visState.paint && currentPaintEntry) {
+                applyPaintToGroup(soloGroup, currentPaintEntry, currentSoloPart.type);
+            }
 
             const finalBox = new THREE.Box3().setFromObject(soloGroup);
             const center = finalBox.getCenter(new THREE.Vector3());
@@ -2918,14 +2955,8 @@ function applySoloView() {
                         clone.quaternion.multiplyQuaternions(m.parent.quaternion, clone.quaternion);
                     }
                     clone.material = Array.isArray(m.material)
-                        ? m.material.map(mat => mat.clone())
-                        : m.material.clone();
-                    const cMats = Array.isArray(clone.material) ? clone.material : [clone.material];
-                    cMats.forEach(mat => {
-                        mat.transparent = false;
-                        mat.opacity = 1.0;
-                        mat.depthWrite = true;
-                    });
+                        ? m.material.map(mat => getCleanBaseMaterial(mat))
+                        : getCleanBaseMaterial(m.material);
                     clone.visible = true;
                     soloGroup.add(clone);
                 }
@@ -2937,6 +2968,10 @@ function applySoloView() {
                 soloGroup.children.forEach(c => c.position.sub(localCenter));
                 soloGroup.position.set(0, 0, 0);
                 soloGroup.updateMatrixWorld(true);
+
+                if (visState.paint && currentPaintEntry) {
+                    applyPaintToGroup(soloGroup, currentPaintEntry, currentSoloPart.type);
+                }
 
                 const finalBox = new THREE.Box3().setFromObject(soloGroup);
                 const c = finalBox.getCenter(new THREE.Vector3());
@@ -3194,6 +3229,7 @@ document.addEventListener('pointerdown', (e) => {
     const groupNormal = new THREE.Group(); const groupAssembly = new THREE.Group(); const groupMore = new THREE.Group();
     groupNormal.visible = false; groupAssembly.visible = true; groupMore.visible = false;
     root.add(groupNormal); root.add(groupAssembly); root.add(groupMore);
+    window.root = root; window.scene = scene;
     const lg = new THREE.Group(); scene.add(lg); lg.add(new THREE.AmbientLight(0xffffff, 1.2));
     const sun = new THREE.DirectionalLight(0xffeebb, 2.5); sun.position.set(50,80,50); lg.add(sun); lg.add(new THREE.DirectionalLight(0xcceeff, 1.0));
 
@@ -3797,6 +3833,8 @@ document.addEventListener('pointerdown', (e) => {
             if(slots.hull?.group) clearPaintFromGroup(slots.hull.group);
             if(slots.turret?.group) clearPaintFromGroup(slots.turret.group);
             if(slots.more?.group) clearPaintFromGroup(slots.more.group);
+            if(soloGroup) clearPaintFromGroup(soloGroup);
+            if(inPlaceBoneOverlay) clearPaintFromGroup(inPlaceBoneOverlay);
             paintAnimState = null; window.paintAnimState = null;
             renderPaintCurrent();
             msg(T.paintCleared);
@@ -4189,6 +4227,7 @@ document.addEventListener('pointerdown', (e) => {
         renderPartsList();
         // Environment gone → restore orbit camera
         setCameraMode('orbit');
+        alignHullToGarageBase();
         if (refit) fitCamera();
     }
 
@@ -4206,6 +4245,7 @@ document.addEventListener('pointerdown', (e) => {
             } else if (slots.scene) {
                 slots.scene.visible = true;
                 setCameraMode('fly');
+                alignHullToGarageBase();
                 if (currentSoloPart) {
                     applySoloView();
                 }
@@ -4510,7 +4550,6 @@ document.addEventListener('pointerdown', (e) => {
 
     // ---- Paint Shader System (Scheme 2 - reference blending) - Fixed circular JSON ----
     const paintedMaterials = [];
-    const paintOriginalMap = new WeakMap();
     // Every live paint material (any kind), so the pattern-scale slider can
     // retune the tiling uniform without rebuilding or recompiling anything.
     const allPaintMats = new Set();
@@ -5131,10 +5170,11 @@ document.addEventListener('pointerdown', (e) => {
     function selectPaint(name){
         if(!name || !PAINTS_CATALOG[name]){
             clearCurrentPaint();
-            return;
+            return Promise.resolve();
         }
         const info = PAINTS_CATALOG[name];
         currentPaintName = name;
+        window.currentPaintName = name;
         visState.paint = true;
         setPaintSwitches(true);
         // Each paint remembers its own scale; local media starts a bit larger
@@ -5145,9 +5185,10 @@ document.addEventListener('pointerdown', (e) => {
             : (info.isLocal ? LOCAL_PAINT_DEFAULT_SCALE : 1);
         window.paintScaleMul = paintScaleMul;
         renderPaintCurrent();
-        loadPaintTexture(name).then(entry=>{
+        return loadPaintTexture(name).then(entry=>{
             entry.scale = paintScaleMul;
             currentPaintEntry = entry;
+            window.currentPaintEntry = entry;
             if(entry.isAnimated){
                 paintAnimState = { entry, time: 0 };
                 if(entry.frame){
@@ -5162,10 +5203,13 @@ document.addEventListener('pointerdown', (e) => {
             // 炮塔组里还挂着手雷克隆体：applyPaintToGroup 会按网格归属自动改用手雷的 cap
             if(slots.turret?.group) applyPaintToGroup(slots.turret.group, entry, 'turret');
             if(slots.more?.group) applyPaintToGroup(slots.more.group, entry, slots.more.cat);
+            if(soloGroup && currentSoloPart) applyPaintToGroup(soloGroup, entry, currentSoloPart.type);
+            if(inPlaceBoneOverlay && currentSoloPart) applyPaintToGroup(inPlaceBoneOverlay, entry, currentSoloPart.type);
             msg(`${T.paintApplied}: ${name}`);
             document.querySelectorAll('.paint-item').forEach(el => {
                 el.classList.toggle('selected', el.dataset.name === name);
             });
+            return entry;
         }).catch(e=>{
             console.error(e);
             msg(String(e.message||e));
@@ -5174,11 +5218,15 @@ document.addEventListener('pointerdown', (e) => {
 
     function clearCurrentPaint(){
         currentPaintName = null;
+        window.currentPaintName = null;
         currentPaintEntry = null;
+        window.currentPaintEntry = null;
         paintAnimState = null;
         if(slots.hull?.group) clearPaintFromGroup(slots.hull.group);
         if(slots.turret?.group) clearPaintFromGroup(slots.turret.group);
         if(slots.more?.group) clearPaintFromGroup(slots.more.group);
+        if(soloGroup) clearPaintFromGroup(soloGroup);
+        if(inPlaceBoneOverlay) clearPaintFromGroup(inPlaceBoneOverlay);
         visState.paint = false;
         setPaintSwitches(false);
         renderPaintCurrent();
@@ -6152,6 +6200,9 @@ document.addEventListener('pointerdown', (e) => {
     }
 
     async function loadRemoteScene(path, variant) {
+        const isGarageAlreadyActive = (cameraMode === 'fly' && !!slots.scene);
+        const savedFlyPos = isGarageAlreadyActive ? camera.position.clone() : null;
+        const savedFlyQuat = isGarageAlreadyActive ? camera.quaternion.clone() : null;
         if(slots.scene) { disposeMixer(slots.scene); groupAssembly.remove(slots.scene); dispose(slots.scene); slots.scene=null; }
         sceneLib.meshes =[]; sceneLib.tex.clear();
         try {
@@ -6246,8 +6297,16 @@ document.addEventListener('pointerdown', (e) => {
             }
             slots.scene = combinedGroup; groupAssembly.add(combinedGroup); runSceneInjector(); renderSceneTextureNames();
             renderPartsList();
-            setCameraMode('fly');
-            placeEnvCamera(combinedGroup);
+            alignHullToGarageBase();
+            if (isGarageAlreadyActive && savedFlyPos && savedFlyQuat) {
+                camera.position.copy(savedFlyPos);
+                camera.quaternion.copy(savedFlyQuat);
+                cameraTarget.position.copy(savedFlyPos);
+                cameraTarget.quaternion.copy(savedFlyQuat);
+            } else {
+                setCameraMode('fly');
+                placeEnvCamera(combinedGroup);
+            }
             if (currentSoloPart) {
                 applySoloView();
             }
@@ -7176,12 +7235,109 @@ document.addEventListener('pointerdown', (e) => {
         return pt;
     }
 
+    function findGaragePlatformBaseTopY(envGroup) {
+        if (!envGroup) return null;
+        envGroup.updateMatrixWorld(true);
+        let baseBox = new THREE.Box3();
+        let hasBase = false;
+
+        envGroup.traverse(o => {
+            if (!o.isMesh) return;
+            const n = ((o.name || '') + ' ' + (o.userData?.originalName || '') + ' ' + (o.parent?.name || '')).toLowerCase();
+            if (n.includes('tnk_base') || n.includes('tank_base') || n.includes('tnkbase')) {
+                const geo = o.geometry;
+                if (geo) {
+                    if (!geo.boundingBox) geo.computeBoundingBox();
+                    if (geo.boundingBox) {
+                        const wb = geo.boundingBox.clone().applyMatrix4(o.matrixWorld);
+                        if (!hasBase) { baseBox.copy(wb); hasBase = true; }
+                        else baseBox.union(wb);
+                    }
+                }
+            }
+        });
+
+        if (hasBase) return baseBox.max.y;
+
+        envGroup.traverse(o => {
+            if (!o.isMesh) return;
+            const n = ((o.name || '') + ' ' + (o.userData?.originalName || '') + ' ' + (o.parent?.name || '')).toLowerCase();
+            if (n.includes('tnk_plat') || n.includes('tank_plat') || n.includes('platform')) {
+                const geo = o.geometry;
+                if (geo) {
+                    if (!geo.boundingBox) geo.computeBoundingBox();
+                    if (geo.boundingBox) {
+                        const wb = geo.boundingBox.clone().applyMatrix4(o.matrixWorld);
+                        if (!hasBase) { baseBox.copy(wb); hasBase = true; }
+                    }
+                }
+            }
+        });
+
+        if (hasBase) return baseBox.max.y;
+        return null;
+    }
+
+    function computeHullTotalBottomWorldY(hullGroup) {
+        if (!hullGroup) return 0;
+        hullGroup.updateMatrixWorld(true);
+        let minY = Infinity;
+        hullGroup.traverse(o => {
+            if (!o.isMesh) return;
+            // 包含底盘整个模型的所有网格（包括隐藏的碰撞箱 box、bound、col、shape 等）
+            const geo = o.geometry;
+            if (!geo) return;
+            if (!geo.boundingBox) geo.computeBoundingBox();
+            if (!geo.boundingBox) return;
+            const wb = geo.boundingBox.clone().applyMatrix4(o.matrixWorld);
+            if (wb.min.y < minY) {
+                minY = wb.min.y;
+            }
+        });
+        return minY === Infinity ? 0 : minY;
+    }
+
+    function alignHullToGarageBase() {
+        if (!slots.hull || !slots.hull.group) return;
+        const isGarageActive = !!slots.scene && document.querySelector('.env-toggle')?.classList.contains('active');
+
+        if (!isGarageActive) {
+            slots.hull.group.position.set(0, 0, 0);
+            slots.hull.group.updateMatrixWorld(true);
+            if (slots.turret?.group) {
+                scanMount(slots.hull.group);
+                snapTurret();
+            }
+            return;
+        }
+
+        const tnkBaseTopY = findGaragePlatformBaseTopY(slots.scene);
+        if (tnkBaseTopY === null) return;
+
+        slots.hull.group.position.z = 0;
+        slots.hull.group.updateMatrixWorld(true);
+
+        const curBottom = computeHullTotalBottomWorldY(slots.hull.group);
+        const deltaY = tnkBaseTopY - curBottom;
+
+        slots.hull.group.position.z = deltaY;
+        slots.hull.group.updateMatrixWorld(true);
+
+        scanMount(slots.hull.group);
+        snapTurret();
+    }
+
     function equipAssembly(grp, fname, type) {
         if(slots[type]) { const old = slots[type].group; disposeMixer(old); groupAssembly.remove(old); dispose(old); }
         slots[type] = { group: grp, name: fname }; groupAssembly.add(grp);
         if(type==='hull') { scanMount(grp); snapTurret(); } else { snapTurret(); }
         applyTypeVisibility(type); // keep the card switch state across reloads
-        fitCamera(); registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames(); renderPartsList();
+        // 在车库漫游模式或单件观察模式下，切换装备保持镜头绝对不变
+        if (!currentSoloPart && cameraMode !== 'fly') {
+            fitCamera();
+        }
+        registerAnim(grp); activeClips[type].clear(); renderAnimChips(type); renderAttachmentPoints(); renderTextureNames(); renderPartsList();
+        alignHullToGarageBase();
         if (currentSoloPart && currentSoloPart.type === type) clearSoloPart();
         else if (currentSoloPart) applySoloView();
         
