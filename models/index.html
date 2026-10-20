@@ -1750,11 +1750,15 @@ function pickPart(clientX, clientY) {
     for (const hit of intersects) {
         const obj = hit.object;
         if (!isEffectivelyVisible(obj)) continue; // skip meshes inside hidden groups too
+        if (obj.name === '__inPlaceBoneOverlay' || obj.name === '__soloPartGroup') continue;
         const name = getPartName(obj);
         if (!name) continue;
         if (obj.isSkinnedMesh) {
             const boneName = pickBoneByInfluence(obj, hit);
-            if (boneName) return { name: boneName, point: hit.point, object: obj, clientX, clientY };
+            if (boneName) {
+                const effectiveName = (boneName.toLowerCase() === 'root') ? name : boneName;
+                return { name: effectiveName, point: hit.point, object: obj, clientX, clientY };
+            }
         }
         return { name, point: hit.point, object: obj, clientX, clientY };
     }
@@ -2156,12 +2160,159 @@ function isMeshInSlot(mesh, type) {
 
 function isCollisionOrHelperMesh(o, type) {
     if (!o) return false;
+    if (o.name === '__inPlaceBoneOverlay' || o.name === '__soloPartGroup') return false;
     if (o.userData?.isAttachmentMarker) return true;
     if (type === 'hull' || type === 'turret') {
         const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
         if (raw.match(/box|bound|col|shape/)) return true;
     }
     return false;
+}
+
+// Cache of bone sub-geometries: WeakMap(skinnedMesh -> Map(boneName -> BufferGeometry))
+const boneSubGeoCache = new WeakMap();
+
+function getBoneSubGeometry(skinnedMesh, boneName) {
+    if (!skinnedMesh || !skinnedMesh.isSkinnedMesh || !skinnedMesh.skeleton) return null;
+    let meshCache = boneSubGeoCache.get(skinnedMesh);
+    if (!meshCache) {
+        meshCache = new Map();
+        boneSubGeoCache.set(skinnedMesh, meshCache);
+    }
+    const cleanTarget = cleanPartName(boneName).toLowerCase();
+    if (meshCache.has(cleanTarget)) return meshCache.get(cleanTarget);
+
+    const bones = skinnedMesh.skeleton.bones;
+    const targetBoneIdx = bones.findIndex(b => {
+        const bn = cleanPartName(b.name || '').toLowerCase();
+        return bn === cleanTarget;
+    });
+    if (targetBoneIdx === -1) return null;
+
+    const g = skinnedMesh.geometry;
+    const pos = g.attributes.position;
+    const norm = g.attributes.normal;
+    const uv = g.attributes.uv;
+    const sIdx = g.attributes.skinIndex;
+    const sW = g.attributes.skinWeight;
+    const idx = g.index;
+    if (!pos || !idx || !sIdx || !sW) return null;
+
+    const tris = [];
+    for (let i = 0; i < idx.count; i += 3) {
+        const v0 = idx.getX(i), v1 = idx.getX(i + 1), v2 = idx.getX(i + 2);
+        const scores = {};
+        [v0, v1, v2].forEach(vi => {
+            for (let j = 0; j < 4; j++) {
+                const bi = sIdx.getComponent(vi, j);
+                const w = sW.getComponent(vi, j);
+                if (w > 0.001) scores[bi] = (scores[bi] || 0) + w;
+            }
+        });
+        let bestBIdx = -1, maxScore = -1;
+        for (const [bi, score] of Object.entries(scores)) {
+            if (score > maxScore) { maxScore = score; bestBIdx = Number(bi); }
+        }
+        if (bestBIdx === targetBoneIdx) {
+            tris.push(v0, v1, v2);
+        }
+    }
+
+    if (tris.length === 0) {
+        meshCache.set(cleanTarget, null);
+        return null;
+    }
+
+    const newPos = [];
+    const newNorm = [];
+    const newUv = [];
+    const newIdx = [];
+    const vertMap = new Map();
+
+    tris.forEach(oldVi => {
+        if (!vertMap.has(oldVi)) {
+            const newVi = newPos.length / 3;
+            vertMap.set(oldVi, newVi);
+            newPos.push(pos.getX(oldVi), pos.getY(oldVi), pos.getZ(oldVi));
+            if (norm) newNorm.push(norm.getX(oldVi), norm.getY(oldVi), norm.getZ(oldVi));
+            if (uv) newUv.push(uv.getX(oldVi), uv.getY(oldVi));
+        }
+        newIdx.push(vertMap.get(oldVi));
+    });
+
+    const subG = new THREE.BufferGeometry();
+    subG.setAttribute('position', new THREE.BufferAttribute(new Float32Array(newPos), 3));
+    if (norm) subG.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(newNorm), 3));
+    if (uv) subG.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(newUv), 2));
+    subG.setIndex(newIdx);
+    subG.computeBoundingBox();
+    subG.computeBoundingSphere();
+
+    meshCache.set(cleanTarget, subG);
+    return subG;
+}
+
+function findBoneSubPartInSlot(type, partName) {
+    const grp = getSlotGroup(type);
+    if (!grp) return null;
+    const cleanTarget = cleanPartName(partName).toLowerCase();
+    let found = null;
+    grp.traverse(o => {
+        if (found || !o.isSkinnedMesh || !o.skeleton) return;
+        if (isCollisionOrHelperMesh(o, type)) return;
+        const bones = o.skeleton.bones;
+        const bIdx = bones.findIndex(b => cleanPartName(b.name || '').toLowerCase() === cleanTarget);
+        if (bIdx !== -1) {
+            const subG = getBoneSubGeometry(o, partName);
+            if (subG) {
+                found = { skinnedMesh: o, boneIdx: bIdx, boneName: cleanPartName(bones[bIdx].name), geometry: subG };
+            }
+        }
+    });
+    return found;
+}
+
+function getSkinnedBonesWithGeometry(skinnedMesh) {
+    if (!skinnedMesh || !skinnedMesh.isSkinnedMesh || !skinnedMesh.skeleton) return [];
+    const bones = skinnedMesh.skeleton.bones;
+    const g = skinnedMesh.geometry;
+    const sIdx = g?.attributes?.skinIndex;
+    const sW = g?.attributes?.skinWeight;
+    const idx = g?.index;
+    if (!sIdx || !sW || !idx || bones.length <= 1) return [];
+
+    const boneTriCounts = new Map();
+    for (let i = 0; i < idx.count; i += 3) {
+        const v0 = idx.getX(i), v1 = idx.getX(i + 1), v2 = idx.getX(i + 2);
+        const scores = {};
+        [v0, v1, v2].forEach(vi => {
+            for (let j = 0; j < 4; j++) {
+                const bi = sIdx.getComponent(vi, j);
+                const w = sW.getComponent(vi, j);
+                if (w > 0.001) scores[bi] = (scores[bi] || 0) + w;
+            }
+        });
+        let bestBIdx = -1, maxScore = -1;
+        for (const [bi, score] of Object.entries(scores)) {
+            if (score > maxScore) { maxScore = score; bestBIdx = Number(bi); }
+        }
+        if (bestBIdx >= 0) {
+            boneTriCounts.set(bestBIdx, (boneTriCounts.get(bestBIdx) || 0) + 1);
+        }
+    }
+
+    const result = [];
+    boneTriCounts.forEach((count, bi) => {
+        if (count > 0 && bones[bi]) {
+            const raw = bones[bi].name;
+            if (raw.toLowerCase() === 'root') return; // root is already represented by the main mesh (hull/turret)
+            const cleaned = cleanPartName(raw);
+            if (cleaned) {
+                result.push({ name: cleaned, boneIdx: bi, triCount: count });
+            }
+        }
+    });
+    return result;
 }
 
 function findMeshesForPart(type, partName) {
@@ -2211,6 +2362,10 @@ function collectPartsForType(type) {
                 found = true;
                 const name = getPartName(o);
                 if (name) names.add(name);
+                if (o.isSkinnedMesh) {
+                    const bones = getSkinnedBonesWithGeometry(o);
+                    bones.forEach(b => names.add(b.name));
+                }
             }
         });
         if (!found && slots.grenade?.template) {
@@ -2218,6 +2373,10 @@ function collectPartsForType(type) {
                 if (!o.isMesh) return;
                 const name = getPartName(o);
                 if (name) names.add(name);
+                if (o.isSkinnedMesh) {
+                    const bones = getSkinnedBonesWithGeometry(o);
+                    bones.forEach(b => names.add(b.name));
+                }
             });
         }
     } else {
@@ -2230,6 +2389,11 @@ function collectPartsForType(type) {
 
                 const name = getPartName(o);
                 if (name) names.add(name);
+
+                if (o.isSkinnedMesh) {
+                    const bones = getSkinnedBonesWithGeometry(o);
+                    bones.forEach(b => names.add(b.name));
+                }
             });
         }
     }
@@ -2360,10 +2524,70 @@ function setSoloMode(mode) {
     updateSoloUI();
 }
 
+let inPlaceBoneOverlay = null;
+
+function clearInPlaceBoneOverlay() {
+    if (inPlaceBoneOverlay) {
+        if (inPlaceBoneOverlay.parent) inPlaceBoneOverlay.parent.remove(inPlaceBoneOverlay);
+        if (inPlaceBoneOverlay.geometry) inPlaceBoneOverlay.geometry.dispose();
+        if (inPlaceBoneOverlay.material) {
+            if (Array.isArray(inPlaceBoneOverlay.material)) inPlaceBoneOverlay.material.forEach(m => m.dispose());
+            else inPlaceBoneOverlay.material.dispose();
+        }
+        inPlaceBoneOverlay = null;
+    }
+}
+
+function setMeshGhost(mesh, isGhost) {
+    if (!mesh || !mesh.isMesh) return;
+    if (mesh.name === '__inPlaceBoneOverlay') return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach(mat => {
+        if (!mat.userData.origSoloProps) {
+            mat.userData.origSoloProps = {
+                transparent: mat.transparent,
+                opacity: mat.opacity,
+                depthWrite: mat.depthWrite
+            };
+        }
+        if (isGhost) {
+            mat.transparent = true;
+            mat.opacity = 0.22;
+            mat.depthWrite = false;
+            mat.needsUpdate = true;
+        } else {
+            const orig = mat.userData.origSoloProps;
+            mat.transparent = orig ? orig.transparent : false;
+            mat.opacity = orig ? orig.opacity : 1.0;
+            mat.depthWrite = orig ? orig.depthWrite : true;
+            mat.needsUpdate = true;
+        }
+    });
+}
+
+function restoreAllMaterials() {
+    root.traverse(o => {
+        if (!o.isMesh) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(mat => {
+            if (mat.userData.origSoloProps) {
+                const orig = mat.userData.origSoloProps;
+                mat.transparent = orig.transparent;
+                mat.opacity = orig.opacity;
+                mat.depthWrite = orig.depthWrite;
+                mat.needsUpdate = true;
+                delete mat.userData.origSoloProps;
+            }
+        });
+    });
+}
+
 function clearSoloPart() {
     if (!currentSoloPart) return;
     currentSoloPart = null;
     window.currentSoloPart = null;
+
+    clearInPlaceBoneOverlay();
 
     if (soloGroup) {
         if (soloGroup.parent) soloGroup.parent.remove(soloGroup);
@@ -2377,6 +2601,7 @@ function clearSoloPart() {
     if (groupMore) groupMore.visible = (currentMode === 'more');
     if (groupNormal) groupNormal.visible = (currentMode === 'normal');
 
+    restoreAllMaterials();
     restoreAllMeshesVisibility();
 
     if (savedCameraState) {
@@ -2394,10 +2619,20 @@ function clearSoloPart() {
 function restoreAllMeshesVisibility() {
     root.traverse(o => {
         if (!o.isMesh) return;
-        const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
-        if (o.userData?.isAttachmentMarker || raw.match(/box|bound|col|shape/)) {
-            o.visible = !!o.userData?.isAttachmentMarker;
+        if (o.userData?.isAttachmentMarker) {
+            o.visible = true;
             return;
+        }
+        if (o.userData?.isCollision) {
+            o.visible = false;
+            return;
+        }
+        const raw = (o.userData?.originalName || o.name || o.parent?.name || '').toLowerCase();
+        if (isMeshInSlot(o, 'hull') || isMeshInSlot(o, 'turret')) {
+            if (raw.match(/box|bound|col|shape/)) {
+                o.visible = false;
+                return;
+            }
         }
         if (o.userData.origVisible !== undefined) {
             o.visible = o.userData.origVisible;
@@ -2422,8 +2657,10 @@ function applySoloView() {
     if (!currentSoloPart) return;
     hidePartTooltip();
 
+    clearInPlaceBoneOverlay();
+
     if (soloViewMode === 'inplace') {
-        // Mode 1: 空间原位 / 保留空间位置
+        // Mode 1: 空间原位 / 保留空间位置，其他部件半透明幽灵材质衬托（看清原有位置）
         if (soloGroup) {
             soloGroup.visible = false;
         }
@@ -2436,45 +2673,98 @@ function applySoloView() {
         if (slots.turret?.group) slots.turret.group.visible = true;
         if (slots.scene) slots.scene.visible = (currentSoloPart.type === 'scene');
 
-        const activeMeshes = [];
-        root.traverse(o => {
-            if (!o.isMesh) return;
-            if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
-                o.visible = false;
-                return;
-            }
+        const boneInfo = findBoneSubPartInSlot(currentSoloPart.type, currentSoloPart.name);
 
-            const pName = getPartName(o);
-            const isMatch = (pName === currentSoloPart.name) && isMeshInSlot(o, currentSoloPart.type);
-            o.visible = isMatch;
-            if (isMatch) {
-                activeMeshes.push(o);
+        if (boneInfo) {
+            // 骨骼部件原位高亮：全车其他网格半透明衬托，提取该骨骼对应表面高亮呈现
+            root.traverse(o => {
+                if (!o.isMesh) return;
+                if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
+                    o.visible = false;
+                    return;
+                }
+                o.visible = true;
+                setMeshGhost(o, true);
                 let p = o.parent;
                 while (p && p !== root) {
                     p.visible = true;
                     p = p.parent;
                 }
-            }
-        });
+            });
 
-        // Frame camera on the active part in situ
-        if (activeMeshes.length > 0) {
-            const box = new THREE.Box3();
-            activeMeshes.forEach(m => box.expandByObject(m));
+            const overlayMat = (Array.isArray(boneInfo.skinnedMesh.material)
+                ? boneInfo.skinnedMesh.material.map(m => m.clone())
+                : boneInfo.skinnedMesh.material.clone());
+            const oMats = Array.isArray(overlayMat) ? overlayMat : [overlayMat];
+            oMats.forEach(m => {
+                m.transparent = false;
+                m.opacity = 1.0;
+                m.depthWrite = true;
+            });
+            inPlaceBoneOverlay = new THREE.Mesh(boneInfo.geometry.clone(), overlayMat);
+            inPlaceBoneOverlay.name = '__inPlaceBoneOverlay';
+            boneInfo.skinnedMesh.add(inPlaceBoneOverlay);
+
+            inPlaceBoneOverlay.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(inPlaceBoneOverlay);
             if (!box.isEmpty()) {
                 const c = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z, 1);
-                const dist = Math.max(maxDim * 2.2, 120);
+                const dist = Math.max(maxDim * 2.5, 80);
                 camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
                 camera.lookAt(c);
                 orbitControls.target.copy(c);
                 orbitControls.update();
             }
+
+        } else {
+            // 普通独立网格部件：选中部件 100% 实体，车身其他部件半透明衬托
+            const activeMeshes = [];
+            root.traverse(o => {
+                if (!o.isMesh) return;
+                if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
+                    o.visible = false;
+                    return;
+                }
+
+                const pName = getPartName(o);
+                const isMatch = (pName === currentSoloPart.name) && isMeshInSlot(o, currentSoloPart.type);
+                o.visible = true;
+
+                if (isMatch) {
+                    setMeshGhost(o, false);
+                    activeMeshes.push(o);
+                    let p = o.parent;
+                    while (p && p !== root) {
+                        p.visible = true;
+                        p = p.parent;
+                    }
+                } else {
+                    setMeshGhost(o, true);
+                }
+            });
+
+            // Frame camera on the active part in situ
+            if (activeMeshes.length > 0) {
+                const box = new THREE.Box3();
+                activeMeshes.forEach(m => box.expandByObject(m));
+                if (!box.isEmpty()) {
+                    const c = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z, 1);
+                    const dist = Math.max(maxDim * 2.2, 120);
+                    camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
+                    camera.lookAt(c);
+                    orbitControls.target.copy(c);
+                    orbitControls.update();
+                }
+            }
         }
 
     } else {
         // Mode 2: 独立单件 / 无其他空间 / 居中展示（无翻转镜像）
+        restoreAllMaterials();
         groupAssembly.visible = false;
         if (groupMore) groupMore.visible = false;
         if (groupNormal) groupNormal.visible = false;
@@ -2491,42 +2781,87 @@ function applySoloView() {
             soloGroup.remove(soloGroup.children[0]);
         }
 
-        const meshes = findMeshesForPart(currentSoloPart.type, currentSoloPart.name);
-        if (meshes.length > 0) {
-            for (const m of meshes) {
-                const clone = m.clone();
-                // Strictly positive scale — no negative scaling / mirroring / flipping
-                clone.scale.set(
-                    Math.abs(m.scale.x) || 1,
-                    Math.abs(m.scale.y) || 1,
-                    Math.abs(m.scale.z) || 1
-                );
-                clone.quaternion.copy(m.quaternion);
-                clone.position.copy(m.position);
-                if (m.parent && m.parent.name === currentSoloPart.name) {
-                    clone.quaternion.multiplyQuaternions(m.parent.quaternion, clone.quaternion);
-                }
-                clone.visible = true;
-                soloGroup.add(clone);
-            }
+        const boneInfo = findBoneSubPartInSlot(currentSoloPart.type, currentSoloPart.name);
+        if (boneInfo) {
+            // 独立单件骨骼提取展示
+            const subG = boneInfo.geometry.clone();
+            subG.computeBoundingBox();
+            const c = subG.boundingBox.getCenter(new THREE.Vector3());
+            subG.translate(-c.x, -c.y, -c.z);
+            subG.computeBoundingBox();
+            subG.computeBoundingSphere();
 
-            soloGroup.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(soloGroup);
-            const center = box.getCenter(new THREE.Vector3());
-            const localCenter = root.worldToLocal(center.clone());
-            soloGroup.children.forEach(c => c.position.sub(localCenter));
+            const soloMat = (Array.isArray(boneInfo.skinnedMesh.material)
+                ? boneInfo.skinnedMesh.material.map(m => m.clone())
+                : boneInfo.skinnedMesh.material.clone());
+            const sMats = Array.isArray(soloMat) ? soloMat : [soloMat];
+            sMats.forEach(m => {
+                m.transparent = false;
+                m.opacity = 1.0;
+                m.depthWrite = true;
+            });
+
+            const soloMesh = new THREE.Mesh(subG, soloMat);
+            soloMesh.visible = true;
+            soloGroup.add(soloMesh);
             soloGroup.position.set(0, 0, 0);
             soloGroup.updateMatrixWorld(true);
 
             const finalBox = new THREE.Box3().setFromObject(soloGroup);
-            const c = finalBox.getCenter(new THREE.Vector3());
+            const center = finalBox.getCenter(new THREE.Vector3());
             const size = finalBox.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z, 1);
-            const dist = Math.max(maxDim * 1.35, 60);
-            camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
-            camera.lookAt(c);
-            orbitControls.target.copy(c);
+            const dist = Math.max(maxDim * 1.5, 60);
+            camera.position.set(center.x + dist, center.y + dist * 0.55, center.z + dist);
+            camera.lookAt(center);
+            orbitControls.target.copy(center);
             orbitControls.update();
+
+        } else {
+            // 普通网格独立单件展示
+            const meshes = findMeshesForPart(currentSoloPart.type, currentSoloPart.name);
+            if (meshes.length > 0) {
+                for (const m of meshes) {
+                    const clone = m.clone();
+                    // Strictly positive scale — no negative scaling / mirroring / flipping
+                    clone.scale.set(
+                        Math.abs(m.scale.x) || 1,
+                        Math.abs(m.scale.y) || 1,
+                        Math.abs(m.scale.z) || 1
+                    );
+                    clone.quaternion.copy(m.quaternion);
+                    clone.position.copy(m.position);
+                    if (m.parent && m.parent.name === currentSoloPart.name) {
+                        clone.quaternion.multiplyQuaternions(m.parent.quaternion, clone.quaternion);
+                    }
+                    const cMats = Array.isArray(clone.material) ? clone.material : [clone.material];
+                    cMats.forEach(mat => {
+                        mat.transparent = false;
+                        mat.opacity = 1.0;
+                        mat.depthWrite = true;
+                    });
+                    clone.visible = true;
+                    soloGroup.add(clone);
+                }
+
+                soloGroup.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(soloGroup);
+                const center = box.getCenter(new THREE.Vector3());
+                const localCenter = root.worldToLocal(center.clone());
+                soloGroup.children.forEach(c => c.position.sub(localCenter));
+                soloGroup.position.set(0, 0, 0);
+                soloGroup.updateMatrixWorld(true);
+
+                const finalBox = new THREE.Box3().setFromObject(soloGroup);
+                const c = finalBox.getCenter(new THREE.Vector3());
+                const size = finalBox.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z, 1);
+                const dist = Math.max(maxDim * 1.35, 60);
+                camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
+                camera.lookAt(c);
+                orbitControls.target.copy(c);
+                orbitControls.update();
+            }
         }
     }
 }
@@ -6999,7 +7334,7 @@ document.addEventListener('pointerdown', (e) => {
         if(td.t && td.t.length>0){ nds=td.t.map((t, idx)=>{ const o = boneIndicesSet.has(idx) ? new THREE.Bone() : new THREE.Object3D(); o.position.set(...t.p); o.quaternion.set(...t.q); o.scale.set(t.s[0]||1,t.s[1]||1,t.s[2]||1); o.name=t.n; return o; }); td.p.forEach((pid,i)=>{ if(pid>=0 && nds[pid]) nds[pid].add(nds[i]); else grp.add(nds[i]); }); }
         grp.updateMatrixWorld(true);
         function createMesh(geo, matsArr, parentNodeIdx) { if (geo.attributes.skinIndex && geo.attributes.skinWeight && geo.userData.skinData && nds.length > 0) { const skData = geo.userData.skinData; const bones = []; const boneInverses = []; for (let k = 0; k < skData.numBones; k++) { const nodeIdx = skData.boneIds[k]; const boneNode = nds[nodeIdx]; bones.push(boneNode); if (bindMats && bindMats[nodeIdx]) { boneInverses.push(new THREE.Matrix4().copy(bindMats[nodeIdx]).invert()); } else { boneInverses.push(new THREE.Matrix4().copy(boneNode.matrixWorld).invert()); } } const skel = new THREE.Skeleton(bones, boneInverses); const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; const skm = new THREE.SkinnedMesh(geo, finalMat); let bindMatrix = null; if (parentNodeIdx !== undefined && bindMats && bindMats[parentNodeIdx]) { bindMatrix = bindMats[parentNodeIdx]; } if (bindMatrix) { skm.bind(skel, bindMatrix); } else { skm.bind(skel); } return skm; } else { const finalMat = matsArr.length === 1 ? matsArr[0] : matsArr; return new THREE.Mesh(geo, finalMat); } }
-        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); const src=mats[idx]; subMat.name=(src?src.n:"default"); if(src&&src.t) subMat.userData.texName=src.t; return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) m.visible=false; m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
+        if(od.length>0){ od.forEach(o=>{ if(!geos[o.mi] || !nds[o.ti]) return; const nm=(geos[o.mi].userData.n||"")+"_"+(nds[o.ti].name||""); let matsArr=[]; if(mats && o.matIdx && o.matIdx.length>0){ matsArr=o.matIdx.map(idx=>{ let subMat=mat.clone(); const src=mats[idx]; subMat.name=(src?src.n:"default"); if(src&&src.t) subMat.userData.texName=src.t; return subMat; }); } else matsArr=[mat.clone()]; const m = createMesh(geos[o.mi], matsArr, o.ti); if(nm.toLowerCase().match(/box|bound|col|shape/)) { m.visible=false; m.userData.origVisible=false; m.userData.isCollision=true; } m.userData.originalName=nm; nds[o.ti].add(m); }); } else { geos.forEach((g,i)=>{ const m = createMesh(g, [mat.clone()]); m.userData.originalName=g.userData.n||"m"+i; grp.add(m); }); }
         const texNames = new Set();
         if (mats && mats.length) mats.forEach(m => { if (m.t) { const base = String(m.t).replace(/\.[^.]+$/, ''); if (base) texNames.add(base); } });
         grp.userData.textureNames = Array.from(texNames);
