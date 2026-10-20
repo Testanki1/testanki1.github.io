@@ -2198,7 +2198,19 @@ function getBoneSubGeometry(skinnedMesh, boneName) {
     const idx = g.index;
     if (!pos || !idx || !sIdx || !sW) return null;
 
-    const tris = [];
+    const origGroups = (g.groups && g.groups.length > 0) ? g.groups : [{ start: 0, count: idx.count, materialIndex: 0 }];
+
+    function getMatIdx(i) {
+        for (let gi = 0; gi < origGroups.length; gi++) {
+            const grp = origGroups[gi];
+            if (i >= grp.start && i < grp.start + grp.count) {
+                return grp.materialIndex || 0;
+            }
+        }
+        return 0;
+    }
+
+    const trisByMat = new Map();
     for (let i = 0; i < idx.count; i += 3) {
         const v0 = idx.getX(i), v1 = idx.getX(i + 1), v2 = idx.getX(i + 2);
         const scores = {};
@@ -2214,11 +2226,13 @@ function getBoneSubGeometry(skinnedMesh, boneName) {
             if (score > maxScore) { maxScore = score; bestBIdx = Number(bi); }
         }
         if (bestBIdx === targetBoneIdx) {
-            tris.push(v0, v1, v2);
+            const matIdx = getMatIdx(i);
+            if (!trisByMat.has(matIdx)) trisByMat.set(matIdx, []);
+            trisByMat.get(matIdx).push(v0, v1, v2);
         }
     }
 
-    if (tris.length === 0) {
+    if (trisByMat.size === 0) {
         meshCache.set(cleanTarget, null);
         return null;
     }
@@ -2228,23 +2242,32 @@ function getBoneSubGeometry(skinnedMesh, boneName) {
     const newUv = [];
     const newIdx = [];
     const vertMap = new Map();
+    const groups = [];
 
-    tris.forEach(oldVi => {
-        if (!vertMap.has(oldVi)) {
-            const newVi = newPos.length / 3;
-            vertMap.set(oldVi, newVi);
-            newPos.push(pos.getX(oldVi), pos.getY(oldVi), pos.getZ(oldVi));
-            if (norm) newNorm.push(norm.getX(oldVi), norm.getY(oldVi), norm.getZ(oldVi));
-            if (uv) newUv.push(uv.getX(oldVi), uv.getY(oldVi));
+    for (const [matIdx, tris] of trisByMat.entries()) {
+        const groupStart = newIdx.length;
+        tris.forEach(oldVi => {
+            if (!vertMap.has(oldVi)) {
+                const newVi = newPos.length / 3;
+                vertMap.set(oldVi, newVi);
+                newPos.push(pos.getX(oldVi), pos.getY(oldVi), pos.getZ(oldVi));
+                if (norm) newNorm.push(norm.getX(oldVi), norm.getY(oldVi), norm.getZ(oldVi));
+                if (uv) newUv.push(uv.getX(oldVi), uv.getY(oldVi));
+            }
+            newIdx.push(vertMap.get(oldVi));
+        });
+        const groupCount = newIdx.length - groupStart;
+        if (groupCount > 0) {
+            groups.push({ start: groupStart, count: groupCount, materialIndex: matIdx });
         }
-        newIdx.push(vertMap.get(oldVi));
-    });
+    }
 
     const subG = new THREE.BufferGeometry();
     subG.setAttribute('position', new THREE.BufferAttribute(new Float32Array(newPos), 3));
     if (norm) subG.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(newNorm), 3));
     if (uv) subG.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(newUv), 2));
     subG.setIndex(newIdx);
+    groups.forEach(grp => subG.addGroup(grp.start, grp.count, grp.materialIndex));
     subG.computeBoundingBox();
     subG.computeBoundingSphere();
 
@@ -2261,9 +2284,12 @@ function findBoneSubPartInSlot(type, partName) {
         if (found || !o.isSkinnedMesh || !o.skeleton) return;
         if (isCollisionOrHelperMesh(o, type)) return;
         const bones = o.skeleton.bones;
-        const bIdx = bones.findIndex(b => cleanPartName(b.name || '').toLowerCase() === cleanTarget);
+        let bIdx = bones.findIndex(b => cleanPartName(b.name || '').toLowerCase() === cleanTarget);
+        if (bIdx === -1 && bones.length > 1 && (cleanTarget === type || cleanTarget === 'root' || (type === 'hull' && cleanTarget === 'hull') || (type === 'turret' && cleanTarget === 'turret'))) {
+            bIdx = bones.findIndex(b => cleanPartName(b.name || '').toLowerCase() === 'root');
+        }
         if (bIdx !== -1) {
-            const subG = getBoneSubGeometry(o, partName);
+            const subG = getBoneSubGeometry(o, bones[bIdx].name);
             if (subG) {
                 found = { skinnedMesh: o, boneIdx: bIdx, boneName: cleanPartName(bones[bIdx].name), geometry: subG };
             }
@@ -2516,6 +2542,12 @@ function setSoloPart(type, partName, mode = null) {
 function setSoloMode(mode) {
     if (mode !== 'inplace' && mode !== 'isolated') return;
     if (soloViewMode === mode) return;
+    if (mode === 'isolated' && soloViewMode === 'inplace') {
+        savedCameraState = {
+            pos: camera.position.clone(),
+            target: orbitControls.target.clone()
+        };
+    }
     soloViewMode = mode;
     window.soloViewMode = soloViewMode;
     if (currentSoloPart) {
@@ -2538,16 +2570,42 @@ function clearInPlaceBoneOverlay() {
     }
 }
 
+function clearSoloGroup() {
+    if (soloGroup) {
+        if (soloGroup.parent) soloGroup.parent.remove(soloGroup);
+        while (soloGroup.children.length > 0) {
+            const child = soloGroup.children[0];
+            soloGroup.remove(child);
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                else child.material.dispose();
+            }
+        }
+        soloGroup = null;
+    }
+}
+
+function isDescendantOf(obj, parent) {
+    let cur = obj.parent;
+    while (cur) {
+        if (cur === parent) return true;
+        cur = cur.parent;
+    }
+    return false;
+}
+
 function setMeshGhost(mesh, isGhost) {
     if (!mesh || !mesh.isMesh) return;
     if (mesh.name === '__inPlaceBoneOverlay') return;
+    if (soloGroup && (mesh === soloGroup || isDescendantOf(mesh, soloGroup))) return;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     mats.forEach(mat => {
         if (!mat.userData.origSoloProps) {
             mat.userData.origSoloProps = {
-                transparent: mat.transparent,
-                opacity: mat.opacity,
-                depthWrite: mat.depthWrite
+                transparent: (mat.opacity === 0.22) ? false : mat.transparent,
+                opacity: (mat.opacity === 0.22) ? 1.0 : mat.opacity,
+                depthWrite: (mat.opacity === 0.22) ? true : mat.depthWrite
             };
         }
         if (isGhost) {
@@ -2568,16 +2626,22 @@ function setMeshGhost(mesh, isGhost) {
 function restoreAllMaterials() {
     root.traverse(o => {
         if (!o.isMesh) return;
+        if (o.name === '__inPlaceBoneOverlay') return;
+        if (soloGroup && (o === soloGroup || isDescendantOf(o, soloGroup))) return;
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         mats.forEach(mat => {
-            if (mat.userData.origSoloProps) {
+            if (mat.userData?.origSoloProps) {
                 const orig = mat.userData.origSoloProps;
                 mat.transparent = orig.transparent;
                 mat.opacity = orig.opacity;
                 mat.depthWrite = orig.depthWrite;
-                mat.needsUpdate = true;
                 delete mat.userData.origSoloProps;
+            } else if (mat.opacity === 0.22) {
+                mat.transparent = false;
+                mat.opacity = 1.0;
+                mat.depthWrite = true;
             }
+            mat.needsUpdate = true;
         });
     });
 }
@@ -2589,14 +2653,7 @@ function clearSoloPart() {
     window.currentSoloPart = null;
 
     clearInPlaceBoneOverlay();
-
-    if (soloGroup) {
-        if (soloGroup.parent) soloGroup.parent.remove(soloGroup);
-        while (soloGroup.children.length > 0) {
-            soloGroup.remove(soloGroup.children[0]);
-        }
-        soloGroup = null;
-    }
+    clearSoloGroup();
 
     groupAssembly.visible = (currentMode === 'assembly');
     if (groupMore) groupMore.visible = (currentMode === 'more');
@@ -2661,14 +2718,14 @@ function applySoloView() {
     if (soloViewMode === 'inplace') {
         // Mode 1: 空间原位 / 保留空间位置，其他部件半透明幽灵材质衬托（看清原有位置）
         // 如果是从 Mode 2 (isolated) 切回 Mode 1，将镜头恢复到进入 Mode 2 前的原本视角
-        if (soloGroup && soloGroup.visible && savedCameraState) {
+        if (savedCameraState) {
             camera.position.copy(savedCameraState.pos);
             orbitControls.target.copy(savedCameraState.target);
             orbitControls.update();
         }
-        if (soloGroup) {
-            soloGroup.visible = false;
-        }
+        clearSoloGroup();
+        restoreAllMaterials();
+
         groupAssembly.visible = (currentMode === 'assembly');
         if (groupMore) groupMore.visible = (currentMode === 'more');
         if (groupNormal) groupNormal.visible = (currentMode === 'normal');
@@ -2705,6 +2762,9 @@ function applySoloView() {
                 m.transparent = false;
                 m.opacity = 1.0;
                 m.depthWrite = true;
+                m.polygonOffset = true;
+                m.polygonOffsetFactor = -1.0;
+                m.polygonOffsetUnits = -4.0;
             });
             inPlaceBoneOverlay = new THREE.Mesh(boneInfo.geometry.clone(), overlayMat);
             inPlaceBoneOverlay.name = '__inPlaceBoneOverlay';
@@ -2749,22 +2809,15 @@ function applySoloView() {
                 target: orbitControls.target.clone()
             };
         }
+        clearSoloGroup();
         restoreAllMaterials();
         groupAssembly.visible = false;
         if (groupMore) groupMore.visible = false;
         if (groupNormal) groupNormal.visible = false;
 
-        if (!soloGroup) {
-            soloGroup = new THREE.Group();
-            soloGroup.name = '__soloPartGroup';
-            root.add(soloGroup);
-        } else if (soloGroup.parent !== root) {
-            root.add(soloGroup);
-        }
-        soloGroup.visible = true;
-        while (soloGroup.children.length > 0) {
-            soloGroup.remove(soloGroup.children[0]);
-        }
+        soloGroup = new THREE.Group();
+        soloGroup.name = '__soloPartGroup';
+        root.add(soloGroup);
 
         const boneInfo = findBoneSubPartInSlot(currentSoloPart.type, currentSoloPart.name);
         if (boneInfo) {
@@ -2819,6 +2872,9 @@ function applySoloView() {
                     if (m.parent && m.parent.name === currentSoloPart.name) {
                         clone.quaternion.multiplyQuaternions(m.parent.quaternion, clone.quaternion);
                     }
+                    clone.material = Array.isArray(m.material)
+                        ? m.material.map(mat => mat.clone())
+                        : m.material.clone();
                     const cMats = Array.isArray(clone.material) ? clone.material : [clone.material];
                     cMats.forEach(mat => {
                         mat.transparent = false;
