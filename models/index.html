@@ -2584,6 +2584,7 @@ function restoreAllMaterials() {
 
 function clearSoloPart() {
     if (!currentSoloPart) return;
+    const wasIsolated = (soloViewMode === 'isolated');
     currentSoloPart = null;
     window.currentSoloPart = null;
 
@@ -2604,14 +2605,12 @@ function clearSoloPart() {
     restoreAllMaterials();
     restoreAllMeshesVisibility();
 
-    if (savedCameraState) {
+    if (wasIsolated && savedCameraState) {
         camera.position.copy(savedCameraState.pos);
         orbitControls.target.copy(savedCameraState.target);
         orbitControls.update();
-        savedCameraState = null;
-    } else {
-        fitCamera();
     }
+    savedCameraState = null;
 
     updateSoloUI();
 }
@@ -2661,6 +2660,12 @@ function applySoloView() {
 
     if (soloViewMode === 'inplace') {
         // Mode 1: 空间原位 / 保留空间位置，其他部件半透明幽灵材质衬托（看清原有位置）
+        // 如果是从 Mode 2 (isolated) 切回 Mode 1，将镜头恢复到进入 Mode 2 前的原本视角
+        if (soloGroup && soloGroup.visible && savedCameraState) {
+            camera.position.copy(savedCameraState.pos);
+            orbitControls.target.copy(savedCameraState.target);
+            orbitControls.update();
+        }
         if (soloGroup) {
             soloGroup.visible = false;
         }
@@ -2705,22 +2710,10 @@ function applySoloView() {
             inPlaceBoneOverlay.name = '__inPlaceBoneOverlay';
             boneInfo.skinnedMesh.add(inPlaceBoneOverlay);
 
-            inPlaceBoneOverlay.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(inPlaceBoneOverlay);
-            if (!box.isEmpty()) {
-                const c = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z, 1);
-                const dist = Math.max(maxDim * 2.5, 80);
-                camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
-                camera.lookAt(c);
-                orbitControls.target.copy(c);
-                orbitControls.update();
-            }
+            // 空间原位模式：镜头完全保持不变，不动镜头！让用户在当前原有视角中直接看清部件位置！
 
         } else {
             // 普通独立网格部件：选中部件 100% 实体，车身其他部件半透明衬托
-            const activeMeshes = [];
             root.traverse(o => {
                 if (!o.isMesh) return;
                 if (isCollisionOrHelperMesh(o, currentSoloPart.type)) {
@@ -2734,7 +2727,6 @@ function applySoloView() {
 
                 if (isMatch) {
                     setMeshGhost(o, false);
-                    activeMeshes.push(o);
                     let p = o.parent;
                     while (p && p !== root) {
                         p.visible = true;
@@ -2745,25 +2737,18 @@ function applySoloView() {
                 }
             });
 
-            // Frame camera on the active part in situ
-            if (activeMeshes.length > 0) {
-                const box = new THREE.Box3();
-                activeMeshes.forEach(m => box.expandByObject(m));
-                if (!box.isEmpty()) {
-                    const c = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z, 1);
-                    const dist = Math.max(maxDim * 2.2, 120);
-                    camera.position.set(c.x + dist, c.y + dist * 0.55, c.z + dist);
-                    camera.lookAt(c);
-                    orbitControls.target.copy(c);
-                    orbitControls.update();
-                }
-            }
+            // 空间原位模式：镜头完全保持不变，不动镜头！让用户在当前原有视角中直接看清部件位置！
         }
 
     } else {
         // Mode 2: 独立单件 / 无其他空间 / 居中展示（无翻转镜像）
+        // 进入 Mode 2 前如果未保存视角，先保存当前视角
+        if (!savedCameraState) {
+            savedCameraState = {
+                pos: camera.position.clone(),
+                target: orbitControls.target.clone()
+            };
+        }
         restoreAllMaterials();
         groupAssembly.visible = false;
         if (groupMore) groupMore.visible = false;
