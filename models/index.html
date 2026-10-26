@@ -2127,11 +2127,16 @@ function toggleAttachmentMarker(type, info) {
             emissiveIntensity: 0.6,
             transparent: true,
             opacity: 0.8,
+            // Respect opaque model depth; still draw over ghosted parts (depthWrite=false there).
+            depthTest: true,
+            depthWrite: false,
             roughness: 0.2,
             metalness: 0.1,
             side: THREE.DoubleSide
         })
     );
+    // Draw after ghosted parts; depth testing still lets opaque meshes occlude markers.
+    marker.renderOrder = 1000;
     marker.name = info.name;
     marker.userData.isAttachmentMarker = true;
     marker.userData.markerName = info.name;
@@ -3150,21 +3155,41 @@ function pruneAttachmentMarkers() {
     }
 }
 function pickAttachmentMarker(clientX, clientY) {
-    // Raycast against registered markers only. This deliberately ignores
-    // semi-transparent/ghost model meshes, so they cannot block marker clicks.
     pruneAttachmentMarkers();
     if (attachmentMarkerMeshes.length === 0) return null;
     const rect = renderer.domElement.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
     partRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-    const hits = partRaycaster.intersectObjects(attachmentMarkerMeshes, true);
-    for (const hit of hits) {
+
+    // Markers are tested separately so ghosted/transparent parts do not block
+    // them. We then explicitly reject a marker if an opaque mesh is in front.
+    const markerHits = partRaycaster.intersectObjects(attachmentMarkerMeshes, true);
+    if (markerHits.length === 0) return null;
+    const sceneHits = partRaycaster.intersectObjects(scene.children, true);
+
+    const isOpaqueBlocker = (hit) => {
         const obj = hit.object;
-        if (isAttachmentMarker(obj) && isEffectivelyVisible(obj)) {
-            const name = obj.userData?.markerName || obj.name || getPartName(obj);
-            return { name, point: hit.point, object: obj, clientX, clientY };
-        }
+        if (!obj?.isMesh || !isEffectivelyVisible(obj)) return false;
+        if (isAttachmentMarker(obj) || obj.name === '__inPlaceBoneOverlay' || obj.name === '__soloPartGroup') return false;
+        if (isCollisionOrHelperMesh(obj)) return false;
+        const materialIndex = hit.face?.materialIndex ?? 0;
+        const material = Array.isArray(obj.material) ? obj.material[materialIndex] : obj.material;
+        if (!material) return false;
+        return material.transparent !== true
+            && (material.opacity ?? 1) >= 0.999
+            && material.depthWrite !== false;
+    };
+
+    for (const hit of markerHits) {
+        const obj = hit.object;
+        if (!isAttachmentMarker(obj) || !isEffectivelyVisible(obj)) continue;
+        const isOccluded = sceneHits.some(sceneHit =>
+            sceneHit.distance < hit.distance - 1e-4 && isOpaqueBlocker(sceneHit)
+        );
+        if (isOccluded) continue;
+        const name = obj.userData?.markerName || obj.name || getPartName(obj);
+        return { name, point: hit.point, object: obj, clientX, clientY };
     }
     return null;
 }
