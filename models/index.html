@@ -1842,36 +1842,43 @@ const TT_LONG_PRESS_MS = 600;
 const TT_MOVE_THRESHOLD = 10;
 
 function showPartTooltip(text, x, y, hitObj = null) {
-    if (isPartSoloModeActive()) return;
+    const isMarkerTooltip = isAttachmentMarker(hitObj);
+    // Attachment markers remain inspectable while a part is being viewed; ordinary
+    // model-part tooltips are still suppressed in solo view.
+    if (isPartSoloModeActive() && !isMarkerTooltip) return;
     partTooltipText.textContent = text;
     partTooltipEl.classList.add('show');
     
-    // Quick solo button inside tooltip header
+    // Only model-part tooltips offer the quick "view this part" action.
     let soloBtn = document.getElementById('part-tooltip-solo-btn');
-    if (!soloBtn) {
-        soloBtn = document.createElement('button');
-        soloBtn.id = 'part-tooltip-solo-btn';
-        soloBtn.className = 'tooltip-solo-btn';
-        soloBtn.type = 'button';
-        soloBtn.title = T.soloThisPart;
-        soloBtn.innerHTML = `<span class="material-symbols-rounded" style="font-size:15px;">view_in_ar</span>`;
-        const hdr = partTooltipEl.querySelector('.part-tooltip-header');
-        if (hdr) hdr.appendChild(soloBtn);
-    }
-    soloBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        hidePartTooltip();
-        let type = 'hull';
-        if (hitObj) {
-            if (isMeshInSlot(hitObj, 'turret')) type = 'turret';
-            else if (isMeshInSlot(hitObj, 'hull')) type = 'hull';
-            else if (isMeshInSlot(hitObj, 'drone')) type = 'drone';
-            else if (isMeshInSlot(hitObj, 'supply')) type = 'supply';
-            else if (isMeshInSlot(hitObj, 'grenade')) type = 'grenade';
-            else if (isMeshInSlot(hitObj, 'normal')) type = 'normal';
+    if (isMarkerTooltip) {
+        if (soloBtn) soloBtn.remove();
+    } else {
+        if (!soloBtn) {
+            soloBtn = document.createElement('button');
+            soloBtn.id = 'part-tooltip-solo-btn';
+            soloBtn.className = 'tooltip-solo-btn';
+            soloBtn.type = 'button';
+            soloBtn.title = T.soloThisPart;
+            soloBtn.innerHTML = `<span class="material-symbols-rounded" style="font-size:15px;">view_in_ar</span>`;
+            const hdr = partTooltipEl.querySelector('.part-tooltip-header');
+            if (hdr) hdr.appendChild(soloBtn);
         }
-        setSoloPart(type, text);
-    };
+        soloBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            hidePartTooltip();
+            let type = 'hull';
+            if (hitObj) {
+                if (isMeshInSlot(hitObj, 'turret')) type = 'turret';
+                else if (isMeshInSlot(hitObj, 'hull')) type = 'hull';
+                else if (isMeshInSlot(hitObj, 'drone')) type = 'drone';
+                else if (isMeshInSlot(hitObj, 'supply')) type = 'supply';
+                else if (isMeshInSlot(hitObj, 'grenade')) type = 'grenade';
+                else if (isMeshInSlot(hitObj, 'normal')) type = 'normal';
+            }
+            setSoloPart(type, text);
+        };
+    }
 
     // Clear action buttons from the previous load
     const animsContainer = document.getElementById('part-tooltip-anims');
@@ -2033,12 +2040,12 @@ function ensureAttachUI() {
     }
 }
 
-function projectNodeTooltip(node, name) {
+function projectNodeTooltip(node, name, tooltipHitObj = node) {
     const worldPos = getGarageObjectWorldCenter(node) || new THREE.Vector3();
     const screen = worldPos.clone().project(camera);
     const x = (screen.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-screen.y * 0.5 + 0.5) * window.innerHeight;
-    showPartTooltip(name, x, y, node);
+    showPartTooltip(name, x, y, tooltipHitObj);
 }
 
 function getGarageObjectWorldCenter(obj) {
@@ -2137,7 +2144,9 @@ function toggleAttachmentMarker(type, info) {
     // (grenade clones are exempt in applyTypeVisibility; markers are not).
     if (type === 'turret' && visState.turret === false) { marker.userData.origVisible = true; marker.visible = false; }
     if (info.btn) info.btn.classList.add('active');
-    projectNodeTooltip(info.node, info.name);
+    // Pass the marker itself so its tooltip is treated as an attachment-point
+    // tooltip (not as a model part with a quick solo button).
+    projectNodeTooltip(info.node, info.name, marker);
 }
 
 function renderAttachmentPoints() {
@@ -2793,12 +2802,14 @@ function clearSoloPart() {
 function restoreAllMeshesVisibility() {
     root.traverse(o => {
         if (!o.isMesh) return;
-        if (isCollisionOrHelperMesh(o)) {
-            o.visible = false;
+        // Markers are also classified as helpers, so restore them before the
+        // generic helper-mesh filter. Preserve their visibility switch state.
+        if (o.userData?.isAttachmentMarker) {
+            o.visible = (o.userData.origVisible !== undefined) ? o.userData.origVisible : true;
             return;
         }
-        if (o.userData?.isAttachmentMarker) {
-            o.visible = true;
+        if (isCollisionOrHelperMesh(o)) {
+            o.visible = false;
             return;
         }
         if (o.userData.origVisible !== undefined) {
@@ -2864,6 +2875,8 @@ function applySoloView() {
             // 骨骼部件原位高亮：全场允许显示的网格（车身、车库、手榴弹等）半透明衬托，提取该骨骼对应表面高亮呈现并绑定骨骼实时动画
             root.traverse(o => {
                 if (!o.isMesh) return;
+                // Attachment markers are also helper meshes, but must remain visible/clickable.
+                if (o.userData?.isAttachmentMarker) return;
                 if (isCollisionOrHelperMesh(o)) {
                     o.visible = false;
                     return;
@@ -2922,6 +2935,8 @@ function applySoloView() {
             // 普通独立网格部件：选中部件 100% 实体，全场其他网格（车身、车库、手榴弹等）半透明衬托
             root.traverse(o => {
                 if (!o.isMesh) return;
+                // Attachment markers are also helper meshes, but must remain visible/clickable.
+                if (o.userData?.isAttachmentMarker) return;
                 if (isCollisionOrHelperMesh(o)) {
                     o.visible = false;
                     return;
@@ -3135,6 +3150,8 @@ function pruneAttachmentMarkers() {
     }
 }
 function pickAttachmentMarker(clientX, clientY) {
+    // Raycast against registered markers only. This deliberately ignores
+    // semi-transparent/ghost model meshes, so they cannot block marker clicks.
     pruneAttachmentMarkers();
     if (attachmentMarkerMeshes.length === 0) return null;
     const rect = renderer.domElement.getBoundingClientRect();
@@ -3157,31 +3174,32 @@ function isOnCanvas(e) { return e.target === canvasEl; }
 
 canvasEl.addEventListener('pointerdown', (e) => {
     if (!isOnCanvas(e)) return;
-    if (isPartSoloModeActive()) {
-        tooltipHit = null;
-        tooltipStartPos = null;
-        tapHit = null;
-        return;
-    }
-    // Track quick taps for attachment markers
+    const soloViewActive = isPartSoloModeActive();
+    tooltipHit = null;
+    tooltipStartPos = null;
+
+    // Track quick taps for attachment markers in every view mode. In solo view
+    // only markers are pickable; ghosted parts must not steal the interaction.
     tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
     tapDidMove = false;
     suppressNextClick = false;
 
     const markerHit = pickAttachmentMarker(e.clientX, e.clientY);
-    tapHit = markerHit || pickPart(e.clientX, e.clientY);
+    tapHit = markerHit || (soloViewActive ? null : pickPart(e.clientX, e.clientY));
 
     if (e.pointerType === 'mouse') {
         if (e.button !== 2) { hidePartTooltip(); return; }
         tooltipStartPos = { x: e.clientX, y: e.clientY };
-        tooltipHit = pickPart(e.clientX, e.clientY);
+        tooltipHit = markerHit || (soloViewActive ? null : pickPart(e.clientX, e.clientY));
     } else if (e.pointerType === 'touch') {
-        lpStart = { x: e.clientX, y: e.clientY };
+        const press = { x: e.clientX, y: e.clientY };
+        lpStart = press;
         if (lpTimer) clearTimeout(lpTimer);
         lpTimer = setTimeout(() => {
-            const hit = pickPart(lpStart.x, lpStart.y);
+            const hit = pickAttachmentMarker(press.x, press.y)
+                || (!isPartSoloModeActive() ? pickPart(press.x, press.y) : null);
             if (hit) {
-                showPartTooltip(hit.name, lpStart.x, lpStart.y, hit.object);
+                showPartTooltip(hit.name, press.x, press.y, hit.object);
             }
             lpTimer = null;
         }, TT_LONG_PRESS_MS);
@@ -3212,15 +3230,10 @@ canvasEl.addEventListener('pointerup', (e) => {
     lpStart = null;
     suppressNextContextMenu = false;
 
-    if (isPartSoloModeActive()) {
-        tapStart = null; tapHit = null; tapDidMove = false;
-        return;
-    }
-
     if (tapStart) {
         const dt = performance.now() - tapStart.t;
         const markerHit = pickAttachmentMarker(e.clientX, e.clientY);
-        if (dt < TAP_MAX_MS && markerHit) {
+        if (dt < TAP_MAX_MS && !tapDidMove && markerHit) {
             suppressNextContextMenu = true;
             suppressNextClick = true;
             showPartTooltip(markerHit.name, e.clientX, e.clientY, markerHit.object);
@@ -3246,13 +3259,17 @@ canvasEl.addEventListener('click', (e) => {
 canvasEl.addEventListener('contextmenu', (e) => {
     if (!isOnCanvas(e)) return;
     e.preventDefault();
-    if (isPartSoloModeActive()) {
-        tooltipHit = null;
-        tooltipStartPos = null;
-        return;
-    }
     if (suppressNextContextMenu) {
         suppressNextContextMenu = false;
+        return;
+    }
+    if (isPartSoloModeActive()) {
+        const markerHit = pickAttachmentMarker(e.clientX, e.clientY);
+        if (markerHit) {
+            showPartTooltip(markerHit.name, e.clientX, e.clientY, markerHit.object);
+        }
+        tooltipHit = null;
+        tooltipStartPos = null;
         return;
     }
     if (tooltipHit) {
