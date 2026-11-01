@@ -1,6 +1,6 @@
 // 只代理本页面的视频请求，统计已传输字节，并支持按播放会话取消。
 // 不缓存视频、不发起额外测速下载；每次实际播放只使用原有视频请求。
-const ROUTE = '/videos/__stream';
+const ROUTE = '/promo-videos/__stream';
 const VIDEO_API_ORIGIN = self.location.hostname === 'testanki1.github.io' ? 'https://testanki1.pages.dev' : self.location.origin;
 const SESSION_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
 const streams = new Map();
