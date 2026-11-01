@@ -46,9 +46,9 @@ self.addEventListener('message', event => {
 self.addEventListener('fetch', event => {
   const incoming = new URL(event.request.url);
   if (incoming.origin !== self.location.origin || incoming.pathname !== ROUTE || event.request.method !== 'GET') return;
-  const id = incoming.searchParams.get('id') || '';
+  const file = incoming.searchParams.get('file') || '';
   const session = incoming.searchParams.get('session') || '';
-  if (!/^[A-Za-z0-9_-]{1,200}$/.test(id) || !SESSION_PATTERN.test(session)) {
+  if (!file || file.length > 1024 || /[\x00-\x1f\x7f]/.test(file) || !SESSION_PATTERN.test(session)) {
     event.respondWith(new Response('Invalid request', {status:400})); return;
   }
   pruneCancelled();
@@ -80,7 +80,7 @@ self.addEventListener('fetch', event => {
     try {
       if (job.stopped) return new Response(null, {status:204});
       const url = new URL('/api/promo-videos', VIDEO_API_ORIGIN);
-      url.searchParams.set('action','video'); url.searchParams.set('id',id);
+      url.searchParams.set('action','video'); url.searchParams.set('file',file);
       const headers = new Headers();
       const range = event.request.headers.get('Range');
       if (range) headers.set('Range',range);
