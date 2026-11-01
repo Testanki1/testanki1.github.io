@@ -11,12 +11,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
   <style>
     /* =========================================================
-       Tokens
+       Tokens & Motion Curves
        ========================================================= */
     :root {
       color-scheme: dark;
       --base: #001926;
       --green: #76FF33;
+      --green-glow: rgba(118, 255, 51, .35);
       --blue: #BFD5FF;
       --ink: #fff;
       --muted: rgba(191, 213, 255, .72);
@@ -68,7 +69,7 @@
     }
 
     /* =========================================================
-       Header & Layout
+       Header & Entrance
        ========================================================= */
     .shell {
       width: min(1080px, 100%);
@@ -78,6 +79,12 @@
 
     .intro {
       padding: 52px 0 28px;
+      animation: introEnter .5s var(--m3-decel) backwards;
+    }
+
+    @keyframes introEnter {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .eyebrow {
@@ -134,7 +141,7 @@
       flex-wrap: wrap;
     }
 
-    /* 形态响应：从方圆到全胶囊 */
+    /* 形态响应：方圆到全胶囊弹性平滑变幻 */
     .filter {
       width: 48px;
       height: 48px;
@@ -147,13 +154,13 @@
       border-radius: 16px;
       transition: 
         border-radius .3s var(--m3-spring),
-        transform .15s var(--m3-spring),
+        transform .18s var(--m3-spring),
         background-color .2s ease,
         color .2s ease;
     }
 
     .filter:active {
-      transform: scale(0.92);
+      transform: scale(0.9) !important;
     }
 
     .filter[aria-pressed=true] {
@@ -172,7 +179,7 @@
 
     .filter .material-symbols-rounded { font-size: 23px; }
 
-    /* 仅允许真实鼠标触发 hover，避免手机触屏粘滞 */
+    /* 仅允许真实鼠标触发 hover，避免触屏手机状态粘滞 */
     @media (hover: hover) and (pointer: fine) {
       .filter:hover {
         background: rgba(191, 213, 255, .16);
@@ -185,15 +192,19 @@
         background: rgba(191, 213, 255, .075);
         border-color: rgba(191, 213, 255, .28);
       }
+      .video-row:hover .badge img {
+        transform: translateY(-2px) scale(1.08);
+      }
       .row-button:hover {
         background: rgba(191, 213, 255, .04);
       }
       .control:hover {
         background: rgba(191, 213, 255, .2);
+        transform: translateY(-2px);
       }
       .control.main:hover {
         background: #8BFF4D;
-        transform: scale(1.06);
+        transform: scale(1.06) translateY(-2px);
       }
     }
 
@@ -209,7 +220,7 @@
       color: var(--blue);
       max-width: 440px;
       width: 100%;
-      transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
+      transition: border-color .25s ease, background-color .25s ease, box-shadow .25s var(--m3-spring);
     }
 
     .searchbox:focus-within {
@@ -219,7 +230,15 @@
       box-shadow: 0 0 0 3px rgba(118, 255, 51, .25);
     }
 
-    .searchbox span { font-size: 21px; }
+    .searchbox span { 
+      font-size: 21px;
+      transition: transform .25s var(--m3-spring), color .2s ease;
+    }
+
+    .searchbox:focus-within span {
+      color: var(--green);
+      transform: scale(1.08);
+    }
 
     .searchbox input {
       border: 0;
@@ -242,7 +261,7 @@
     }
 
     /* =========================================================
-       Video Rows & List
+       Video Rows & 列表阶梯渐入动画 (Staggered Entrance)
        ========================================================= */
     .list {
       display: flex;
@@ -255,7 +274,19 @@
       border: 1px solid rgba(191, 213, 255, .15);
       border-radius: 23px;
       overflow: visible;
-      transition: border-color .25s ease, background-color .25s ease;
+      transition: border-color .25s ease, background-color .25s ease, transform .2s var(--m3-spring);
+      animation: rowEntrance .38s var(--m3-decel) backwards;
+    }
+
+    @keyframes rowEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
     }
 
     .video-row:has(.row-button[aria-expanded=true]) {
@@ -292,12 +323,12 @@
     .row-icons {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
 
-    /* 纯净悬浮的装备图标，无多余背景色块 */
+    /* 纯净悬浮的装备图标，无多余背景色块，支持悬停微浮 */
     .badge {
       height: 30px;
       width: 30px;
@@ -311,13 +342,14 @@
       height: 23px;
       width: 23px;
       object-fit: contain;
+      transition: transform .25s var(--m3-spring);
     }
 
     .row-expand {
       flex: 0 0 auto;
       color: var(--blue);
       font-size: 24px;
-      transition: transform .35s var(--m3-spring);
+      transition: transform .38s var(--m3-spring), color .2s ease;
     }
 
     .row-button[aria-expanded=true] .row-expand {
@@ -341,19 +373,25 @@
     }
 
     /* =========================================================
-       Inline Player & 精致 Seekbar 控制体系
+       Inline Player & 展开动效 (Unfolding Motion)
        ========================================================= */
     .inline-player {
       padding: 0 14px 16px;
-      animation: playerEnter .3s var(--m3-decel) forwards;
+      transform-origin: top center;
+      animation: playerExpand .35s var(--m3-decel) forwards;
     }
 
-    @keyframes playerEnter {
-      from { opacity: 0; transform: translateY(-6px); }
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes playerExpand {
+      0% {
+        opacity: 0;
+        transform: translateY(-8px) scaleY(0.95);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+      }
     }
 
-    /* 移除了任何暗沉的边框与投影衬底 */
     .player-frame {
       position: relative;
       width: 100%;
@@ -406,8 +444,8 @@
     }
 
     /* 
-       M3 精细化进度条：
-       默认高度 4px，交互时展开至 6px；彻底修复滑动点方形轮廓 
+       M3 精致进度条：
+       标准 4px 轨道，交互悬停展开至 6px；彻底修复滑动点方形轮廓 
     */
     .range {
       appearance: none;
@@ -497,7 +535,7 @@
     }
 
     .control:active {
-      transform: scale(0.9) !important;
+      transform: scale(0.88) !important;
       border-radius: 22px;
     }
 
@@ -507,16 +545,21 @@
       background: var(--green);
       color: var(--base);
       border-radius: 18px;
+      transition: 
+        transform .2s var(--m3-spring),
+        background-color .2s ease,
+        border-radius .2s var(--m3-spring);
     }
 
     .control.main:active {
-      transform: scale(0.92) !important;
+      transform: scale(0.9) !important;
       border-radius: 24px;
     }
 
     .control.main .material-symbols-rounded {
       font-size: 27px;
       font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+      transition: transform .2s var(--m3-spring);
     }
 
     .volume { width: 70px; }
@@ -532,7 +575,7 @@
       max-width: calc(100% - 24px);
       opacity: 0;
       visibility: hidden;
-      transform: translate(-50%, -42%) scale(.9);
+      transform: translate(-50%, -42%) scale(.88);
       pointer-events: none;
       transition: 
         opacity .25s var(--m3-standard),
@@ -866,8 +909,12 @@ function renderList() {
   closePlayer(); list.replaceChildren();
   const shown = filteredVideos(); status.textContent = t.count(shown.length, videos.length);
   if (!shown.length) { const message = document.createElement('div'); message.className = 'message'; message.textContent = t.noResults; list.append(message); return; }
-  for (const item of shown) {
+  
+  // 恢复阶梯渐入级联动画
+  shown.forEach((item, index) => {
     const row = document.createElement('article'); row.className = 'video-row';
+    row.style.animationDelay = `${Math.min(index * 32, 400)}ms`;
+    
     const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'row-button';
     trigger.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-label',t.playName(item.displayName));
     const title = document.createElement('span'); title.className = 'row-title'; title.textContent = item.displayName;
@@ -884,7 +931,7 @@ function renderList() {
       closePlayer(); openPlayer(item,row,trigger);
     });
     list.append(row);
-  }
+  });
 }
 
 function formatTime(value) {
