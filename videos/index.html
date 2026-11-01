@@ -28,7 +28,7 @@
     .controls-row{justify-content:center;flex-wrap:wrap;gap:8px}
     .buffer-overlay{position:absolute;z-index:2;left:50%;top:50%;max-width:calc(100% - 24px);opacity:0;visibility:hidden;transform:translate(-50%,-42%) scale(.9);pointer-events:none;transition:opacity .28s var(--ease),transform .28s var(--ease),visibility 0s linear .28s}
     .buffer-overlay.is-visible{opacity:1;visibility:visible;transform:translate(-50%,-50%) scale(1);transition:opacity .28s var(--ease),transform .28s var(--ease),visibility 0s}
-    .buffer-chip{display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:10px 17px;border-radius:24px;color:var(--blue);background:rgba(0,25,38,.9);border:1px solid rgba(191,213,255,.2);box-shadow:0 8px 24px rgba(0,0,0,.25);backdrop-filter:blur(12px)}
+    .buffer-chip{display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:10px 17px;color:var(--blue);text-shadow:0 1px 6px rgba(0,0,0,.95)}
     .buffer-spinner{color:var(--green);font-size:24px;animation:buffer-spin 1.2s linear infinite}
     .transfer-status{color:var(--blue);font-size:12px;line-height:1.4;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
     @keyframes buffer-spin{to{transform:rotate(360deg)}}
@@ -278,7 +278,7 @@ function openPlayer(item,row,trigger) {
   download.href = '/api/promo-videos?action=video&id=' + encodeURIComponent(item.id);
   download.download = item.name; download.title = t.download;
   const session = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, progressFrame = null;
+  let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, bufferingDelay = null, progressFrame = null;
   let lastRate = '', lastRateTime = 0;
   video.setAttribute('aria-label', t.playName(item.displayName));
   const label = (button, text) => { button.setAttribute('aria-label',text); button.title = text; };
@@ -312,6 +312,7 @@ function openPlayer(item,row,trigger) {
   }
   function clearBuffering() {
     buffering = false;
+    clearTimeout(bufferingDelay); bufferingDelay = null;
     clearTimeout(transferTimer); transferTimer = null;
     setTransferStatus('');
   }
@@ -324,8 +325,11 @@ function openPlayer(item,row,trigger) {
     target.addEventListener('contextmenu',event => event.preventDefault());
     target.addEventListener('dragstart',event => event.preventDefault());
   }
-  seek.addEventListener('pointerdown',() => { seeking = true; });
-  for (const event of ['pointerup','pointercancel','change']) seek.addEventListener(event,() => { seeking = false; progress(); });
+  seek.addEventListener('pointerdown',() => { seeking = true; clearBuffering(); });
+  for (const event of ['pointerup','pointercancel','change']) seek.addEventListener(event,() => {
+    seeking = false; progress();
+    if (!video.paused && !video.ended && video.readyState < 3) scheduleBuffering();
+  });
   seek.addEventListener('input',() => { if (Number.isFinite(video.duration)) video.currentTime = Math.min(video.duration,Number(seek.value)); progress(); });
   vol.addEventListener('input',() => { video.volume = Number(vol.value); video.muted = video.volume === 0; });
   mute.addEventListener('click',() => { if (video.muted || video.volume === 0) { if (video.volume === 0) video.volume = 1; video.muted = false; } else video.muted = true; });
@@ -346,20 +350,29 @@ function openPlayer(item,row,trigger) {
     }
     clearBuffering();
   });
-  video.addEventListener('waiting',() => {
-    // waiting 只表示数据不足；主动暂停或结束时不显示速度。
-    if (video.paused || video.ended) return;
-    buffering = true;
-    clearTimeout(transferTimer); transferTimer = null;
-    const age = Date.now() - lastRateTime;
-    if (!meterAvailable) setTransferStatus(t.speedUnavailable);
-    else if (lastRate && age < 1800) {
-      setTransferStatus(t.transfer(lastRate));
-      transferTimer = setTimeout(() => {
-        transferTimer = null;
-        setTransferStatus(buffering && !video.paused && !video.ended ? t.buffering : '');
-      }, 1800 - age);
-    } else setTransferStatus(t.buffering);
+  function scheduleBuffering() {
+    // 跳转时 waiting 可能只持续一瞬间；拖动期间或数据已可继续播放时不显示。
+    if (seeking || video.paused || video.ended || buffering || bufferingDelay !== null) return;
+    bufferingDelay = setTimeout(() => {
+      bufferingDelay = null;
+      if (seeking || video.paused || video.ended || video.readyState >= 3) return;
+      buffering = true;
+      clearTimeout(transferTimer); transferTimer = null;
+      const age = Date.now() - lastRateTime;
+      if (!meterAvailable) setTransferStatus(t.speedUnavailable);
+      else if (lastRate && age < 1800) {
+        setTransferStatus(t.transfer(lastRate));
+        transferTimer = setTimeout(() => {
+          transferTimer = null;
+          setTransferStatus(buffering && !video.paused && !video.ended ? t.buffering : '');
+        }, 1800 - age);
+      } else setTransferStatus(t.buffering);
+    }, 450);
+  }
+  video.addEventListener('waiting',scheduleBuffering);
+  video.addEventListener('seeked',() => {
+    if (video.readyState >= 3) clearBuffering();
+    else scheduleBuffering();
   });
   video.addEventListener('playing',() => { clearBuffering(); startProgressFrames(); });
   video.addEventListener('keydown',event => { if (event.key === ' ' || event.key === 'k') { event.preventDefault(); togglePlay(); } });
@@ -452,5 +465,5 @@ async function loadVideos() {
 loadVideos();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53ab4f06c3d428f',t:'MTc5MzUzNDA4Nw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53ab4f06c3d428f',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53ac543baf6375e',t:'MTc5MzUzNDc1Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53ac543baf6375e',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
