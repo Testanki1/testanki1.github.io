@@ -26,6 +26,7 @@
       /* Motion Physics */
       --m3-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
       --m3-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+      --m3-expand: cubic-bezier(0.16, 1, 0.3, 1);
       --m3-standard: cubic-bezier(0.2, 0, 0, 1);
     }
 
@@ -141,7 +142,6 @@
       flex-wrap: wrap;
     }
 
-    /* 形态响应：方圆到全胶囊弹性平滑变幻 */
     .filter {
       width: 48px;
       height: 48px;
@@ -179,7 +179,6 @@
 
     .filter .material-symbols-rounded { font-size: 23px; }
 
-    /* 仅允许真实鼠标触发 hover，避免触屏手机状态粘滞 */
     @media (hover: hover) and (pointer: fine) {
       .filter:hover {
         background: rgba(191, 213, 255, .16);
@@ -261,7 +260,7 @@
     }
 
     /* =========================================================
-       Video Rows & 列表阶梯渐入动画 (Staggered Entrance)
+       Video Rows & 明显的展开交互动效 (Container Transform)
        ========================================================= */
     .list {
       display: flex;
@@ -273,8 +272,12 @@
       background: rgba(191, 213, 255, .055);
       border: 1px solid rgba(191, 213, 255, .15);
       border-radius: 23px;
-      overflow: visible;
-      transition: border-color .25s ease, background-color .25s ease, transform .2s var(--m3-spring);
+      overflow: hidden;
+      transition: 
+        border-color .35s ease, 
+        background-color .35s ease, 
+        box-shadow .35s var(--m3-decel),
+        transform .35s var(--m3-spring);
       animation: rowEntrance .38s var(--m3-decel) backwards;
     }
 
@@ -289,9 +292,12 @@
       }
     }
 
+    /* 展开激活态：卡片自然微浮起 + 明显的绿色光晕 */
     .video-row:has(.row-button[aria-expanded=true]) {
-      background: rgba(191, 213, 255, .08);
-      border-color: rgba(118, 255, 51, .65);
+      background: rgba(191, 213, 255, .085);
+      border-color: rgba(118, 255, 51, .75);
+      box-shadow: 0 8px 30px -4px rgba(118, 255, 51, .22);
+      transform: scale(1.006);
     }
 
     .row-button {
@@ -304,11 +310,13 @@
       padding: 14px 18px;
       color: #fff;
       text-align: left;
-      transition: background-color .15s ease;
+      transition: background-color .15s ease, transform .15s var(--m3-spring);
     }
 
+    /* 点击下压弹性触觉反馈 */
     .row-button:active {
-      transform: scale(0.995);
+      transform: scale(0.98);
+      background: rgba(191, 213, 255, .08);
     }
 
     .row-title {
@@ -328,7 +336,6 @@
       justify-content: flex-end;
     }
 
-    /* 纯净悬浮的装备图标，无多余背景色块，支持悬停微浮 */
     .badge {
       height: 30px;
       width: 30px;
@@ -345,15 +352,26 @@
       transition: transform .25s var(--m3-spring);
     }
 
+    /* 极具存在感的动态胶囊展开指示器 */
     .row-expand {
       flex: 0 0 auto;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
       color: var(--blue);
+      background: rgba(191, 213, 255, .06);
       font-size: 24px;
-      transition: transform .38s var(--m3-spring), color .2s ease;
+      transition: 
+        transform .45s var(--m3-spring), 
+        background-color .25s ease,
+        color .25s ease;
     }
 
     .row-button[aria-expanded=true] .row-expand {
-      transform: rotate(180deg);
+      transform: rotate(180deg) scale(1.12);
+      background: rgba(118, 255, 51, .18);
       color: var(--green);
     }
 
@@ -373,23 +391,29 @@
     }
 
     /* =========================================================
-       Inline Player & 展开动效 (Unfolding Motion)
+       CSS Grid 物理抽屉式平滑展开体系 (Smooth Accordion)
        ========================================================= */
     .inline-player {
-      padding: 0 14px 16px;
-      transform-origin: top center;
-      animation: playerExpand .35s var(--m3-decel) forwards;
+      display: grid;
+      grid-template-rows: 0fr;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: 
+        grid-template-rows .42s var(--m3-expand),
+        opacity .32s ease,
+        transform .42s var(--m3-expand);
     }
 
-    @keyframes playerExpand {
-      0% {
-        opacity: 0;
-        transform: translateY(-8px) scaleY(0.95);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scaleY(1);
-      }
+    .inline-player.is-expanded {
+      grid-template-rows: 1fr;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .player-accordion-inner {
+      min-height: 0;
+      overflow: hidden;
+      padding: 0 14px 16px;
     }
 
     .player-frame {
@@ -443,10 +467,7 @@
       font-weight: 500;
     }
 
-    /* 
-       M3 精致进度条：
-       标准 4px 轨道，交互悬停展开至 6px；彻底修复滑动点方形轮廓 
-    */
+    /* M3 精致进度条（4px -> 6px） */
     .range {
       appearance: none;
       -webkit-appearance: none;
@@ -565,7 +586,7 @@
     .volume { width: 70px; }
 
     /* =========================================================
-       Buffering Indicator (纯净文字 + 绿色加载指示，无暗色厚底)
+       Buffering Indicator (纯净加载)
        ========================================================= */
     .buffer-overlay {
       position: absolute;
@@ -632,7 +653,17 @@
       height: 100%;
       background: #000;
       padding: 0;
-      display: block;
+      display: block !important;
+      grid-template-rows: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+
+    .inline-player:fullscreen .player-accordion-inner {
+      padding: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
     }
 
     .inline-player:fullscreen .player-frame {
@@ -671,9 +702,10 @@
       .filter { width: 44px; height: 44px; }
       .row-button { padding: 12px; gap: 9px; }
       .row-title { font-size: 14px; }
+      .row-expand { width: 30px; height: 30px; font-size: 21px; }
       .badge { width: 26px; height: 26px; }
       .badge img { width: 21px; height: 21px; }
-      .inline-player { padding: 0 9px 12px; }
+      .player-accordion-inner { padding: 0 9px 12px; }
       .control { width: 38px; height: 38px; border-radius: 14px; }
       .control.main { width: 44px; height: 44px; border-radius: 16px; }
       .volume { display: none; }
@@ -860,7 +892,8 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
   if (data?.type === 'promo-transfer' && activePlayer?.session === data.session) activePlayer.transfer(data);
 });
 
-function closePlayer(restoreFocus = false) {
+// 支持平滑折叠关闭动画
+function closePlayer(restoreFocus = false, animated = false) {
   if (!activePlayer) return;
   const { video, panel, trigger, fullHandler, cleanup, itemName, session } = activePlayer;
   activePlayer = null;
@@ -870,9 +903,16 @@ function closePlayer(restoreFocus = false) {
   cleanup();
   if (document.fullscreenElement === panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   document.removeEventListener('fullscreenchange', fullHandler);
-  video.pause(); video.removeAttribute('src'); video.load(); panel.remove();
+  video.pause(); video.removeAttribute('src'); video.load();
   trigger.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-label',t.playName(itemName));
   if (restoreFocus) trigger.focus();
+
+  if (animated && panel) {
+    panel.classList.remove('is-expanded');
+    setTimeout(() => { panel.remove(); }, 340);
+  } else {
+    panel.remove();
+  }
 }
 
 function makeFilter(key, label, node) {
@@ -910,7 +950,6 @@ function renderList() {
   const shown = filteredVideos(); status.textContent = t.count(shown.length, videos.length);
   if (!shown.length) { const message = document.createElement('div'); message.className = 'message'; message.textContent = t.noResults; list.append(message); return; }
   
-  // 恢复阶梯渐入级联动画
   shown.forEach((item, index) => {
     const row = document.createElement('article'); row.className = 'video-row';
     row.style.animationDelay = `${Math.min(index * 32, 400)}ms`;
@@ -926,8 +965,9 @@ function renderList() {
     if (!item.known) { const tag = document.createElement('span'); tag.className = 'unknown'; tag.textContent = t.unclassified; badges.append(tag); }
     const expand = icon('expand_more'); expand.classList.add('row-expand');
     trigger.append(title,badges,expand); row.append(trigger);
+    
     trigger.addEventListener('click', () => {
-      if (activePlayer?.trigger === trigger) { closePlayer(true); return; }
+      if (activePlayer?.trigger === trigger) { closePlayer(true, true); return; }
       closePlayer(); openPlayer(item,row,trigger);
     });
     list.append(row);
@@ -943,15 +983,17 @@ function formatTime(value) {
 function openPlayer(item,row,trigger) {
   const panel = document.createElement('div'); panel.className = 'inline-player';
   panel.innerHTML = `
-    <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
-    <div class="controls">
-      <div class="seek-row"><span class="time current">0:00</span><input class="range seek" type="range" min="0" max="0" step="any" value="0" disabled data-i18n-aria="seek"><span class="time duration">0:00</span></div>
-      <div class="controls-row">
-        <button class="control mute" type="button" data-i18n-aria="mute"><span class="material-symbols-rounded" aria-hidden="true">volume_up</span></button>
-        <input class="range volume" type="range" min="0" max="1" step="0.05" value="1" data-i18n-aria="volume">
-        <button class="control main play" type="button" data-i18n-aria="play"><span class="material-symbols-rounded" aria-hidden="true">play_arrow</span></button>
-        <a class="control download" data-i18n-aria="download" download><span class="material-symbols-rounded" aria-hidden="true">download</span></a>
-        <button class="control full" type="button" data-i18n-aria="fullscreen"><span class="material-symbols-rounded" aria-hidden="true">fullscreen</span></button>
+    <div class="player-accordion-inner">
+      <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
+      <div class="controls">
+        <div class="seek-row"><span class="time current">0:00</span><input class="range seek" type="range" min="0" max="0" step="any" value="0" disabled data-i18n-aria="seek"><span class="time duration">0:00</span></div>
+        <div class="controls-row">
+          <button class="control mute" type="button" data-i18n-aria="mute"><span class="material-symbols-rounded" aria-hidden="true">volume_up</span></button>
+          <input class="range volume" type="range" min="0" max="1" step="0.05" value="1" data-i18n-aria="volume">
+          <button class="control main play" type="button" data-i18n-aria="play"><span class="material-symbols-rounded" aria-hidden="true">play_arrow</span></button>
+          <a class="control download" data-i18n-aria="download" download><span class="material-symbols-rounded" aria-hidden="true">download</span></a>
+          <button class="control full" type="button" data-i18n-aria="fullscreen"><span class="material-symbols-rounded" aria-hidden="true">fullscreen</span></button>
+        </div>
       </div>
     </div>`;
   localize(panel);
@@ -1086,6 +1128,12 @@ function openPlayer(item,row,trigger) {
   full.title = full.getAttribute('aria-label');
 
   row.append(panel); trigger.setAttribute('aria-expanded','true'); trigger.setAttribute('aria-label',t.closeName(item.displayName));
+  
+  // 下一帧触发真实物理展开动画
+  requestAnimationFrame(() => {
+    panel.classList.add('is-expanded');
+  });
+
   const transfer = data => {
     if (data.event === 'speed') {
       const rate = formatRate(data.bytesPerSecond);
