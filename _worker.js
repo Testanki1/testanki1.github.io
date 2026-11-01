@@ -242,6 +242,10 @@ async function promoDriveGet(url, apiKey) {
   return fetch(url, { headers: { 'x-goog-api-key': apiKey } });
 }
 
+function promoNameWithoutExtension(name) {
+  return name.replace(/\.[^.]+$/, '');
+}
+
 async function promoList(apiKey, folderId) {
   let pageToken = '';
   const videos = [];
@@ -261,8 +265,8 @@ async function promoList(apiKey, folderId) {
     const data = await response.json();
     for (const file of data.files || []) {
       if (typeof file.id !== 'string' || typeof file.name !== 'string' || !file.mimeType?.startsWith('video/')) continue;
-      // 返回文件名，而不是 Drive 文件 ID；ID 仅在服务端使用。
-      videos.push({ file: file.name, name: file.name.replace(/\.[^.]+$/, '') });
+      // 返回去除最后一个扩展名的文件名；ID 只在服务端使用。
+      videos.push({ name: promoNameWithoutExtension(file.name) });
     }
     pageToken = data.nextPageToken || '';
     if (!pageToken) {
@@ -277,8 +281,8 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
   if (typeof fileName !== 'string' || !fileName || fileName.length > 1024 || /[\x00-\x1f\x7f]/.test(fileName)) {
     return promoJson({ error: '无效的视频文件名。' }, 400);
   }
-  // 根据完整文件名在指定文件夹中查找；不把文件 ID 发送给客户端。
-  // Drive 允许同一个文件夹有同名文件，因此遍历完目录并拒绝歧义。
+  // 根据去掉扩展名的文件名在指定文件夹中查找；不把文件 ID 发送给客户端。
+  // Drive 允许重名、同名不同扩展名；遍历完目录以避免歧义。
   let file = null;
   let pageToken = '';
   let complete = false;
@@ -297,8 +301,8 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
     }
     const data = await listResponse.json();
     for (const item of data.files || []) {
-      if (item.name !== fileName || !item.mimeType?.startsWith('video/') || typeof item.id !== 'string') continue;
-      if (file) return promoJson({ error: '文件夹中有重名视频，请重命名后重试。' }, 409);
+      if (typeof item.name !== 'string' || promoNameWithoutExtension(item.name) !== fileName || !item.mimeType?.startsWith('video/') || typeof item.id !== 'string') continue;
+      if (file) return promoJson({ error: '文件夹中有同名视频，请重命名后重试。' }, 409);
       file = item;
     }
     pageToken = data.nextPageToken || '';
