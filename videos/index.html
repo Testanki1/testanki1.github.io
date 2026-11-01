@@ -104,6 +104,15 @@ const EQUIPMENT = [
 
 // 宣传片资料从 /videos/catalog.json 读取；数组自身的顺序就是显示顺序。
 const catalogByName = new Map();
+// GitHub Pages 没有后端：只有在该站点上使用现有的 Cloudflare 视频接口。
+const VIDEO_API_ORIGIN = location.hostname === 'testanki1.github.io' ? 'https://testanki1.pages.dev' : location.origin;
+function videoApiUrl(action, id, download = false) {
+  const url = new URL('/api/promo-videos', VIDEO_API_ORIGIN);
+  url.searchParams.set('action', action);
+  if (id) url.searchParams.set('id', id);
+  if (download) url.searchParams.set('download', '1');
+  return url.href;
+}
 // 浏览器语言为中文时显示字典中的中文标题，其他语言显示 Drive 原名。
 const isChinese = /^zh(?:-|$)/i.test(navigator.language || '');
 const t = isChinese ? {
@@ -163,7 +172,7 @@ let videos = [], activeFilter = 'standard', activePlayer = null;
 // SKIN_SERIES 数组按 Wiki 顺序排列；standard 是默认外观，放在最前。
 status.textContent = t.loading;
 // Service Worker 只转发视频字节并统计速率；不可用时仍直接播放，不伪造速度。
-const STREAM_WORKER = '/videos/stream-sw.js?v=2';
+const STREAM_WORKER = '/videos/stream-sw.js?v=3';
 const meterReady = (async () => {
   if (!('serviceWorker' in navigator) || typeof ReadableStream === 'undefined') return false;
   try {
@@ -280,7 +289,7 @@ function openPlayer(item,row,trigger) {
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
   const download = q('.download'), surface = q('.video-interaction'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
-  download.href = '/api/promo-videos?action=video&id=' + encodeURIComponent(item.id);
+  download.href = videoApiUrl('video', item.id, true);
   download.download = item.name; download.title = t.download;
   const session = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, bufferingDelay = null, progressFrame = null;
@@ -350,7 +359,7 @@ function openPlayer(item,row,trigger) {
     if (meterAvailable && activePlayer?.video === video) {
       meterAvailable = false; activePlayer.session = null; lastRate = ''; clearTimeout(transferTimer); transferTimer = null;
       setTransferStatus(buffering && !video.paused ? t.speedUnavailable : '');
-      video.src = '/api/promo-videos?action=video&id=' + encodeURIComponent(item.id);
+      video.src = videoApiUrl('video', item.id);
       video.load(); video.play().catch(() => {}); return;
     }
     clearBuffering();
@@ -418,7 +427,7 @@ function openPlayer(item,row,trigger) {
   Promise.race([meterReady, new Promise(resolve => setTimeout(() => resolve(false), 5000))]).then(available => {
     if (activePlayer?.video !== video) return;
     meterAvailable = available;
-    const source = available ? '/videos/__stream?id=' + encodeURIComponent(item.id) + '&session=' + encodeURIComponent(session) : '/api/promo-videos?action=video&id=' + encodeURIComponent(item.id);
+    const source = available ? '/videos/__stream?id=' + encodeURIComponent(item.id) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.id);
     video.src = source; video.load();
     video.play().catch(() => { /* 被禁止自动播放时可按播放按钮。 */ });
   });
@@ -427,7 +436,7 @@ search.addEventListener('input',() => { renderFilters(); renderList(); });
 async function loadVideos() {
   try {
     const [response, catalogResponse] = await Promise.all([
-      fetch('/api/promo-videos?action=list',{cache:'no-store'}),
+      fetch(videoApiUrl('list'),{cache:'no-store'}),
       fetch('/videos/catalog.json',{cache:'no-store'}),
     ]);
     if (!response.ok) throw new Error(t.loadFailure);
@@ -470,5 +479,5 @@ async function loadVideos() {
 loadVideos();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53ad088ad86375e',t:'MTc5MzUzNTIxOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53ad088ad86375e',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53b1507c8920f68',t:'MTc5MzUzODAyMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53b1507c8920f68',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
