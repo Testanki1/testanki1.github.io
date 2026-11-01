@@ -243,18 +243,34 @@ async function promoList(apiKey, folderId) {
 
 async function promoVideo(request, apiKey, folderId, fileId) {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(fileId || '')) return promoJson({ error: '无效的视频 ID。' }, 400);
-  const metadataUrl = new URL(`${PROMO_DRIVE_API}/${encodeURIComponent(fileId)}`);
-  metadataUrl.searchParams.set('fields', 'id,mimeType,parents,trashed');
-  metadataUrl.searchParams.set('supportsAllDrives', 'true');
-  const metadataResponse = await promoDriveGet(metadataUrl, apiKey);
-  if (metadataResponse.status === 404) return promoJson({ error: '视频不存在或无权访问。' }, 404);
-  if (!metadataResponse.ok) {
-    console.error('Promo Drive metadata failed, HTTP', metadataResponse.status);
-    return promoJson({ error: '无法读取视频信息，请检查 Google Drive API 和共享权限。' }, 502);
+  // Public files.get may omit parents without OAuth, so validate membership
+  // using the same folder-scoped files.list query that powers the video list.
+  // Never accept the file ID without proving it belongs to this folder.
+  let file = null;
+  let pageToken = '';
+  let complete = false;
+  for (let page = 0; page < 20; page++) {
+    const listUrl = new URL(PROMO_DRIVE_API);
+    listUrl.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
+    listUrl.searchParams.set('fields', 'nextPageToken,files(id,mimeType)');
+    listUrl.searchParams.set('pageSize', '1000');
+    listUrl.searchParams.set('supportsAllDrives', 'true');
+    listUrl.searchParams.set('includeItemsFromAllDrives', 'true');
+    if (pageToken) listUrl.searchParams.set('pageToken', pageToken);
+    const listResponse = await promoDriveGet(listUrl, apiKey);
+    if (!listResponse.ok) {
+      console.error('Promo Drive membership listing failed, HTTP', listResponse.status);
+      return promoJson({ error: '无法验证视频是否在指定文件夹，请检查 Google Drive API。' }, 502);
+    }
+    const data = await listResponse.json();
+    file = (data.files || []).find(item => item.id === fileId && item.mimeType?.startsWith('video/')) || null;
+    if (file) break;
+    pageToken = data.nextPageToken || '';
+    if (!pageToken) { complete = true; break; }
   }
-  const file = await metadataResponse.json();
-  if (file.trashed || !file.parents?.includes(folderId) || !file.mimeType?.startsWith('video/')) {
-    return promoJson({ error: '视频不在指定文件夹中。' }, 404);
+  if (!file) {
+    if (!complete) return promoJson({ error: '文件夹过大，无法完成验证。' }, 502);
+    return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404);
   }
   const range = request.headers.get('Range');
   if (range && (!/^bytes=\d*-\d*$/.test(range) || range === 'bytes=-')) {
