@@ -46,6 +46,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // 视频接口单独处理跨域；其余路由行为保持不变。
+    if (url.pathname === '/api/promo-videos') {
+      if (request.method === 'OPTIONS') return promoCors(new Response(null, {status:204}), request);
+      return promoCors(await handlePromoVideos(request, env), request);
+    }
+
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -54,11 +60,6 @@ export default {
           'Access-Control-Allow-Headers': 'Content-Type',
         },
       });
-    }
-
-    // 宣传视频接口：保留其他所有现有路由。
-    if (url.pathname === '/api/promo-videos') {
-      return handlePromoVideos(request, env);
     }
 
     // 路由 A: WebSocket 实时连接 (国内访客通过 pages.dev 接入)
@@ -194,6 +195,29 @@ export default {
 // ============ 宣传视频：只访问环境变量中指定的公开文件夹 ============
 // 密钥与文件夹 ID 均通过 Cloudflare Variables and Secrets 配置，不写入仓库。
 const PROMO_DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
+const PROMO_CORS_ORIGINS = new Set(['https://testanki1.github.io', 'https://testanki1.pages.dev']);
+
+// CORS 只是浏览器的跨域策略，并不限制别人直接访问公开接口。
+function promoCors(response, request) {
+  const headers = new Headers(response.headers);
+  const origin = request.headers.get('Origin');
+  headers.append('Vary', 'Origin');
+  if (origin && PROMO_CORS_ORIGINS.has(origin)) {
+    headers.set('Access-Control-Allow-Origin', origin);
+    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Range, Content-Type');
+    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag, Last-Modified');
+  }
+  return new Response(response.body, {status:response.status, statusText:response.statusText, headers});
+}
+function promoAttachmentName(file) {
+  // filename* 支持中文和空格；ASCII 回退名应与内容类型对应。
+  const fallback = file.mimeType === 'video/mp4' ? 'video.mp4' : 'video';
+  let encoded;
+  try { encoded = encodeURIComponent(file.name || fallback).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }
+  catch { encoded = encodeURIComponent(fallback); }
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
 
 function promoJson(value, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -241,7 +265,7 @@ async function promoList(apiKey, folderId) {
   return promoJson({ error: '文件过多，无法在一次请求中列出全部文件。' }, 502);
 }
 
-async function promoVideo(request, apiKey, folderId, fileId) {
+async function promoVideo(request, apiKey, folderId, fileId, download = false) {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(fileId || '')) return promoJson({ error: '无效的视频 ID。' }, 400);
   // Public files.get may omit parents without OAuth, so validate membership
   // using the same folder-scoped files.list query that powers the video list.
@@ -252,7 +276,7 @@ async function promoVideo(request, apiKey, folderId, fileId) {
   for (let page = 0; page < 20; page++) {
     const listUrl = new URL(PROMO_DRIVE_API);
     listUrl.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
-    listUrl.searchParams.set('fields', 'nextPageToken,files(id,mimeType)');
+    listUrl.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType)');
     listUrl.searchParams.set('pageSize', '1000');
     listUrl.searchParams.set('supportsAllDrives', 'true');
     listUrl.searchParams.set('includeItemsFromAllDrives', 'true');
@@ -301,7 +325,7 @@ async function promoVideo(request, apiKey, folderId, fileId) {
     if (value) out.set(key, value);
   }
   out.set('Content-Type', file.mimeType);
-  out.set('Content-Disposition', 'inline');
+  out.set('Content-Disposition', download ? promoAttachmentName(file) : 'inline');
   out.set('X-Content-Type-Options', 'nosniff');
   out.set('Cache-Control', 'no-store');
   return new Response(response.body, { status: response.status, headers: out });
@@ -316,7 +340,7 @@ async function handlePromoVideos(request, env) {
   const url = new URL(request.url);
   try {
     if (url.searchParams.get('action') === 'list') return await promoList(apiKey, folderId);
-    if (url.searchParams.get('action') === 'video') return await promoVideo(request, apiKey, folderId, url.searchParams.get('id'));
+    if (url.searchParams.get('action') === 'video') return await promoVideo(request, apiKey, folderId, url.searchParams.get('id'), url.searchParams.get('download') === '1');
     return promoJson({ error: '未知操作。' }, 400);
   } catch (error) {
     // 不记录请求 URL 或密钥。
