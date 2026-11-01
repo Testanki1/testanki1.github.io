@@ -163,16 +163,17 @@ let videos = [], activeFilter = 'standard', activePlayer = null;
 // SKIN_SERIES 数组按 Wiki 顺序排列；standard 是默认外观，放在最前。
 status.textContent = t.loading;
 // Service Worker 只转发视频字节并统计速率；不可用时仍直接播放，不伪造速度。
+const STREAM_WORKER = '/videos/stream-sw.js?v=2';
 const meterReady = (async () => {
   if (!('serviceWorker' in navigator) || typeof ReadableStream === 'undefined') return false;
   try {
-    const registration = await navigator.serviceWorker.register('/videos/stream-sw.js', {scope:'/videos/'});
+    const registration = await navigator.serviceWorker.register(STREAM_WORKER, {scope:'/videos/'});
     await navigator.serviceWorker.ready;
-    if (navigator.serviceWorker.controller?.scriptURL.includes('/videos/stream-sw.js')) return true;
+    if (navigator.serviceWorker.controller?.scriptURL.includes(STREAM_WORKER)) return true;
     return await new Promise(resolve => {
       let done = false;
-      const finish = () => { if (done) return; done = true; clearTimeout(timer); navigator.serviceWorker.removeEventListener('controllerchange', check); resolve(!!navigator.serviceWorker.controller?.scriptURL.includes('/videos/stream-sw.js')); };
-      const check = () => { if (navigator.serviceWorker.controller?.scriptURL.includes('/videos/stream-sw.js')) finish(); };
+      const finish = () => { if (done) return; done = true; clearTimeout(timer); navigator.serviceWorker.removeEventListener('controllerchange', check); resolve(!!navigator.serviceWorker.controller?.scriptURL.includes(STREAM_WORKER)); };
+      const check = () => { if (navigator.serviceWorker.controller?.scriptURL.includes(STREAM_WORKER)) finish(); };
       const timer = setTimeout(finish, 3500);
       navigator.serviceWorker.addEventListener('controllerchange', check);
       check();
@@ -189,8 +190,12 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
 });
 function closePlayer(restoreFocus = false) {
   if (!activePlayer) return;
-  const { video, panel, trigger, fullHandler, cleanup, itemName } = activePlayer;
+  const { video, panel, trigger, fullHandler, cleanup, itemName, session } = activePlayer;
   activePlayer = null;
+  // 显式取消这个播放会话内的所有分段请求。
+  if (session && 'serviceWorker' in navigator) {
+    try { navigator.serviceWorker.controller?.postMessage({type:'promo-cancel',session}); } catch {}
+  }
   cleanup();
   if (document.fullscreenElement === panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   document.removeEventListener('fullscreenchange', fullHandler);
@@ -465,5 +470,5 @@ async function loadVideos() {
 loadVideos();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53ac543baf6375e',t:'MTc5MzUzNDc1Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53ac543baf6375e',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53ad088ad86375e',t:'MTc5MzUzNTIxOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53ad088ad86375e',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
