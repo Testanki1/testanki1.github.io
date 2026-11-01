@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>电影级宣传片合集 · Testanki</title>
+  <title>电影级宣传片合集</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700;800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -105,12 +105,17 @@ const EQUIPMENT = [
 // 宣传片资料从 /promo-videos/catalog.json 读取；数组自身的顺序就是显示顺序。
 const catalogByName = new Map();
 // GitHub Pages 没有后端：只有在该站点上使用现有的 Cloudflare 视频接口。
-const VIDEO_API_ORIGIN = location.hostname === 'testanki1.github.io' ? 'https://testanki1.pages.dev' : location.origin;
-function videoApiUrl(action, id, download = false) {
+const VIDEO_API_ORIGIN = location.hostname.endsWith('.github.io')
+  ? `https://${location.hostname.slice(0, -'.github.io'.length)}.pages.dev`
+  : location.origin;
+function videoApiUrl(action, id, download = false, filename = null) {
   const url = new URL('/api/promo-videos', VIDEO_API_ORIGIN);
   url.searchParams.set('action', action);
   if (id) url.searchParams.set('id', id);
-  if (download) url.searchParams.set('download', '1');
+  if (download) {
+    url.searchParams.set('download', '1');
+    if (filename) url.searchParams.set('filename', filename);
+  }
   return url.href;
 }
 // 浏览器语言为中文时显示字典中的中文标题，其他语言显示 Drive 原名。
@@ -141,7 +146,7 @@ const t = isChinese ? {
   buffering:'Buffering…', speedUnavailable:'Buffering · Speed unavailable', transfer:(value) => `Loading ${value}`,
 };
 document.documentElement.lang = isChinese ? 'zh-CN' : 'en';
-document.title = isChinese ? '电影级宣传片合集 · Testanki' : 'Cinematic promo collection · Testanki';
+document.title = isChinese ? '电影级宣传片合集' : 'Cinematic promo collection';
 function localize(root) {
   root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t[el.dataset.i18n]; });
   root.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t[el.dataset.i18nAria]); });
@@ -172,7 +177,7 @@ let videos = [], activeFilter = 'standard', activePlayer = null;
 // SKIN_SERIES 数组按 Wiki 顺序排列；standard 是默认外观，放在最前。
 status.textContent = t.loading;
 // Service Worker 只转发视频字节并统计速率；不可用时仍直接播放，不伪造速度。
-const STREAM_WORKER = '/promo-videos/stream-sw.js?v=4';
+const STREAM_WORKER = '/promo-videos/stream-sw.js?v=5';
 const meterReady = (async () => {
   if (!('serviceWorker' in navigator) || typeof ReadableStream === 'undefined') return false;
   try {
@@ -289,8 +294,8 @@ function openPlayer(item,row,trigger) {
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
   const download = q('.download'), surface = q('.video-interaction'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
-  download.href = videoApiUrl('video', item.id, true);
-  download.download = item.name; download.title = t.download;
+  download.href = videoApiUrl('video', item.id, true, item.displayName);
+  download.download = item.displayName; download.title = t.download;
   const session = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, bufferingDelay = null, progressFrame = null;
   let lastRate = '', lastRateTime = 0;
