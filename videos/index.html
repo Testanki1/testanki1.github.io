@@ -124,7 +124,7 @@ const translations = isChinese ? {
   sideTitle:'官方宣传片，玩家整理。', sideText:'包含高清皮肤、地图与活动等 3D坦克 宣传片。',
   videosInCollection:'个视频', explore:'宣传片列表', exploreAll:'全部宣传片', search:'搜索视频名称',
   categories:'视频分类', filters:'皮肤系列筛选', all:'全部', skinsEquipment:'皮肤与装备',
-  mapsOther:'地图、活动与其他', series:'系列', unmarked:'未标明系列', other:'地图、活动与其他',
+  mapsOther:'地图、活动与其他', series:'系列', other:'地图、活动与其他',
   noResults:'没有找到符合条件的视频。试试其他关键词或分类。', skin:'皮肤', otherShort:'其他',
   loading:'正在读取视频列表…', loadError:'加载失败',
   loadFailure:'无法读取视频列表。请检查 Cloudflare 和 Google Drive 配置。',
@@ -139,7 +139,7 @@ const translations = isChinese ? {
   sideTitle:'Official promos, collected by a fan.', sideText:'Tanki Online promo videos featuring HD skins, maps, and events.',
   videosInCollection:'VIDEOS IN COLLECTION', explore:'PROMO LIST', exploreAll:'All promo videos', search:'Search video names',
   categories:'Video categories', filters:'Skin series filters', all:'All', skinsEquipment:'Skins & equipment',
-  mapsOther:'Maps, events & more', series:'Series', unmarked:'Series not specified', other:'Maps, events & more',
+  mapsOther:'Maps, events & more', series:'Series', other:'Maps, events & more',
   noResults:'No videos match. Try another search or filter.', skin:'SKIN', otherShort:'OTHER',
   loading:'Loading videos…', loadError:'Loading failed',
   loadFailure:'Could not load videos. Check the Cloudflare and Google Drive configuration.',
@@ -181,6 +181,8 @@ function classify(name) {
   const series = SKIN_SERIES.filter((item) => item.aliases.some((term) => containsTerm(name, term)));
   const skins = series.some((item) => item.key === 'XT_HD') ? series.filter((item) => !['XT','HD'].includes(item.key)) : series;
   const equipment = EQUIPMENT.filter((item) => item.aliases.some((term) => containsTerm(name, term)));
+  // 只识别出装备但未标明系列时，按用户要求归入 HD。
+  if (!skins.length && equipment.length) skins.push(SKIN_SERIES.find(item => item.key === 'HD'));
   return { skins, equipment };
 }
 function image(src, alt) {
@@ -215,9 +217,6 @@ function renderFilters() {
     const count = videos.filter(v => v.skins.some(x => x.key === series.key)).length;
     if (count) addChip(series.key, itemLabel('skin', series), series.icon, count);
   }
-  // 文件名没写系列但识别出装备的宣传不猜成 standard，单独显示。
-  const unmarked = videos.filter(v => !v.skins.length && v.equipment.length).length;
-  if (unmarked) addChip('__unmarked__', t.unmarked, null, unmarked);
   filters.append(row);
 }
 function render() {
@@ -226,8 +225,7 @@ function render() {
   const list = videos.filter(v => {
     if (!matchingCategory(v) || !v.name.toLocaleLowerCase().includes(keyword)) return false;
     if (category === 'skins-equipment') {
-      if (selectedSeries === '__unmarked__' && (v.skins.length || !v.equipment.length)) return false;
-      if (selectedSeries && selectedSeries !== '__unmarked__' && !v.skins.some(x => x.key === selectedSeries)) return false;
+      if (selectedSeries && !v.skins.some(x => x.key === selectedSeries)) return false;
     }
     return true;
   });
@@ -290,5 +288,5 @@ async function loadVideos() {
 }
 loadVideos();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a539a622e8643911',t:'MTc5MzUyMjk5NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a539a622e8643911',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a539b0d37fac3911',t:'MTc5MzUyMzQzMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a539b0d37fac3911',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
