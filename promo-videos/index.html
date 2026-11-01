@@ -294,7 +294,7 @@ function openPlayer(item,row,trigger) {
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
   const download = q('.download'), surface = q('.video-interaction'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
-  download.href = videoApiUrl('video', item.file, true, item.displayName);
+  download.href = videoApiUrl('video', item.name, true, item.displayName);
   download.download = item.displayName; download.title = t.download;
   const session = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, bufferingDelay = null, progressFrame = null;
@@ -364,7 +364,7 @@ function openPlayer(item,row,trigger) {
     if (meterAvailable && activePlayer?.video === video) {
       meterAvailable = false; activePlayer.session = null; lastRate = ''; clearTimeout(transferTimer); transferTimer = null;
       setTransferStatus(buffering && !video.paused ? t.speedUnavailable : '');
-      video.src = videoApiUrl('video', item.file);
+      video.src = videoApiUrl('video', item.name);
       video.load(); video.play().catch(() => {}); return;
     }
     clearBuffering();
@@ -432,7 +432,7 @@ function openPlayer(item,row,trigger) {
   Promise.race([meterReady, new Promise(resolve => setTimeout(() => resolve(false), 5000))]).then(available => {
     if (activePlayer?.video !== video) return;
     meterAvailable = available;
-    const source = available ? '/promo-videos/__stream?file=' + encodeURIComponent(item.file) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.file);
+    const source = available ? '/promo-videos/__stream?file=' + encodeURIComponent(item.name) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.name);
     video.src = source; video.load();
     video.play().catch(() => { /* 被禁止自动播放时可按播放按钮。 */ });
   });
@@ -461,7 +461,7 @@ async function loadVideos() {
           entry.equipment.some(key => !EQUIPMENT.some(equipment => equipment.key === key))) throw new Error(t.badCatalog);
       catalogByName.set(entry.name, entry);
     }
-    const driveFiles = data.videos.filter(v => typeof v.file === 'string' && typeof v.name === 'string');
+    const driveFiles = data.videos.filter(v => typeof v.name === 'string');
     const byName = new Map();
     for (const file of driveFiles) {
       if (!byName.has(file.name)) byName.set(file.name, []);
