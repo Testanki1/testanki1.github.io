@@ -206,15 +206,22 @@ function promoCors(response, request) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Range, Content-Type');
-    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag, Last-Modified');
+    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Last-Modified');
   }
   return new Response(response.body, {status:response.status, statusText:response.statusText, headers});
 }
-function promoAttachmentName(file) {
-  // filename* 支持中文和空格；ASCII 回退名应与内容类型对应。
-  const fallback = file.mimeType === 'video/mp4' ? 'video.mp4' : 'video';
+function promoAttachmentName(file, requestedName) {
+  // 保留文件真实扩展名；清除文件系统非法字符和控制字符。
+  const original = typeof file.name === 'string' ? file.name : '';
+  const byMime = {'video/mp4':'.mp4', 'video/webm':'.webm', 'video/quicktime':'.mov', 'video/x-matroska':'.mkv'};
+  const extension = original.match(/(\.[A-Za-z0-9]{1,12})$/)?.[1] || byMime[file.mimeType] || '';
+  const fallback = 'video' + extension;
+  const base = typeof requestedName === 'string'
+    ? Array.from(requestedName.replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, '_').trim().replace(/^[. ]+|[. ]+$/g, '')).slice(0, 150).join('')
+    : '';
+  const filename = base ? base + extension : (original || fallback);
   let encoded;
-  try { encoded = encodeURIComponent(file.name || fallback).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }
+  try { encoded = encodeURIComponent(filename).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }
   catch { encoded = encodeURIComponent(fallback); }
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
@@ -254,7 +261,8 @@ async function promoList(apiKey, folderId) {
     const data = await response.json();
     for (const file of data.files || []) {
       if (typeof file.id !== 'string' || typeof file.name !== 'string' || !file.mimeType?.startsWith('video/')) continue;
-      videos.push({ id: file.id, name: file.name.replace(/\.[^.]+$/, '') });
+      // 返回文件名，而不是 Drive 文件 ID；ID 仅在服务端使用。
+      videos.push({ file: file.name, name: file.name.replace(/\.[^.]+$/, '') });
     }
     pageToken = data.nextPageToken || '';
     if (!pageToken) {
@@ -265,11 +273,12 @@ async function promoList(apiKey, folderId) {
   return promoJson({ error: '文件过多，无法在一次请求中列出全部文件。' }, 502);
 }
 
-async function promoVideo(request, apiKey, folderId, fileId, download = false) {
-  if (!/^[A-Za-z0-9_-]{1,200}$/.test(fileId || '')) return promoJson({ error: '无效的视频 ID。' }, 400);
-  // Public files.get may omit parents without OAuth, so validate membership
-  // using the same folder-scoped files.list query that powers the video list.
-  // Never accept the file ID without proving it belongs to this folder.
+async function promoVideo(request, apiKey, folderId, fileName, download = false, requestedName = null) {
+  if (typeof fileName !== 'string' || !fileName || fileName.length > 1024 || /[\x00-\x1f\x7f]/.test(fileName)) {
+    return promoJson({ error: '无效的视频文件名。' }, 400);
+  }
+  // 根据完整文件名在指定文件夹中查找；不把文件 ID 发送给客户端。
+  // Drive 允许同一个文件夹有同名文件，因此遍历完目录并拒绝歧义。
   let file = null;
   let pageToken = '';
   let complete = false;
@@ -287,15 +296,16 @@ async function promoVideo(request, apiKey, folderId, fileId, download = false) {
       return promoJson({ error: '无法验证视频是否在指定文件夹，请检查 Google Drive API。' }, 502);
     }
     const data = await listResponse.json();
-    file = (data.files || []).find(item => item.id === fileId && item.mimeType?.startsWith('video/')) || null;
-    if (file) break;
+    for (const item of data.files || []) {
+      if (item.name !== fileName || !item.mimeType?.startsWith('video/') || typeof item.id !== 'string') continue;
+      if (file) return promoJson({ error: '文件夹中有重名视频，请重命名后重试。' }, 409);
+      file = item;
+    }
     pageToken = data.nextPageToken || '';
     if (!pageToken) { complete = true; break; }
   }
-  if (!file) {
-    if (!complete) return promoJson({ error: '文件夹过大，无法完成验证。' }, 502);
-    return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404);
-  }
+  if (!complete) return promoJson({ error: '文件夹过大，无法完成验证。' }, 502);
+  if (!file) return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404);
   const range = request.headers.get('Range');
   if (range && (!/^bytes=\d*-\d*$/.test(range) || range === 'bytes=-')) {
     return new Response('Unsupported Range', { status: 416 });
@@ -303,7 +313,7 @@ async function promoVideo(request, apiKey, folderId, fileId, download = false) {
   const headers = new Headers();
   if (range) headers.set('Range', range);
   const url = new URL('https://drive.usercontent.google.com/download');
-  url.searchParams.set('id', fileId);
+  url.searchParams.set('id', file.id);
   url.searchParams.set('export', 'download');
   url.searchParams.set('confirm', 't');
   const response = await fetch(url, { headers, redirect: 'follow' });
@@ -320,12 +330,12 @@ async function promoVideo(request, apiKey, folderId, fileId, download = false) {
     return promoJson({ error: 'Google Drive 返回网页而非视频。请检查共享权限、下载限制和流量配额。' }, 502);
   }
   const out = new Headers();
-  for (const key of ['Content-Length', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']) {
+  for (const key of ['Content-Length', 'Content-Range', 'Accept-Ranges', 'Last-Modified']) {
     const value = response.headers.get(key);
     if (value) out.set(key, value);
   }
   out.set('Content-Type', file.mimeType);
-  out.set('Content-Disposition', download ? promoAttachmentName(file) : 'inline');
+  out.set('Content-Disposition', download ? promoAttachmentName(file, requestedName) : 'inline');
   out.set('X-Content-Type-Options', 'nosniff');
   out.set('Cache-Control', 'no-store');
   return new Response(response.body, { status: response.status, headers: out });
@@ -340,7 +350,7 @@ async function handlePromoVideos(request, env) {
   const url = new URL(request.url);
   try {
     if (url.searchParams.get('action') === 'list') return await promoList(apiKey, folderId);
-    if (url.searchParams.get('action') === 'video') return await promoVideo(request, apiKey, folderId, url.searchParams.get('id'), url.searchParams.get('download') === '1');
+    if (url.searchParams.get('action') === 'video') return await promoVideo(request, apiKey, folderId, url.searchParams.get('file'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
     return promoJson({ error: '未知操作。' }, 400);
   } catch (error) {
     // 不记录请求 URL 或密钥。
