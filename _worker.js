@@ -56,6 +56,11 @@ export default {
       });
     }
 
+    // 宣传视频接口：保留其他所有现有路由。
+    if (url.pathname === '/api/promo-videos') {
+      return handlePromoVideos(request, env);
+    }
+
     // 路由 A: WebSocket 实时连接 (国内访客通过 pages.dev 接入)
     if (url.pathname === '/api/sfx-ws') {
       const id = env.SFX_HUB.idFromName('GLOBAL_SFX_HUB');
@@ -185,3 +190,121 @@ export default {
     return await serveAssetOr404(request, env);
   }
 };
+
+// ============ 宣传视频：只访问环境变量中指定的公开文件夹 ============
+// 密钥与文件夹 ID 均通过 Cloudflare Variables and Secrets 配置，不写入仓库。
+const PROMO_DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
+
+function promoJson(value, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+
+async function promoDriveGet(url, apiKey) {
+  // 密钥放请求头，不放 URL，避免泄露在 URL 日志中。
+  return fetch(url, { headers: { 'x-goog-api-key': apiKey } });
+}
+
+async function promoList(apiKey, folderId) {
+  let pageToken = '';
+  const videos = [];
+  for (let page = 0; page < 20; page++) {
+    const url = new URL(PROMO_DRIVE_API);
+    url.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
+    url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType)');
+    url.searchParams.set('pageSize', '1000');
+    url.searchParams.set('supportsAllDrives', 'true');
+    url.searchParams.set('includeItemsFromAllDrives', 'true');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const response = await promoDriveGet(url, apiKey);
+    if (!response.ok) {
+      console.error('Promo Drive listing failed, HTTP', response.status);
+      return promoJson({ error: `Google Drive 列表请求失败（HTTP ${response.status}）。请检查 API Key、Drive API 和文件夹共享权限。` }, 502);
+    }
+    const data = await response.json();
+    for (const file of data.files || []) {
+      if (typeof file.id !== 'string' || typeof file.name !== 'string' || !file.mimeType?.startsWith('video/')) continue;
+      videos.push({ id: file.id, name: file.name.replace(/\.[^.]+$/, '') });
+    }
+    pageToken = data.nextPageToken || '';
+    if (!pageToken) {
+      videos.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }));
+      return promoJson({ videos });
+    }
+  }
+  return promoJson({ error: '文件过多，无法在一次请求中列出全部文件。' }, 502);
+}
+
+async function promoVideo(request, apiKey, folderId, fileId) {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(fileId || '')) return promoJson({ error: '无效的视频 ID。' }, 400);
+  const metadataUrl = new URL(`${PROMO_DRIVE_API}/${encodeURIComponent(fileId)}`);
+  metadataUrl.searchParams.set('fields', 'id,mimeType,parents,trashed');
+  metadataUrl.searchParams.set('supportsAllDrives', 'true');
+  const metadataResponse = await promoDriveGet(metadataUrl, apiKey);
+  if (metadataResponse.status === 404) return promoJson({ error: '视频不存在或无权访问。' }, 404);
+  if (!metadataResponse.ok) {
+    console.error('Promo Drive metadata failed, HTTP', metadataResponse.status);
+    return promoJson({ error: '无法读取视频信息，请检查 Google Drive API 和共享权限。' }, 502);
+  }
+  const file = await metadataResponse.json();
+  if (file.trashed || !file.parents?.includes(folderId) || !file.mimeType?.startsWith('video/')) {
+    return promoJson({ error: '视频不在指定文件夹中。' }, 404);
+  }
+  const range = request.headers.get('Range');
+  if (range && (!/^bytes=\d*-\d*$/.test(range) || range === 'bytes=-')) {
+    return new Response('Unsupported Range', { status: 416 });
+  }
+  const headers = new Headers();
+  if (range) headers.set('Range', range);
+  const url = new URL('https://drive.usercontent.google.com/download');
+  url.searchParams.set('id', fileId);
+  url.searchParams.set('export', 'download');
+  url.searchParams.set('confirm', 't');
+  const response = await fetch(url, { headers, redirect: 'follow' });
+  if (response.status === 416) {
+    const h = new Headers();
+    const cr = response.headers.get('Content-Range');
+    if (cr) h.set('Content-Range', cr);
+    return new Response(null, { status: 416, headers: h });
+  }
+  if (response.status !== 200 && response.status !== 206) {
+    return promoJson({ error: `Google Drive 下载失败（HTTP ${response.status}）。` }, 502);
+  }
+  if ((response.headers.get('Content-Type') || '').toLowerCase().includes('text/html')) {
+    return promoJson({ error: 'Google Drive 返回网页而非视频。请检查共享权限、下载限制和流量配额。' }, 502);
+  }
+  const out = new Headers();
+  for (const key of ['Content-Length', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']) {
+    const value = response.headers.get(key);
+    if (value) out.set(key, value);
+  }
+  out.set('Content-Type', file.mimeType);
+  out.set('Content-Disposition', 'inline');
+  out.set('X-Content-Type-Options', 'nosniff');
+  out.set('Cache-Control', 'no-store');
+  return new Response(response.body, { status: response.status, headers: out });
+}
+
+async function handlePromoVideos(request, env) {
+  if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
+  const apiKey = env.GOOGLE_DRIVE_API_KEY;
+  const folderId = env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!apiKey || !folderId) return promoJson({ error: '请在 Cloudflare 中配置 GOOGLE_DRIVE_API_KEY 和 GOOGLE_DRIVE_FOLDER_ID。' }, 500);
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(folderId)) return promoJson({ error: 'Google Drive 文件夹 ID 格式无效。' }, 500);
+  const url = new URL(request.url);
+  try {
+    if (url.searchParams.get('action') === 'list') return await promoList(apiKey, folderId);
+    if (url.searchParams.get('action') === 'video') return await promoVideo(request, apiKey, folderId, url.searchParams.get('id'));
+    return promoJson({ error: '未知操作。' }, 400);
+  } catch (error) {
+    // 不记录请求 URL 或密钥。
+    console.error('Promo proxy network or parsing error');
+    return promoJson({ error: '访问 Google Drive 时发生错误。' }, 502);
+  }
+}
