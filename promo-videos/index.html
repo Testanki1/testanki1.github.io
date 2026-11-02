@@ -336,12 +336,12 @@
       display: grid;
       place-items: center;
       color: var(--base);
-      background: var(--green);
+      background: rgba(118, 255, 51, .68);
       border-radius: 50%;
       font-size: 30px;
       transform: translate(-50%, -50%);
-      box-shadow: 0 8px 28px rgba(0, 0, 0, .3);
-      transition: transform .24s var(--m3-spatial), box-shadow .2s var(--m3-effects);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+      transition: transform .24s var(--m3-spatial), background-color .2s var(--m3-effects), box-shadow .2s var(--m3-effects);
     }
 
     .player-host[hidden], .poster-trigger[hidden] { display: none; }
@@ -458,11 +458,39 @@
       -webkit-user-select: none;
     }
 
+    .controls-space {
+      display: grid;
+      grid-template-rows: 0fr;
+      opacity: 0;
+      transition:
+        grid-template-rows .36s var(--m3-spatial),
+        opacity .2s var(--m3-effects);
+    }
+
+    .controls-space.is-open {
+      grid-template-rows: 1fr;
+      opacity: 1;
+    }
+
     .controls {
-      padding: 14px 6px 0;
+      min-height: 0;
+      overflow: hidden;
+      padding: 0 6px;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      transition: padding-top .36s var(--m3-spatial);
+    }
+
+    .controls-space.is-open .controls { padding-top: 14px; }
+
+    @keyframes playerControlsEnter {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .controls.is-entering {
+      animation: playerControlsEnter .34s var(--m3-spatial) both;
     }
 
     .seek-row {
@@ -1010,6 +1038,17 @@ function evictOldestPausedPlayer() {
   return false;
 }
 
+function animatePlayerControls(panel) {
+  const space = panel.querySelector('.controls-space');
+  const controls = panel.querySelector('.controls');
+  if (!space || !controls) return;
+  space.classList.remove('is-open');
+  controls.classList.remove('is-entering');
+  void space.offsetHeight;
+  space.classList.add('is-open');
+  controls.classList.add('is-entering');
+}
+
 // 在同一卡片内恢复已缓存播放器（零重新加载）
 function playCachedPlayer(player, row, trigger) {
   cachedPlayers.delete(player.key);
@@ -1028,6 +1067,7 @@ function playCachedPlayer(player, row, trigger) {
   activePlayer = player;
 
   if (player.panel.parentNode !== player.host) player.host.append(player.panel);
+  animatePlayerControls(player.panel);
 
   if (player.video.ended) {
     try { player.video.currentTime = 0; } catch {}
@@ -1130,6 +1170,7 @@ function openPlayer(item,row,trigger) {
   panel.innerHTML = `
     <div class="player-layout">
       <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><img class="video-poster" alt="" aria-hidden="true"><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
+      <div class="controls-space">
       <div class="controls">
         <div class="seek-row"><span class="time current">0:00</span><input class="range seek" type="range" min="0" max="0" step="any" value="0" disabled data-i18n-aria="seek"><span class="time duration">0:00</span></div>
         <div class="controls-row">
@@ -1138,15 +1179,14 @@ function openPlayer(item,row,trigger) {
           <button class="control main play" type="button" data-i18n-aria="play"><span class="material-symbols-rounded" aria-hidden="true">play_arrow</span></button>
           <a class="control download" data-i18n-aria="download" download><span class="material-symbols-rounded" aria-hidden="true">download</span></a>
           <button class="control full" type="button" data-i18n-aria="fullscreen"><span class="material-symbols-rounded" aria-hidden="true">fullscreen</span></button>
-          <button class="control close-player" type="button" data-i18n-aria="close"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
         </div>
+      </div>
       </div>
     </div>`;
   localize(panel);
   const q = selector => panel.querySelector(selector), video = q('video'), videoPoster = q('.video-poster'), seek = q('.seek'), current = q('.current'), duration = q('.duration');
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
-  const closeButton = q('.close-player');
   const download = q('.download'), surface = q('.video-interaction'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
   download.href = videoApiUrl('video', item.name, true, item.displayName);
   download.download = item.displayName; download.title = t.download;
@@ -1226,7 +1266,6 @@ function openPlayer(item,row,trigger) {
   async function togglePlay() { try { if (video.paused || video.ended) await video.play(); else video.pause(); } catch { clearBuffering(); } }
 
   play.addEventListener('click',togglePlay);
-  closeButton.addEventListener('click',() => pausePlayer(player, true, false));
   surface.addEventListener('click',() => { if (document.fullscreenElement === panel) panel.classList.toggle('controls-visible'); else togglePlay(); });
   for (const target of [video,surface]) {
     target.addEventListener('contextmenu',event => event.preventDefault());
@@ -1335,6 +1374,7 @@ function openPlayer(item,row,trigger) {
   trigger.hidden = true;
   panel.hidden = false;
   host.append(panel);
+  animatePlayerControls(panel);
 
   const transfer = data => {
     if (data.event === 'speed') {
