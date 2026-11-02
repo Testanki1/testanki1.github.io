@@ -437,8 +437,22 @@
       -webkit-user-select: none;
     }
 
+    .video-poster {
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: var(--base);
+      pointer-events: none;
+    }
+
+    .video-poster[hidden] { display: none; }
+
     .video-interaction {
       position: absolute;
+      z-index: 2;
       inset: 0;
       user-select: none;
       -webkit-user-select: none;
@@ -915,13 +929,15 @@ function formatRate(bytesPerSecond) {
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
   const data = event.data;
-  if (data?.type === 'promo-transfer' && activePlayer?.session === data.session) activePlayer.transfer(data);
+  if (data?.type !== 'promo-transfer') return;
+  const player = [...cachedPlayers.values()].find(item => item.session === data.session);
+  if (player) player.transfer(data);
 });
 
 const MAX_CACHED_PLAYERS = 3;
 const MIN_RESUME_SECONDS = 2;
-const cachedPlayers = new Map(); // item.name -> player（仅当前页面内存，刷新即清空）
-const sessionProgress = new Map(); // item.name -> seconds（仅当前页面内存，超出缓存池时兜底记秒数）
+const cachedPlayers = new Map(); // item.name -> video player cache for this page session
+const sessionProgress = new Map(); // item.name -> resume time, kept in memory for this page session
 let sessionAudio = { volume: 1, muted: false };
 
 function recordPlayerProgress(player) {
@@ -939,10 +955,11 @@ function recordPlayerProgress(player) {
 
 function evictPlayer(player) {
   if (!player || player.evicted) return;
+  recordPlayerProgress(player)
   player.evicted = true;
+  player.wantsPlay = false;
   cachedPlayers.delete(player.key);
   if (activePlayer === player) activePlayer = null;
-  recordPlayerProgress(player);
   if (player.session && 'serviceWorker' in navigator) {
     try { navigator.serviceWorker.controller?.postMessage({type:'promo-cancel',session:player.session}); } catch {}
   }
@@ -950,29 +967,47 @@ function evictPlayer(player) {
   if (document.fullscreenElement === player.panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   document.removeEventListener('fullscreenchange', player.fullHandler);
   player.video.pause();
+  if (player.trigger) player.trigger.hidden = false;
+  if (player.host) player.host.hidden = true;
   player.video.removeAttribute('src');
   player.video.load();
   player.panel.remove();
 }
 
-// 收起播放器（不销毁 <video>，保留已缓冲的视频数据与当前画面）
-function collapsePlayer(restoreFocus = false, instant = false) {
-  if (!activePlayer) return;
-  const player = activePlayer;
-  activePlayer = null;
-  recordPlayerProgress(player);
+// Pause one card and restore its poster without destroying its buffered video element.
+function pausePlayer(player, restoreFocus = false, instant = false) {
+  if (!player || player.evicted) return;
+  if (activePlayer === player) activePlayer = null;
+  recordPlayerProgress(player)
+  player.wantsPlay = false;
   player.cleanup();
   if (document.fullscreenElement === player.panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   player.video.pause();
   player.panel.inert = true;
+  player.panel.hidden = true;
   if (player.trigger) {
     player.trigger.hidden = false;
     player.trigger.setAttribute('aria-label', t.playName(player.itemName));
     if (restoreFocus) player.trigger.focus();
   }
-  player.panel.hidden = true;
   if (player.host) player.host.hidden = true;
   if (instant) player.panel.remove();
+}
+
+// Filtering/searching removes the playing cards, so stop every player before rerendering.
+function stopAllPlayers(instant = true) {
+  for (const player of cachedPlayers.values()) pausePlayer(player, false, instant);
+  activePlayer = null;
+}
+
+function evictOldestPausedPlayer() {
+  for (const player of cachedPlayers.values()) {
+    if (!player.wantsPlay && (player.video.paused || player.video.ended)) {
+      evictPlayer(player);
+      return true;
+    }
+  }
+  return false;
 }
 
 // 在同一卡片内恢复已缓存播放器（零重新加载）
@@ -981,6 +1016,7 @@ function playCachedPlayer(player, row, trigger) {
   cachedPlayers.set(player.key, player);
   player.trigger = trigger;
   player.host = row.querySelector('.player-host');
+  player.wantsPlay = true;
   player.host.hidden = false;
   player.trigger.hidden = true;
   player.panel.hidden = false;
@@ -1037,7 +1073,7 @@ function filteredVideos() {
 }
 
 function renderList() {
-  collapsePlayer(false, true);
+  stopAllPlayers(true);
   for (const player of cachedPlayers.values()) {
     if (player.panel.parentNode) {
       player.panel.remove();
@@ -1075,7 +1111,6 @@ function renderList() {
     row.append(trigger, playerHost, meta);
 
     trigger.addEventListener('click', () => {
-      collapsePlayer(false, false);
       const cached = cachedPlayers.get(item.name);
       if (cached) { playCachedPlayer(cached, row, trigger); return; }
       openPlayer(item, row, trigger);
@@ -1094,7 +1129,7 @@ function openPlayer(item,row,trigger) {
   const panel = document.createElement('div'); panel.className = 'inline-player';
   panel.innerHTML = `
     <div class="player-layout">
-      <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
+      <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><img class="video-poster" alt="" aria-hidden="true"><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
       <div class="controls">
         <div class="seek-row"><span class="time current">0:00</span><input class="range seek" type="range" min="0" max="0" step="any" value="0" disabled data-i18n-aria="seek"><span class="time duration">0:00</span></div>
         <div class="controls-row">
@@ -1108,7 +1143,7 @@ function openPlayer(item,row,trigger) {
       </div>
     </div>`;
   localize(panel);
-  const q = selector => panel.querySelector(selector), video = q('video'), seek = q('.seek'), current = q('.current'), duration = q('.duration');
+  const q = selector => panel.querySelector(selector), video = q('video'), videoPoster = q('.video-poster'), seek = q('.seek'), current = q('.current'), duration = q('.duration');
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
   const closeButton = q('.close-player');
@@ -1119,10 +1154,33 @@ function openPlayer(item,row,trigger) {
   let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, bufferingDelay = null, progressFrame = null;
   let lastRate = '', lastRateTime = 0, metadataLoaded = false, pendingResume = sessionProgress.get(item.name) || 0;
   video.poster = videoApiUrl('thumbnail', item.name);
+  videoPoster.src = video.poster;
+  videoPoster.addEventListener('error', () => { videoPoster.hidden = true; }, { once: true });
+  let firstFramePresented = false;
+  let firstFrameCallbackPending = false;
   video.volume = sessionAudio.volume;
   video.muted = sessionAudio.muted;
   video.setAttribute('aria-label', t.playName(item.displayName));
   const label = (button, text) => { button.setAttribute('aria-label',text); button.title = text; };
+
+  function revealPosterAfterPresentedFrame() {
+    if (firstFramePresented || firstFrameCallbackPending) return;
+    const reveal = () => {
+      firstFrameCallbackPending = false;
+      if (firstFramePresented) return;
+      firstFramePresented = true;
+      videoPoster.hidden = true;
+    };
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      firstFrameCallbackPending = true;
+      video.requestVideoFrameCallback(reveal);
+    } else {
+      requestAnimationFrame(() => {
+        if (!video.paused && video.readyState >= 2) reveal();
+        else firstFrameCallbackPending = false;
+      });
+    }
+  }
 
   function progress() {
     const total = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
@@ -1168,7 +1226,7 @@ function openPlayer(item,row,trigger) {
   async function togglePlay() { try { if (video.paused || video.ended) await video.play(); else video.pause(); } catch { clearBuffering(); } }
 
   play.addEventListener('click',togglePlay);
-  closeButton.addEventListener('click',() => collapsePlayer(true, false));
+  closeButton.addEventListener('click',() => pausePlayer(player, true, false));
   surface.addEventListener('click',() => { if (document.fullscreenElement === panel) panel.classList.toggle('controls-visible'); else togglePlay(); });
   for (const target of [video,surface]) {
     target.addEventListener('contextmenu',event => event.preventDefault());
@@ -1198,13 +1256,17 @@ function openPlayer(item,row,trigger) {
     }
     progress();
   });
-  video.addEventListener('play',() => { updatePlay(); startProgressFrames(); });
+  video.addEventListener('timeupdate',() => recordPlayerProgress(player));
+  video.addEventListener('play',() => { player.wantsPlay = true; updatePlay(); startProgressFrames(); });
   video.addEventListener('pause',() => {
+    player.wantsPlay = false;
     updatePlay(); stopProgressFrames(); progress(); clearBuffering();
+    recordPlayerProgress(player)
   });
   video.addEventListener('ended',() => {
+    player.wantsPlay = false;
     updatePlay(); stopProgressFrames(); progress(); clearBuffering();
-    sessionProgress.delete(item.name);
+    recordPlayerProgress(player)
   });
   video.addEventListener('volumechange',() => {
     updateVolume();
@@ -1212,13 +1274,14 @@ function openPlayer(item,row,trigger) {
   });
   video.addEventListener('error',() => {
     if (meterAvailable && !player.evicted) {
+      const resumePlayback = player.wantsPlay && !player.panel.hidden;
       if (metadataLoaded && video.currentTime >= MIN_RESUME_SECONDS) pendingResume = video.currentTime;
       metadataLoaded = false;
       meterAvailable = false; player.session = null; lastRate = ''; clearTimeout(transferTimer); transferTimer = null;
       setTransferStatus(buffering && !video.paused ? t.speedUnavailable : '');
       video.src = videoApiUrl('video', item.name);
       video.load();
-      if (activePlayer === player) video.play().catch(() => {});
+      if (resumePlayback) video.play().catch(() => {});
       return;
     }
     clearBuffering();
@@ -1248,7 +1311,7 @@ function openPlayer(item,row,trigger) {
     if (video.readyState >= 3) clearBuffering();
     else scheduleBuffering();
   });
-  video.addEventListener('playing',() => { clearBuffering(); startProgressFrames(); });
+  video.addEventListener('playing',() => { clearBuffering(); startProgressFrames(); revealPosterAfterPresentedFrame(); });
   video.addEventListener('keydown',event => { if (event.key === ' ' || event.key === 'k') { event.preventDefault(); togglePlay(); } });
 
   function showFullscreenControls() {
@@ -1300,14 +1363,12 @@ function openPlayer(item,row,trigger) {
     transfer,
     itemName: item.displayName,
     evicted: false,
+    wantsPlay: true,
     isMetadataLoaded: () => metadataLoaded,
     syncVolumeUi: updateVolume,
     cleanup: () => { clearBuffering(); stopProgressFrames(); },
   };
-  if (cachedPlayers.size >= MAX_CACHED_PLAYERS) {
-    const oldest = cachedPlayers.values().next().value;
-    if (oldest) evictPlayer(oldest);
-  }
+  if (cachedPlayers.size >= MAX_CACHED_PLAYERS) evictOldestPausedPlayer();
   cachedPlayers.set(item.name, player);
   activePlayer = player;
   updatePlay(); progress(); updateVolume();
@@ -1317,7 +1378,7 @@ function openPlayer(item,row,trigger) {
     meterAvailable = available;
     const source = available ? '/promo-videos/__stream?name=' + encodeURIComponent(item.name) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.name);
     video.src = source; video.load();
-    if (activePlayer === player) video.play().catch(() => {});
+    if (!player.evicted && !player.panel.hidden && player.wantsPlay) video.play().catch(() => {});
   });
 }
 
