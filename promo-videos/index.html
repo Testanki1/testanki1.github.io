@@ -202,15 +202,14 @@
         transform: scale(1.08);
       }
       .video-row:hover {
-        background: rgba(191, 213, 255, .075);
         border-color: rgba(191, 213, 255, .28);
+        background: rgba(191, 213, 255, .075);
       }
       .video-row:hover .badge img {
         transform: translateY(-2px) scale(1.08);
       }
-      .row-button:hover {
-        background: rgba(191, 213, 255, .04);
-      }
+      .poster-trigger:hover .poster-image { transform: scale(1.035); }
+      .poster-trigger:hover .poster-play { transform: translate(-50%, -50%) scale(1.08); }
       .control:hover {
         background: rgba(191, 213, 255, .2);
         transform: translateY(-2px);
@@ -277,19 +276,19 @@
        Video Rows & 列表交互
        ========================================================= */
     .list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      align-items: start;
     }
 
     .video-row {
+      min-width: 0;
       background: rgba(191, 213, 255, .055);
       border: 1px solid rgba(191, 213, 255, .15);
       border-radius: 23px;
       overflow: hidden;
-      transition:
-        border-color .2s var(--m3-effects),
-        background-color .2s var(--m3-effects);
+      transition: border-color .2s var(--m3-effects), background-color .2s var(--m3-effects);
       animation: rowEntrance .42s var(--m3-spatial) backwards;
     }
 
@@ -304,31 +303,54 @@
       }
     }
 
-    .video-row:has(.row-button[aria-expanded=true]) {
+    .poster-trigger {
+      position: relative;
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      padding: 0;
+      overflow: hidden;
+      border-radius: 0;
       background: rgba(191, 213, 255, .08);
-      border-color: rgba(191, 213, 255, .15);
+      color: var(--base);
+      cursor: pointer;
     }
 
-    .video-row:has(.row-button[aria-expanded=true]) .row-button {
-      border-radius: 22px 22px 0 0;
+    .poster-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform .32s var(--m3-spatial), opacity .2s var(--m3-effects);
     }
 
-    .row-button {
-      border-radius: 22px;
+    .poster-image[hidden] { display: none; }
+
+    .poster-play {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      color: var(--base);
+      background: var(--green);
+      border-radius: 50%;
+      font-size: 30px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, .3);
+      transition: transform .24s var(--m3-spatial), box-shadow .2s var(--m3-effects);
+    }
+
+    .player-host[hidden], .poster-trigger[hidden] { display: none; }
+
+    .row-meta {
+      min-height: 70px;
+      padding: 12px 15px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      width: 100%;
-      min-height: 76px;
-      padding: 14px 18px;
-      color: #fff;
-      text-align: left;
-      transition: background-color .18s var(--m3-effects);
-    }
-
-    /* 点击下压弹性触觉反馈 */
-    .row-button:active {
-      background: rgba(191, 213, 255, .08);
+      gap: 12px;
     }
 
     .row-title {
@@ -364,28 +386,6 @@
       transition: transform .25s var(--m3-spatial);
     }
 
-    /* 
-       纯净的右侧展开箭头：
-       移除圆形背景和宽高，颜色始终保持统一的柔和蓝，仅靠 180° 旋转表达状态
-    */
-    .row-expand {
-      flex: 0 0 44px;
-      width: 44px;
-      height: 44px;
-      display: grid;
-      place-items: center;
-      color: var(--base);
-      font-size: 27px;
-      background: var(--green);
-      border: 0;
-      border-radius: 50%;
-      transition: transform .2s var(--m3-spatial), background-color .2s var(--m3-effects);
-    }
-
-    .row-button[aria-expanded=true] .row-expand {
-      display: none;
-    }
-
     .unknown {
       font-size: 11px;
       color: var(--muted);
@@ -402,35 +402,16 @@
     }
 
     /* =========================================================
-       CSS Grid 物理抽屉式平滑展开体系 (Smooth Accordion)
+       In-place player / poster presentation
        ========================================================= */
     .inline-player {
-      display: grid;
-      grid-template-rows: 0fr;
-      opacity: 0;
-      transition:
-        grid-template-rows .42s var(--m3-spatial),
-        opacity .2s var(--m3-effects);
-    }
-
-    .inline-player:not(.is-expanded):not(:fullscreen) {
-      pointer-events: none;
-    }
-
-    .inline-player.is-expanded {
-      grid-template-rows: 1fr;
+      display: block;
       opacity: 1;
     }
 
-    .player-accordion-inner {
+    .player-layout {
       min-height: 0;
-      overflow: hidden;
-      padding: 0 14px 16px;
-      transition: padding-bottom .42s var(--m3-spatial);
-    }
-
-    .inline-player:not(.is-expanded):not(:fullscreen) .player-accordion-inner {
-      padding-bottom: 0;
+      padding: 0 10px 12px;
     }
 
     .player-frame {
@@ -676,7 +657,7 @@
       transform: none !important;
     }
 
-    .inline-player:fullscreen .player-accordion-inner {
+    .inline-player:fullscreen .player-layout {
       padding: 0;
       height: 100%;
       display: flex;
@@ -717,11 +698,12 @@
       .shell { padding: 0 16px 60px; }
       .intro { padding: 38px 0 24px; }
       .filter { width: 48px; height: 48px; }
-      .row-button { padding: 12px; gap: 9px; }
+      .list { grid-template-columns: 1fr; gap: 12px; }
+      .row-meta { min-height: 64px; padding: 10px 12px; }
       .row-title { font-size: 14px; }
       .badge { width: 26px; height: 26px; }
       .badge img { width: 21px; height: 21px; }
-      .player-accordion-inner { padding: 0 9px 12px; }
+      .player-layout { padding: 0 8px 10px; }
       .control { width: 48px; height: 48px; border-radius: 16px; }
       .control.main { width: 56px; height: 56px; border-radius: 20px; }
       .volume { display: none; }
@@ -835,10 +817,10 @@ const catalogByName = new Map();
 const VIDEO_API_ORIGIN = location.hostname.endsWith('.github.io')
   ? `https://${location.hostname.slice(0, -'.github.io'.length)}.pages.dev`
   : location.origin;
-function videoApiUrl(action, file, download = false, filename = null) {
+function videoApiUrl(action, name, download = false, filename = null) {
   const url = new URL('/api/promo-videos', VIDEO_API_ORIGIN);
   url.searchParams.set('action', action);
-  if (file) url.searchParams.set('file', file);
+  if (name) url.searchParams.set('name', name);
   if (download) {
     url.searchParams.set('download', '1');
     if (filename) url.searchParams.set('filename', filename);
@@ -907,7 +889,7 @@ const search = document.getElementById('search'), status = document.getElementBy
 let videos = [], activeFilter = 'standard', activePlayer = null;
 status.textContent = t.loading;
 
-const STREAM_WORKER = '/promo-videos/stream-sw.js?v=6';
+const STREAM_WORKER = '/promo-videos/stream-sw.js?v=7';
 const meterReady = (async () => {
   if (!('serviceWorker' in navigator) || typeof ReadableStream === 'undefined') return false;
   try {
@@ -983,37 +965,32 @@ function collapsePlayer(restoreFocus = false, instant = false) {
   player.video.pause();
   player.panel.inert = true;
   if (player.trigger) {
-    player.trigger.setAttribute('aria-expanded', 'false');
+    player.trigger.hidden = false;
     player.trigger.setAttribute('aria-label', t.playName(player.itemName));
     if (restoreFocus) player.trigger.focus();
   }
-  player.panel.classList.remove('is-expanded');
+  player.panel.hidden = true;
+  if (player.host) player.host.hidden = true;
   if (instant) player.panel.remove();
 }
 
-// 重新展开内存里已缓存的播放器（零重新加载）
-function expandCachedPlayer(player, row, trigger) {
+// 在同一卡片内恢复已缓存播放器（零重新加载）
+function playCachedPlayer(player, row, trigger) {
   cachedPlayers.delete(player.key);
   cachedPlayers.set(player.key, player);
   player.trigger = trigger;
+  player.host = row.querySelector('.player-host');
+  player.host.hidden = false;
+  player.trigger.hidden = true;
+  player.panel.hidden = false;
   player.panel.inert = false;
   player.video.volume = sessionAudio.volume;
   player.video.muted = sessionAudio.muted;
   player.syncVolumeUi();
-  trigger.setAttribute('aria-expanded', 'true');
-  trigger.setAttribute('aria-label', t.closeName(player.itemName));
+  trigger.setAttribute('aria-label', t.playName(player.itemName));
   activePlayer = player;
 
-  if (player.panel.parentNode !== row) {
-    player.panel.classList.remove('is-expanded');
-    row.append(player.panel);
-    void player.panel.offsetHeight;
-    requestAnimationFrame(() => {
-      if (activePlayer === player) player.panel.classList.add('is-expanded');
-    });
-  } else {
-    player.panel.classList.add('is-expanded');
-  }
+  if (player.panel.parentNode !== player.host) player.host.append(player.panel);
 
   if (player.video.ended) {
     try { player.video.currentTime = 0; } catch {}
@@ -1062,7 +1039,6 @@ function renderList() {
   collapsePlayer(false, true);
   for (const player of cachedPlayers.values()) {
     if (player.panel.parentNode) {
-      player.panel.classList.remove('is-expanded');
       player.panel.remove();
     }
     player.trigger = null;
@@ -1074,9 +1050,19 @@ function renderList() {
   shown.forEach((item, index) => {
     const row = document.createElement('article'); row.className = 'video-row';
     row.style.animationDelay = `${Math.min(index * 32, 400)}ms`;
-    
-    const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'row-button';
-    trigger.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-label',t.playName(item.displayName));
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button'; trigger.className = 'poster-trigger';
+    trigger.setAttribute('aria-label', t.playName(item.displayName));
+    const poster = document.createElement('img');
+    poster.className = 'poster-image'; poster.alt = ''; poster.loading = 'lazy';
+    poster.decoding = 'async'; poster.src = videoApiUrl('thumbnail', item.name);
+    poster.addEventListener('error', () => { poster.hidden = true; });
+    const playMark = icon('play_arrow'); playMark.classList.add('poster-play');
+    trigger.append(poster, playMark);
+
+    const playerHost = document.createElement('div'); playerHost.className = 'player-host'; playerHost.hidden = true;
+    const meta = document.createElement('div'); meta.className = 'row-meta';
     const title = document.createElement('span'); title.className = 'row-title'; title.textContent = item.displayName;
     const badges = document.createElement('span'); badges.className = 'row-icons';
     for (const obj of item.equipment) {
@@ -1084,16 +1070,13 @@ function renderList() {
       const badge = document.createElement('span'); badge.className = 'badge'; badge.append(image('equipment',obj)); badges.append(badge);
     }
     if (!item.known) { const tag = document.createElement('span'); tag.className = 'unknown'; tag.textContent = t.unclassified; badges.append(tag); }
-    const expand = icon('play_arrow');
-    expand.classList.add('row-expand');
-    expand.setAttribute('aria-hidden', 'true');
-    trigger.append(title,badges,expand); row.append(trigger);
-    
+    meta.append(title, badges);
+    row.append(trigger, playerHost, meta);
+
     trigger.addEventListener('click', () => {
-      if (activePlayer?.key === item.name) { collapsePlayer(true, false); return; }
       collapsePlayer(false, false);
       const cached = cachedPlayers.get(item.name);
-      if (cached) { expandCachedPlayer(cached, row, trigger); return; }
+      if (cached) { playCachedPlayer(cached, row, trigger); return; }
       openPlayer(item, row, trigger);
     });
     list.append(row);
@@ -1109,7 +1092,7 @@ function formatTime(value) {
 function openPlayer(item,row,trigger) {
   const panel = document.createElement('div'); panel.className = 'inline-player';
   panel.innerHTML = `
-    <div class="player-accordion-inner">
+    <div class="player-layout">
       <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
       <div class="controls">
         <div class="seek-row"><span class="time current">0:00</span><input class="range seek" type="range" min="0" max="0" step="any" value="0" disabled data-i18n-aria="seek"><span class="time duration">0:00</span></div>
@@ -1119,6 +1102,7 @@ function openPlayer(item,row,trigger) {
           <button class="control main play" type="button" data-i18n-aria="play"><span class="material-symbols-rounded" aria-hidden="true">play_arrow</span></button>
           <a class="control download" data-i18n-aria="download" download><span class="material-symbols-rounded" aria-hidden="true">download</span></a>
           <button class="control full" type="button" data-i18n-aria="fullscreen"><span class="material-symbols-rounded" aria-hidden="true">fullscreen</span></button>
+          <button class="control close-player" type="button" data-i18n-aria="close"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
         </div>
       </div>
     </div>`;
@@ -1126,6 +1110,7 @@ function openPlayer(item,row,trigger) {
   const q = selector => panel.querySelector(selector), video = q('video'), seek = q('.seek'), current = q('.current'), duration = q('.duration');
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
+  const closeButton = q('.close-player');
   const download = q('.download'), surface = q('.video-interaction'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
   download.href = videoApiUrl('video', item.name, true, item.displayName);
   download.download = item.displayName; download.title = t.download;
@@ -1181,6 +1166,7 @@ function openPlayer(item,row,trigger) {
   async function togglePlay() { try { if (video.paused || video.ended) await video.play(); else video.pause(); } catch { clearBuffering(); } }
 
   play.addEventListener('click',togglePlay);
+  closeButton.addEventListener('click',() => collapsePlayer(true, false));
   surface.addEventListener('click',() => { if (document.fullscreenElement === panel) panel.classList.toggle('controls-visible'); else togglePlay(); });
   for (const target of [video,surface]) {
     target.addEventListener('contextmenu',event => event.preventDefault());
@@ -1279,12 +1265,11 @@ function openPlayer(item,row,trigger) {
   document.addEventListener('fullscreenchange',fullHandler);
   full.title = full.getAttribute('aria-label');
 
-  row.append(panel); trigger.setAttribute('aria-expanded','true'); trigger.setAttribute('aria-label',t.closeName(item.displayName));
-  
-  // 下一帧触发平滑抽屉展开
-  requestAnimationFrame(() => {
-    panel.classList.add('is-expanded');
-  });
+  const host = row.querySelector('.player-host');
+  host.hidden = false;
+  trigger.hidden = true;
+  panel.hidden = false;
+  host.append(panel);
 
   const transfer = data => {
     if (data.event === 'speed') {
@@ -1307,6 +1292,7 @@ function openPlayer(item,row,trigger) {
     video,
     panel,
     trigger,
+    host,
     fullHandler,
     session,
     transfer,
@@ -1327,7 +1313,7 @@ function openPlayer(item,row,trigger) {
   Promise.race([meterReady, new Promise(resolve => setTimeout(() => resolve(false), 5000))]).then(available => {
     if (player.evicted) return;
     meterAvailable = available;
-    const source = available ? '/promo-videos/__stream?file=' + encodeURIComponent(item.name) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.name);
+    const source = available ? '/promo-videos/__stream?name=' + encodeURIComponent(item.name) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.name);
     video.src = source; video.load();
     if (activePlayer === player) video.play().catch(() => {});
   });
