@@ -23,11 +23,16 @@
       --muted: rgba(191, 213, 255, .72);
       --outline: rgba(191, 213, 255, .18);
 
-      /* Motion Physics */
-      --m3-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-      --m3-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
-      --m3-expand: cubic-bezier(0.16, 1, 0.3, 1);
-      --m3-standard: cubic-bezier(0.2, 0, 0, 1);
+      /* Motion: spatial changes use a gentle expressive spring; effects stay restrained. */
+      --m3-spatial: cubic-bezier(0.18, 0.9, 0.22, 1.08);
+      --m3-effects: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    /* Use a spring-like piecewise curve where CSS linear() easing is supported. */
+    @supports (transition-timing-function: linear(0, 1)) {
+      :root {
+        --m3-spatial: linear(0, 0.006 4%, 0.03 10%, 0.11 21%, 0.28 37%, 0.52 55%, 0.75 70%, 0.91 83%, 1.015 93%, 1.03 97%, 1);
+      }
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -66,7 +71,7 @@
       font-feature-settings: 'liga';
       -webkit-font-smoothing: antialiased;
       font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
-      transition: font-variation-settings .2s ease;
+      transition: font-variation-settings .2s var(--m3-effects);
     }
 
     /* =========================================================
@@ -80,7 +85,7 @@
 
     .intro {
       padding: 52px 0 28px;
-      animation: introEnter .5s var(--m3-decel) backwards;
+      animation: introEnter .5s var(--m3-spatial) backwards;
     }
 
     @keyframes introEnter {
@@ -153,11 +158,11 @@
       border: 1px solid var(--outline);
       border-radius: 16px;
       transition:
-        border-radius .3s var(--m3-spring),
-        transform .18s var(--m3-spring),
-        background-color .2s ease,
-        color .2s ease,
-        border-color .2s ease;
+        border-radius .3s var(--m3-spatial),
+        transform .18s var(--m3-spatial),
+        background-color .2s var(--m3-effects),
+        color .2s var(--m3-effects),
+        border-color .2s var(--m3-effects);
     }
 
     .filter-icon {
@@ -171,12 +176,13 @@
       width: 27px;
       height: 27px;
       object-fit: contain;
+      transition: transform .22s var(--m3-spatial);
     }
 
     .filter-icon .material-symbols-rounded { font-size: 23px; }
 
     .filter:active {
-      transform: scale(0.9) !important;
+      transform: scale(0.94) !important;
     }
 
     .filter[aria-pressed=true] {
@@ -227,7 +233,7 @@
       color: var(--blue);
       max-width: 440px;
       width: 100%;
-      transition: border-color .25s ease, background-color .25s ease, box-shadow .25s var(--m3-spring);
+      transition: border-color .2s var(--m3-effects), background-color .2s var(--m3-effects), box-shadow .2s var(--m3-effects);
     }
 
     .searchbox:focus-within {
@@ -239,7 +245,7 @@
 
     .searchbox span { 
       font-size: 21px;
-      transition: transform .25s var(--m3-spring), color .2s ease;
+      transition: transform .22s var(--m3-spatial), color .18s var(--m3-effects);
     }
 
     .searchbox:focus-within span {
@@ -281,10 +287,10 @@
       border: 1px solid rgba(191, 213, 255, .15);
       border-radius: 23px;
       overflow: hidden;
-      transition: 
-        border-color .3s ease, 
-        background-color .3s ease;
-      animation: rowEntrance .38s var(--m3-decel) backwards;
+      transition:
+        border-color .2s var(--m3-effects),
+        background-color .2s var(--m3-effects);
+      animation: rowEntrance .42s var(--m3-spatial) backwards;
     }
 
     @keyframes rowEntrance {
@@ -317,7 +323,7 @@
       padding: 14px 18px;
       color: #fff;
       text-align: left;
-      transition: background-color .15s ease, transform .15s var(--m3-spring);
+      transition: background-color .18s var(--m3-effects);
     }
 
     /* 点击下压弹性触觉反馈 */
@@ -355,7 +361,7 @@
       height: 23px;
       width: 23px;
       object-fit: contain;
-      transition: transform .25s var(--m3-spring);
+      transition: transform .25s var(--m3-spatial);
     }
 
     /* 
@@ -363,16 +369,21 @@
        移除圆形背景和宽高，颜色始终保持统一的柔和蓝，仅靠 180° 旋转表达状态
     */
     .row-expand {
-      flex: 0 0 auto;
-      color: var(--blue);
-      font-size: 24px;
-      background: transparent;
+      flex: 0 0 44px;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--base);
+      font-size: 27px;
+      background: var(--green);
       border: 0;
-      transition: transform .35s var(--m3-spring);
+      border-radius: 50%;
+      transition: transform .2s var(--m3-spatial), background-color .2s var(--m3-effects);
     }
 
     .row-button[aria-expanded=true] .row-expand {
-      transform: rotate(180deg);
+      visibility: hidden;
     }
 
     .unknown {
@@ -398,8 +409,8 @@
       grid-template-rows: 0fr;
       opacity: 0;
       transition:
-        grid-template-rows .42s var(--m3-expand),
-        opacity .32s ease;
+        grid-template-rows .42s var(--m3-spatial),
+        opacity .2s var(--m3-effects);
     }
 
     .inline-player:not(.is-expanded):not(:fullscreen) {
@@ -415,7 +426,7 @@
       min-height: 0;
       overflow: hidden;
       padding: 0 14px 16px;
-      transition: padding-bottom .42s var(--m3-expand);
+      transition: padding-bottom .42s var(--m3-spatial);
     }
 
     .inline-player:not(.is-expanded):not(:fullscreen) .player-accordion-inner {
@@ -484,7 +495,7 @@
       border-radius: 99px;
       background: linear-gradient(to right, var(--green) 0%, var(--green) var(--progress, 0%), rgba(191, 213, 255, .25) var(--progress, 0%), rgba(191, 213, 255, .25) 100%);
       cursor: pointer;
-      transition: height .2s var(--m3-standard);
+      transition: height .2s var(--m3-effects);
     }
 
     .range:focus-visible {
@@ -501,7 +512,7 @@
       outline: none !important;
       border-radius: 50%;
       background: var(--green);
-      transition: transform .2s var(--m3-spring);
+      transition: transform .2s var(--m3-spatial);
     }
 
     .range::-moz-range-thumb {
@@ -511,7 +522,7 @@
       outline: none !important;
       border-radius: 50%;
       background: var(--green);
-      transition: transform .2s var(--m3-spring);
+      transition: transform .2s var(--m3-spatial);
     }
 
     .range::-moz-focus-outer {
@@ -556,13 +567,13 @@
       color: var(--blue);
       background: rgba(191, 213, 255, .1);
       transition: 
-        background-color .2s ease,
-        transform .15s var(--m3-spring),
-        border-radius .2s var(--m3-spring);
+        background-color .2s var(--m3-effects),
+        transform .18s var(--m3-spatial),
+        border-radius .2s var(--m3-spatial);
     }
 
     .control:active {
-      transform: scale(0.88) !important;
+      transform: scale(0.94) !important;
       border-radius: 22px;
     }
 
@@ -573,20 +584,20 @@
       color: var(--base);
       border-radius: 18px;
       transition: 
-        transform .2s var(--m3-spring),
-        background-color .2s ease,
-        border-radius .2s var(--m3-spring);
+        transform .2s var(--m3-spatial),
+        background-color .2s var(--m3-effects),
+        border-radius .2s var(--m3-spatial);
     }
 
     .control.main:active {
-      transform: scale(0.9) !important;
+      transform: scale(0.94) !important;
       border-radius: 24px;
     }
 
     .control.main .material-symbols-rounded {
       font-size: 27px;
       font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
-      transition: transform .2s var(--m3-spring);
+      transition: transform .2s var(--m3-spatial);
     }
 
     .volume { width: 70px; }
@@ -605,8 +616,8 @@
       transform: translate(-50%, -42%) scale(.88);
       pointer-events: none;
       transition: 
-        opacity .25s var(--m3-standard),
-        transform .25s var(--m3-spring),
+        opacity .25s var(--m3-effects),
+        transform .25s var(--m3-spatial),
         visibility 0s linear .25s;
     }
 
@@ -614,7 +625,7 @@
       opacity: 1;
       visibility: visible;
       transform: translate(-50%, -50%) scale(1);
-      transition: opacity .25s var(--m3-standard), transform .25s var(--m3-spring), visibility 0s;
+      transition: opacity .25s var(--m3-effects), transform .25s var(--m3-spatial), visibility 0s;
     }
 
     .buffer-chip {
@@ -690,7 +701,7 @@
       opacity: 0;
       transform: translateY(18px);
       pointer-events: none;
-      transition: opacity .28s var(--m3-standard), transform .28s var(--m3-standard);
+      transition: opacity .2s var(--m3-effects), transform .28s var(--m3-spatial);
     }
 
     .inline-player:fullscreen.controls-visible .controls {
@@ -1073,7 +1084,9 @@ function renderList() {
       const badge = document.createElement('span'); badge.className = 'badge'; badge.append(image('equipment',obj)); badges.append(badge);
     }
     if (!item.known) { const tag = document.createElement('span'); tag.className = 'unknown'; tag.textContent = t.unclassified; badges.append(tag); }
-    const expand = icon('expand_more'); expand.classList.add('row-expand');
+    const expand = icon('play_arrow');
+    expand.classList.add('row-expand');
+    expand.setAttribute('aria-hidden', 'true');
     trigger.append(title,badges,expand); row.append(trigger);
     
     trigger.addEventListener('click', () => {
