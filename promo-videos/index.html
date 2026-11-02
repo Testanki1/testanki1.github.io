@@ -265,12 +265,48 @@
     .searchbox input::placeholder { color: rgba(191, 213, 255, .6); }
 
     .list-head {
-      color: var(--muted);
-      font-size: 12px;
-      min-height: 18px;
+      width: fit-content;
+      max-width: 100%;
+      min-height: 40px;
       margin: 22px 2px 13px;
+      padding: 8px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--blue);
+      font-size: 13px;
+      line-height: 1.35;
       font-variant-numeric: tabular-nums;
+      background: rgba(191, 213, 255, .08);
+      border: 1px solid var(--outline);
+      border-radius: 16px;
+      transition: background-color .2s var(--m3-effects), border-color .2s var(--m3-effects), color .2s var(--m3-effects);
     }
+
+    .list-head[data-state="loading"] {
+      color: var(--ink);
+      background: rgba(118, 255, 51, .08);
+      border-color: rgba(118, 255, 51, .28);
+    }
+
+    .list-head[data-state="error"] {
+      color: var(--muted);
+      border-style: dashed;
+    }
+
+    .status-spinner {
+      display: none;
+      flex: 0 0 auto;
+      color: var(--green);
+      font-size: 20px;
+    }
+
+    .list-head[data-state="loading"] .status-spinner {
+      display: inline-block;
+      animation: statusSpin 1.1s linear infinite;
+    }
+
+    @keyframes statusSpin { to { transform: rotate(360deg); } }
 
     /* =========================================================
        Video Rows & 列表交互
@@ -342,6 +378,16 @@
       transform: translate(-50%, -50%);
       box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
       transition: transform .24s var(--m3-spatial), background-color .2s var(--m3-effects), box-shadow .2s var(--m3-effects);
+    }
+
+    @keyframes posterPlayActivate {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      35% { opacity: 1; transform: translate(-50%, -50%) scale(1.16); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+    }
+
+    .poster-trigger.is-activating .poster-play {
+      animation: posterPlayActivate .28s var(--m3-spatial) both;
     }
 
     .player-host[hidden], .poster-trigger[hidden] { display: none; }
@@ -672,13 +718,28 @@
       animation: buffer-spin 1.2s linear infinite;
     }
 
-    .transfer-status {
+    .buffer-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .buffer-state {
       font-size: 13px;
-      line-height: 1.4;
+      line-height: 1.3;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .transfer-status {
+      font-size: 12px;
+      line-height: 1.25;
       text-align: center;
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
       font-weight: 500;
+      opacity: .88;
     }
 
     @keyframes buffer-spin {
@@ -801,7 +862,7 @@
     <div class="filter-bar" id="filters" role="group" data-i18n-aria="filters" aria-label="系列筛选"></div>
     <label class="searchbox"><span class="material-symbols-rounded" aria-hidden="true">search</span><input id="search" type="search" data-i18n-placeholder="search" data-i18n-aria="search" placeholder="搜索宣传片名称" aria-label="搜索宣传片名称"></label>
   </section>
-  <p class="list-head" id="status" role="status" aria-live="polite">正在读取宣传片…</p>
+  <p class="list-head" id="status" data-state="loading" role="status" aria-live="polite"><span class="status-spinner material-symbols-rounded" aria-hidden="true">progress_activity</span><span class="status-text">正在读取宣传片…</span></p>
   <section class="list" id="list" data-i18n-aria="list" aria-label="宣传片列表"></section>
 </main>
 <script>
@@ -880,10 +941,10 @@ const t = isChinese ? {
   unclassified:'未分类', loading:'正在读取宣传片…', loadError:'加载失败',
   loadFailure:'加载失败，请稍后重试。',
   badList:'加载失败，请稍后重试。', catalogFailure:'加载失败，请稍后重试。', badCatalog:'加载失败，请稍后重试。', noResults:'没有找到符合条件的宣传片。',
-  count:(shown,total) => `显示 ${shown} 个 · 共 ${total} 个`,
+  count:(shown) => `当前类别 ${shown} 个`,
   play:'播放', pause:'暂停', seek:'播放进度',
   mute:'静音', unmute:'取消静音', volume:'音量', download:'下载视频', fullscreen:'全屏', exitFullscreen:'退出全屏', close:'关闭播放器',
-  buffering:'缓冲中…', speedUnavailable:'缓冲中 · 无法测量加载速度', transfer:(value) => `加载速度 ${value}`,
+  buffering:'缓冲中', transfer:(value) => `加载速度 ${value}`,
 } : {
   archive:'Tanki Online · Fan collection', title:'Cinematic promo collection',
   description:'Official promos covering skins, equipment, maps, and events, collected by a fan. This is not an official release.',
@@ -892,10 +953,10 @@ const t = isChinese ? {
   unclassified:'Unclassified', loading:'Loading promos…', loadError:'Loading failed',
   loadFailure:'Unable to load. Please try again later.',
   badList:'Unable to load. Please try again later.', catalogFailure:'Unable to load. Please try again later.', badCatalog:'Unable to load. Please try again later.', noResults:'No promos match your selection.',
-  count:(shown,total) => `Showing ${shown} of ${total}`,
+  count:(shown) => `Current category · ${shown}`,
   play:'Play', pause:'Pause', seek:'Playback position',
   mute:'Mute', unmute:'Unmute', volume:'Volume', download:'Download video', fullscreen:'Fullscreen', exitFullscreen:'Exit fullscreen', close:'Close player',
-  buffering:'Buffering…', speedUnavailable:'Buffering · Speed unavailable', transfer:(value) => `Loading ${value}`,
+  buffering:'Buffering', transfer:(value) => `Loading speed ${value}`,
 };
 document.documentElement.lang = isChinese ? 'zh-CN' : 'en';
 document.title = isChinese ? '电影级宣传片合集' : 'Cinematic promo collection';
@@ -929,8 +990,13 @@ function icon(name) {
 
 const filters = document.getElementById('filters'), list = document.getElementById('list');
 const search = document.getElementById('search'), status = document.getElementById('status');
+const statusText = status.querySelector('.status-text');
+function setStatus(message, state = 'count') {
+  status.dataset.state = state;
+  statusText.textContent = message;
+}
 let videos = [], activeFilter = 'standard', activePlayer = null;
-status.textContent = t.loading;
+setStatus(t.loading, 'loading');
 
 const STREAM_WORKER = '/promo-videos/stream-sw.js?v=7';
 const meterReady = (async () => {
@@ -995,7 +1061,11 @@ function evictPlayer(player) {
   if (document.fullscreenElement === player.panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   document.removeEventListener('fullscreenchange', player.fullHandler);
   player.video.pause();
-  if (player.trigger) player.trigger.hidden = false;
+  if (player.trigger) {
+    player.trigger.hidden = false;
+    player.trigger.disabled = false;
+    player.trigger.classList.remove('is-activating');
+  }
   if (player.host) player.host.hidden = true;
   player.video.removeAttribute('src');
   player.video.load();
@@ -1015,6 +1085,8 @@ function pausePlayer(player, restoreFocus = false, instant = false) {
   player.panel.hidden = true;
   if (player.trigger) {
     player.trigger.hidden = false;
+    player.trigger.disabled = false;
+    player.trigger.classList.remove('is-activating');
     player.trigger.setAttribute('aria-label', t.playName(player.itemName));
     if (restoreFocus) player.trigger.focus();
   }
@@ -1121,7 +1193,7 @@ function renderList() {
     player.trigger = null;
   }
   list.replaceChildren();
-  const shown = filteredVideos(); status.textContent = t.count(shown.length, videos.length);
+  const shown = filteredVideos(); setStatus(t.count(shown.length), 'count');
   if (!shown.length) { const message = document.createElement('div'); message.className = 'message'; message.textContent = t.noResults; list.append(message); return; }
   
   shown.forEach((item, index) => {
@@ -1151,9 +1223,17 @@ function renderList() {
     row.append(trigger, playerHost, meta);
 
     trigger.addEventListener('click', () => {
-      const cached = cachedPlayers.get(item.name);
-      if (cached) { playCachedPlayer(cached, row, trigger); return; }
-      openPlayer(item, row, trigger);
+      if (trigger.disabled) return;
+      trigger.disabled = true;
+      trigger.classList.add('is-activating');
+      const activate = () => {
+        if (!trigger.isConnected || !row.isConnected) return;
+        const cached = cachedPlayers.get(item.name);
+        if (cached) { playCachedPlayer(cached, row, trigger); return; }
+        openPlayer(item, row, trigger);
+      };
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(activate, reduceMotion ? 0 : 280);
     });
     list.append(row);
   });
@@ -1169,7 +1249,7 @@ function openPlayer(item,row,trigger) {
   const panel = document.createElement('div'); panel.className = 'inline-player';
   panel.innerHTML = `
     <div class="player-layout">
-      <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><img class="video-poster" alt="" aria-hidden="true"><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="transfer-status"></span></div></div></div>
+      <div class="player-frame"><video playsinline preload="metadata" tabindex="0" draggable="false" controlslist="nodownload noplaybackrate noremoteplayback"></video><img class="video-poster" alt="" aria-hidden="true"><div class="video-interaction" aria-hidden="true"></div><div class="buffer-overlay" aria-hidden="true"><div class="buffer-chip"><span class="material-symbols-rounded buffer-spinner" aria-hidden="true">progress_activity</span><span class="buffer-message"><span class="buffer-state"></span><span class="transfer-status"></span></span></div></div></div>
       <div class="controls-space">
       <div class="controls">
         <div class="seek-row"><span class="time current">0:00</span><input class="range seek" type="range" min="0" max="0" step="any" value="0" disabled data-i18n-aria="seek"><span class="time duration">0:00</span></div>
@@ -1187,7 +1267,7 @@ function openPlayer(item,row,trigger) {
   const q = selector => panel.querySelector(selector), video = q('video'), videoPoster = q('.video-poster'), seek = q('.seek'), current = q('.current'), duration = q('.duration');
   const play = q('.play'), playIcon = play.querySelector('.material-symbols-rounded'), mute = q('.mute'), vol = q('.volume'), volIcon = mute.querySelector('.material-symbols-rounded');
   const full = q('.full'), fullIcon = full.querySelector('.material-symbols-rounded');
-  const download = q('.download'), surface = q('.video-interaction'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
+  const download = q('.download'), surface = q('.video-interaction'), bufferState = q('.buffer-state'), transferStatus = q('.transfer-status'), bufferOverlay = q('.buffer-overlay');
   download.href = videoApiUrl('video', item.name, true, item.displayName);
   download.download = item.displayName; download.title = t.download;
   const session = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -1248,17 +1328,19 @@ function openPlayer(item,row,trigger) {
     progressFrame = null;
   }
 
-  function setTransferStatus(text) {
-    transferStatus.textContent = text;
-    bufferOverlay.classList.toggle('is-visible', !!text);
-    bufferOverlay.setAttribute('aria-hidden', String(!text));
+  function setTransferStatus(bufferText, speedText = '') {
+    bufferState.textContent = bufferText;
+    transferStatus.textContent = speedText;
+    const visible = !!bufferText || !!speedText;
+    bufferOverlay.classList.toggle('is-visible', visible);
+    bufferOverlay.setAttribute('aria-hidden', String(!visible));
   }
 
   function clearBuffering() {
     buffering = false;
     clearTimeout(bufferingDelay); bufferingDelay = null;
     clearTimeout(transferTimer); transferTimer = null;
-    setTransferStatus('');
+    setTransferStatus('', '');
   }
 
   function updatePlay() { const paused = video.paused || video.ended; playIcon.textContent = paused ? 'play_arrow' : 'pause'; label(play,paused ? t.play : t.pause); }
@@ -1317,7 +1399,7 @@ function openPlayer(item,row,trigger) {
       if (metadataLoaded && video.currentTime >= MIN_RESUME_SECONDS) pendingResume = video.currentTime;
       metadataLoaded = false;
       meterAvailable = false; player.session = null; lastRate = ''; clearTimeout(transferTimer); transferTimer = null;
-      setTransferStatus(buffering && !video.paused ? t.speedUnavailable : '');
+      setTransferStatus(buffering && !video.paused ? t.buffering : '');
       video.src = videoApiUrl('video', item.name);
       video.load();
       if (resumePlayback) video.play().catch(() => {});
@@ -1334,9 +1416,9 @@ function openPlayer(item,row,trigger) {
       buffering = true;
       clearTimeout(transferTimer); transferTimer = null;
       const age = Date.now() - lastRateTime;
-      if (!meterAvailable) setTransferStatus(t.speedUnavailable);
+      if (!meterAvailable) setTransferStatus(t.buffering);
       else if (lastRate && age < 1800) {
-        setTransferStatus(t.transfer(lastRate));
+        setTransferStatus(t.buffering, t.transfer(lastRate));
         transferTimer = setTimeout(() => {
           transferTimer = null;
           setTransferStatus(buffering && !video.paused && !video.ended ? t.buffering : '');
@@ -1382,14 +1464,14 @@ function openPlayer(item,row,trigger) {
       if (!rate) return;
       lastRate = rate; lastRateTime = Date.now();
       if (!buffering || video.paused || video.ended) return;
-      setTransferStatus(t.transfer(rate));
+      setTransferStatus(t.buffering, t.transfer(rate));
       clearTimeout(transferTimer);
       transferTimer = setTimeout(() => {
         transferTimer = null;
         setTransferStatus(buffering && !video.paused && !video.ended ? t.buffering : '');
       }, 1800);
     }
-    if (data.event === 'error' && buffering && !video.paused && !video.ended) setTransferStatus(t.speedUnavailable);
+    if (data.event === 'error' && buffering && !video.paused && !video.ended) setTransferStatus(t.buffering);
   };
 
   const player = {
@@ -1459,7 +1541,7 @@ async function loadVideos() {
     videos = arranged.map(v => ({...v,...classify(v.name)}));
     renderFilters(); renderList();
   } catch (error) {
-    status.textContent = t.loadError;
+    setStatus(t.loadError, 'error');
     const message = document.createElement('div'); message.className = 'message';
     message.textContent = error instanceof SyntaxError ? t.badCatalog :
       ([t.loadFailure,t.catalogFailure].some(text => error.message?.startsWith(text)) || error.message === t.badList || error.message === t.badCatalog ? error.message : t.loadFailure);
