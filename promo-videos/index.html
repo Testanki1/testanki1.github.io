@@ -393,6 +393,10 @@
         transform .42s var(--m3-expand);
     }
 
+    .inline-player:not(.is-expanded):not(:fullscreen) {
+      pointer-events: none;
+    }
+
     .inline-player.is-expanded {
       grid-template-rows: 1fr;
       opacity: 1;
@@ -403,6 +407,11 @@
       min-height: 0;
       overflow: hidden;
       padding: 0 14px 16px;
+      transition: padding-bottom .42s var(--m3-expand);
+    }
+
+    .inline-player:not(.is-expanded):not(:fullscreen) .player-accordion-inner {
+      padding-bottom: 0;
     }
 
     .player-frame {
@@ -880,27 +889,90 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
   if (data?.type === 'promo-transfer' && activePlayer?.session === data.session) activePlayer.transfer(data);
 });
 
-// 支持平滑折叠关闭动画
-function closePlayer(restoreFocus = false, animated = false) {
-  if (!activePlayer) return;
-  const { video, panel, trigger, fullHandler, cleanup, itemName, session } = activePlayer;
-  activePlayer = null;
-  if (session && 'serviceWorker' in navigator) {
-    try { navigator.serviceWorker.controller?.postMessage({type:'promo-cancel',session}); } catch {}
-  }
-  cleanup();
-  if (document.fullscreenElement === panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
-  document.removeEventListener('fullscreenchange', fullHandler);
-  video.pause(); video.removeAttribute('src'); video.load();
-  trigger.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-label',t.playName(itemName));
-  if (restoreFocus) trigger.focus();
+const MAX_CACHED_PLAYERS = 3;
+const MIN_RESUME_SECONDS = 2;
+const cachedPlayers = new Map(); // item.name -> player（仅当前页面内存，刷新即清空）
+const sessionProgress = new Map(); // item.name -> seconds（仅当前页面内存，超出缓存池时兜底记秒数）
+let sessionAudio = { volume: 1, muted: false };
 
-  if (animated && panel) {
-    panel.classList.remove('is-expanded');
-    setTimeout(() => { panel.remove(); }, 340);
+function recordPlayerProgress(player) {
+  if (!player || player.evicted || !player.isMetadataLoaded()) return;
+  const { video, key } = player;
+  const total = video.duration;
+  const pos = video.currentTime;
+  const nearEnd = Number.isFinite(total) && total > 0 && (total - pos <= Math.min(2.5, total * 0.05));
+  if (video.ended || nearEnd || !Number.isFinite(pos) || pos < MIN_RESUME_SECONDS) {
+    sessionProgress.delete(key);
   } else {
-    panel.remove();
+    sessionProgress.set(key, pos);
   }
+}
+
+function evictPlayer(player) {
+  if (!player || player.evicted) return;
+  player.evicted = true;
+  cachedPlayers.delete(player.key);
+  if (activePlayer === player) activePlayer = null;
+  recordPlayerProgress(player);
+  if (player.session && 'serviceWorker' in navigator) {
+    try { navigator.serviceWorker.controller?.postMessage({type:'promo-cancel',session:player.session}); } catch {}
+  }
+  player.cleanup();
+  if (document.fullscreenElement === player.panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  document.removeEventListener('fullscreenchange', player.fullHandler);
+  player.video.pause();
+  player.video.removeAttribute('src');
+  player.video.load();
+  player.panel.remove();
+}
+
+// 收起播放器（不销毁 <video>，保留已缓冲的视频数据与当前画面）
+function collapsePlayer(restoreFocus = false, instant = false) {
+  if (!activePlayer) return;
+  const player = activePlayer;
+  activePlayer = null;
+  recordPlayerProgress(player);
+  player.cleanup();
+  if (document.fullscreenElement === player.panel && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  player.video.pause();
+  player.panel.inert = true;
+  if (player.trigger) {
+    player.trigger.setAttribute('aria-expanded', 'false');
+    player.trigger.setAttribute('aria-label', t.playName(player.itemName));
+    if (restoreFocus) player.trigger.focus();
+  }
+  player.panel.classList.remove('is-expanded');
+  if (instant) player.panel.remove();
+}
+
+// 重新展开内存里已缓存的播放器（零重新加载）
+function expandCachedPlayer(player, row, trigger) {
+  cachedPlayers.delete(player.key);
+  cachedPlayers.set(player.key, player);
+  player.trigger = trigger;
+  player.panel.inert = false;
+  player.video.volume = sessionAudio.volume;
+  player.video.muted = sessionAudio.muted;
+  player.syncVolumeUi();
+  trigger.setAttribute('aria-expanded', 'true');
+  trigger.setAttribute('aria-label', t.closeName(player.itemName));
+  activePlayer = player;
+
+  if (player.panel.parentNode !== row) {
+    player.panel.classList.remove('is-expanded');
+    row.append(player.panel);
+    void player.panel.offsetHeight;
+    requestAnimationFrame(() => {
+      if (activePlayer === player) player.panel.classList.add('is-expanded');
+    });
+  } else {
+    player.panel.classList.add('is-expanded');
+  }
+
+  if (player.video.ended) {
+    try { player.video.currentTime = 0; } catch {}
+  }
+  player.video.play().catch(() => {});
 }
 
 function makeFilter(key, label, node) {
@@ -934,7 +1006,15 @@ function filteredVideos() {
 }
 
 function renderList() {
-  closePlayer(); list.replaceChildren();
+  collapsePlayer(false, true);
+  for (const player of cachedPlayers.values()) {
+    if (player.panel.parentNode) {
+      player.panel.classList.remove('is-expanded');
+      player.panel.remove();
+    }
+    player.trigger = null;
+  }
+  list.replaceChildren();
   const shown = filteredVideos(); status.textContent = t.count(shown.length, videos.length);
   if (!shown.length) { const message = document.createElement('div'); message.className = 'message'; message.textContent = t.noResults; list.append(message); return; }
   
@@ -955,8 +1035,11 @@ function renderList() {
     trigger.append(title,badges,expand); row.append(trigger);
     
     trigger.addEventListener('click', () => {
-      if (activePlayer?.trigger === trigger) { closePlayer(true, true); return; }
-      closePlayer(); openPlayer(item,row,trigger);
+      if (activePlayer?.key === item.name) { collapsePlayer(true, false); return; }
+      collapsePlayer(false, false);
+      const cached = cachedPlayers.get(item.name);
+      if (cached) { expandCachedPlayer(cached, row, trigger); return; }
+      openPlayer(item, row, trigger);
     });
     list.append(row);
   });
@@ -993,7 +1076,9 @@ function openPlayer(item,row,trigger) {
   download.download = item.displayName; download.title = t.download;
   const session = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let seeking = false, buffering = false, meterAvailable = false, transferTimer = null, bufferingDelay = null, progressFrame = null;
-  let lastRate = '', lastRateTime = 0;
+  let lastRate = '', lastRateTime = 0, metadataLoaded = false, pendingResume = sessionProgress.get(item.name) || 0;
+  video.volume = sessionAudio.volume;
+  video.muted = sessionAudio.muted;
   video.setAttribute('aria-label', t.playName(item.displayName));
   const label = (button, text) => { button.setAttribute('aria-label',text); button.title = text; };
 
@@ -1056,18 +1141,42 @@ function openPlayer(item,row,trigger) {
   vol.addEventListener('input',() => { video.volume = Number(vol.value); video.muted = video.volume === 0; });
   mute.addEventListener('click',() => { if (video.muted || video.volume === 0) { if (video.volume === 0) video.volume = 1; video.muted = false; } else video.muted = true; });
 
-  for (const event of ['timeupdate','loadedmetadata','durationchange','emptied','seeked']) video.addEventListener(event,progress);
+  for (const event of ['timeupdate','durationchange','emptied','seeked']) video.addEventListener(event,progress);
+  video.addEventListener('loadedmetadata',() => {
+    metadataLoaded = true;
+    if (pendingResume >= MIN_RESUME_SECONDS && Number.isFinite(video.duration) && video.duration > 0) {
+      const target = pendingResume;
+      pendingResume = 0;
+      if (video.duration - target > Math.min(2.5, video.duration * 0.05)) {
+        try { video.currentTime = target; } catch {}
+      } else {
+        sessionProgress.delete(item.name);
+      }
+    }
+    progress();
+  });
   video.addEventListener('play',() => { updatePlay(); startProgressFrames(); });
-  for (const event of ['pause','ended']) video.addEventListener(event,() => {
+  video.addEventListener('pause',() => {
     updatePlay(); stopProgressFrames(); progress(); clearBuffering();
   });
-  video.addEventListener('volumechange',updateVolume);
+  video.addEventListener('ended',() => {
+    updatePlay(); stopProgressFrames(); progress(); clearBuffering();
+    sessionProgress.delete(item.name);
+  });
+  video.addEventListener('volumechange',() => {
+    updateVolume();
+    sessionAudio = { volume: video.volume, muted: video.muted };
+  });
   video.addEventListener('error',() => {
-    if (meterAvailable && activePlayer?.video === video) {
-      meterAvailable = false; activePlayer.session = null; lastRate = ''; clearTimeout(transferTimer); transferTimer = null;
+    if (meterAvailable && !player.evicted) {
+      if (metadataLoaded && video.currentTime >= MIN_RESUME_SECONDS) pendingResume = video.currentTime;
+      metadataLoaded = false;
+      meterAvailable = false; player.session = null; lastRate = ''; clearTimeout(transferTimer); transferTimer = null;
       setTransferStatus(buffering && !video.paused ? t.speedUnavailable : '');
       video.src = videoApiUrl('video', item.name);
-      video.load(); video.play().catch(() => {}); return;
+      video.load();
+      if (activePlayer === player) video.play().catch(() => {});
+      return;
     }
     clearBuffering();
   });
@@ -1138,15 +1247,34 @@ function openPlayer(item,row,trigger) {
     if (data.event === 'error' && buffering && !video.paused && !video.ended) setTransferStatus(t.speedUnavailable);
   };
 
-  activePlayer = {video,panel,trigger,fullHandler,session,transfer,itemName:item.displayName,cleanup:() => { clearBuffering(); stopProgressFrames(); }};
+  const player = {
+    key: item.name,
+    video,
+    panel,
+    trigger,
+    fullHandler,
+    session,
+    transfer,
+    itemName: item.displayName,
+    evicted: false,
+    isMetadataLoaded: () => metadataLoaded,
+    syncVolumeUi: updateVolume,
+    cleanup: () => { clearBuffering(); stopProgressFrames(); },
+  };
+  if (cachedPlayers.size >= MAX_CACHED_PLAYERS) {
+    const oldest = cachedPlayers.values().next().value;
+    if (oldest) evictPlayer(oldest);
+  }
+  cachedPlayers.set(item.name, player);
+  activePlayer = player;
   updatePlay(); progress(); updateVolume();
 
   Promise.race([meterReady, new Promise(resolve => setTimeout(() => resolve(false), 5000))]).then(available => {
-    if (activePlayer?.video !== video) return;
+    if (player.evicted) return;
     meterAvailable = available;
     const source = available ? '/promo-videos/__stream?file=' + encodeURIComponent(item.name) + '&session=' + encodeURIComponent(session) : videoApiUrl('video', item.name);
     video.src = source; video.load();
-    video.play().catch(() => {});
+    if (activePlayer === player) video.play().catch(() => {});
   });
 }
 
