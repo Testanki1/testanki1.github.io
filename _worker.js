@@ -197,6 +197,15 @@ export default {
 const PROMO_DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const PROMO_CORS_ORIGINS = new Set(['https://testanki1.github.io', 'https://testanki1.pages.dev']);
 
+// 免配置目录列表缓存（仅在服务端内部保存「文件名 -> Drive 文件 ID / MIME」，绝不向客户端暴露 ID）：
+// 1. Worker 实例内存缓存（5 分钟，0 网络开销）
+// 2. Cloudflare 原生边缘缓存 caches.default（1 小时，无需建 KV、无需改配置、无每日读写次数限制）
+const PROMO_MEM_TTL_MS = 5 * 60 * 1000;
+const PROMO_CACHE_TTL_SECONDS = 3600;
+const PROMO_REFRESH_COOLDOWN_MS = 60 * 1000;
+let PROMO_MEM_CACHE = null; // { folderId, expiresAt, catalog }
+let PROMO_INFLIGHT = null;  // { key, promise } 并发去重，避免冷启动瞬间重复请求 Drive
+
 // CORS 只是浏览器的跨域策略，并不限制别人直接访问公开接口。
 function promoCors(response, request) {
   const headers = new Headers(response.headers);
@@ -206,7 +215,7 @@ function promoCors(response, request) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Range, Content-Type');
-    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Last-Modified');
+    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Last-Modified, X-Promo-Cache');
   }
   return new Response(response.body, {status:response.status, statusText:response.statusText, headers});
 }
@@ -226,15 +235,14 @@ function promoAttachmentName(file, requestedName) {
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
-function promoJson(value, status = 200) {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
+function promoJson(value, status = 200, extraHeaders = null) {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+  };
+  if (extraHeaders) Object.assign(headers, extraHeaders);
+  return new Response(JSON.stringify(value), { status, headers });
 }
 
 async function promoDriveGet(url, apiKey) {
@@ -246,9 +254,26 @@ function promoNameWithoutExtension(name) {
   return name.replace(/\.[^.]+$/, '');
 }
 
-async function promoList(apiKey, folderId) {
-  let pageToken = '';
+function promoBuildCatalog(files, updatedAt) {
   const videos = [];
+  const byName = new Map();
+  for (const file of files) {
+    if (!file || typeof file.id !== 'string' || typeof file.name !== 'string' || !file.mimeType?.startsWith('video/')) continue;
+    const base = promoNameWithoutExtension(file.name);
+    videos.push({ name: base });
+    if (!byName.has(base)) {
+      byName.set(base, { conflict: false, file: { id: file.id, name: file.name, mimeType: file.mimeType } });
+    } else {
+      byName.set(base, { conflict: true, file: null });
+    }
+  }
+  videos.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }));
+  return { updatedAt, files, videos, byName };
+}
+
+async function promoFetchDriveFiles(apiKey, folderId) {
+  let pageToken = '';
+  const files = [];
   for (let page = 0; page < 20; page++) {
     const url = new URL(PROMO_DRIVE_API);
     url.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
@@ -260,63 +285,97 @@ async function promoList(apiKey, folderId) {
     const response = await promoDriveGet(url, apiKey);
     if (!response.ok) {
       console.error('Promo Drive listing failed, HTTP', response.status);
-      return promoJson({ error: `Google Drive 列表请求失败（HTTP ${response.status}）。请检查 API Key、Drive API 和文件夹共享权限。` }, 502);
+      return { ok: false, status: response.status, reason: 'http' };
     }
     const data = await response.json();
-    for (const file of data.files || []) {
-      if (typeof file.id !== 'string' || typeof file.name !== 'string' || !file.mimeType?.startsWith('video/')) continue;
-      // 返回去除最后一个扩展名的文件名；ID 只在服务端使用。
-      videos.push({ name: promoNameWithoutExtension(file.name) });
+    for (const item of data.files || []) {
+      if (typeof item.id !== 'string' || typeof item.name !== 'string' || !item.mimeType?.startsWith('video/')) continue;
+      files.push({ id: item.id, name: item.name, mimeType: item.mimeType });
     }
     pageToken = data.nextPageToken || '';
-    if (!pageToken) {
-      videos.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }));
-      return promoJson({ videos });
-    }
+    if (!pageToken) return { ok: true, files };
   }
-  return promoJson({ error: '文件过多，无法在一次请求中列出全部文件。' }, 502);
+  return { ok: false, status: 502, reason: 'too_many' };
 }
 
-async function promoVideo(request, apiKey, folderId, fileName, download = false, requestedName = null) {
-  if (typeof fileName !== 'string' || !fileName || fileName.length > 1024 || /[\x00-\x1f\x7f]/.test(fileName)) {
-    return promoJson({ error: '无效的视频文件名。' }, 400);
+function promoEdgeCacheRequest(origin, folderId) {
+  return new Request(`${origin}/__promo_internal_catalog_v1/${encodeURIComponent(folderId)}`, { method: 'GET' });
+}
+
+async function promoGetCatalog(origin, apiKey, folderId, forceRefresh = false) {
+  const now = Date.now();
+  const edgeCache = typeof caches !== 'undefined' && caches && caches.default ? caches.default : null;
+
+  // 1. 优先读 Worker 实例内存（0 次外部请求）
+  if (!forceRefresh && PROMO_MEM_CACHE && PROMO_MEM_CACHE.folderId === folderId && PROMO_MEM_CACHE.expiresAt > now) {
+    return { ok: true, catalog: PROMO_MEM_CACHE.catalog, source: 'MEM' };
   }
-  // 根据去掉扩展名的文件名在指定文件夹中查找；不把文件 ID 发送给客户端。
-  // Drive 允许重名、同名不同扩展名；遍历完目录以避免歧义。
-  let file = null;
-  let pageToken = '';
-  let complete = false;
-  for (let page = 0; page < 20; page++) {
-    const listUrl = new URL(PROMO_DRIVE_API);
-    listUrl.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
-    listUrl.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType)');
-    listUrl.searchParams.set('pageSize', '1000');
-    listUrl.searchParams.set('supportsAllDrives', 'true');
-    listUrl.searchParams.set('includeItemsFromAllDrives', 'true');
-    if (pageToken) listUrl.searchParams.set('pageToken', pageToken);
-    const listResponse = await promoDriveGet(listUrl, apiKey);
-    if (!listResponse.ok) {
-      console.error('Promo Drive membership listing failed, HTTP', listResponse.status);
-      return promoJson({ error: '无法验证视频是否在指定文件夹，请检查 Google Drive API。' }, 502);
+
+  // 并发去重：同一实例同时进来的请求共用同一个 Promise
+  const inflightKey = `${folderId}:${forceRefresh ? 'refresh' : 'read'}`;
+  if (PROMO_INFLIGHT && PROMO_INFLIGHT.key === inflightKey) {
+    return PROMO_INFLIGHT.promise;
+  }
+
+  const task = (async () => {
+    const edgeReq = edgeCache ? promoEdgeCacheRequest(origin, folderId) : null;
+
+    // 2. 读同机房 Cloudflare Cache API 边缘缓存（有效期 1 小时）
+    if (!forceRefresh && edgeCache && edgeReq) {
+      try {
+        const edgeHit = await edgeCache.match(edgeReq);
+        if (edgeHit) {
+          const cached = await edgeHit.json();
+          if (cached && Array.isArray(cached.files)) {
+            const updatedAt = typeof cached.updatedAt === 'number' ? cached.updatedAt : Date.now();
+            const catalog = promoBuildCatalog(cached.files, updatedAt);
+            PROMO_MEM_CACHE = { folderId, catalog, expiresAt: Date.now() + PROMO_MEM_TTL_MS };
+            return { ok: true, catalog, source: 'EDGE' };
+          }
+        }
+      } catch (err) {
+        console.error('Promo edge cache read skipped');
+      }
     }
-    const data = await listResponse.json();
-    for (const item of data.files || []) {
-      if (typeof item.name !== 'string' || promoNameWithoutExtension(item.name) !== fileName || !item.mimeType?.startsWith('video/') || typeof item.id !== 'string') continue;
-      if (file) return promoJson({ error: '文件夹中有同名视频，请重命名后重试。' }, 409);
-      file = item;
+
+    // 3. 回源 Google Drive files.list，并写入内存与边缘缓存
+    const fetched = await promoFetchDriveFiles(apiKey, folderId);
+    if (!fetched.ok) return fetched;
+    const updatedAt = Date.now();
+    const payload = JSON.stringify({ updatedAt, files: fetched.files });
+    const catalog = promoBuildCatalog(fetched.files, updatedAt);
+    PROMO_MEM_CACHE = { folderId, catalog, expiresAt: updatedAt + PROMO_MEM_TTL_MS };
+
+    if (edgeCache && edgeReq) {
+      try {
+        await edgeCache.put(edgeReq, new Response(payload, {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${PROMO_CACHE_TTL_SECONDS}` },
+        }));
+      } catch (err) {
+        console.error('Promo edge cache write skipped');
+      }
     }
-    pageToken = data.nextPageToken || '';
-    if (!pageToken) { complete = true; break; }
+    return { ok: true, catalog, source: 'MISS' };
+  })();
+
+  PROMO_INFLIGHT = { key: inflightKey, promise: task };
+  try {
+    return await task;
+  } finally {
+    if (PROMO_INFLIGHT && PROMO_INFLIGHT.promise === task) PROMO_INFLIGHT = null;
   }
-  if (!complete) return promoJson({ error: '文件夹过大，无法完成验证。' }, 502);
-  if (!file) return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404);
-  const range = request.headers.get('Range');
-  if (range && (!/^bytes=\d*-\d*$/.test(range) || range === 'bytes=-')) {
-    return new Response('Unsupported Range', { status: 416 });
-  }
+}
+
+function promoCanRefresh(result) {
+  return result.ok
+    && result.source !== 'MISS'
+    && (Date.now() - result.catalog.updatedAt >= PROMO_REFRESH_COOLDOWN_MS);
+}
+
+async function promoFetchMedia(fileId, apiKey, range) {
   // 改走 Drive API 的 alt=media：不再经过 drive.usercontent.google.com 的网页下载端点，
   // 因此不会撞上「此文件已超出下载配额」那个 HTML 拦截页。返回的是原始字节，不转码。
-  const url = new URL(`${PROMO_DRIVE_API}/${encodeURIComponent(file.id)}`);
+  const url = new URL(`${PROMO_DRIVE_API}/${encodeURIComponent(fileId)}`);
   url.searchParams.set('alt', 'media');
   url.searchParams.set('supportsAllDrives', 'true');
   const authHeaders = new Headers({ 'x-goog-api-key': apiKey });
@@ -332,8 +391,71 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
       response = await fetch(new URL(location, url).href, { headers: mediaHeaders, redirect: 'follow' });
     }
   }
+  return response;
+}
+
+async function promoList(origin, apiKey, folderId, wantRefresh = false) {
+  let result = await promoGetCatalog(origin, apiKey, folderId, false);
+  if (wantRefresh && promoCanRefresh(result)) {
+    const refreshed = await promoGetCatalog(origin, apiKey, folderId, true);
+    if (refreshed.ok) result = refreshed;
+  }
+  if (!result.ok) {
+    if (result.reason === 'too_many') {
+      return promoJson({ error: '文件过多，无法在一次请求中列出全部文件。' }, 502);
+    }
+    return promoJson({ error: `Google Drive 列表请求失败（HTTP ${result.status}）。请检查 API Key、Drive API 和文件夹共享权限。` }, 502);
+  }
+  return promoJson({ videos: result.catalog.videos }, 200, { 'X-Promo-Cache': result.source });
+}
+
+async function promoVideo(request, origin, apiKey, folderId, fileName, download = false, requestedName = null) {
+  if (typeof fileName !== 'string' || !fileName || fileName.length > 1024 || /[\x00-\x1f\x7f]/.test(fileName)) {
+    return promoJson({ error: '无效的视频文件名。' }, 400);
+  }
+  const range = request.headers.get('Range');
+  if (range && (!/^bytes=\d*-\d*$/.test(range) || range === 'bytes=-')) {
+    return new Response('Unsupported Range', { status: 416 });
+  }
+
+  // 根据去掉扩展名的文件名在目录缓存中查找；若未命中且距上次刷新已满 60 秒，自动回源刷新一次（兼容刚上传的新视频）。
+  let result = await promoGetCatalog(origin, apiKey, folderId, false);
+  if (!result.ok) {
+    if (result.reason === 'too_many') return promoJson({ error: '文件夹过大，无法完成验证。' }, 502);
+    return promoJson({ error: '无法验证视频是否在指定文件夹，请检查 Google Drive API。' }, 502);
+  }
+
+  let entry = result.catalog.byName.get(fileName);
+  if (!entry && promoCanRefresh(result)) {
+    const refreshed = await promoGetCatalog(origin, apiKey, folderId, true);
+    if (refreshed.ok) {
+      result = refreshed;
+      entry = result.catalog.byName.get(fileName);
+    }
+  }
+  if (!entry) return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404, { 'X-Promo-Cache': result.source });
+  if (entry.conflict) return promoJson({ error: '文件夹中有同名视频，请重命名后重试。' }, 409, { 'X-Promo-Cache': result.source });
+
+  let file = entry.file;
+  let response = await promoFetchMedia(file.id, apiKey, range);
+
+  // 如果你在 Drive 里删掉旧视频并重传了同名新文件（文件 ID 变了），旧缓存 ID 会 404：自动刷新一次目录重试。
+  if (response.status === 404 && promoCanRefresh(result)) {
+    const refreshed = await promoGetCatalog(origin, apiKey, folderId, true);
+    if (refreshed.ok) {
+      result = refreshed;
+      const nextEntry = result.catalog.byName.get(fileName);
+      if (!nextEntry) return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404, { 'X-Promo-Cache': result.source });
+      if (nextEntry.conflict) return promoJson({ error: '文件夹中有同名视频，请重命名后重试。' }, 409, { 'X-Promo-Cache': result.source });
+      if (nextEntry.file.id !== file.id) {
+        file = nextEntry.file;
+        response = await promoFetchMedia(file.id, apiKey, range);
+      }
+    }
+  }
+
   if (response.status === 416) {
-    const h = new Headers();
+    const h = new Headers({ 'X-Promo-Cache': result.source });
     const cr = response.headers.get('Content-Range');
     if (cr) h.set('Content-Range', cr);
     return new Response(null, { status: 416, headers: h });
@@ -343,10 +465,10 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
     // 注意：只截取前 300 字符，且不含文件 ID。
     const detail = await response.text().catch(() => '');
     console.error('Promo media fetch failed, HTTP', response.status, detail.slice(0, 300));
-    return promoJson({ error: `Google Drive 下载失败（HTTP ${response.status}）。`, detail: detail.slice(0, 300) }, 502);
+    return promoJson({ error: `Google Drive 下载失败（HTTP ${response.status}）。`, detail: detail.slice(0, 300) }, 502, { 'X-Promo-Cache': result.source });
   }
   if ((response.headers.get('Content-Type') || '').toLowerCase().includes('text/html')) {
-    return promoJson({ error: 'Google Drive 返回网页而非视频。请检查共享权限、下载限制和流量配额。' }, 502);
+    return promoJson({ error: 'Google Drive 返回网页而非视频。请检查共享权限、下载限制和流量配额。' }, 502, { 'X-Promo-Cache': result.source });
   }
   const out = new Headers();
   for (const key of ['Content-Length', 'Content-Range', 'Accept-Ranges', 'Last-Modified']) {
@@ -359,6 +481,7 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
   out.set('Content-Disposition', download ? promoAttachmentName(file, requestedName) : 'inline');
   out.set('X-Content-Type-Options', 'nosniff');
   out.set('Cache-Control', 'no-store');
+  out.set('X-Promo-Cache', result.source);
   return new Response(response.body, { status: response.status, headers: out });
 }
 
@@ -370,8 +493,8 @@ async function handlePromoVideos(request, env) {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(folderId)) return promoJson({ error: 'Google Drive 文件夹 ID 格式无效。' }, 500);
   const url = new URL(request.url);
   try {
-    if (url.searchParams.get('action') === 'list') return await promoList(apiKey, folderId);
-    if (url.searchParams.get('action') === 'video') return await promoVideo(request, apiKey, folderId, url.searchParams.get('file'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
+    if (url.searchParams.get('action') === 'list') return await promoList(url.origin, apiKey, folderId, url.searchParams.get('refresh') === '1');
+    if (url.searchParams.get('action') === 'video') return await promoVideo(request, url.origin, apiKey, folderId, url.searchParams.get('file'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
     return promoJson({ error: '未知操作。' }, 400);
   } catch (error) {
     // 不记录请求 URL 或密钥。
