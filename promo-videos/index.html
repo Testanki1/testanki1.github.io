@@ -209,7 +209,13 @@
         transform: translateY(-2px) scale(1.08);
       }
       .poster-trigger:hover .poster-image { transform: scale(1.035); }
-      .poster-trigger:hover .poster-play { transform: translate(-50%, -50%) scale(1.08); }
+      .poster-trigger:hover .poster-play {
+        animation: posterPlayHover .42s var(--m3-spatial) both;
+      }
+      .poster-trigger:hover .poster-play::after {
+        opacity: .9;
+        transform: scale(1.08);
+      }
       .control:hover {
         background: rgba(191, 213, 255, .2);
         transform: translateY(-2px);
@@ -273,11 +279,13 @@
     }
 
     .list-head[data-state="loading"] {
-      width: 64px;
-      height: 64px;
-      min-height: 64px;
-      display: grid;
-      place-items: center;
+      width: 100%;
+      height: 76px;
+      min-height: 76px;
+      margin: 18px 0 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 0;
     }
 
@@ -296,85 +304,53 @@
     .status-visual {
       display: none;
       position: relative;
-      width: 58px;
-      height: 58px;
+      width: 52px;
+      height: 52px;
       flex: 0 0 auto;
-      filter: drop-shadow(0 5px 16px rgba(72, 220, 135, .16));
     }
 
     .list-head[data-state="loading"] .status-visual { display: block; }
 
-    .status-visual::before {
-      content: "";
+    .status-orbit-svg {
       position: absolute;
-      inset: 12px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(118, 255, 51, .12), transparent 72%);
-      animation: statusHalo 1.8s var(--m3-effects) infinite alternate;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      transform: rotate(-90deg);
+      overflow: visible;
     }
 
-    .status-orbit {
-      position: absolute;
-      border-radius: 50%;
-      animation: statusOrbit 3s linear infinite;
+    .status-track-circle {
+      fill: none;
+      stroke: rgba(191, 213, 255, .12);
+      stroke-width: 2.5;
     }
 
-    .status-orbit--outer {
-      inset: 4px;
-      border: 1px solid rgba(191, 213, 255, .24);
-      border-top-color: var(--green);
-      border-right-color: rgba(118, 255, 51, .48);
+    .status-spinner-circle {
+      fill: none;
+      stroke: var(--green);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 1, 126;
+      stroke-dashoffset: 0;
+      opacity: 0;
+      filter: drop-shadow(0 0 3px rgba(118, 255, 51, .8));
+      transform-origin: 25px 25px;
+      transition: opacity .2s var(--m3-effects);
     }
 
-    .status-orbit--outer::before,
-    .status-orbit--inner::before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      border-radius: 50%;
-      transform: translateX(-50%);
+    .list-head[data-state="loading"] .status-spinner-circle {
+      opacity: 1;
+      animation: statusSpinnerRotate 1.8s linear infinite,
+                 statusSpinnerDash 1.4s cubic-bezier(.4, 0, .2, 1) infinite;
     }
 
-    .status-orbit--outer::before {
-      top: 1px;
-      width: 7px;
-      height: 7px;
-      background: var(--green);
-      box-shadow: 0 0 12px rgba(118, 255, 51, .8);
-    }
-
-    .status-orbit--inner {
-      inset: 13px;
-      border: 1px dashed rgba(191, 213, 255, .36);
-      animation-duration: 2.1s;
-      animation-direction: reverse;
-    }
-
-    .status-orbit--inner::before {
-      top: 0;
-      width: 5px;
-      height: 5px;
-      background: var(--blue);
-      box-shadow: 0 0 10px rgba(191, 213, 255, .72);
-    }
-
-    .status-core {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 11px;
-      height: 11px;
-      border-radius: 4px;
-      background: var(--green);
-      box-shadow: 0 0 17px rgba(118, 255, 51, .6);
-      transform: translate(-50%, -50%) rotate(45deg);
-      animation: statusCore 1.25s var(--m3-spatial) infinite alternate;
-    }
-
-    @keyframes statusOrbit { to { transform: rotate(360deg); } }
-    @keyframes statusHalo { to { opacity: .45; transform: scale(1.2); } }
-    @keyframes statusCore {
-      to { border-radius: 50%; transform: translate(-50%, -50%) rotate(135deg) scale(.72); }
+    @keyframes statusSpinnerRotate { to { transform: rotate(360deg); } }
+    @keyframes statusSpinnerDash {
+      0% { stroke-dasharray: 1, 126; stroke-dashoffset: 0; }
+      50% { stroke-dasharray: 90, 126; stroke-dashoffset: -32px; }
+      100% { stroke-dasharray: 90, 126; stroke-dashoffset: -124px; }
     }
 
     /* =========================================================
@@ -449,14 +425,43 @@
       transition: transform .24s var(--m3-spatial), background-color .2s var(--m3-effects), box-shadow .2s var(--m3-effects);
     }
 
+    .poster-play::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border: 1px solid rgba(118, 255, 51, .62);
+      border-radius: inherit;
+      opacity: 0;
+      transform: scale(.78);
+      transition: opacity .18s var(--m3-effects), transform .34s var(--m3-spatial);
+      pointer-events: none;
+    }
+
+    .poster-trigger.is-pressed .poster-play {
+      transform: translate(-50%, -50%) scale(.88);
+      transition-duration: .08s;
+    }
+
+    .poster-trigger.is-pressed .poster-play::after {
+      opacity: 1;
+      transform: scale(1.16);
+    }
+
+    @keyframes posterPlayHover {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      58% { transform: translate(-50%, -50%) scale(1.17); }
+      100% { transform: translate(-50%, -50%) scale(1.11); }
+    }
+
     @keyframes posterPlayActivate {
       0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-      35% { opacity: 1; transform: translate(-50%, -50%) scale(1.16); }
+      18% { opacity: 1; transform: translate(-50%, -50%) scale(.88); }
+      48% { opacity: 1; transform: translate(-50%, -50%) scale(1.16); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
     }
 
     .poster-trigger.is-activating .poster-play {
-      animation: posterPlayActivate .28s var(--m3-spatial) both;
+      animation: posterPlayActivate .32s var(--m3-spatial) both;
     }
 
     .player-host[hidden], .poster-trigger[hidden] { display: none; }
@@ -931,7 +936,7 @@
     <div class="filter-bar" id="filters" role="group" data-i18n-aria="filters" aria-label="系列筛选"></div>
     <label class="searchbox"><span class="material-symbols-rounded" aria-hidden="true">search</span><input id="search" type="search" data-i18n-placeholder="search" data-i18n-aria="search" placeholder="搜索宣传片名称" aria-label="搜索宣传片名称"></label>
   </section>
-  <p class="list-head" id="status" data-state="loading" role="status" aria-live="polite"><span class="status-visual" aria-hidden="true"><span class="status-orbit status-orbit--outer"></span><span class="status-orbit status-orbit--inner"></span><span class="status-core"></span></span><span class="status-text is-visually-hidden">正在读取宣传片…</span></p>
+  <p class="list-head" id="status" data-state="loading" role="status" aria-live="polite"><span class="status-visual" aria-hidden="true"><svg class="status-orbit-svg" viewBox="0 0 50 50"><circle class="status-track-circle" cx="25" cy="25" r="20"></circle><circle class="status-spinner-circle" cx="25" cy="25" r="20"></circle></svg></span><span class="status-text is-visually-hidden">正在读取宣传片…</span></p>
   <section class="list" id="list" data-i18n-aria="list" aria-label="宣传片列表"></section>
 </main>
 <script>
@@ -1291,6 +1296,15 @@ function renderList() {
     if (!item.known) { const tag = document.createElement('span'); tag.className = 'unknown'; tag.textContent = t.unclassified; badges.append(tag); }
     meta.append(title, badges);
     row.append(trigger, playerHost, meta);
+
+    trigger.addEventListener('pointerdown', event => {
+      if (trigger.disabled || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      trigger.classList.add('is-pressed');
+    });
+    const releasePosterPress = () => trigger.classList.remove('is-pressed');
+    for (const event of ['pointerup','pointercancel','pointerleave','lostpointercapture']) {
+      trigger.addEventListener(event, releasePosterPress);
+    }
 
     trigger.addEventListener('click', () => {
       if (trigger.disabled) return;
