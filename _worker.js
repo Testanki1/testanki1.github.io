@@ -314,13 +314,24 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
   if (range && (!/^bytes=\d*-\d*$/.test(range) || range === 'bytes=-')) {
     return new Response('Unsupported Range', { status: 416 });
   }
-  const headers = new Headers();
-  if (range) headers.set('Range', range);
-  const url = new URL('https://drive.usercontent.google.com/download');
-  url.searchParams.set('id', file.id);
-  url.searchParams.set('export', 'download');
-  url.searchParams.set('confirm', 't');
-  const response = await fetch(url, { headers, redirect: 'follow' });
+  // 改走 Drive API 的 alt=media：不再经过 drive.usercontent.google.com 的网页下载端点，
+  // 因此不会撞上「此文件已超出下载配额」那个 HTML 拦截页。返回的是原始字节，不转码。
+  const url = new URL(`${PROMO_DRIVE_API}/${encodeURIComponent(file.id)}`);
+  url.searchParams.set('alt', 'media');
+  url.searchParams.set('supportsAllDrives', 'true');
+  const authHeaders = new Headers({ 'x-goog-api-key': apiKey });
+  if (range) authHeaders.set('Range', range);
+  let response = await fetch(url, { headers: authHeaders, redirect: 'manual' });
+  // alt=media 通常会 302/307 到 doc-XX-XX-servers.googleusercontent.com。
+  // 手动跟随重定向，避免把 x-goog-api-key 一起带到重定向目标上。
+  if ([301, 302, 303, 307, 308].includes(response.status)) {
+    const location = response.headers.get('location');
+    if (location) {
+      const mediaHeaders = new Headers();
+      if (range) mediaHeaders.set('Range', range);
+      response = await fetch(new URL(location, url).href, { headers: mediaHeaders, redirect: 'follow' });
+    }
+  }
   if (response.status === 416) {
     const h = new Headers();
     const cr = response.headers.get('Content-Range');
@@ -328,7 +339,11 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
     return new Response(null, { status: 416, headers: h });
   }
   if (response.status !== 200 && response.status !== 206) {
-    return promoJson({ error: `Google Drive 下载失败（HTTP ${response.status}）。` }, 502);
+    // 把 Drive 的错误体回传一小段，方便定位：是 downloadQuotaExceeded / rateLimitExceeded / 还是权限问题。
+    // 注意：只截取前 300 字符，且不含文件 ID。
+    const detail = await response.text().catch(() => '');
+    console.error('Promo media fetch failed, HTTP', response.status, detail.slice(0, 300));
+    return promoJson({ error: `Google Drive 下载失败（HTTP ${response.status}）。`, detail: detail.slice(0, 300) }, 502);
   }
   if ((response.headers.get('Content-Type') || '').toLowerCase().includes('text/html')) {
     return promoJson({ error: 'Google Drive 返回网页而非视频。请检查共享权限、下载限制和流量配额。' }, 502);
@@ -338,6 +353,8 @@ async function promoVideo(request, apiKey, folderId, fileName, download = false,
     const value = response.headers.get(key);
     if (value) out.set(key, value);
   }
+  // 拖动进度条依赖 Accept-Ranges；媒体主机偶尔不回这个头，补一个默认值。
+  if (!out.has('Accept-Ranges')) out.set('Accept-Ranges', 'bytes');
   out.set('Content-Type', file.mimeType);
   out.set('Content-Disposition', download ? promoAttachmentName(file, requestedName) : 'inline');
   out.set('X-Content-Type-Options', 'nosniff');
