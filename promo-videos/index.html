@@ -143,18 +143,15 @@
     }
 
     .filter {
-      min-height: 48px;
-      padding: 0 14px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 9px;
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
       flex: 0 0 auto;
       color: var(--blue);
       background: rgba(191, 213, 255, .08);
       border: 1px solid var(--outline);
-      border-radius: 999px;
-      white-space: nowrap;
+      border-radius: 16px;
       transition:
         border-radius .3s var(--m3-spring),
         transform .18s var(--m3-spring),
@@ -164,32 +161,19 @@
     }
 
     .filter-icon {
-      width: 22px;
-      height: 22px;
       display: grid;
       place-items: center;
-      flex: 0 0 auto;
+      width: 27px;
+      height: 27px;
     }
 
     .filter-icon img {
-      width: 22px;
-      height: 22px;
+      width: 27px;
+      height: 27px;
       object-fit: contain;
     }
 
-    .filter-icon .material-symbols-rounded { font-size: 21px; }
-
-    .filter-label {
-      font-size: 13px;
-      line-height: 1;
-      font-weight: 600;
-    }
-
-    .filter-check {
-      display: none;
-      font-size: 18px;
-      font-variation-settings: 'FILL' 1, 'wght' 650, 'GRAD' 0, 'opsz' 20;
-    }
+    .filter-icon .material-symbols-rounded { font-size: 23px; }
 
     .filter:active {
       transform: scale(0.9) !important;
@@ -199,17 +183,12 @@
       background: var(--green);
       color: var(--base);
       border-color: var(--green);
-      border-radius: 999px;
-      font-weight: 700;
+      border-radius: 24px;
     }
-
-    .filter[aria-pressed=true] .filter-check { display: inline-block; }
 
     @media (hover: hover) and (pointer: fine) {
       .filter:hover:not([aria-pressed=true]) {
         background: rgba(191, 213, 255, .16);
-      }
-      .filter:hover {
         transform: translateY(-2px);
       }
       .filter:hover .filter-icon img,
@@ -321,7 +300,11 @@
 
     .video-row:has(.row-button[aria-expanded=true]) {
       background: rgba(191, 213, 255, .08);
-      border-color: rgba(118, 255, 51, .65);
+      border-color: rgba(191, 213, 255, .15);
+    }
+
+    .video-row:has(.row-button[aria-expanded=true]) .row-button {
+      border-radius: 22px 22px 0 0;
     }
 
     .row-button {
@@ -339,7 +322,6 @@
 
     /* 点击下压弹性触觉反馈 */
     .row-button:active {
-      transform: scale(0.985);
       background: rgba(191, 213, 255, .08);
     }
 
@@ -415,11 +397,9 @@
       display: grid;
       grid-template-rows: 0fr;
       opacity: 0;
-      transform: translateY(-8px);
-      transition: 
+      transition:
         grid-template-rows .42s var(--m3-expand),
-        opacity .32s ease,
-        transform .42s var(--m3-expand);
+        opacity .32s ease;
     }
 
     .inline-player:not(.is-expanded):not(:fullscreen) {
@@ -429,7 +409,6 @@
     .inline-player.is-expanded {
       grid-template-rows: 1fr;
       opacity: 1;
-      transform: translateY(0);
     }
 
     .player-accordion-inner {
@@ -499,28 +478,18 @@
       appearance: none;
       -webkit-appearance: none;
       min-width: 0;
-      height: 48px;
-      border: 0;
+      height: 4px;
+      border: 0 !important;
       outline: none;
       border-radius: 99px;
-      background: linear-gradient(to right, var(--green) 0%, var(--green) var(--progress, 0%), rgba(191, 213, 255, .25) var(--progress, 0%), rgba(191, 213, 255, .25) 100%) center / 100% 4px no-repeat;
+      background: linear-gradient(to right, var(--green) 0%, var(--green) var(--progress, 0%), rgba(191, 213, 255, .25) var(--progress, 0%), rgba(191, 213, 255, .25) 100%);
       cursor: pointer;
-      touch-action: pan-y;
+      transition: height .2s var(--m3-standard);
     }
 
     .range:focus-visible {
       outline: 2px solid var(--green);
-      outline-offset: 2px;
-    }
-
-    .range::-webkit-slider-runnable-track {
-      height: 4px;
-      background: transparent;
-    }
-
-    .range::-moz-range-track {
-      height: 4px;
-      background: transparent;
+      outline-offset: 5px;
     }
 
     .range::-webkit-slider-thumb {
@@ -736,7 +705,7 @@
     @media (max-width: 600px) {
       .shell { padding: 0 16px 60px; }
       .intro { padding: 38px 0 24px; }
-      .filter { min-height: 48px; }
+      .filter { width: 48px; height: 48px; }
       .row-button { padding: 12px; gap: 9px; }
       .row-title { font-size: 14px; }
       .badge { width: 26px; height: 26px; }
@@ -748,7 +717,7 @@
       .time { min-width: 33px; font-size: 11px; }
       .controls-row { gap: 8px; }
 
-      /* keep the filter controls in one swipeable rail. */
+      /* Keep the filter controls in one swipeable rail. */
       #filters.filter-bar {
         flex-wrap: nowrap;
         overflow-x: auto;
@@ -764,7 +733,7 @@
       }
 
       #filters.filter-bar > .filter {
-        flex: 0 0 auto;
+        flex: 0 0 48px;
         scroll-snap-align: start;
       }
 
@@ -1051,17 +1020,7 @@ function makeFilter(key, label, node) {
   leading.className = 'filter-icon';
   leading.setAttribute('aria-hidden', 'true');
   leading.append(node);
-
-  const text = document.createElement('span');
-  text.className = 'filter-label';
-  text.textContent = label;
-
-  const check = document.createElement('span');
-  check.className = 'material-symbols-rounded filter-check';
-  check.setAttribute('aria-hidden', 'true');
-  check.textContent = 'check';
-
-  button.append(leading, text, check);
+  button.append(leading);
   button.addEventListener('click', () => { activeFilter = key; search.value = ''; renderFilters(); renderList(); });
   filters.append(button);
 }
