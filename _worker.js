@@ -596,7 +596,7 @@ async function handlePromoVideos(request, env) {
   const url = new URL(request.url);
   try {
     if (url.searchParams.get('action') === 'list') return await promoList(url.origin, apiKey, folderId, url.searchParams.get('refresh') === '1');
-    if (url.searchParams.get('action') === 'video') return await promoVideo(request, url.origin, apiKey, folderId, url.searchParams.get('name') || url.searchParams.get('file'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
+    if (url.searchParams.get('action') === 'video') return await promoVideo(request, url.origin, apiKey, folderId, url.searchParams.get('name'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
     if (url.searchParams.get('action') === 'thumbnail') return await promoThumbnail(url.origin, apiKey, folderId, url.searchParams.get('name'));
     return promoJson({ error: '未知操作。' }, 400);
   } catch (error) {
