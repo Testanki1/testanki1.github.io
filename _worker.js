@@ -215,7 +215,7 @@ function promoCors(response, request) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Range, Content-Type');
-    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Last-Modified, X-Promo-Cache');
+    headers.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Last-Modified, X-Promo-Cache, X-Promo-Thumbnail-Cache');
   }
   return new Response(response.body, {status:response.status, statusText:response.statusText, headers});
 }
@@ -262,7 +262,7 @@ function promoBuildCatalog(files, updatedAt) {
     const base = promoNameWithoutExtension(file.name);
     videos.push({ name: base });
     if (!byName.has(base)) {
-      byName.set(base, { conflict: false, file: { id: file.id, name: file.name, mimeType: file.mimeType } });
+      byName.set(base, { conflict: false, file: { id: file.id, name: file.name, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || '', thumbnailVersion: file.thumbnailVersion || '', modifiedTime: file.modifiedTime || '' } });
     } else {
       byName.set(base, { conflict: true, file: null });
     }
@@ -277,7 +277,7 @@ async function promoFetchDriveFiles(apiKey, folderId) {
   for (let page = 0; page < 20; page++) {
     const url = new URL(PROMO_DRIVE_API);
     url.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
-    url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType)');
+    url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,thumbnailLink,thumbnailVersion,modifiedTime)');
     url.searchParams.set('pageSize', '1000');
     url.searchParams.set('supportsAllDrives', 'true');
     url.searchParams.set('includeItemsFromAllDrives', 'true');
@@ -290,7 +290,7 @@ async function promoFetchDriveFiles(apiKey, folderId) {
     const data = await response.json();
     for (const item of data.files || []) {
       if (typeof item.id !== 'string' || typeof item.name !== 'string' || !item.mimeType?.startsWith('video/')) continue;
-      files.push({ id: item.id, name: item.name, mimeType: item.mimeType });
+      files.push({ id: item.id, name: item.name, mimeType: item.mimeType, thumbnailLink: item.thumbnailLink || '', thumbnailVersion: item.thumbnailVersion || '', modifiedTime: item.modifiedTime || '' });
     }
     pageToken = data.nextPageToken || '';
     if (!pageToken) return { ok: true, files };
@@ -299,7 +299,7 @@ async function promoFetchDriveFiles(apiKey, folderId) {
 }
 
 function promoEdgeCacheRequest(origin, folderId) {
-  return new Request(`${origin}/__promo_internal_catalog_v1/${encodeURIComponent(folderId)}`, { method: 'GET' });
+  return new Request(`${origin}/__promo_internal_catalog_v2/${encodeURIComponent(folderId)}`, { method: 'GET' });
 }
 
 async function promoGetCatalog(origin, apiKey, folderId, forceRefresh = false) {
@@ -485,6 +485,108 @@ async function promoVideo(request, origin, apiKey, folderId, fileName, download 
   return new Response(response.body, { status: response.status, headers: out });
 }
 
+// Serve Google Drive thumbnails through this Worker. The short-lived Drive URL and file ID
+// remain server-side; only image bytes and this site's action=thumbnail URL reach the browser.
+const PROMO_THUMB_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const PROMO_THUMB_INFLIGHT = new Map();
+
+function promoThumbCacheRequest(origin, file) {
+  const version = file.thumbnailVersion || file.modifiedTime || 'v1';
+  return new Request(`${origin}/__promo_internal_thumbnail_v1/${encodeURIComponent(file.id)}/${encodeURIComponent(version)}`, { method: 'GET' });
+}
+
+function promoThumbnailUrlAllowed(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' && (
+      host === 'drive.google.com' ||
+      host === 'googleusercontent.com' ||
+      host.endsWith('.googleusercontent.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function promoThumbnail(origin, apiKey, folderId, name) {
+  if (typeof name !== 'string' || !name || name.length > 1024 || /[\x00-\x1f\x7f]/.test(name)) {
+    return promoJson({ error: '无效的视频名称。' }, 400);
+  }
+
+  let result = await promoGetCatalog(origin, apiKey, folderId, false);
+  if (!result.ok) return promoJson({ error: '无法验证视频是否在指定文件夹中。' }, 502);
+  let entry = result.catalog.byName.get(name);
+  if ((!entry || !entry.file?.thumbnailLink) && promoCanRefresh(result)) {
+    const refreshed = await promoGetCatalog(origin, apiKey, folderId, true);
+    if (refreshed.ok) { result = refreshed; entry = result.catalog.byName.get(name); }
+  }
+  if (!entry) return promoJson({ error: '视频不存在或不在指定文件夹中。' }, 404);
+  if (entry.conflict) return promoJson({ error: '文件夹中有同名视频，请重命名后重试。' }, 409);
+
+  const edgeCache = typeof caches !== 'undefined' && caches?.default ? caches.default : null;
+  const fetchAndCache = async currentEntry => {
+    const file = currentEntry.file;
+    const link = file.thumbnailLink;
+    if (!link || !promoThumbnailUrlAllowed(link)) return null;
+    const cacheRequest = promoThumbCacheRequest(origin, file);
+    if (edgeCache) {
+      try {
+        const hit = await edgeCache.match(cacheRequest);
+        if (hit) {
+          const headers = new Headers(hit.headers);
+          headers.set('X-Promo-Thumbnail-Cache', 'HIT');
+          return new Response(hit.body, { status: hit.status, headers });
+        }
+      } catch { /* Continue to Drive if edge cache is unavailable. */ }
+    }
+
+    // Collapse concurrent cold requests for the same Drive asset in this Worker isolate.
+    const cacheKey = cacheRequest.url;
+    if (PROMO_THUMB_INFLIGHT.has(cacheKey)) {
+      const shared = await PROMO_THUMB_INFLIGHT.get(cacheKey);
+      return shared ? shared.clone() : null;
+    }
+    const task = (async () => {
+      const source = await fetch(link, { headers: { Accept: 'image/*' }, redirect: 'follow' });
+      const type = (source.headers.get('Content-Type') || '').split(';')[0].toLowerCase();
+      if (!source.ok || !type.startsWith('image/')) return null;
+      const headers = new Headers({
+        'Content-Type': type,
+        'Cache-Control': `public, max-age=3600, s-maxage=${PROMO_THUMB_CACHE_TTL_SECONDS}, stale-while-revalidate=86400`,
+        'X-Content-Type-Options': 'nosniff',
+        'X-Promo-Thumbnail-Cache': 'MISS',
+      });
+      const response = new Response(source.body, { status: 200, headers });
+      if (edgeCache) {
+        try { await edgeCache.put(cacheRequest, response.clone()); } catch { /* A successful image must still be served. */ }
+      }
+      return response;
+    })();
+    PROMO_THUMB_INFLIGHT.set(cacheKey, task);
+    try {
+      const shared = await task;
+      return shared ? shared.clone() : null;
+    } finally { PROMO_THUMB_INFLIGHT.delete(cacheKey); }
+  };
+
+  let response = await fetchAndCache(entry);
+  // thumbnailLink URLs expire. Refresh Drive metadata once, then retry without surfacing the URL.
+  if (!response) {
+    const refreshed = await promoGetCatalog(origin, apiKey, folderId, true);
+    if (refreshed.ok) {
+      result = refreshed;
+      entry = result.catalog.byName.get(name);
+      if (entry && !entry.conflict) response = await fetchAndCache(entry);
+    }
+  }
+  if (!response) return promoJson({ error: '此视频暂时没有可用的 Drive 缩略图。' }, 404);
+
+  const headers = new Headers(response.headers);
+  headers.set('X-Promo-Thumbnail-Cache', response.headers.get('X-Promo-Thumbnail-Cache') || 'HIT');
+  return new Response(response.body, { status: response.status, headers });
+}
+
 async function handlePromoVideos(request, env) {
   if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
   const apiKey = env.GOOGLE_DRIVE_API_KEY;
@@ -494,7 +596,8 @@ async function handlePromoVideos(request, env) {
   const url = new URL(request.url);
   try {
     if (url.searchParams.get('action') === 'list') return await promoList(url.origin, apiKey, folderId, url.searchParams.get('refresh') === '1');
-    if (url.searchParams.get('action') === 'video') return await promoVideo(request, url.origin, apiKey, folderId, url.searchParams.get('file'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
+    if (url.searchParams.get('action') === 'video') return await promoVideo(request, url.origin, apiKey, folderId, url.searchParams.get('name') || url.searchParams.get('file'), url.searchParams.get('download') === '1', url.searchParams.get('filename'));
+    if (url.searchParams.get('action') === 'thumbnail') return await promoThumbnail(url.origin, apiKey, folderId, url.searchParams.get('name'));
     return promoJson({ error: '未知操作。' }, 400);
   } catch (error) {
     // 不记录请求 URL 或密钥。
