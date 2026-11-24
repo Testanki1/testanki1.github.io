@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>3D坦克测试服务器</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <!-- 预连接并异步加载字体，避免阻塞页面渲染与脚本执行 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    </noscript>
 
     <style>
         :root {
@@ -38,12 +42,6 @@
         * {
             -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
-        }
-
-        .material-symbols-rounded {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-          font-size: 24px;
-          user-select: none;
         }
 
         .header {
@@ -258,8 +256,8 @@
     <div id="no-servers" class="hidden">当前暂无服务器</div>
 
     <script>
-        const userLang = navigator.language || navigator.userLanguage; 
-        const isChinese = userLang.startsWith('zh');
+        const userLang = navigator.language || navigator.userLanguage || 'en';
+        const isChinese = userLang.toLowerCase().startsWith('zh');
 
         const texts = {
             title: isChinese ? '3D坦克测试服务器' : 'Tanki Online Test Server',
@@ -273,39 +271,104 @@
         document.getElementById('no-servers').textContent = texts.noServers;
 
         if (!isChinese) {
-            document.documentElement.lang = "en";
+            document.documentElement.lang = 'en';
         }
 
-        let isChecking = false; 
+        // 统一维护服务器列表
+        const SERVERS = [];
+        for (let i = 1; i <= 10; i++) {
+            SERVERS.push({
+                containerId: 'deploy-results',
+                id: `deploy-${i}`,
+                name: `Deploy ${i}`,
+                balancer: `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`,
+                link: `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`,
+                order: i * 10,
+                showVersion: true
+            });
+        }
+        SERVERS.push(
+            {
+                containerId: 'other-results',
+                id: 'classic-btn',
+                name: 'Classic (Test)',
+                balancer: 'https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer',
+                link: 'https://public-deploy-classic.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-classic.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer',
+                order: 100,
+                showVersion: false
+            },
+            {
+                containerId: 'other-results',
+                id: 'ru-btn',
+                name: 'RU (Test)',
+                balancer: 'https://balancer.ru.tankionline.com/balancer',
+                link: 'https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com',
+                order: 101,
+                showVersion: true
+            },
+            {
+                containerId: 'other-results',
+                id: 'china-btn',
+                name: 'China (Test)',
+                balancer: 'https://balancer.public-deploy-china.test-eu.tankionline.com/balancer',
+                link: 'https://public-deploy-china.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-china.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-china.test-eu.tankionline.com/balancer',
+                order: 102,
+                showVersion: true
+            }
+        );
 
-        async function checkURL(url) {
+        let isChecking = false;
+
+        // 合并原 HEAD + GET 为单次带超时的 GET 请求，消除重复请求与死等
+        async function fetchServerInfo(url, timeoutMs = 5000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
             const noCacheUrl = `${url}?t=${Date.now()}`;
+
             try {
-                const response = await fetch(noCacheUrl, { method: 'HEAD' });
-                return response.ok || response.status === 503;
+                const response = await fetch(noCacheUrl, {
+                    method: 'GET',
+                    signal: controller.signal
+                });
+
+                if (!response.ok && response.status !== 503) {
+                    response.body?.cancel().catch(() => {});
+                    return { accessible: false, data: null };
+                }
+
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    // 例如 503 返回非 JSON 时保留按钮并显示 0/0
+                }
+
+                return { accessible: true, data };
             } catch (error) {
-                return false;
+                return { accessible: false, data: null };
+            } finally {
+                clearTimeout(timer);
             }
         }
 
         function createButtonElement(label, link) {
             const container = document.createElement('a');
             container.className = 'button-container';
-            container.href = link; 
-            
+            container.href = link;
+
             const nameWrapper = document.createElement('div');
             nameWrapper.className = 'name-wrapper';
 
             const nameSpan = document.createElement('span');
             nameSpan.textContent = label;
             nameSpan.className = 'server-name';
-            
+
             const versionSpan = document.createElement('span');
             versionSpan.className = 'server-version hidden';
 
             nameWrapper.appendChild(nameSpan);
             nameWrapper.appendChild(versionSpan);
-            
+
             const infoWrapper = document.createElement('div');
             infoWrapper.className = 'info-wrapper';
 
@@ -345,31 +408,21 @@
 
             container.appendChild(nameWrapper);
             container.appendChild(infoWrapper);
-            
-            return container;
-        }
 
-        async function fetchBalancerData(url) {
-            const noCacheUrl = `${url}?t=${Date.now()}`;
-            try {
-                const response = await fetch(noCacheUrl);
-                return await response.json();
-            } catch (error) {
-                return null;
-            }
+            return container;
         }
 
         function extractCounts(data) {
             if (!data) return { onlineCount: 0, inbattlesCount: 0 };
-            
+
             if (data.nodes) {
                 const onlineCount = Object.values(data.nodes).reduce((sum, node) => sum + (node.online || 0), 0);
                 const inbattlesCount = Object.values(data.nodes).reduce((sum, node) => sum + (node.inbattles || 0), 0);
                 return { onlineCount, inbattlesCount };
             } else if (data.online !== undefined) {
-                return { 
-                    onlineCount: data.online, 
-                    inbattlesCount: data.inbattles !== undefined ? data.inbattles : 0 
+                return {
+                    onlineCount: data.online,
+                    inbattlesCount: data.inbattles !== undefined ? data.inbattles : 0
                 };
             }
             return { onlineCount: 0, inbattlesCount: 0 };
@@ -386,7 +439,7 @@
                 container.appendChild(element);
             }
 
-            element.href = targetUrl; 
+            element.href = targetUrl;
 
             element.querySelector('.online-count').textContent = counts.onlineCount;
             element.querySelector('.inbattles-count').textContent = counts.inbattlesCount;
@@ -414,71 +467,35 @@
             isChecking = true;
 
             const loader = document.getElementById('loader');
-            const noServersDiv = document.getElementById('no-servers'); 
-            
+            const noServersDiv = document.getElementById('no-servers');
+            let loaderHidden = false;
+
+            const hideLoader = () => {
+                if (isInitialLoad && !loaderHidden) {
+                    loaderHidden = true;
+                    loader.style.display = 'none';
+                }
+            };
+
             try {
                 if (isInitialLoad) {
                     loader.style.display = 'flex';
                 }
-                
-                let fetchTasks = [];
 
-                // 1. 获取部署(Deploy)服务器 (只保留单一 Deploy 链接)
-                for (let i = 1; i <= 10; i++) {
-                    const deployBalancer = `https://balancer.public-deploy${i}.test-eu.tankionline.com/balancer`;
-                    const baseUrl = `https://public-deploy${i}.test-eu.tankionline.com/browser-public/index.html`;
-                    const id = `deploy-${i}`;
+                const fetchTasks = SERVERS.map(async (server) => {
+                    const { accessible, data } = await fetchServerInfo(server.balancer, 5000);
 
-                    fetchTasks.push(checkURL(deployBalancer).then(async isAccessible => {
-                        if (isAccessible) {
-                            const balancerData = await fetchBalancerData(deployBalancer);
-                            const counts = extractCounts(balancerData);
-                            const version = balancerData ? balancerData.serverVersion : null;
+                    if (accessible) {
+                        const counts = extractCounts(data);
+                        const version = server.showVersion && data ? data.serverVersion : null;
 
-                            renderButton('deploy-results', id, `Deploy ${i}`, baseUrl, counts, i * 10, version);
-                        } else {
-                            removeButton(id);
-                        }
-                    }));
-                }
-
-                // 2. 获取其他独立服务器: Classic / RU / China
-                const extraServers = [
-                    {
-                        id: 'classic-btn',
-                        name: 'Classic (Test)',
-                        balancer: 'https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer',
-                        link: 'https://public-deploy-classic.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-classic.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-classic.test-eu.tankionline.com/balancer',
-                        order: 100
-                    },
-                    {
-                        id: 'ru-btn',
-                        name: 'RU (Test)',
-                        balancer: 'https://balancer.ru.tankionline.com/balancer',
-                        link: 'https://test.ru.tankionline.com/play/?config-template=https://c{server}.ru.tankionline.com/config.xml&balancer=https://balancer.ru.tankionline.com/balancer&resources=https://s.ru.tankionline.com',
-                        order: 101
-                    },
-                    {
-                        id: 'china-btn',
-                        name: 'China (Test)',
-                        balancer: 'https://balancer.public-deploy-china.test-eu.tankionline.com/balancer',
-                        link: 'https://public-deploy-china.test-eu.tankionline.com/browser-public/index.html?config-template=https://c{server}.public-deploy-china.test-eu.tankionline.com/config.xml&resources=../resources&balancer=https://balancer.public-deploy-china.test-eu.tankionline.com/balancer',
-                        order: 102
+                        renderButton(server.containerId, server.id, server.name, server.link, counts, server.order, version);
+                        noServersDiv.classList.add('hidden');
+                        // 只要任一可用服务器返回，立即隐藏全屏 loading，实现首屏秒开
+                        hideLoader();
+                    } else {
+                        removeButton(server.id);
                     }
-                ];
-
-                extraServers.forEach(server => {
-                    fetchTasks.push(checkURL(server.balancer).then(async isAccessible => {
-                        if (isAccessible) {
-                            const balancerData = await fetchBalancerData(server.balancer);
-                            const counts = extractCounts(balancerData);
-                            const version = server.id === 'classic-btn' ? null : (balancerData ? balancerData.serverVersion : null);
-                            
-                            renderButton('other-results', server.id, server.name, server.link, counts, server.order, version);
-                        } else {
-                            removeButton(server.id);
-                        }
-                    }));
                 });
 
                 await Promise.allSettled(fetchTasks);
@@ -490,19 +507,27 @@
                     noServersDiv.classList.add('hidden');
                 }
 
-                if (isInitialLoad) {
-                    loader.style.display = 'none';
-                }
+                hideLoader();
             } finally {
                 isChecking = false;
             }
         }
 
-        checkURLs(true);
-        setInterval(function() {
-            checkURLs(false);
-        }, 5000);
+        // 首次加载结束后再启动定时轮询，且页面在后台时不发请求
+        checkURLs(true).then(() => {
+            setInterval(() => {
+                if (!document.hidden) {
+                    checkURLs(false);
+                }
+            }, 5000);
+        });
 
+        // 从后台切回页面时立即刷新一次
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && !isChecking) {
+                checkURLs(false);
+            }
+        });
     </script>
 </body>
 </html>
