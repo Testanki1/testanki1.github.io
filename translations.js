@@ -29,7 +29,7 @@ const replacementDict = {
 'Hunter': '猎人中甲',
 'Crusader': '十字军',
 'Viking': '维京',
-'Dictator': '主宰者',
+'Dictator': '裁决者',
 'Ares': '阿瑞斯',
 'Titan': '泰坦',
 'Mammoth': '猛犸象',
